@@ -7,8 +7,9 @@ Der fertige Prompt steht jeweils darunter.
 
 ## Phase 1 – Grün-Teil
 
-### K1 · Katalog aus der BewRL ⬜ (#katalog)
+### K1 · Katalog aus der BewRL 👀 (#katalog)
 Ergebnis: `data/katalog.json` + `data/katalog.schema.json` + kurze Doku `data/README.md`
+Stand: Branch katalog/bewrl-katalog – katalog.json (52 Positionen inkl. S. 18 Ziergehölze/Hecken/Rasen+geschützter Baum), invasive.json (41 Arten), Schema + README – PR #1 offen, ✅ nach Merge.
 > Lies CLAUDE.md und docs/ARCHITEKTUR.md. Erstelle aus docs/Richtlinie.pdf (Abschnitte
 > II Außenanlagen und III Aufwuchs, S. 12–18) den Katalog data/katalog.json: jede
 > Position mit id, Kategorie, Bezeichnung, Einheit, Altersstufe/Form (falls vorhanden),

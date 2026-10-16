@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "WEP-Katalog",
+  "type": "object",
+  "required": ["meta", "positionen"],
+  "properties": {
+    "meta": { "type": "object" },
+    "positionen": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "abschnitt", "kategorie", "bezeichnung", "einheit", "seite", "regeln", "arten", "relevanz"],
+        "properties": {
+          "id": { "type": "string" },
+          "abschnitt": { "type": "string" },
+          "kategorie": { "type": "string" },
+          "bezeichnung": { "type": "string" },
+          "einheit": { "type": "string", "enum": ["m", "m²", "m³", "Stück", "Pauschale"] },
+          "hoechstwert": { "type": "number" },
+          "varianten": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["hoechstwert"],
+              "properties": {
+                "form": { "type": "string" },
+                "altersstufe": { "type": "string" },
+                "groesse": { "type": "string" },
+                "material": { "type": "string" },
+                "ausfuehrung": { "type": "string" },
+                "typ": { "type": "string" },
+                "hoechstwert": { "type": "number" }
+              },
+              "additionalProperties": false
+            }
+          },
+          "seite": { "type": "integer" },
+          "regeln": { "type": "string" },
+          "arten": { "type": "array", "items": { "type": "string" } },
+          "relevanz": { "type": "integer", "minimum": 1, "maximum": 5 }
+        },
+        "oneOf": [
+          { "required": ["hoechstwert"], "not": { "required": ["varianten"] } },
+          { "required": ["varianten"], "not": { "required": ["hoechstwert"] } }
+        ],
+        "additionalProperties": false
+      }
+    }
+  }
+}
