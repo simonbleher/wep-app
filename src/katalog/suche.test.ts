@@ -52,6 +52,32 @@ describe('sucheKatalog – Tippfehler-Toleranz', () => {
   });
 });
 
+describe('sucheKatalog – Alltags-Synonyme', () => {
+  it('"Regentonne" liefert den Regenwasserauffangbehälter als Top-Treffer', () => {
+    const treffer = sucheKatalog(positionen, 'Regentonne');
+    expect(treffer[0].position.id).toBe('aa-regenwasserbehaelter');
+  });
+
+  it('"Gartenweg" liefert den Wege- und Platzbelag als Top-Treffer', () => {
+    const treffer = sucheKatalog(positionen, 'Gartenweg');
+    expect(treffer[0].position.id).toBe('aa-wegebelag');
+  });
+});
+
+describe('sucheKatalog – schwaches Fuzzy-Rauschen verwerfen', () => {
+  it('"Tulpen" findet die Knollen/Zwiebeln-Position, nicht die Einfriedung', () => {
+    const treffer = sucheKatalog(positionen, 'Tulpen');
+    expect(treffer[0].position.id).toMatch(/^aw-knollen-zwiebeln/);
+    expect(treffer.map((t) => t.position.id)).not.toContain('aa-einfriedung');
+  });
+
+  it('"Rasen" findet die Rasen-Position, nicht die Rose', () => {
+    const treffer = sucheKatalog(positionen, 'Rasen');
+    expect(treffer[0].position.id).toBe('aw-rasen');
+    expect(treffer.map((t) => t.position.id)).not.toContain('aw-rose');
+  });
+});
+
 describe('sucheKatalog – ohne Suchbegriff', () => {
   it('leerer Begriff liefert alle Positionen, nach relevanz absteigend', () => {
     const treffer = sucheKatalog(positionen, '');
@@ -116,5 +142,21 @@ describe('istInvasiv', () => {
 
   it('Tippfehler ("Götterbaun") erkennt den Götterbaum trotzdem', () => {
     expect(istInvasiv(invasive, 'Götterbaun')?.id).toBe('ailanthus-altissima');
+  });
+
+  it('kein Fehlalarm: "Japanischer Staudenknöterich" matcht NICHT den "Japanischer Hopfen"', () => {
+    const treffer = istInvasiv(invasive, 'Japanischer Staudenknöterich');
+    // Der Staudenknöterich (Reynoutria/Fallopia japonica) steht nicht auf der
+    // Unionsliste in invasive.json – daher darf kein Treffer entstehen und auf
+    // keinen Fall der falsche "Japanischer Hopfen".
+    expect(treffer?.id).not.toBe('humulus-scandens');
+    const staudenknoeterich = invasive.find((a) =>
+      a.deutsch.toLowerCase().includes('staudenknöterich'),
+    );
+    expect(treffer).toBe(staudenknoeterich ?? null);
+  });
+
+  it('"Japanischer Ahorn" ist nicht invasiv und liefert null', () => {
+    expect(istInvasiv(invasive, 'Japanischer Ahorn')).toBeNull();
   });
 });

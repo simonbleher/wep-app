@@ -38,6 +38,7 @@
           "seite": { "type": "integer" },
           "regeln": { "type": "string" },
           "arten": { "type": "array", "items": { "type": "string" } },
+          "synonyme": { "type": "array", "items": { "type": "string" } },
           "relevanz": { "type": "integer", "minimum": 1, "maximum": 5 }
         },
         "oneOf": [

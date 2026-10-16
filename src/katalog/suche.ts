@@ -11,39 +11,64 @@ import type {
   TrefferGrund,
   Variante,
 } from './types.js';
-import { feldQualitaet, normalisiere } from './util.js';
+import { feldQualitaet, levenshtein, normalisiere } from './util.js';
 
-// Feldgewichte (absteigend): Bezeichnung am stärksten, dann Arten-Namen,
-// dann Kategorie, zuletzt die Varianten-Merkmale.
+// Feldgewichte (absteigend): Bezeichnung am stärksten, dann Arten-Namen und
+// Alltags-Synonyme (gleiche Stufe), dann Kategorie, zuletzt die Varianten-Merkmale.
 const GEWICHT = {
   bezeichnung: 1.0,
   art: 0.85,
+  synonym: 0.85,
   kategorie: 0.6,
   variante: 0.5,
 } as const;
 
+/**
+ * Mindest-Trefferqualität (reine Qualität, ungewichtet) für einen ernsthaften
+ * Treffer. Exakte, Präfix- und Teilstring-Treffer liegen klar darüber (≥ 0,75),
+ * ebenso enge Tippfehler-Treffer mit nur einem Edit (0,72). Schwache Fuzzy-
+ * Treffer mit zwei Edits (0,62) werden verworfen – so taucht z. B. „Tulpen“
+ * nicht mehr über „Türen“ bei der Einfriedung und „Rasen“ nicht mehr über „Rose“
+ * auf, während „Ligustar“ → Liguster (ein Edit) weiterhin durchkommt.
+ */
+const MIN_QUALITAET = 0.7;
+
 interface PositionsFeldTreffer {
-  grund: Extract<TrefferGrund, 'bezeichnung' | 'kategorie' | 'art'>;
+  grund: Extract<TrefferGrund, 'bezeichnung' | 'kategorie' | 'art' | 'synonym'>;
   score: number; // Gewicht × Qualität
+  qualitaet: number; // reine Trefferqualität [0,1], ohne Feldgewicht
   matchText: string;
 }
 
-/** Bester Feldtreffer eines Tokens auf Positionsebene (Bezeichnung/Arten/Kategorie). */
+/**
+ * Bester Feldtreffer eines Tokens auf Positionsebene
+ * (Bezeichnung/Arten/Synonyme/Kategorie).
+ */
 function bestePositionsFeld(position: Position, token: string): PositionsFeldTreffer {
+  const bezQ = feldQualitaet(token, position.bezeichnung);
   let best: PositionsFeldTreffer = {
     grund: 'bezeichnung',
-    score: GEWICHT.bezeichnung * feldQualitaet(token, position.bezeichnung),
+    score: GEWICHT.bezeichnung * bezQ,
+    qualitaet: bezQ,
     matchText: position.bezeichnung,
   };
 
   for (const art of position.arten) {
-    const score = GEWICHT.art * feldQualitaet(token, art);
-    if (score > best.score) best = { grund: 'art', score, matchText: art };
+    const qualitaet = feldQualitaet(token, art);
+    const score = GEWICHT.art * qualitaet;
+    if (score > best.score) best = { grund: 'art', score, qualitaet, matchText: art };
   }
 
-  const katScore = GEWICHT.kategorie * feldQualitaet(token, position.kategorie);
+  for (const synonym of position.synonyme ?? []) {
+    const qualitaet = feldQualitaet(token, synonym);
+    const score = GEWICHT.synonym * qualitaet;
+    if (score > best.score) best = { grund: 'synonym', score, qualitaet, matchText: synonym };
+  }
+
+  const katQ = feldQualitaet(token, position.kategorie);
+  const katScore = GEWICHT.kategorie * katQ;
   if (katScore > best.score) {
-    best = { grund: 'kategorie', score: katScore, matchText: position.kategorie };
+    best = { grund: 'kategorie', score: katScore, qualitaet: katQ, matchText: position.kategorie };
   }
 
   return best;
@@ -93,6 +118,7 @@ function besteVariante(position: Position, token: string): VariantenTreffer | nu
  */
 function bewertePosition(position: Position, tokens: string[]): Treffer | null {
   let gesamtScore = 0;
+  let besteQualitaet = 0;
   let bestesPosFeld: PositionsFeldTreffer | null = null;
   let bestVariante: VariantenTreffer | null = null;
 
@@ -108,15 +134,24 @@ function bewertePosition(position: Position, tokens: string[]): Treffer | null {
 
     if (variante && varScore > posFeld.score) {
       // Token passt am besten auf ein Variantenmerkmal.
+      besteQualitaet = Math.max(besteQualitaet, variante.qualitaet);
       if (!bestVariante || variante.qualitaet > bestVariante.qualitaet) {
         bestVariante = variante;
       }
-    } else if (!bestesPosFeld || posFeld.score > bestesPosFeld.score) {
-      bestesPosFeld = posFeld;
+    } else {
+      besteQualitaet = Math.max(besteQualitaet, posFeld.qualitaet);
+      if (!bestesPosFeld || posFeld.score > bestesPosFeld.score) {
+        bestesPosFeld = posFeld;
+      }
     }
   }
 
   if (gesamtScore <= 0) return null;
+
+  // Schwaches Fuzzy-Rauschen verwerfen: Wenn selbst der beste Treffer dieser
+  // Position nur ein schwacher Tippfehler-Treffer unterhalb der Mindestqualität
+  // ist, ist die Position kein ernsthafter Kandidat (siehe MIN_QUALITAET).
+  if (besteQualitaet < MIN_QUALITAET) return null;
 
   if (bestVariante) {
     return {
@@ -194,8 +229,9 @@ function listeOhneBegriff(positionen: Position[], options: SucheOptions): Treffe
 /**
  * Durchsucht den Katalog. Ohne Suchbegriff wird die komplette Liste nach
  * „zuletzt verwendet“ und `relevanz` sortiert zurückgegeben. Mit Suchbegriff
- * wird tippfehlertolerant über Bezeichnung, Arten, Kategorie und
- * Varianten-Merkmale gesucht.
+ * wird tippfehlertolerant über Bezeichnung, Arten, Alltags-Synonyme, Kategorie
+ * und Varianten-Merkmale gesucht. Schwache Fuzzy-Treffer unterhalb von
+ * MIN_QUALITAET werden verworfen.
  */
 export function sucheKatalog(
   positionen: Position[],
@@ -217,10 +253,64 @@ export function sucheKatalog(
 }
 
 /**
+ * Enge Tippfehler-Schwelle NUR für die Invasiv-Prüfung: deutlich strenger als
+ * die allgemeine Suche. Kurze Namen dulden genau einen Edit, lange Namen
+ * (ab ~17 Zeichen) höchstens zwei – gedeckelt bei 2. So bleibt eine leichte
+ * Verschreibung eines echten Namens erkennbar, ohne dass ganze Wörter „erfunden“
+ * werden dürfen.
+ */
+function invasivSchwelle(laenge: number): number {
+  return Math.min(2, Math.max(1, Math.floor(laenge * 0.12)));
+}
+
+/**
+ * Trefferqualität des GANZEN (normalisierten) Suchnamens gegen EINEN ganzen
+ * (normalisierten) Zielnamen, Wert in [0, 1]. Bewusst ohne Einzelwort-Fuzzy:
+ * Gleichheit > Präfix (beidseitig) > enger Tippfehler auf dem gesamten Namen.
+ * Dadurch kann ein einzelnes geteiltes Wort eines mehrwortigen Suchbegriffs
+ * NICHT auf einen anderen mehrwortigen Eintrag matchen (z. B. „Japanischer
+ * Staudenknöterich“ nicht auf „Japanischer Hopfen“).
+ */
+function ganzerNameQualitaet(query: string, ziel: string): number {
+  if (!query || !ziel) return 0;
+  if (query === ziel) return 1;
+  if (ziel.startsWith(query) && query.length >= 3) return 0.9;
+  if (query.startsWith(ziel) && ziel.length >= 3) return 0.85;
+  const d = levenshtein(query, ziel);
+  if (d <= invasivSchwelle(ziel.length)) return 0.7;
+  return 0;
+}
+
+/**
+ * Beste Qualität des ganzen Suchnamens gegen ein Feld. Ein Feld kann mehrere
+ * gleichwertige Namen per „/“ enthalten (z. B. „Riesenbärenklau / Herkules-
+ * staude“); diese werden als eigenständige GANZE Namen behandelt – aber niemals
+ * Wort für Wort gefuzzt.
+ */
+function invasivFeldQualitaet(query: string, feldtext: string): number {
+  const ziel = normalisiere(feldtext);
+  if (!query || !ziel) return 0;
+
+  let best = 0;
+  for (const name of ziel.split('/')) {
+    const kandidat = name.trim();
+    if (!kandidat) continue;
+    best = Math.max(best, ganzerNameQualitaet(query, kandidat));
+    if (best === 1) break;
+  }
+  return best;
+}
+
+/**
  * Prüft, ob `name` einer invasiven Art der Unionsliste entspricht. Vergleicht
- * tippfehlertolerant gegen deutschen, wissenschaftlichen, Synonym- und
- * englischen Namen (jeweils falls vorhanden). Nutzt dieselbe Normalisierung/
- * Toleranz wie die Suche. Gibt die gefundene Art oder null zurück.
+ * den GANZEN normalisierten Namen gegen deutschen, wissenschaftlichen, Synonym-
+ * und englischen Namen (jeweils falls vorhanden). Exakte oder Präfix-Treffer
+ * gewinnen; Tippfehler sind nur auf dem ganzen Namen und nur innerhalb einer
+ * engen Schwelle erlaubt (siehe invasivSchwelle). Es wird bewusst NICHT pro
+ * Einzelwort gefuzzt, damit ein geteiltes Wort eines mehrwortigen Namens (z. B.
+ * „Japanischer …“) keinen Fehlalarm auf einem anderen mehrwortigen Eintrag
+ * auslöst – ein falscher Invasiv-Hinweis ist schlimmer als keiner. Gibt die
+ * gefundene Art oder null zurück.
  */
 export function istInvasiv(arten: InvasiveArt[], name: string): InvasiveArt | null {
   const query = normalisiere(name);
@@ -233,7 +323,7 @@ export function istInvasiv(arten: InvasiveArt[], name: string): InvasiveArt | nu
     const felder = [art.deutsch, art.wissenschaftlich, art.synonym, art.englisch];
     for (const feld of felder) {
       if (!feld) continue;
-      const qualitaet = feldQualitaet(query, feld);
+      const qualitaet = invasivFeldQualitaet(query, feld);
       if (qualitaet > besteQualitaet) {
         besteQualitaet = qualitaet;
         best = art;
