@@ -42,6 +42,12 @@ export interface Position {
   regeln: string;
   /** Beispielpflanzen für Suche/Zuordnung (nicht abschließend). */
   arten: string[];
+  /**
+   * Umgangssprachliche Synonyme für die Suche (optional), z. B. „Regentonne“
+   * für den Regenwasserauffangbehälter. Werden bei der Suche wie `arten`
+   * gewichtet, damit Alltagsbegriffe die passende Position finden.
+   */
+  synonyme?: string[];
   /** Häufigkeit im Kleingarten (1–5, 5 = sehr häufig) für die Sortierung. */
   relevanz: number;
 }

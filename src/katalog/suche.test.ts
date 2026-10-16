@@ -92,6 +92,49 @@ describe('sucheKatalog – limit', () => {
   });
 });
 
+describe('sucheKatalog – Synonyme (Alltagsbegriffe)', () => {
+  it('"Regentonne" liefert den Regenwasserauffangbehälter als Top-Treffer', () => {
+    const treffer = sucheKatalog(positionen, 'Regentonne');
+    expect(treffer[0].position.id).toBe('aa-regenwasserbehaelter');
+  });
+
+  it('"Gartenweg" liefert den Wege- und Platzbelag als Top-Treffer', () => {
+    const treffer = sucheKatalog(positionen, 'Gartenweg');
+    expect(treffer[0].position.id).toBe('aa-wegebelag');
+  });
+
+  it('"Zaun" liefert die Einfriedung als Top-Treffer', () => {
+    const treffer = sucheKatalog(positionen, 'Zaun');
+    expect(treffer[0].position.id).toBe('aa-einfriedung');
+  });
+
+  it('"Komposter" liefert die Kompostanlage als Top-Treffer', () => {
+    const treffer = sucheKatalog(positionen, 'Komposter');
+    expect(treffer[0].position.id).toBe('aa-kompostanlage');
+  });
+});
+
+describe('sucheKatalog – Fuzzy-Mindestpunktzahl', () => {
+  it('"Tulpen" findet Knollen/Zwiebeln und NICHT die Einfriedung (schwacher Fuzzy "Türen")', () => {
+    const treffer = sucheKatalog(positionen, 'Tulpen');
+    const ids = treffer.map((t) => t.position.id);
+    expect(ids).not.toContain('aa-einfriedung');
+    expect(treffer[0].position.id).toMatch(/^aw-knollen-zwiebeln/);
+  });
+
+  it('"Rasen" findet den Rasen und NICHT die Rose (schwacher Fuzzy "Rose")', () => {
+    const treffer = sucheKatalog(positionen, 'Rasen');
+    const ids = treffer.map((t) => t.position.id);
+    expect(ids).not.toContain('aw-rose');
+    expect(treffer[0].position.id).toBe('aw-rasen');
+  });
+
+  it('legitime Tippfehler-Toleranz bleibt erhalten: "Ligustar" liefert weiter die Hecke', () => {
+    const treffer = sucheKatalog(positionen, 'Ligustar');
+    expect(treffer[0].position.id).toBe('aw-hecke');
+  });
+});
+
 describe('istInvasiv', () => {
   it('erkennt eine invasive Art am deutschen Namen', () => {
     expect(istInvasiv(invasive, 'Götterbaum')?.id).toBe('ailanthus-altissima');
@@ -116,5 +159,27 @@ describe('istInvasiv', () => {
 
   it('Tippfehler ("Götterbaun") erkennt den Götterbaum trotzdem', () => {
     expect(istInvasiv(invasive, 'Götterbaun')?.id).toBe('ailanthus-altissima');
+  });
+
+  // Kein Fehlalarm auf Basis eines einzelnen geteilten/Fuzzy-Wortes:
+  it('"Japanischer Staudenknöterich" schlägt NICHT fälschlich auf "Japanischer Hopfen" an', () => {
+    // Hinweis: „Japanischer Staudenknöterich“ steht NICHT auf der Unionsliste in
+    // data/invasive.json (verifiziert). Entscheidend ist, dass das geteilte Wort
+    // „Japanischer“ keinen Treffer auf „Japanischer Hopfen“ erzeugt.
+    const treffer = istInvasiv(invasive, 'Japanischer Staudenknöterich');
+    expect(treffer?.id).not.toBe('humulus-scandens');
+    expect(treffer).toBeNull();
+  });
+
+  it('"Japanischer Ahorn" ist NICHT invasiv (kein Treffer über das Wort "Japanischer")', () => {
+    expect(istInvasiv(invasive, 'Japanischer Ahorn')).toBeNull();
+  });
+
+  it('der vollständige Name "Japanischer Hopfen" wird weiterhin korrekt erkannt', () => {
+    expect(istInvasiv(invasive, 'Japanischer Hopfen')?.id).toBe('humulus-scandens');
+  });
+
+  it('Teilstring des vollen Namens: "Herkulesstaude" erkennt den Riesenbärenklau', () => {
+    expect(istInvasiv(invasive, 'Herkulesstaude')?.id).toBe('heracleum-mantegazzianum');
   });
 });

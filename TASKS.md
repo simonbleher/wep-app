@@ -26,7 +26,12 @@ Stand: Branch katalog/bewrl-katalog – katalog.json (52 Positionen inkl. S. 18 
 > data/invasive.json aus der Unionsliste (Anlage, S. 25) an. Prüfe jeden Höchstwert
 > gegen das PDF. Erstelle einen PR.
 
-### K2 · Suche & Sortierung 👀 (#katalog)
+### K2 · Suche & Sortierung ✅ (#katalog)
+Stand: PR #3 gemergt (tippfehlertolerante Suche, Sortierung, Invasiv-Prüfung).
+Nachgebessert in `katalog/suche-nachbesserung`: Invasiv-Falschalarm behoben
+(strengerer Ganznamen-Abgleich), umgangssprachliche `synonyme` ergänzt
+(z. B. „Regentonne“, „Gartenweg“) und eine Fuzzy-Mindestpunktzahl eingeführt,
+die schwache Tippfehler-Treffer bei vorhandenen starken Treffern verwirft.
 > Implementiere in src/katalog/ eine Suchfunktion über data/katalog.json:
 > tippfehlertolerant, findet auch Arten-Namen (Apfel → Obstgehölz), sortiert ohne
 > Suchbegriff nach relevanz und "zuletzt verwendet". Mit Unit-Tests. PR.

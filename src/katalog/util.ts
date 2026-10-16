@@ -59,39 +59,63 @@ export function schwelle(laenge: number): number {
 }
 
 /**
+ * Ergebnis einer Trefferbewertung: die Qualität in [0, 1] plus die Information,
+ * ob die beste Übereinstimmung NUR über die Levenshtein-Tippfehlertoleranz
+ * zustande kam (`fuzzy: true`) oder über einen starken Treffer (Gleichheit,
+ * Präfix oder Teilstring; `fuzzy: false`). Diese Unterscheidung braucht die
+ * Suche, um schwache Fuzzy-Treffer bei vorhandenen starken Treffern zu verwerfen.
+ */
+export interface FeldTreffer {
+  qualitaet: number;
+  fuzzy: boolean;
+}
+
+/**
  * Trefferqualität eines Suchtokens gegen ein einzelnes Zielwort, Wert in [0, 1]:
  * Gleichheit > Präfix > Teilstring > Tippfehler (Levenshtein innerhalb Schwelle).
- * Beide Eingaben sind bereits normalisiert.
+ * Nur der Tippfehler-Zweig liefert `fuzzy: true`. Beide Eingaben sind bereits
+ * normalisiert.
  */
-function wortQualitaet(token: string, wort: string): number {
-  if (!token || !wort) return 0;
-  if (token === wort) return 1;
-  if (wort.startsWith(token) && token.length >= 2) return 0.9;
+function wortTreffer(token: string, wort: string): FeldTreffer {
+  if (!token || !wort) return { qualitaet: 0, fuzzy: false };
+  if (token === wort) return { qualitaet: 1, fuzzy: false };
+  if (wort.startsWith(token) && token.length >= 2) return { qualitaet: 0.9, fuzzy: false };
   // Suchbegriff länger als das Zielwort, Zielwort ist Präfix (z. B. „apfelbaum“ → „apfel“).
-  if (token.startsWith(wort) && wort.length >= 2) return 0.85;
-  if (wort.includes(token) && token.length >= 3) return 0.75;
+  if (token.startsWith(wort) && wort.length >= 2) return { qualitaet: 0.85, fuzzy: false };
+  if (wort.includes(token) && token.length >= 3) return { qualitaet: 0.75, fuzzy: false };
   const d = levenshtein(token, wort);
-  if (d <= schwelle(token.length)) return Math.max(0.5, 0.72 - (d - 1) * 0.1);
-  return 0;
+  if (d <= schwelle(token.length)) {
+    return { qualitaet: Math.max(0.5, 0.72 - (d - 1) * 0.1), fuzzy: true };
+  }
+  return { qualitaet: 0, fuzzy: false };
+}
+
+/**
+ * Bester Treffer (Qualität + Fuzzy-Kennzeichen) eines bereits normalisierten
+ * Suchtokens gegen einen (rohen) Feldtext. Prüft den ganzen Text (Gleichheit/
+ * Präfix/Teilstring) und jedes einzelne Wort (zusätzlich tippfehlertolerant).
+ */
+export function feldTreffer(token: string, feldtext: string): FeldTreffer {
+  const ziel = normalisiere(feldtext);
+  if (!token || !ziel) return { qualitaet: 0, fuzzy: false };
+
+  let best: FeldTreffer = { qualitaet: 0, fuzzy: false };
+  if (ziel === token) best = { qualitaet: 1, fuzzy: false };
+  else if (ziel.startsWith(token) && token.length >= 2) best = { qualitaet: 0.9, fuzzy: false };
+  else if (ziel.includes(token) && token.length >= 3) best = { qualitaet: 0.75, fuzzy: false };
+
+  for (const wort of woerter(ziel)) {
+    if (best.qualitaet === 1) break;
+    const kandidat = wortTreffer(token, wort);
+    if (kandidat.qualitaet > best.qualitaet) best = kandidat;
+  }
+  return best;
 }
 
 /**
  * Beste Trefferqualität eines bereits normalisierten Suchtokens gegen einen
- * (rohen) Feldtext, Wert in [0, 1]. Prüft den ganzen Text (Gleichheit/Präfix/
- * Teilstring) und jedes einzelne Wort (zusätzlich tippfehlertolerant).
+ * (rohen) Feldtext, Wert in [0, 1]. Dünne Hülle um {@link feldTreffer}.
  */
 export function feldQualitaet(token: string, feldtext: string): number {
-  const ziel = normalisiere(feldtext);
-  if (!token || !ziel) return 0;
-
-  let best = 0;
-  if (ziel === token) best = 1;
-  else if (ziel.startsWith(token) && token.length >= 2) best = 0.9;
-  else if (ziel.includes(token) && token.length >= 3) best = 0.75;
-
-  for (const wort of woerter(ziel)) {
-    if (best === 1) break;
-    best = Math.max(best, wortQualitaet(token, wort));
-  }
-  return best;
+  return feldTreffer(token, feldtext).qualitaet;
 }

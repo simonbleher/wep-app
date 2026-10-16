@@ -27,6 +27,10 @@ Jede Position hat:
 - `arten` – gängige Beispielpflanzen für Suche/Zuordnung (nicht abschließend,
   nicht bindend; bei technischen Außenanlagen leer). Eigene Pflanzen/Freitext
   sind laut CLAUDE.md immer zusätzlich erlaubt.
+- `synonyme` – **optional**: umgangssprachliche Begriffe für die Suche (z. B.
+  „Regentonne“ → Regenwasserauffangbehälter, „Gartenweg“ → Wege- und Platzbelag,
+  „Zaun“ → Einfriedung). Werden bei der Suche wie `arten` gewichtet, damit
+  Alltagsbegriffe die richtige Position finden. Fehlt das Feld, gilt es als leer.
 - `relevanz` – 1–5, wie häufig die Position im Kleingarten vorkommt (5 = sehr
   häufig), für die Sortierung der Trefferliste.
 
