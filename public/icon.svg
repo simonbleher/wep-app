@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="WEP">
+  <rect width="512" height="512" rx="96" fill="#1b5e20" />
+  <text x="256" y="300" font-family="system-ui, sans-serif" font-size="180"
+        font-weight="700" fill="#ffffff" text-anchor="middle">WEP</text>
+  <path d="M256 330c-40 0-72 24-72 54v12h144v-12c0-30-32-54-72-54z" fill="#a5d6a7" />
+</svg>
