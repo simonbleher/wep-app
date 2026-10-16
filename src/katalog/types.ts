@@ -42,6 +42,13 @@ export interface Position {
   regeln: string;
   /** Beispielpflanzen für Suche/Zuordnung (nicht abschließend). */
   arten: string[];
+  /**
+   * Alltags-/Umgangssprachliche Begriffe für dieselbe Position (optional), z. B.
+   * „Regentonne“ für den Regenwasserauffangbehälter oder „Gartenweg“ für den
+   * Wege- und Platzbelag. Nur gesetzt, wo ein echter Alltagsbegriff existiert.
+   * In der Suche wie `arten` gewichtet.
+   */
+  synonyme?: string[];
   /** Häufigkeit im Kleingarten (1–5, 5 = sehr häufig) für die Sortierung. */
   relevanz: number;
 }
@@ -76,6 +83,7 @@ export type TrefferGrund =
   | 'bezeichnung'
   | 'kategorie'
   | 'art'
+  | 'synonym'
   | 'variante'
   | 'zuletzt'
   | 'relevanz';
