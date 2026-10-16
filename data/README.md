@@ -5,7 +5,7 @@ des Landesverbandes Berlin der Gartenfreunde e. V., gültig ab 01.01.2023
 (`docs/Richtlinie.pdf`).
 
 ## Dateien
-- `katalog.json` – Positionen aus Abschnitt II (Außenanlagen) und III (Aufwuchs), gedruckte S. 12–17.
+- `katalog.json` – Positionen aus Abschnitt II (Außenanlagen) und III (Aufwuchs), gedruckte S. 12–18.
 - `invasive.json` – Unionsliste invasiver Pflanzenarten (Anlage, gedruckte S. 25–26).
 - `katalog.schema.json` – JSON-Schema (Draft 07) zur Validierung von `katalog.json`.
 
