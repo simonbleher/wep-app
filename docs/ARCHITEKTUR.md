@@ -1,6 +1,33 @@
 # Architektur
 
-## Überblick
+## Beta-Umfang (gilt vorrangig, Stand 2026-10-16)
+
+Die App ist in der Testphase und wird zunächst **nur von Simon (Grün-Wertermittler)**
+genutzt. Alles unten zu Rollen-Sync, Bau-Teil und BV-OneDrive ist Zielbild für später.
+
+```
+ Parzelle (Handy/Tablet)        Simons privates OneDrive        Schreibtisch
+┌──────────────────────┐  Sync  ┌───────────────────────┐      ┌────────────────────────┐
+│ PWA: Grün erfassen   │◀─────▶│ Apps/WEP-App/          │◀────▶│ PWA (Windows/Browser)  │
+│ (offline, IndexedDB) │        │   <Vorgangs-Nr>.json   │      │ Bau-Excel hochladen ──┐│
+└──────────────────────┘        └───────────────────────┘      │ + Grün aus der App    ││
+                                                                │ = <Nr>_WEP.xlsx  ◀────┘│
+                                                                └────────────────────────┘
+```
+
+- **Ein Nutzer, mehrere Geräte.** Sync über Microsoft Graph in den App-Ordner von
+  Simons privatem OneDrive (Berechtigung nur `Files.ReadWrite.AppFolder`).
+- **Kein Bau-Teil in der App.** Der Bau-Wertermittler füllt wie bisher die
+  WEP-Excel aus („Bau-Excel“). Die App liest diese Datei ein und schreibt nur den
+  Grün-Teil hinein (Außenanlagen, Aufwuchs I/II, Beseitigungskosten Abschnitt 2,
+  Formalien E13 und noch leere Formalien). Bau-Blätter werden nie verändert.
+- Ohne Bau-Excel wird die leere Vorlage `docs/WEP_Vorlage.xlsx` befüllt.
+- Personendaten (Unterpächter-Namen) liegen nur lokal und in Simons OneDrive,
+  nie im Repo.
+
+## Zielbild (später, nicht Teil der Beta)
+
+### Rollen-Sync mit BV-OneDrive
 
 ```
  Parzelle (offline)                 BV-OneDrive                    Büro
