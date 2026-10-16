@@ -1,0 +1,15 @@
+{
+  "name": "wep-app",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "PLATZHALTER nur für die K2-Tests (Katalog-Suche). Das endgültige Grundgerüst entsteht parallel in A1 (app-gruen/grundgeruest) und ersetzt/erweitert diese Datei.",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.4"
+  }
+}
