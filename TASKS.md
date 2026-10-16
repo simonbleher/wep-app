@@ -26,7 +26,7 @@ Stand: Branch katalog/bewrl-katalog – katalog.json (52 Positionen inkl. S. 18 
 > data/invasive.json aus der Unionsliste (Anlage, S. 25) an. Prüfe jeden Höchstwert
 > gegen das PDF. Erstelle einen PR.
 
-### K2 · Suche & Sortierung 🔄 (#katalog)
+### K2 · Suche & Sortierung ✅ (#katalog) – Nachbesserungen offen (Invasiv-Falschalarm, Synonyme), siehe K2b
 > Implementiere in src/katalog/ eine Suchfunktion über data/katalog.json:
 > tippfehlertolerant, findet auch Arten-Namen (Apfel → Obstgehölz), sortiert ohne
 > Suchbegriff nach relevanz und "zuletzt verwendet". Mit Unit-Tests. PR.
