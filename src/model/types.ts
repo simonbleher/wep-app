@@ -23,6 +23,19 @@ export interface Wep {
 }
 
 /**
+ * Ein Hinweis zu einer Position (Regel-Warnung oder Information).
+ * Entspricht dem Grundsatz „Nichts sperren, nur warnen“: Regelverstöße
+ * (z. B. Hecke > 1,25 m, invasive Art) erzeugen Hinweise, keine Blockaden.
+ * `schwere` unterscheidet reine Info von einer Warnung; `regel` kann optional
+ * auf die zugrunde liegende Regel verweisen (z. B. Katalog-Regeltext).
+ */
+export interface Hinweis {
+  schwere: 'info' | 'warnung'
+  text: string
+  regel?: string
+}
+
+/**
  * Eine bewertete Position (Außenanlage oder Aufwuchs).
  * Die Spaltenangaben beziehen sich auf das Zellen-Mapping der Vorlage.
  */
@@ -36,7 +49,7 @@ export interface Position {
   hoechstwert?: number // aus Katalog
   einzelpreis: number // Spalte K – Vorschlag, frei überschreibbar
   preisManuell: boolean
-  hinweise: string[] // Regel-Warnungen
+  hinweise: Hinweis[] // Regel-Warnungen
 }
 
 // OFFENE FRAGE: `Formalien` wird in docs/ARCHITEKTUR.md referenziert, aber nicht
