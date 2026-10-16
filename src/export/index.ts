@@ -17,6 +17,7 @@ import {
   AUFWUCHS_II,
   BESEITIGUNG_AA,
   formalienWertAlsString,
+  isoDateToExcelSerial,
   type PositionsBereich,
 } from './cellMapper'
 import {
@@ -99,13 +100,17 @@ export async function exportWep(
   // 4. Beseitigungskosten Abschnitt 2 patchen
   await patchBeseitigung(zip, wep)
 
-  // 5. calcChain.xml entfernen → Excel baut die Berechnungskette neu auf
-  //    (verhindert Probleme mit veralteten Berechungsreihenfolgen)
-  if (zip.file('xl/calcChain.xml')) {
-    zip.remove('xl/calcChain.xml')
-  }
+  // 5. calcChain.xml entfernen und alle Querverweise bereinigen.
+  //    Wenn nur die Datei gelöscht wird, bleiben Einträge in
+  //    [Content_Types].xml und xl/_rels/workbook.xml.rels übrig, was Excel
+  //    mit „Problem mit Inhalten, reparieren?" quittiert.
+  await bereinigCalcChain(zip)
 
-  // 6. Als Blob erzeugen
+  // 6. fullCalcOnLoad="1" in xl/workbook.xml setzen, damit Excel/LibreOffice
+  //    beim Öffnen alle Formeln neu berechnet und keine gecachten Summen zeigt.
+  await setzeFullCalcOnLoad(zip)
+
+  // 7. Als Blob erzeugen
   const blob = await zip.generateAsync({
     type: 'blob',
     mimeType:
@@ -163,6 +168,16 @@ async function patchFormalien(
       const num = Number(wep.formalien[key])
       if (!isNaN(num)) {
         patches.push({ cell: def.cell, value: num })
+      }
+    } else if (def.typ === 'datum') {
+      // Datum als echte Excel-Seriennummer speichern (nicht als Text).
+      // Das Datums-Format (s-Attribut) bleibt durch patchCell erhalten.
+      const roherWert = wep.formalien[key]
+      if (typeof roherWert === 'string' && roherWert) {
+        const serial = isoDateToExcelSerial(roherWert)
+        if (serial > 0) {
+          patches.push({ cell: def.cell, value: serial })
+        }
       }
     } else {
       patches.push({ cell: def.cell, value: appWert })
@@ -306,4 +321,73 @@ async function patchBeseitigung(zip: JSZip, wep: Wep): Promise<void> {
 
   xml = patchCells(xml, patches)
   zip.file(BESEITIGUNG_AA.sheetPath, xml)
+}
+
+// ---------------------------------------------------------------------------
+// Bug-Fix 1: calcChain.xml vollständig entfernen
+// ---------------------------------------------------------------------------
+
+/**
+ * Entfernt calcChain.xml aus dem ZIP und bereinigt gleichzeitig alle
+ * Querverweise in [Content_Types].xml und xl/_rels/workbook.xml.rels.
+ *
+ * Hintergrund: Wird nur die Datei gelöscht, bleiben dangling Referenzen
+ * übrig, die Excel beim Öffnen mit „Problem mit Inhalten, reparieren?"
+ * meldet.
+ */
+async function bereinigCalcChain(zip: JSZip): Promise<void> {
+  if (!zip.file('xl/calcChain.xml')) return
+
+  // 1. Datei löschen
+  zip.remove('xl/calcChain.xml')
+
+  // 2. Eintrag in [Content_Types].xml entfernen
+  const ctFile = zip.file('[Content_Types].xml')
+  if (ctFile) {
+    let ctXml = await ctFile.async('string')
+    ctXml = ctXml.replace(
+      /<Override\s[^>]*calcChain[^>]*\/>/g,
+      '',
+    )
+    zip.file('[Content_Types].xml', ctXml)
+  }
+
+  // 3. Relationship in xl/_rels/workbook.xml.rels entfernen
+  const relsFile = zip.file('xl/_rels/workbook.xml.rels')
+  if (relsFile) {
+    let relsXml = await relsFile.async('string')
+    relsXml = relsXml.replace(
+      /<Relationship\s[^>]*calcChain[^>]*\/>/g,
+      '',
+    )
+    zip.file('xl/_rels/workbook.xml.rels', relsXml)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Bug-Fix 2: fullCalcOnLoad="1" in workbook.xml setzen
+// ---------------------------------------------------------------------------
+
+/**
+ * Setzt `fullCalcOnLoad="1"` am `<calcPr>`-Element in xl/workbook.xml.
+ *
+ * Ohne dieses Attribut zeigen Excel und LibreOffice beim Öffnen der Datei
+ * unter Umständen gecachte (veraltete) Summenwerte an, statt alle Formeln
+ * neu zu berechnen.
+ */
+async function setzeFullCalcOnLoad(zip: JSZip): Promise<void> {
+  const wbFile = zip.file('xl/workbook.xml')
+  if (!wbFile) return
+
+  let xml = await wbFile.async('string')
+
+  // <calcPr .../> patchen: fullCalcOnLoad hinzufügen oder aktualisieren.
+  // Erfasst self-closing Tags mit beliebigen Attributen.
+  xml = xml.replace(/<calcPr\b([^/]*)\s*\/>/g, (_match, attrs: string) => {
+    // Vorhandenes fullCalcOnLoad-Attribut entfernen, dann neu setzen
+    const saubereAttrs = attrs.replace(/\s*fullCalcOnLoad="[^"]*"/, '')
+    return `<calcPr${saubereAttrs} fullCalcOnLoad="1"/>`
+  })
+
+  zip.file('xl/workbook.xml', xml)
 }

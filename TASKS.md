@@ -44,7 +44,7 @@ Stand: Branch katalog/bewrl-katalog – katalog.json (52 Positionen inkl. S. 18 
 > (Vorschlag = Höchstwert × Zustand, überschreibbar), eigene Pflanze per Freitext.
 > Regel-Warnungen anzeigen, nicht blockieren. Live-Summe. PR.
 
-### E1 · Excel-Export: Bau-Excel + App → fertiges WEP 👀 (#export) – nach A1
+### E1 · Excel-Export: Bau-Excel + App → fertiges WEP ⬜ (#export) – nach A1
 > Lies CLAUDE.md und docs/ARCHITEKTUR.md (Abschnitte „Beta-Umfang“ und Zellen-Mapping).
 > Schreibe src/export/: Eingabe ist ein Wep-Objekt aus der App plus **optional eine
 > Bau-Excel** (die WEP-Vorlage, in der der Bau-Wertermittler seine Blätter schon

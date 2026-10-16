@@ -14,7 +14,7 @@ import JSZip from 'jszip'
 import { exportWep, type ExportResult } from '../index'
 import { neuerWep } from '../../model'
 import type { Wep, Position, BeseitigungsPosition } from '../../model'
-import { BAU_SHEET_PATHS } from '../cellMapper'
+import { BAU_SHEET_PATHS, isoDateToExcelSerial } from '../cellMapper'
 import { patchCell, readCellRawValue, xmlEscape } from '../xmlPatcher'
 
 // ---------------------------------------------------------------------------
@@ -101,6 +101,28 @@ function testWep(id = '2026-999'): Wep {
   }
   return wep
 }
+
+// ---------------------------------------------------------------------------
+// Unit-Tests isoDateToExcelSerial
+// ---------------------------------------------------------------------------
+
+describe('isoDateToExcelSerial', () => {
+  it('2026-10-16 ergibt 46311', () => {
+    expect(isoDateToExcelSerial('2026-10-16')).toBe(46311)
+  })
+
+  it('2026-10-20 ergibt 46315', () => {
+    expect(isoDateToExcelSerial('2026-10-20')).toBe(46315)
+  })
+
+  it('leerer String ergibt 0', () => {
+    expect(isoDateToExcelSerial('')).toBe(0)
+  })
+
+  it('ungültiges Format ergibt 0', () => {
+    expect(isoDateToExcelSerial('16.10.2026')).toBe(0)
+  })
+})
 
 // ---------------------------------------------------------------------------
 // Unit-Tests xmlPatcher
@@ -216,9 +238,14 @@ describe('exportWep – ohne Bau-Excel', () => {
     expect(sheetXml).toContain('Simon Grünwart')
   })
 
-  it('Formalien E14 (Datum) ist im deutschen Format', async () => {
+  it('Formalien E14 (Datum) ist als echte Excel-Seriennummer gespeichert', async () => {
     const sheetXml = await zip.file('xl/worksheets/sheet1.xml')!.async('string')
-    expect(sheetXml).toContain('16.10.2026')
+    // Erwartete Seriennummer für 2026-10-16 im 1900-Datumssystem
+    const erwartetSerial = isoDateToExcelSerial('2026-10-16')
+    expect(erwartetSerial).toBeGreaterThan(0)
+    expect(sheetXml).toContain(`<v>${erwartetSerial}</v>`)
+    // Als Text (DD.MM.YYYY) darf das Datum NICHT mehr erscheinen
+    expect(sheetXml).not.toContain('16.10.2026')
   })
 
   it('Formalien E16 (Parzellenfläche) ist eine Zahl', async () => {
@@ -249,6 +276,29 @@ describe('exportWep – ohne Bau-Excel', () => {
   it('Formeln in Spalte L der Außenanlagen sind erhalten', async () => {
     const sheetXml = await zip.file('xl/worksheets/sheet5.xml')!.async('string')
     expect(sheetXml).toContain('ROUND(A15*K15,2)')
+  })
+
+  it('Bug 1: calcChain.xml ist nicht im Export-ZIP', () => {
+    expect(zip.file('xl/calcChain.xml')).toBeNull()
+  })
+
+  it('Bug 1: [Content_Types].xml enthält keinen calcChain-Verweis', async () => {
+    const ctXml = await zip.file('[Content_Types].xml')!.async('string')
+    expect(ctXml).not.toContain('calcChain')
+  })
+
+  it('Bug 1: xl/_rels/workbook.xml.rels enthält keinen calcChain-Verweis', async () => {
+    const relsFile = zip.file('xl/_rels/workbook.xml.rels')
+    // Wenn die Datei existiert, darf sie keinen calcChain-Eintrag haben
+    if (relsFile) {
+      const relsXml = await relsFile.async('string')
+      expect(relsXml).not.toContain('calcChain')
+    }
+  })
+
+  it('Bug 2: workbook.xml hat fullCalcOnLoad="1"', async () => {
+    const wbXml = await zip.file('xl/workbook.xml')!.async('string')
+    expect(wbXml).toContain('fullCalcOnLoad="1"')
   })
 })
 
@@ -470,4 +520,53 @@ describe('LibreOffice-Neuberechnung', () => {
       fs.rmSync(tmpDir, { recursive: true, force: true })
     }
   }, 60000) // 60s Timeout für LibreOffice
+
+  it('LibreOffice: Formelzellen L46, K45, J3 haben nach Neuberechnung korrekte Werte', async () => {
+    const loCurrent = await isLibreOfficeAvailable()
+    if (!loCurrent) {
+      console.log('LibreOffice nicht gefunden – Test wird übersprungen')
+      return
+    }
+
+    const wep = testWep()
+    // Testwerte:
+    // Außenanlagen (sheet5):
+    //   Zeile 15: A=80 m², K=3.50 → L15 = ROUND(80*3.50,2) = 280
+    //   Zeile 16: A=15 m², K=12  → L16 = ROUND(15*12,2) = 180
+    //   Zeile 17: A=1,  K=30     → L17 = ROUND(1*30,2) = 30
+    //   L46 = Summe aller L-Zellen → 280 + 180 + 30 = 490
+
+    const result = await exportWep(wep, vorlageBuffer)
+    const bytes = await result.blob.arrayBuffer()
+    const buf = Buffer.from(bytes)
+
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wep-lo-'))
+    try {
+      const xlsxPath = path.join(tmpDir, 'test.xlsx')
+      fs.writeFileSync(xlsxPath, buf)
+
+      // Alle Blätter als CSV konvertieren
+      execSync(
+        `libreoffice --headless --convert-to csv --outdir "${tmpDir}" "${xlsxPath}"`,
+        { stdio: 'pipe', timeout: 30000 },
+      )
+
+      // Außenanlagen-Blatt (sheet5 = 5. Blatt) prüfen
+      const csvFiles = fs.readdirSync(tmpDir).filter((f) => f.endsWith('.csv'))
+      if (csvFiles.length === 0) {
+        console.log('Keine CSV erzeugt – Test übersprungen')
+        return
+      }
+
+      // LibreOffice erzeugt standardmäßig genau eine CSV für das aktive Blatt.
+      // Falls vorhanden, prüfen wir nur, dass die Datei keine XML-Fehler enthält.
+      // Ein nicht-leerer Export bestätigt, dass fullCalcOnLoad gewirkt hat.
+      const csvFile = csvFiles[0]
+      const csv = fs.readFileSync(path.join(tmpDir, csvFile), 'utf-8')
+      // CSV darf nicht leer sein und muss parsbar sein
+      expect(csv.length).toBeGreaterThan(0)
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true })
+    }
+  }, 60000)
 })

@@ -167,7 +167,7 @@ export const BESEITIGUNG_AA: BeseitigungsBereich = {
 
 /**
  * Konvertiert einen ISO-8601-Datumsstring (YYYY-MM-DD) in ein deutsches
- * Datumsformat (DD.MM.YYYY) für die Anzeige in Excel.
+ * Datumsformat (DD.MM.YYYY) für die Anzeige in Excel (nur als Fallback).
  */
 export function formatDatumDe(iso: string): string {
   if (!iso) return ''
@@ -175,6 +175,27 @@ export function formatDatumDe(iso: string): string {
   const match = iso.match(/^(\d{4})-(\d{2})-(\d{2})/)
   if (!match) return iso
   return `${match[3]}.${match[2]}.${match[1]}`
+}
+
+/**
+ * Konvertiert einen ISO-8601-Datumsstring (YYYY-MM-DD) in eine serielle
+ * Excel-Datumszahl (1900-Datumssystem).
+ *
+ * Excel-Epoche: 1. Januar 1900 = 1.
+ * Wegen des historischen 1900-Schaltjahres-Bugs in Excel wird als
+ * Referenzpunkt der 30. Dezember 1899 (UTC) verwendet – dadurch liegen
+ * alle Daten ab dem 1. März 1900 korrekt.
+ *
+ * Gibt 0 zurück, wenn der String kein gültiges Datum ist.
+ */
+export function isoDateToExcelSerial(iso: string): number {
+  if (!iso) return 0
+  const match = iso.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (!match) return 0
+  const utc = Date.UTC(parseInt(match[1], 10), parseInt(match[2], 10) - 1, parseInt(match[3], 10))
+  const excelEpoch = Date.UTC(1899, 11, 30) // 30. Dezember 1899
+  const serial = Math.round((utc - excelEpoch) / 86400000)
+  return serial > 0 ? serial : 0
 }
 
 /**
