@@ -11,7 +11,7 @@ import { execSync } from 'node:child_process'
 import os from 'node:os'
 import JSZip from 'jszip'
 
-import { exportWep, type ExportResult } from '../index'
+import { exportWep, deckblattPfade, type ExportResult } from '../index'
 import { neuerWep } from '../../model'
 import type { Wep, Position, BeseitigungsPosition } from '../../model'
 import { BAU_SHEET_PATHS, isoDateToExcelSerial } from '../cellMapper'
@@ -410,12 +410,21 @@ describe('exportWep – mit Bau-Excel', () => {
   })
 
   it('Bau-Blatt-XMLs sind byte-gleich (sheet3 Baulichkeiten)', async () => {
+    // Deckblätter fassen Bau und Grün zusammen: Dort werden nur die veralteten
+    // Zwischenwerte (<v>) von Formelzellen entfernt, Inhalte bleiben gleich.
+    const deckblaetter = new Set(await deckblattPfade(zip))
+    const ohneZwischenwerte = (xml: string) =>
+      xml.replace(/(<c\b[^>]*>\s*<f\b[^>]*?(?:\/>|>[^<]*<\/f>))\s*<v>[^<]*<\/v>/g, '$1')
     for (const sheetPath of BAU_SHEET_PATHS) {
       const vorher = bauExcelXmlVorher[sheetPath]
       if (!vorher) continue // Nicht in diesem XLSX vorhanden
       const nachher = await zip.file(sheetPath)?.async('string')
       if (!nachher) continue
-      expect(nachher).toBe(vorher)
+      if (deckblaetter.has(sheetPath)) {
+        expect(nachher, sheetPath).toBe(ohneZwischenwerte(vorher))
+      } else {
+        expect(nachher, sheetPath).toBe(vorher)
+      }
     }
   })
 })
@@ -545,28 +554,42 @@ describe('LibreOffice-Neuberechnung', () => {
       const xlsxPath = path.join(tmpDir, 'test.xlsx')
       fs.writeFileSync(xlsxPath, buf)
 
-      // Alle Blätter als CSV konvertieren
+      // Als XLSX neu speichern lassen: LibreOffice schreibt dabei die
+      // frisch berechneten Werte als Zwischenwerte in die Datei.
+      const outDir = path.join(tmpDir, 'out')
+      fs.mkdirSync(outDir)
       execSync(
-        `libreoffice --headless --convert-to csv --outdir "${tmpDir}" "${xlsxPath}"`,
-        { stdio: 'pipe', timeout: 30000 },
+        `libreoffice --headless --calc --convert-to xlsx --outdir "${outDir}" "${xlsxPath}"`,
+        { stdio: 'pipe', timeout: 60000 },
       )
-
-      // Außenanlagen-Blatt (sheet5 = 5. Blatt) prüfen
-      const csvFiles = fs.readdirSync(tmpDir).filter((f) => f.endsWith('.csv'))
-      if (csvFiles.length === 0) {
-        console.log('Keine CSV erzeugt – Test übersprungen')
-        return
+      const outZip = await JSZip.loadAsync(fs.readFileSync(path.join(outDir, 'test.xlsx')))
+      const wert = async (sheet: string, zelle: string) => {
+        const xml = await outZip.file(`xl/worksheets/${sheet}.xml`)!.async('string')
+        const m = new RegExp(`<c r="${zelle}"[^>]*>[\\s\\S]*?<v>([^<]*)</v>`).exec(xml)
+        return m ? Number(m[1]) : NaN
       }
-
-      // LibreOffice erzeugt standardmäßig genau eine CSV für das aktive Blatt.
-      // Falls vorhanden, prüfen wir nur, dass die Datei keine XML-Fehler enthält.
-      // Ein nicht-leerer Export bestätigt, dass fullCalcOnLoad gewirkt hat.
-      const csvFile = csvFiles[0]
-      const csv = fs.readFileSync(path.join(tmpDir, csvFile), 'utf-8')
-      // CSV darf nicht leer sein und muss parsbar sein
-      expect(csv.length).toBeGreaterThan(0)
+      // Erwartete Summen direkt aus den Testdaten berechnen
+      const summe = (ps: { anzahl: number; einzelpreis: number }[]) =>
+        Math.round(ps.reduce((s, p) => s + Math.round(p.anzahl * p.einzelpreis * 100) / 100, 0) * 100) / 100
+      expect(await wert('sheet5', 'L46')).toBeCloseTo(summe(wep.gruen.aussenanlagen), 2)
+      expect(await wert('sheet6', 'L46')).toBeCloseTo(summe(wep.gruen.aufwuchs.slice(0, 28)), 2)
+      const flaeche = wep.formalien.parzellenflaecheM2
+      expect(await wert('sheet5', 'J3')).toBeCloseTo(((flaeche - 24) / 100) * 6, 2)
+      const bes = wep.gruen.beseitigungAA.reduce((s, b) => s + b.menge * b.einzelpreis * b.faktor, 0)
+      expect(await wert('sheet17', 'K45')).toBeCloseTo(bes, 2)
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true })
     }
   }, 60000)
+})
+
+describe('exportWep – Zwischenwerte', () => {
+  it('Formelzellen der Grün-Blätter und Deckblätter haben keine veralteten Zwischenwerte', async () => {
+    const result = await exportWep(testWep(), vorlageBuffer)
+    const zip = await JSZip.loadAsync(await result.blob.arrayBuffer())
+    for (const sheet of ['sheet1', 'sheet2', 'sheet5', 'sheet6', 'sheet7', 'sheet17']) {
+      const xml = await zip.file(`xl/worksheets/${sheet}.xml`)!.async('string')
+      expect(xml, sheet).not.toMatch(/<f\b[^>]*(?:\/>|>[^<]*<\/f>)\s*<v>/)
+    }
+  })
 })

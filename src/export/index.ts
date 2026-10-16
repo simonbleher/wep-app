@@ -110,6 +110,20 @@ export async function exportWep(
   //    beim Öffnen alle Formeln neu berechnet und keine gecachten Summen zeigt.
   await setzeFullCalcOnLoad(zip)
 
+  // 6b. Veraltete Zwischenwerte (<v>) von Formelzellen in den Grün-Blättern
+  //     und den Deckblättern entfernen. LibreOffice ignoriert fullCalcOnLoad in
+  //     der Standardeinstellung und zeigt sonst die alten Summen (z. B. 0 €).
+  //     Formelzellen ohne Zwischenwert werden von Excel und LibreOffice beim
+  //     Öffnen immer berechnet. Bau-Blätter bleiben unangetastet.
+  await entferneZwischenwerte(zip, [
+    'xl/worksheets/sheet1.xml', // Formalien
+    AUSSENANLAGEN.sheetPath,
+    AUFWUCHS_I.sheetPath,
+    AUFWUCHS_II.sheetPath,
+    BESEITIGUNG_AA.sheetPath,
+    ...(await deckblattPfade(zip)),
+  ])
+
   // 7. Als Blob erzeugen
   const blob = await zip.generateAsync({
     type: 'blob',
@@ -390,4 +404,50 @@ async function setzeFullCalcOnLoad(zip: JSZip): Promise<void> {
   })
 
   zip.file('xl/workbook.xml', xml)
+}
+
+// ---------------------------------------------------------------------------
+// Zwischenwerte von Formelzellen entfernen (LibreOffice-Neuberechnung)
+// ---------------------------------------------------------------------------
+
+/**
+ * Entfernt in den angegebenen Blättern das `<v>`-Element aller Formelzellen.
+ * Ohne Zwischenwert müssen Excel und LibreOffice die Formel beim Öffnen
+ * berechnen – unabhängig von deren Neuberechnungs-Einstellungen.
+ */
+export async function entferneZwischenwerte(
+  zip: JSZip,
+  pfade: string[],
+): Promise<void> {
+  for (const pfad of new Set(pfade)) {
+    const file = zip.file(pfad)
+    if (!file) continue
+    const xml = await file.async('string')
+    const neu = xml.replace(
+      /(<c\b[^>]*>\s*<f\b[^>]*?(?:\/>|>[^<]*<\/f>))\s*<v>[^<]*<\/v>/g,
+      '$1',
+    )
+    if (neu !== xml) zip.file(pfad, neu)
+  }
+}
+
+/**
+ * Findet die Blätter, deren Name mit „Deckbl" beginnt (Zusammenfassungen,
+ * die auf die Grün-Summen verweisen), und liefert ihre Pfade im ZIP.
+ */
+export async function deckblattPfade(zip: JSZip): Promise<string[]> {
+  const wb = await zip.file('xl/workbook.xml')?.async('string')
+  const rels = await zip.file('xl/_rels/workbook.xml.rels')?.async('string')
+  if (!wb || !rels) return []
+  const pfade: string[] = []
+  for (const m of wb.matchAll(/<sheet\b[^>]*>/g)) {
+    const tag = m[0]
+    const name = /\bname="([^"]*)"/.exec(tag)?.[1] ?? ''
+    const rid = /\br:id="([^"]*)"/.exec(tag)?.[1]
+    if (!rid || !name.startsWith('Deckbl')) continue
+    const rel = new RegExp(`<Relationship\\b[^>]*\\bId="${rid}"[^>]*>`).exec(rels)?.[0]
+    const target = rel && /\bTarget="([^"]*)"/.exec(rel)?.[1]
+    if (target) pfade.push(target.startsWith('/') ? target.slice(1) : `xl/${target}`)
+  }
+  return pfade
 }
