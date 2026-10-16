@@ -1,0 +1,174 @@
+/* Globale Stile der WEP-App.
+   Ziel: Bedienung im Freien auf Handy/Tablet – große Bedienelemente,
+   hoher Kontrast, gut lesbare Schrift. Mobile-first. */
+
+:root {
+  color-scheme: light;
+
+  /* Hochkontrast-Palette für den Außeneinsatz */
+  --farbe-primaer: #1b5e20;
+  --farbe-primaer-dunkel: #0f3d14;
+  --farbe-gefahr: #b71c1c;
+  --farbe-text: #1a1a1a;
+  --farbe-text-schwach: #444;
+  --farbe-hintergrund: #f4f6f4;
+  --farbe-flaeche: #ffffff;
+  --farbe-rand: #c4ccc4;
+  --farbe-fokus: #0057d8;
+
+  /* Große, gut lesbare Grundschrift */
+  --schrift-basis: 18px;
+  --radius: 12px;
+  --abstand: 16px;
+  --touch-min: 56px;
+
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: var(--schrift-basis);
+  line-height: 1.5;
+  color: var(--farbe-text);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--farbe-hintergrund);
+}
+
+body {
+  /* Safe-Area-Insets für Geräte mit Notch / abgerundeten Ecken */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+.app {
+  min-height: 100vh;
+}
+
+.seite {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: var(--abstand);
+  display: flex;
+  flex-direction: column;
+  gap: var(--abstand);
+}
+
+.kopf {
+  display: flex;
+  align-items: center;
+  gap: var(--abstand);
+  flex-wrap: wrap;
+}
+
+h1 {
+  font-size: 1.5rem;
+  margin: 0;
+}
+
+/* Buttons – mindestens 56px hoch, klare Flächen */
+.btn {
+  min-height: var(--touch-min);
+  min-width: var(--touch-min);
+  padding: 0 20px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  border: 2px solid var(--farbe-rand);
+  border-radius: var(--radius);
+  background: var(--farbe-flaeche);
+  color: var(--farbe-text);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-gross {
+  font-size: 1.15rem;
+}
+
+.btn-primary {
+  background: var(--farbe-primaer);
+  border-color: var(--farbe-primaer-dunkel);
+  color: #fff;
+  width: 100%;
+  min-height: 64px;
+  font-size: 1.25rem;
+}
+
+.btn-primary:active {
+  background: var(--farbe-primaer-dunkel);
+}
+
+.btn-gefahr {
+  color: var(--farbe-gefahr);
+  border-color: var(--farbe-gefahr);
+  background: var(--farbe-flaeche);
+}
+
+/* Deutlich sichtbarer Tastatur-Fokus */
+:focus-visible {
+  outline: 3px solid var(--farbe-fokus);
+  outline-offset: 2px;
+}
+
+.hinweis {
+  color: var(--farbe-text-schwach);
+  background: var(--farbe-flaeche);
+  border: 1px solid var(--farbe-rand);
+  border-radius: var(--radius);
+  padding: var(--abstand);
+  margin: 0;
+}
+
+/* WEP-Liste */
+.liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.karte {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.karte-haupt {
+  flex: 1;
+  min-height: var(--touch-min);
+  padding: 14px 18px;
+  text-align: left;
+  border: 2px solid var(--farbe-rand);
+  border-radius: var(--radius);
+  background: var(--farbe-flaeche);
+  color: var(--farbe-text);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+}
+
+.karte-haupt:active {
+  border-color: var(--farbe-primaer);
+}
+
+.karte-id {
+  font-size: 0.95rem;
+  color: var(--farbe-text-schwach);
+  font-variant-numeric: tabular-nums;
+}
+
+.karte-titel {
+  font-size: 1.15rem;
+  font-weight: 600;
+}

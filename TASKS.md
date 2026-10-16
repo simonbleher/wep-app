@@ -25,7 +25,7 @@ Stand: Branch katalog/bewrl-katalog – katalog.json (52 Positionen inkl. S. 18 
 > tippfehlertolerant, findet auch Arten-Namen (Apfel → Obstgehölz), sortiert ohne
 > Suchbegriff nach relevanz und "zuletzt verwendet". Mit Unit-Tests. PR.
 
-### A1 · PWA-Grundgerüst ⬜ (#app-gruen)
+### A1 · PWA-Grundgerüst 👀 (#app-gruen)
 > Lies CLAUDE.md und docs/ARCHITEKTUR.md. Lege das PWA-Grundgerüst an (TypeScript,
 > Vite, installierbar, offline per Service Worker, IndexedDB). Begründe die
 > Framework-Wahl in docs/ENTSCHEIDUNGEN.md. Ziel-Geräte: Handy und Tablet im
