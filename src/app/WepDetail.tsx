@@ -30,6 +30,8 @@ import { sucheKatalog } from '@/katalog'
 import { ladeWep, speichereWep } from './db'
 import { SkizzeTab } from './SkizzeTab'
 import { skizzeAlsPng } from '@/skizze/skizzePng'
+import { skizzeDatenZuFormen, type Kasten } from '@/export/skizzeFormen'
+import { svgZuPngBrowser } from '@/export/svgRaster'
 import { exportWep, type ExportResult } from '@/export'
 import { berechnePreisvorschlag } from '@/gruen/preisvorschlag'
 import { berechneRegelhinweise } from '@/gruen/regelhinweise'
@@ -1127,6 +1129,9 @@ function ExportTab({
   setExportZustand: (z: ExportZustand) => void
   bauExcelRef: React.MutableRefObject<File | null>
 }) {
+  // Standard: Skizze als bearbeitbare Excel-Formen; Fallback: Bild (PNG)
+  const [skizzeAlsBild, setSkizzeAlsBild] = useState(false)
+
   function onBauExcelChange(e: ChangeEvent<HTMLInputElement>) {
     bauExcelRef.current = e.target.files?.[0] ?? null
   }
@@ -1146,15 +1151,25 @@ function ExportTab({
         sourceBuffer = await resp.arrayBuffer()
       }
 
-      // Skizze (falls gezeichnet) als PNG mitgeben → Blatt „Skizze Außenanlage-Aufwuchs“.
-      // Der Export entscheidet, ob das PNG transparent sein muss (Bau-Formen im Blatt).
+      // Skizze (falls gezeichnet) ins Blatt „Skizze Außenanlage-Aufwuchs“: als bearbeitbare
+      // Excel-Formen (Standard), die vorhandene Bau-Skizze bleibt unverändert. Fallback: PNG
+      // (der Export entscheidet, ob es transparent sein muss).
       const skizze = wep.skizze
-      const skizzePng = skizze?.elemente.length
-        ? async (o: { transparent: boolean }) =>
-            (await skizzeAlsPng(skizze, undefined, undefined, o)).arrayBuffer()
-        : undefined
+      const hatSkizze = Boolean(skizze?.elemente.length)
+      const skizzeFormen =
+        hatSkizze && skizze
+          ? {
+              elemente: ({ zeichenbereich }: { zeichenbereich: Kasten }) => skizzeDatenZuFormen(skizze, zeichenbereich),
+              rasterisiere: svgZuPngBrowser,
+            }
+          : undefined
+      const skizzePng =
+        hatSkizze && skizze
+          ? async (o: { transparent: boolean }) =>
+              (await skizzeAlsPng(skizze, undefined, undefined, o)).arrayBuffer()
+          : undefined
 
-      const result = await exportWep(wep, sourceBuffer, { skizzePng })
+      const result = await exportWep(wep, sourceBuffer, { skizzeFormen, skizzePng, skizzeAlsBild })
 
       // Datei-Download auslösen
       const url = URL.createObjectURL(result.blob)
@@ -1197,6 +1212,17 @@ function ExportTab({
         />
       </div>
 
+      {wep.skizze?.elemente.length ? (
+        <label className="hinweis-klein">
+          <input
+            type="checkbox"
+            checked={skizzeAlsBild}
+            onChange={(e) => setSkizzeAlsBild(e.target.checked)}
+          />{' '}
+          Skizze als Bild statt als bearbeitbare Formen einfügen
+        </label>
+      ) : null}
+
       <button
         type="button"
         className="btn btn-primary"
@@ -1216,7 +1242,10 @@ function ExportTab({
             ✅ Export erfolgreich: {exportZustand.result.filename}
           </p>
           {exportZustand.result.skizzeEingefuegt && (
-            <p className="hinweis-klein">🖍️ Skizze ins Blatt „Skizze Außenanlage-Aufwuchs“ eingefügt.</p>
+            <p className="hinweis-klein">
+              🖍️ Skizze ins Blatt „Skizze Außenanlage-Aufwuchs“ eingefügt
+              {exportZustand.result.skizzeFormen ? ' (bearbeitbare Excel-Formen).' : ' (als Bild).'}
+            </p>
           )}
 
           {exportZustand.result.konflikte.length > 0 && (

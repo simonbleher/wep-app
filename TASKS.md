@@ -76,6 +76,16 @@ Stand: Branch katalog/bewrl-katalog – katalog.json (52 Positionen inkl. S. 18 
 > Erneuter Export ersetzt die alte App-Skizze. Bau-Blätter unverändert. Die App
 > übergibt das PNG (skizzeAlsPng) im Export-Tab, sobald S2 gemerged ist.
 
+### E3 · Grün-Skizze als native Excel-Formen 👀 (#export) – Branch export/skizze-formen
+> `exportWep(wep, excel, { skizzeFormen })` schreibt die Skizze als bearbeitbare Formen
+> (`xdr:sp`/`cxnSp`/`pic` mit SVG + PNG-Fallback) an das vorhandene Drawing von „Skizze
+> Außenanlage-Aufwuchs“; Bau-Kopie und Vorlagen-Textfelder bleiben byte-gleich, erneuter
+> Export ersetzt nur Formen mit `descr="wep-app"`. Stil nach `docs/skills/parzellen-skizze.md`.
+> PNG nur noch Fallback (`skizzeAlsBild`, Checkbox im Export-Tab). Vergleichsbild:
+> `npm run ki-test-skizze-export` → `tools/ki-test/ergebnis-skizze/fall1/formen-export.png`.
+> Offen: Sichtprüfung in echtem Excel (nur LibreOffice getestet), Editor mit den neuen
+> Elementtypen (Hecke, Baum …) – bis dahin erzeugt nur die KI-Strecke Lageplan-Elemente.
+
 ### S1 · Einfaches Skizzen-Tool 👀 (#skizze) – PR #9, nach A1
 > Einfache Zeichenfläche für die Parzellenskizze: Rechteck, Linie, Kreis (Baum),
 > Text, Maßangabe, Rückgängig. Speichern als JSON, Export als PNG für die Vorlage.
@@ -119,5 +129,4 @@ ergänzt Simon in `tools/ki-test/faelle/<name>/eingabe.jpg`.
 ### K-B0 · Skizzen-Testlauf 👀 (#00-leitung) – Branch ki/skizze-test
 Ergebnis: `npm run ki-test-skizze`, Übersicht `tools/ki-test/ergebnis-skizze.html`, Fall 1 mit
 `soll.json` (Entwurf, offene Fragen im PR). Assistent A: Eingabe nur Text/.docx (Fall 04).
-Export-Sofortfix: PNG transparent, wenn das Blatt schon Formen hat. Offen als eigene Aufgabe:
-„Grün als Excel-Formen“.
+Export-Sofortfix: PNG transparent, wenn das Blatt schon Formen hat. Weiterführung: E3.

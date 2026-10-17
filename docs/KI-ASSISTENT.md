@@ -41,7 +41,8 @@ in der App sichtbar und editierbar.
 - Neue Elementtypen im Editor: Weg + Tor, Hecke, Baum-Piktogramm, Strauch, Kompost,
   Schacht, „entfernen“ (Stern + rotes X), Mängelhinweis mit Pfeil, rote Maßlinie.
 - Modus Bau: Gebäude aus Blatt „Skizze Bau“ der Bau-Excel als Grundlage übernehmen.
-- Später optional: Export als bearbeitbare Excel-Formen statt PNG.
+- Export als bearbeitbare Excel-Formen statt PNG: **umgesetzt** (E3, `src/export/skizzeFormen.ts`);
+  `tools/ki-test/skizze/formen.ts` übersetzt die Ausrichtung in `FormElement`e.
 
 ## Erkenntnis aus echter Bau-Excel (17.10.2026)
 
