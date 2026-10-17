@@ -26,8 +26,10 @@ import {
   type CellPatch,
 } from './xmlPatcher'
 import { fuegeSkizzeEin, skizzeBlattHatFormen } from './skizzeBild'
+import { fuegeSkizzeFormenEin, type SkizzeFormenErgebnis, type SkizzeFormenOptionen } from './skizzeFormen'
 
 export { skizzeBlattHatFormen } from './skizzeBild'
+export * from './skizzeFormen'
 
 // ---------------------------------------------------------------------------
 // Typen
@@ -49,6 +51,19 @@ export interface FormalienKonflikt {
 
 export interface ExportOptionen {
   /**
+   * Parzellenskizze als native, bearbeitbare Excel-Formen (Standard-Weg).
+   * Die Formen werden an das vorhandene Drawing des Blatts „Skizze
+   * Außenanlage-Aufwuchs“ angehängt; fremde Formen (Bau-Skizze) bleiben
+   * unverändert, eigene Formen eines früheren Exports werden ersetzt.
+   * Siehe `skizzeFormen.ts`.
+   */
+  skizzeFormen?: SkizzeFormenOptionen
+  /**
+   * Fallback: Skizze statt als Formen als Bild einfügen, auch wenn `skizzeFormen`
+   * übergeben wurde (z. B. wenn die Formen in einer Excel-Version Probleme machen).
+   */
+  skizzeAlsBild?: boolean
+  /**
    * Parzellenskizze als PNG (z. B. aus skizzeAlsPng). Wird in das Blatt
    * „Skizze Außenanlage-Aufwuchs“ in den Bereich B7:G48 eingepasst.
    *
@@ -64,6 +79,8 @@ export interface ExportOptionen {
 }
 
 export interface ExportResult {
+  /** Ergebnis des Formen-Exports (undefined: keine Formen geschrieben) */
+  skizzeFormen?: SkizzeFormenErgebnis
   /** true, wenn eine Skizze ins Skizzen-Blatt eingefügt wurde */
   skizzeEingefuegt: boolean
   /** true, wenn das Skizzen-Blatt schon eigene Formen hatte (PNG transparent angefordert) */
@@ -127,9 +144,14 @@ export async function exportWep(
   // 4b. Parzellenskizze als Bild ins Blatt „Skizze Außenanlage-Aufwuchs“
   //     (das PNG erzeugt die App im Browser mit skizzeAlsPng)
   //     Vorhandene Formen im Blatt (Bau-Skizze) → PNG transparent anfordern.
-  const skizzeTransparent = optionen.skizzePng ? await skizzeBlattHatFormen(zip) : false
-  let skizzeEingefuegt = false
-  if (optionen.skizzePng) {
+  //     Standard sind native Formen (`skizzeFormen`); das PNG ist nur Fallback.
+  let skizzeFormen: SkizzeFormenErgebnis | undefined
+  const alsFormen = Boolean(optionen.skizzeFormen) && !optionen.skizzeAlsBild
+  if (alsFormen) skizzeFormen = await fuegeSkizzeFormenEin(zip, optionen.skizzeFormen!)
+  const pngNutzen = Boolean(optionen.skizzePng) && !alsFormen
+  const skizzeTransparent = pngNutzen ? await skizzeBlattHatFormen(zip) : false
+  let skizzeEingefuegt = Boolean(skizzeFormen)
+  if (pngNutzen && optionen.skizzePng) {
     const png =
       typeof optionen.skizzePng === 'function'
         ? await optionen.skizzePng({ transparent: skizzeTransparent })
@@ -180,6 +202,7 @@ export async function exportWep(
     aufwuchsAbgeschnitten,
     skizzeEingefuegt,
     skizzeTransparent,
+    skizzeFormen,
   }
 }
 

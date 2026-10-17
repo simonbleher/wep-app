@@ -22,9 +22,22 @@ import JSZip from 'jszip'
 
 export const SKIZZE_BLATTNAME = 'Skizze Außenanlage-Aufwuchs'
 export const SKIZZE_BILDNAME = 'WEP-App Skizze'
+/** Marker (`descr`) aller Formen, die die App selbst ins Drawing schreibt. */
+export const WEP_APP_MARKER = 'wep-app'
 
-const EMU_PRO_PX = 9525
-const EMU_PRO_PT = 12700
+/** Regex für einen Anker (oneCell/twoCell/absolute) im Drawing. */
+export const ANKER_REGEX = /<xdr:(oneCellAnchor|twoCellAnchor|absoluteAnchor)\b(?:(?!<\/xdr:\1>)[\s\S])*?<\/xdr:\1>/g
+
+/** true, wenn der Anker von der App stammt (Formen mit descr="wep-app" oder das alte PNG). */
+export function istEigenerAnker(anker: string): boolean {
+  return (
+    anker.includes(`name="${SKIZZE_BILDNAME}"`) ||
+    new RegExp(`<xdr:cNvPr\\b[^>]*\\sdescr="${WEP_APP_MARKER}"`).test(anker)
+  )
+}
+
+export const EMU_PRO_PX = 9525
+export const EMU_PRO_PT = 12700
 
 /** Spaltenbreiten B–G der Vorlage (Zeichen) → EMU (Excel: 1 Zeichen ≈ 7 px). */
 const SPALTEN_EMU = [6.42578125, 18.28515625, 27.85546875, 13.85546875, 9.7109375, 11.7109375].map(
@@ -58,9 +71,9 @@ export function zelleUndVersatz(abstand: number, groessen: number[], start: numb
   return [start, 0]
 }
 
-const NS_REL = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
-const REL_DRAWING = `${NS_REL}/drawing`
-const REL_IMAGE = `${NS_REL}/image`
+export const NS_REL = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
+export const REL_DRAWING = `${NS_REL}/drawing`
+export const REL_IMAGE = `${NS_REL}/image`
 
 // ---------------------------------------------------------------------------
 // Hilfen
@@ -89,17 +102,17 @@ export function einpassen(
   return { x: Math.round((boxBreite - cx) / 2), y: Math.round((boxHoehe - cy) / 2), cx, cy }
 }
 
-function verzeichnis(pfad: string): string {
+export function verzeichnis(pfad: string): string {
   return pfad.slice(0, pfad.lastIndexOf('/'))
 }
 
-function relsPfad(teilPfad: string): string {
+export function relsPfad(teilPfad: string): string {
   const i = teilPfad.lastIndexOf('/')
   return `${teilPfad.slice(0, i)}/_rels/${teilPfad.slice(i + 1)}.rels`
 }
 
 /** Löst ein relatives Target („../drawings/drawing9.xml“) gegen ein Verzeichnis auf. */
-function aufloesen(basisVerzeichnis: string, target: string): string {
+export function aufloesen(basisVerzeichnis: string, target: string): string {
   if (target.startsWith('/')) return target.slice(1)
   const teile = basisVerzeichnis.split('/').filter(Boolean)
   for (const t of target.split('/')) {
@@ -109,22 +122,22 @@ function aufloesen(basisVerzeichnis: string, target: string): string {
   return teile.join('/')
 }
 
-function xmlAttr(tag: string, name: string): string | undefined {
+export function xmlAttr(tag: string, name: string): string | undefined {
   const m = new RegExp(`\\s${name}="([^"]*)"`).exec(tag)
   return m?.[1]
 }
 
-function xmlEntschaerfen(s: string): string {
+export function xmlEntschaerfen(s: string): string {
   return s.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
 }
 
-interface Beziehung {
+export interface Beziehung {
   id: string
   type: string
   target: string
 }
 
-function leseBeziehungen(xml: string): Beziehung[] {
+export function leseBeziehungen(xml: string): Beziehung[] {
   return [...xml.matchAll(/<Relationship\b[^>]*>/g)].map((m) => ({
     id: xmlAttr(m[0], 'Id') ?? '',
     type: xmlAttr(m[0], 'Type') ?? '',
@@ -132,16 +145,16 @@ function leseBeziehungen(xml: string): Beziehung[] {
   }))
 }
 
-function neueRelId(xml: string): string {
+export function neueRelId(xml: string): string {
   const ids = [...xml.matchAll(/\bId="rId(\d+)"/g)].map((m) => Number(m[1]))
   return `rId${Math.max(0, ...ids) + 1}`
 }
 
-const LEERE_RELS =
+export const LEERE_RELS =
   '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
   '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>'
 
-function fuegeBeziehungHinzu(xml: string, type: string, target: string): { xml: string; id: string } {
+export function fuegeBeziehungHinzu(xml: string, type: string, target: string): { xml: string; id: string } {
   const id = neueRelId(xml)
   const eintrag = `<Relationship Id="${id}" Type="${type}" Target="${target}"/>`
   return { xml: xml.replace('</Relationships>', `${eintrag}</Relationships>`), id }
@@ -162,7 +175,7 @@ export async function findeBlattPfad(zip: JSZip, blattName: string): Promise<str
 }
 
 /** Position des <drawing>-Elements laut Schema-Reihenfolge von CT_Worksheet. */
-function fuegeDrawingElementEin(blattXml: string, relId: string): string {
+export function fuegeDrawingElementEin(blattXml: string, relId: string): string {
   const element = `<drawing r:id="${relId}"/>`
   const nachfolger = [
     '<legacyDrawing',
@@ -183,17 +196,42 @@ function fuegeDrawingElementEin(blattXml: string, relId: string): string {
   throw new Error('Blatt-XML ohne </worksheet>')
 }
 
-const LEERES_DRAWING =
+export const LEERES_DRAWING =
   '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
   '<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" ' +
   'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"></xdr:wsDr>'
 
-/** Entfernt Anker, die ein früherer App-Export eingefügt hat. */
-function entferneAltesSkizzenbild(drawingXml: string): string {
-  return drawingXml.replace(
-    /<xdr:(oneCellAnchor|twoCellAnchor|absoluteAnchor)\b(?:(?!<\/xdr:\1>)[\s\S])*?<\/xdr:\1>/g,
-    (anker) => (anker.includes(`name="${SKIZZE_BILDNAME}"`) ? '' : anker),
-  )
+/**
+ * Entfernt alle eigenen Formen der App (altes PNG, Formen mit descr="wep-app") aus dem
+ * Drawing – samt ihren Bilddateien. Fremde Formen bleiben unberührt. Gibt die Anzahl zurück.
+ */
+export async function entferneEigeneFormen(zip: JSZip, drawingPfad: string): Promise<number> {
+  const drawingXml = (await zip.file(drawingPfad)?.async('string')) ?? LEERES_DRAWING
+  const relsDatei = relsPfad(drawingPfad)
+  let rels = await zip.file(relsDatei)?.async('string')
+  const freigegeben = new Set<string>()
+  let entfernt = 0
+  const neu = drawingXml.replace(ANKER_REGEX, (anker) => {
+    if (!anker.includes(`descr="${WEP_APP_MARKER}"`) && !anker.includes('name="WEP-App Skizze"')) return anker
+    entfernt++
+    for (const m of anker.matchAll(/r:embed="([^"]+)"/g)) freigegeben.add(m[1])
+    return ''
+  })
+  if (entfernt === 0) return 0
+
+  // Bilder dieser Formen aufräumen: Beziehung entfernen und – nur bei App-Dateien – die Datei löschen
+  if (rels && freigegeben.size) {
+    const verbleibend = new Set([...neu.matchAll(/r:embed="([^"]+)"/g)].map((m) => m[1]))
+    for (const b of leseBeziehungen(rels)) {
+      if (!freigegeben.has(b.id) || verbleibend.has(b.id)) continue
+      rels = rels.replace(new RegExp(`<Relationship\\b[^>]*\\bId="${b.id}"[^>]*/>`), '')
+      const datei = b.target.replace(/^\.\.\//, 'xl/')
+      if (/\/wep-skizze[^/]*$/.test(datei)) zip.remove(datei)
+    }
+    zip.file(relsDatei, rels)
+  }
+  zip.file(drawingPfad, neu)
+  return entfernt
 }
 
 function bildAnker(relId: string, shapeId: number, breite: number, hoehe: number): string {
@@ -217,6 +255,39 @@ function bildAnker(relId: string, shapeId: number, breite: number, hoehe: number
   )
 }
 
+/**
+ * Findet das Drawing eines Blatts (über <drawing r:id> und die Blatt-Beziehungen)
+ * oder legt ein leeres an und verknüpft es (Beziehung, <drawing>-Element,
+ * Content-Type). Gibt den Pfad im ZIP zurück.
+ */
+export async function findeOderLegeDrawingAn(zip: JSZip, blattPfad: string): Promise<string | undefined> {
+  const blattDatei = zip.file(blattPfad)
+  if (!blattDatei) return undefined
+  const blattRelsPfad = relsPfad(blattPfad)
+  let blattRels = (await zip.file(blattRelsPfad)?.async('string')) ?? LEERE_RELS
+  let blattXml = await blattDatei.async('string')
+  const drawingRef = /<drawing\b[^>]*>/.exec(blattXml)
+  const drawingRel = drawingRef
+    ? leseBeziehungen(blattRels).find((r) => r.id === xmlAttr(drawingRef[0], 'r:id'))
+    : undefined
+  if (drawingRel) return aufloesen(verzeichnis(blattPfad), drawingRel.target)
+
+  let n = 1
+  while (zip.file(`xl/drawings/drawing${n}.xml`)) n++
+  const drawingPfad = `xl/drawings/drawing${n}.xml`
+  zip.file(drawingPfad, LEERES_DRAWING)
+  const neu = fuegeBeziehungHinzu(blattRels, REL_DRAWING, `../drawings/drawing${n}.xml`)
+  blattRels = neu.xml
+  blattXml = fuegeDrawingElementEin(blattXml, neu.id)
+  zip.file(blattRelsPfad, blattRels)
+  zip.file(blattPfad, blattXml)
+  await ergaenzeContentType(
+    zip,
+    `<Override PartName="/${drawingPfad}" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>`,
+  )
+  return drawingPfad
+}
+
 // ---------------------------------------------------------------------------
 // Öffentliche Funktion
 // ---------------------------------------------------------------------------
@@ -232,32 +303,10 @@ export async function fuegeSkizzeEin(zip: JSZip, png: Uint8Array): Promise<boole
   if (!blattPfad || !blattDatei) return false
 
   // 1. Drawing des Blatts finden oder anlegen
-  const blattRelsPfad = relsPfad(blattPfad)
-  let blattRels = (await zip.file(blattRelsPfad)?.async('string')) ?? LEERE_RELS
-  let blattXml = await blattDatei.async('string')
-  let drawingPfad: string
-  const drawingRef = /<drawing\b[^>]*>/.exec(blattXml)
-  const drawingRel = drawingRef
-    ? leseBeziehungen(blattRels).find((r) => r.id === xmlAttr(drawingRef[0], 'r:id'))
-    : undefined
+  const drawingPfad = (await findeOderLegeDrawingAn(zip, blattPfad))!
 
-  if (drawingRel) {
-    drawingPfad = aufloesen(verzeichnis(blattPfad), drawingRel.target)
-  } else {
-    let n = 1
-    while (zip.file(`xl/drawings/drawing${n}.xml`)) n++
-    drawingPfad = `xl/drawings/drawing${n}.xml`
-    zip.file(drawingPfad, LEERES_DRAWING)
-    const neu = fuegeBeziehungHinzu(blattRels, REL_DRAWING, `../drawings/drawing${n}.xml`)
-    blattRels = neu.xml
-    blattXml = fuegeDrawingElementEin(blattXml, neu.id)
-    zip.file(blattRelsPfad, blattRels)
-    zip.file(blattPfad, blattXml)
-    await ergaenzeContentType(
-      zip,
-      `<Override PartName="/${drawingPfad}" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>`,
-    )
-  }
+  // 1b. Eigene Formen/PNG eines früheren Exports entfernen
+  await entferneEigeneFormen(zip, drawingPfad)
 
   // 2. Bild ablegen
   let m = 1
@@ -273,9 +322,7 @@ export async function fuegeSkizzeEin(zip: JSZip, png: Uint8Array): Promise<boole
   zip.file(drawingRelsPfad, bildRel.xml)
 
   // 4. Anker ins Drawing (alte App-Skizze vorher entfernen)
-  let drawingXml = entferneAltesSkizzenbild(
-    (await zip.file(drawingPfad)?.async('string')) ?? LEERES_DRAWING,
-  )
+  let drawingXml = (await zip.file(drawingPfad)?.async('string')) ?? LEERES_DRAWING
   const shapeIds = [...drawingXml.matchAll(/<xdr:cNvPr\b[^>]*\sid="(\d+)"/g)].map((x) => Number(x[1]))
   const anker = bildAnker(bildRel.id, Math.max(1, ...shapeIds) + 1, breite, hoehe)
   drawingXml = drawingXml.replace('</xdr:wsDr>', `${anker}</xdr:wsDr>`)
@@ -301,7 +348,7 @@ export function zaehleFremdeFormen(drawingXml: string): number {
     /<xdr:(oneCellAnchor|twoCellAnchor|absoluteAnchor)\b(?:(?!<\/xdr:\1>)[\s\S])*?<\/xdr:\1>/g,
   )) {
     const anker = m[0]
-    if (anker.includes(`name="${SKIZZE_BILDNAME}"`) || istLeeresTextfeld(anker)) continue
+    if (istEigenerAnker(anker) || istLeeresTextfeld(anker)) continue
     n++
   }
   return n
@@ -326,7 +373,7 @@ export async function skizzeBlattHatFormen(quelle: JSZip | ArrayBuffer | Uint8Ar
   return drawingXml ? zaehleFremdeFormen(drawingXml) > 0 : false
 }
 
-async function ergaenzeContentType(zip: JSZip, eintrag: string): Promise<void> {
+export async function ergaenzeContentType(zip: JSZip, eintrag: string): Promise<void> {
   const pfad = '[Content_Types].xml'
   const xml = await zip.file(pfad)?.async('string')
   if (!xml) return

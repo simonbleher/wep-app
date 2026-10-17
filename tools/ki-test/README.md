@@ -105,3 +105,13 @@ schlägt den Typ: „Pavillon LVP“ = LVP). Daraus entsteht je Achse eine **st�
 Abbildung Foto → EMU (eine einzige Gerade schob neue Elemente in die Laube, weil Handskizzen
 nicht proportional sind). Mindestens 2 Bezugsgebäude, sonst Grundstücksrahmen. Was einem
 Bau-Objekt zugeordnet ist, gilt als vorhanden, der Rest als „neu“.
+
+## Formen-Export (Vergleichsbild)
+
+`npm run ki-test-skizze-export [-- --fall fall1] [-- --antwort <json>]` – Bau-Formen aus
+`aussen-vorher.json` als Drawing in die Vorlage schreiben, neue Elemente (Standard: `soll.json`)
+ausrichten und mit `exportWep({ skizzeFormen })` als Excel-Formen exportieren, danach mit
+LibreOffice rendern. Ergebnis in `ergebnis-skizze/<fall>/`: `formen-export.xlsx` (in Excel
+öffnen und Formen anklicken!), `formen-vorher.png`, `formen-export.png`, `formen-stilprobe.png`
+(alle Elementtypen auf leerem Blatt). Voraussetzung: LibreOffice (`SOFFICE=…` bei abweichendem
+Pfad) und PyMuPDF (`python -m pip install pymupdf`) für das PNG.
