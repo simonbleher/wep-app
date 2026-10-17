@@ -200,3 +200,307 @@ h1 {
   border-color: #b26a00;
   background: #fff4e0;
 }
+
+.hinweis-info {
+  border-color: #1565c0;
+  background: #e3f0ff;
+}
+
+.hinweis-ok {
+  border-color: var(--farbe-primaer);
+  background: #e8f5e9;
+}
+
+/* ─── Tab-Leiste ─────────────────────────────────────────────────────────── */
+
+.tab-leiste {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  border-bottom: 2px solid var(--farbe-rand);
+  padding-bottom: 4px;
+}
+
+.tab-btn {
+  min-height: 48px;
+  padding: 0 14px;
+  font-size: 1rem;
+  font-weight: 500;
+  border: 2px solid var(--farbe-rand);
+  border-bottom: none;
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: var(--farbe-hintergrund);
+  color: var(--farbe-text-schwach);
+  cursor: pointer;
+}
+
+.tab-btn-aktiv {
+  background: var(--farbe-flaeche);
+  color: var(--farbe-primaer);
+  border-color: var(--farbe-primaer);
+  font-weight: 700;
+}
+
+/* ─── Formular ────────────────────────────────────────────────────────────── */
+
+.formular {
+  display: flex;
+  flex-direction: column;
+  gap: var(--abstand);
+}
+
+.abschnitt-titel {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--farbe-primaer);
+}
+
+.eingabe-gruppe {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.eingabe-label {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--farbe-text-schwach);
+}
+
+.eingabe {
+  width: 100%;
+  min-height: var(--touch-min);
+  padding: 10px 14px;
+  font-size: 1rem;
+  border: 2px solid var(--farbe-rand);
+  border-radius: var(--radius);
+  background: var(--farbe-flaeche);
+  color: var(--farbe-text);
+  font-family: inherit;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.eingabe:focus {
+  outline: 3px solid var(--farbe-fokus);
+  outline-offset: 2px;
+}
+
+textarea.eingabe {
+  resize: vertical;
+  min-height: 80px;
+}
+
+/* ─── Positionsliste ────────────────────────────────────────────────────── */
+
+.pos-liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pos-karte {
+  border: 2px solid var(--farbe-rand);
+  border-radius: var(--radius);
+  background: var(--farbe-flaeche);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pos-karte-kopf {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.pos-karte-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pos-bezeichnung {
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+
+.pos-anzahl {
+  color: var(--farbe-text-schwach);
+  font-size: 0.95rem;
+}
+
+.pos-zustand {
+  color: var(--farbe-text-schwach);
+  font-size: 0.9rem;
+  font-style: italic;
+}
+
+.pos-preis {
+  font-size: 0.9rem;
+  color: var(--farbe-text-schwach);
+}
+
+.pos-gesamt {
+  font-weight: 700;
+  color: var(--farbe-primaer);
+}
+
+.pos-begruendung {
+  font-size: 0.9rem;
+  color: var(--farbe-text-schwach);
+  margin: 0;
+  font-style: italic;
+}
+
+.summen-zeile {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--farbe-flaeche);
+  border: 2px solid var(--farbe-primaer);
+  border-radius: var(--radius);
+  font-size: 1.1rem;
+}
+
+.summen-wert {
+  font-weight: 700;
+  font-size: 1.25rem;
+  color: var(--farbe-primaer);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Schnellsuche & Panel ──────────────────────────────────────────────── */
+
+.panel {
+  border: 2px solid var(--farbe-primaer);
+  border-radius: var(--radius);
+  background: var(--farbe-flaeche);
+  padding: var(--abstand);
+  display: flex;
+  flex-direction: column;
+  gap: var(--abstand);
+}
+
+.panel-kopf {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.panel-titel {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.panel-fuss {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.suche-liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.suche-eintrag {
+  width: 100%;
+  min-height: var(--touch-min);
+  padding: 12px 14px;
+  text-align: left;
+  border: 2px solid var(--farbe-rand);
+  border-radius: var(--radius);
+  background: var(--farbe-flaeche);
+  color: var(--farbe-text);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.suche-eintrag:active {
+  border-color: var(--farbe-primaer);
+  background: #e8f5e9;
+}
+
+.suche-bezeichnung {
+  font-weight: 600;
+}
+
+.suche-meta {
+  font-size: 0.9rem;
+  color: var(--farbe-text-schwach);
+}
+
+.preis-zeile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.preis-anzeige {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--farbe-primaer);
+  font-variant-numeric: tabular-nums;
+}
+
+.preis-basis {
+  font-size: 0.85rem;
+  color: var(--farbe-text-schwach);
+}
+
+.hinweis-klein {
+  font-size: 0.9rem;
+  color: var(--farbe-text-schwach);
+  margin: 0;
+}
+
+/* ─── Export-Ergebnis ───────────────────────────────────────────────────── */
+
+.export-ergebnis {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.konflikte-liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.konflikt-eintrag {
+  padding: 8px 12px;
+  background: #fff4e0;
+  border: 1px solid #b26a00;
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+}
+
+.hinweis-warnung-titel {
+  font-size: 0.95rem;
+  color: #b26a00;
+  font-weight: 600;
+  margin: 0;
+}

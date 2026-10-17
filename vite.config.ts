@@ -47,7 +47,7 @@ export default defineConfig({
       },
       workbox: {
         // Offline-Precaching aller gebauten Assets
-        globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest}'],
+        globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest,xlsx}'],
       },
     }),
   ],
