@@ -172,3 +172,31 @@ h1 {
   font-size: 1.15rem;
   font-weight: 600;
 }
+
+/* OneDrive-Leiste */
+.sync {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.sync-zeile {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: var(--abstand);
+  border: 1px solid var(--farbe-rand);
+  border-radius: var(--radius);
+  background: var(--farbe-flaeche);
+}
+
+.sync-text {
+  overflow-wrap: anywhere;
+}
+
+.hinweis-warnung {
+  border-color: #b26a00;
+  background: #fff4e0;
+}
