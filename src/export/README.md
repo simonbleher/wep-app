@@ -62,6 +62,12 @@ byte-gleich mit dem Original.
 | Aufwuchs I                 | sheet6.xml  | A8, A18–A45, B/C/K 18–45 |
 | Aufwuchs II (Überlauf)     | sheet7.xml  | A10–A45, B/C/K 10–45     |
 | Beseitigungskosten Abschn. 2 | sheet17.xml | B/F/G/H/J 34–44        |
+| Skizze (optional, PNG)     | sheet19.xml → drawing9.xml | Bild in B7:G48 (`skizzeBild.ts`) |
+
+Skizze: `exportWep(wep, excel, { skizzePng })`. Das PNG kommt aus der App
+(`skizzeAlsPng`), der Export legt es unter `xl/media/` ab, ergänzt Beziehungen und
+`[Content_Types].xml` und passt es zentriert in den umrandeten Bereich ein. Ein Bild
+namens „WEP-App Skizze“ aus einem früheren Export wird vorher entfernt.
 
 ## Regeln
 

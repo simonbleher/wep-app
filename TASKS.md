@@ -70,6 +70,12 @@ Stand: Branch katalog/bewrl-katalog – katalog.json (52 Positionen inkl. S. 18 
 > exportieren, mit LibreOffice neu berechnen, Summen prüfen, und prüfen, dass
 > Bau-Blätter byte-gleich bleiben. PR.
 
+### E2 · Skizze als Bild in die Excel 👀 (#export) – von der Leitung umgesetzt
+> `exportWep(wep, excel, { skizzePng })` fügt das PNG ins Blatt „Skizze
+> Außenanlage-Aufwuchs“ ein (Bereich B7:G48, Seitenverhältnis bleibt, zentriert).
+> Erneuter Export ersetzt die alte App-Skizze. Bau-Blätter unverändert. Die App
+> übergibt das PNG (skizzeAlsPng) im Export-Tab, sobald S2 gemerged ist.
+
 ### S1 · Einfaches Skizzen-Tool 👀 (#skizze) – PR #9, nach A1
 > Einfache Zeichenfläche für die Parzellenskizze: Rechteck, Linie, Kreis (Baum),
 > Text, Maßangabe, Rückgängig. Speichern als JSON, Export als PNG für die Vorlage.

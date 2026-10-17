@@ -25,6 +25,7 @@ import {
   readCellRawValue,
   type CellPatch,
 } from './xmlPatcher'
+import { fuegeSkizzeEin } from './skizzeBild'
 
 // ---------------------------------------------------------------------------
 // Typen
@@ -44,7 +45,17 @@ export interface FormalienKonflikt {
   appWert: string
 }
 
+export interface ExportOptionen {
+  /**
+   * Parzellenskizze als PNG (z. B. aus skizzeAlsPng). Wird in das Blatt
+   * „Skizze Außenanlage-Aufwuchs“ in den Bereich B7:G48 eingepasst.
+   */
+  skizzePng?: ArrayBuffer | Uint8Array
+}
+
 export interface ExportResult {
+  /** true, wenn eine Skizze ins Skizzen-Blatt eingefügt wurde */
+  skizzeEingefuegt: boolean
   /** Das fertige XLSX als Blob (zum Download) */
   blob: Blob
   /** Vorgeschlagener Dateiname, z. B. "2026-999_WEP.xlsx" */
@@ -80,6 +91,7 @@ export interface ExportResult {
 export async function exportWep(
   wep: Wep,
   sourceExcel: ArrayBuffer,
+  optionen: ExportOptionen = {},
 ): Promise<ExportResult> {
   const zip = await JSZip.loadAsync(sourceExcel)
   const konflikte: FormalienKonflikt[] = []
@@ -99,6 +111,17 @@ export async function exportWep(
 
   // 4. Beseitigungskosten Abschnitt 2 patchen
   await patchBeseitigung(zip, wep)
+
+  // 4b. Parzellenskizze als Bild ins Blatt „Skizze Außenanlage-Aufwuchs“
+  //     (das PNG erzeugt die App im Browser mit skizzeAlsPng)
+  const skizzeEingefuegt = optionen.skizzePng
+    ? await fuegeSkizzeEin(
+        zip,
+        optionen.skizzePng instanceof Uint8Array
+          ? optionen.skizzePng
+          : new Uint8Array(optionen.skizzePng),
+      )
+    : false
 
   // 5. calcChain.xml entfernen und alle Querverweise bereinigen.
   //    Wenn nur die Datei gelöscht wird, bleiben Einträge in
@@ -135,7 +158,14 @@ export async function exportWep(
 
   const filename = `${wep.formalien.vorgangsNr || wep.id}_WEP.xlsx`
 
-  return { blob, filename, konflikte, aufwuchsUeberlauf, aufwuchsAbgeschnitten }
+  return {
+    blob,
+    filename,
+    konflikte,
+    aufwuchsUeberlauf,
+    aufwuchsAbgeschnitten,
+    skizzeEingefuegt,
+  }
 }
 
 // ---------------------------------------------------------------------------
