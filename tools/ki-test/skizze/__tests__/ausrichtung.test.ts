@@ -54,7 +54,7 @@ describe('Ausrichtung mit dem Soll von Fall 1', () => {
 
   it('nutzt die Bezugsgebäude, nicht den Rahmen', () => {
     expect(a.methode).toBe('bezug')
-    expect(a.bezuege.map((b) => b.klasse).sort()).toEqual(['asg', 'laube', 'lvp', 'pavillon'])
+    expect(a.bezuege.map((b) => b.klasse).sort()).toEqual(['asg', 'laube', 'lvp']) // „Pavillon LVP“ ist ein Kasten = LVP
     expect(a.restfehlerProzent).not.toBeNull()
     expect(a.restfehlerProzent!).toBeLessThan(15)
   })
