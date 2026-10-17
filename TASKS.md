@@ -63,7 +63,7 @@ Stand: Branch katalog/bewrl-katalog – katalog.json (52 Positionen inkl. S. 18 
 > exportieren, mit LibreOffice neu berechnen, Summen prüfen, und prüfen, dass
 > Bau-Blätter byte-gleich bleiben. PR.
 
-### S1 · Einfaches Skizzen-Tool ⬜ (#skizze) – nach A1
+### S1 · Einfaches Skizzen-Tool 👀 (#skizze) – PR #9, nach A1
 > Einfache Zeichenfläche für die Parzellenskizze: Rechteck, Linie, Kreis (Baum),
 > Text, Maßangabe, Rückgängig. Speichern als JSON, Export als PNG für die Vorlage.
 > Touch-tauglich. Vorläufige Lösung, wird später ersetzt – also schlank halten. PR.

@@ -1,0 +1,125 @@
+/**
+ * Typen für die Parzellenskizze (Aufgabe S1).
+ *
+ * Eine Skizze besteht aus einer geordneten Liste von Elementen. Jedes Element
+ * hat einen eindeutigen Typ und eine eindeutige id. Das gesamte Objekt `SkizzeDaten`
+ * wird als JSON in der WEP-Datei gespeichert und ist serialisierungsfähig.
+ */
+
+// ---------------------------------------------------------------------------
+// Werkzeuge
+// ---------------------------------------------------------------------------
+
+/** Alle verfügbaren Zeichenwerkzeuge. */
+export type SkizzeWerkzeug =
+  | 'rechteck'
+  | 'linie'
+  | 'kreis'
+  | 'text'
+  | 'massangabe'
+  | 'auswahl'
+
+// ---------------------------------------------------------------------------
+// Elemente
+// ---------------------------------------------------------------------------
+
+/** Basis-Felder, die alle Skizze-Elemente gemeinsam haben. */
+interface ElementBasis {
+  id: string
+}
+
+/** Gefülltes Rechteck (z. B. Gebäude, Beet). */
+export interface SkizzeRechteck extends ElementBasis {
+  typ: 'rechteck'
+  x: number
+  y: number
+  breite: number
+  hoehe: number
+}
+
+/** Gerade Linie zwischen zwei Punkten. */
+export interface SkizzeLinie extends ElementBasis {
+  typ: 'linie'
+  x1: number
+  y1: number
+  x2: number
+  y2: number
+}
+
+/** Kreis (im Lageplan: Baum-Symbol), optional mit Beschriftung. */
+export interface SkizzeKreis extends ElementBasis {
+  typ: 'kreis'
+  cx: number
+  cy: number
+  radius: number
+  beschriftung?: string
+}
+
+/** Freitext auf der Zeichenfläche. */
+export interface SkizzeText extends ElementBasis {
+  typ: 'text'
+  x: number
+  y: number
+  inhalt: string
+  schriftgroesse?: number // Pixel, Standard 14
+}
+
+/**
+ * Maßangabe: Bemaßungslinie mit Zahl in m.
+ * Wird als Linie mit Endhaken und mittigem Label gezeichnet.
+ */
+export interface SkizzeMassangabe extends ElementBasis {
+  typ: 'massangabe'
+  x1: number
+  y1: number
+  x2: number
+  y2: number
+  /** Anzeigetext, z. B. „3,5 m". Frei eingebbar, wird nicht aus Koordinaten berechnet. */
+  beschriftung: string
+}
+
+/** Vereinigungs-Typ aller Skizze-Elemente. */
+export type SkizzeElement =
+  | SkizzeRechteck
+  | SkizzeLinie
+  | SkizzeKreis
+  | SkizzeText
+  | SkizzeMassangabe
+
+// ---------------------------------------------------------------------------
+// Gesamt-Datenstruktur (wird auch in src/model/types.ts referenziert)
+// ---------------------------------------------------------------------------
+
+/**
+ * Alle Daten einer Parzellenskizze.
+ * Wird als `wep.skizze` gespeichert.
+ */
+export interface SkizzeDaten {
+  /** Geordnete Liste der Zeichenelemente (hintere Elemente zuerst). */
+  elemente: SkizzeElement[]
+  /** Breite der Zeichenfläche in logischen Pixeln (Default 800). */
+  breite?: number
+  /** Höhe der Zeichenfläche in logischen Pixeln (Default 600). */
+  hoehe?: number
+  /** Raster einblenden? */
+  raster?: boolean
+  /** Rasterabstand in Pixeln (Default 40). */
+  rasterGroesse?: number
+}
+
+// ---------------------------------------------------------------------------
+// Hilfsfunktionen für neue Elemente
+// ---------------------------------------------------------------------------
+
+let _idZaehler = 0
+
+/** Erzeugt eine einfache, eindeutige ID für ein neues Element. */
+export function neueId(): string {
+  _idZaehler += 1
+  return `el-${Date.now()}-${_idZaehler}`
+}
+
+/** Leere SkizzeDaten (kein Element). */
+export function leereSkizze(): SkizzeDaten {
+  return { elemente: [], breite: 800, hoehe: 600, raster: true, rasterGroesse: 40 }
+}
