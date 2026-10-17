@@ -99,6 +99,17 @@ Stand: Branch katalog/bewrl-katalog – katalog.json (52 Positionen inkl. S. 18 
 > privaten Konto registriert (Redirect-URIs für localhost und die spätere
 > Veröffentlichung). Tests mit gemocktem Graph-Client. PR.
 
+## KI-Assistent (Plan: docs/KI-ASSISTENT.md)
+
+### K-A0 · KI-Testlauf 👀 (#00-leitung) – Branch ki/testlauf
+Ergebnis: `tools/ki-test/` (`npm run ki-test`), Prompt `tools/ki-test/prompt-aufnahme.md`,
+3 erfundene Testfälle, Bericht `tools/ki-test/ergebnis.md`. Fotos handschriftlicher Listen
+ergänzt Simon in `tools/ki-test/faelle/<name>/eingabe.jpg`.
+> Testlauf (Node/TypeScript) für Assistent A: Aufnahmeliste → Katalogpositionen mit
+> Gemini (kostenlos). Nur JSON nach responseSchema, keine Preise (App rechnet über
+> berechnePreisvorschlag). Modellkette aus models.list, bei 429 nächstes Modell.
+> Auswertung je Modell × Fall: Recall/Precision, ID/Variante, Δ Summe €, unsicher, Laufzeit.
+
 ## Offene Fragen an Simon / den BV
 - Zustandsstufen: feste Prozent-Staffel oder freie Schätzung?
 - Geräte vor Ort: Handy oder Tablet?

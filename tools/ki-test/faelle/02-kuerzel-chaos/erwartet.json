@@ -1,0 +1,315 @@
+{
+  "positionen": [
+    {
+      "katalogId": "aa-einfriedung",
+      "varianteIndex": 1,
+      "anzahl": 10,
+      "einheit": "m",
+      "bezeichnung": "Holzzaun",
+      "zustand": "mittel",
+      "unsicher": false,
+      "grund": "Holz"
+    },
+    {
+      "katalogId": null,
+      "varianteIndex": null,
+      "anzahl": 25,
+      "einheit": "m",
+      "bezeichnung": "Maschendrahtzaun, durchwachsen",
+      "zustand": "schlecht",
+      "unsicher": false,
+      "grund": "nicht bewerten: durchwachsener Zaun"
+    },
+    {
+      "katalogId": "aa-tueranlage",
+      "varianteIndex": null,
+      "anzahl": 1,
+      "einheit": "Stück",
+      "bezeichnung": "Tür 1,00 m",
+      "zustand": "mittel",
+      "unsicher": false,
+      "grund": "Türanlage"
+    },
+    {
+      "katalogId": "aa-tueranlage",
+      "varianteIndex": null,
+      "anzahl": 1,
+      "einheit": "Stück",
+      "bezeichnung": "Tür 0,80 m",
+      "zustand": "mittel",
+      "unsicher": false,
+      "grund": "Türanlage, andere Breite"
+    },
+    {
+      "katalogId": "aa-wegebelag",
+      "varianteIndex": 0,
+      "anzahl": 8,
+      "einheit": "m²",
+      "bezeichnung": "Weg Rindenmulch",
+      "zustand": "mittel",
+      "unsicher": false,
+      "grund": "Mulch = einfache Art"
+    },
+    {
+      "katalogId": "aa-hochbeet",
+      "varianteIndex": null,
+      "anzahl": 2,
+      "einheit": "m²",
+      "bezeichnung": "Hochbeet 60 cm",
+      "zustand": "mittel",
+      "unsicher": false,
+      "grund": "2 × 1 m, mind. 50 cm"
+    },
+    {
+      "katalogId": "aa-wasserleitung",
+      "varianteIndex": null,
+      "anzahl": 20,
+      "einheit": "m",
+      "bezeichnung": "Wasserleitung",
+      "zustand": "mittel",
+      "unsicher": false,
+      "grund": "Wasserltg"
+    },
+    {
+      "katalogId": "aa-zapfventil",
+      "varianteIndex": null,
+      "anzahl": 2,
+      "einheit": "Stück",
+      "bezeichnung": "Zapfventil",
+      "zustand": "mittel",
+      "unsicher": false,
+      "grund": "Zapfhähne"
+    },
+    {
+      "katalogId": null,
+      "varianteIndex": null,
+      "anzahl": 1,
+      "einheit": "Stück",
+      "bezeichnung": "Kompost aus Asbestplatten",
+      "zustand": "schlecht",
+      "unsicher": false,
+      "grund": "nicht bewerten: Asbest"
+    },
+    {
+      "katalogId": "aa-oekologisches-objekt",
+      "varianteIndex": 0,
+      "anzahl": 1,
+      "einheit": "Stück",
+      "bezeichnung": "Insektenhotel",
+      "zustand": "mittel",
+      "unsicher": false,
+      "grund": "Insektenhotel"
+    },
+    {
+      "katalogId": "aw-obstgehoelz",
+      "varianteIndex": 1,
+      "anzahl": 1,
+      "einheit": "Stück",
+      "bezeichnung": "Apfel, Buschbaum, 5–30 J.",
+      "zustand": "gut",
+      "unsicher": false,
+      "grund": "BB ca. 8 J."
+    },
+    {
+      "katalogId": "aw-obstgehoelz",
+      "varianteIndex": 5,
+      "anzahl": 1,
+      "einheit": "Stück",
+      "bezeichnung": "Apfel, Halbstamm, über 30 J.",
+      "zustand": "mittel",
+      "unsicher": false,
+      "grund": "HS 40 J., dünn"
+    },
+    {
+      "katalogId": "aw-obstgehoelz",
+      "varianteIndex": 8,
+      "anzahl": 1,
+      "einheit": "Stück",
+      "bezeichnung": "Pflaume, Hochstamm, über 30 J.",
+      "zustand": "mittel",
+      "unsicher": true,
+      "grund": "alt – Alter geschätzt",
+      "alternativ": [
+        {
+          "katalogId": "aw-obstgehoelz",
+          "varianteIndex": 7
+        }
+      ]
+    },
+    {
+      "katalogId": "aw-obstgehoelz",
+      "varianteIndex": 13,
+      "anzahl": 1,
+      "einheit": "Stück",
+      "bezeichnung": "Süßkirsche, Spalier",
+      "zustand": "gut",
+      "unsicher": true,
+      "grund": "Alter unbekannt",
+      "alternativ": [
+        {
+          "katalogId": "aw-obstgehoelz",
+          "varianteIndex": 12
+        },
+        {
+          "katalogId": "aw-obstgehoelz",
+          "varianteIndex": 14
+        }
+      ]
+    },
+    {
+      "katalogId": "aw-beerenobst",
+      "varianteIndex": 1,
+      "anzahl": 6,
+      "einheit": "Stück",
+      "bezeichnung": "Himbeere, Busch",
+      "zustand": "gut",
+      "unsicher": true,
+      "grund": "Alter unbekannt",
+      "alternativ": [
+        {
+          "katalogId": "aw-beerenobst",
+          "varianteIndex": 0
+        }
+      ]
+    },
+    {
+      "katalogId": "aw-beerenobst",
+      "varianteIndex": 1,
+      "anzahl": 1,
+      "einheit": "Stück",
+      "bezeichnung": "Heidelbeere, Busch",
+      "zustand": "gut",
+      "unsicher": true,
+      "grund": "Anzahl und Alter fehlen",
+      "alternativ": [
+        {
+          "katalogId": "aw-beerenobst",
+          "varianteIndex": 0
+        }
+      ]
+    },
+    {
+      "katalogId": "aw-weinrebe",
+      "varianteIndex": 1,
+      "anzahl": 1,
+      "einheit": "Stück",
+      "bezeichnung": "Weinrebe, 10 J.",
+      "zustand": "gut",
+      "unsicher": false,
+      "grund": "5 J. und älter"
+    },
+    {
+      "katalogId": "aw-kraeuter-flaechig",
+      "varianteIndex": null,
+      "anzahl": 3,
+      "einheit": "m²",
+      "bezeichnung": "Lavendel",
+      "zustand": "gut",
+      "unsicher": false,
+      "grund": "Lavendel",
+      "alternativ": [
+        {
+          "katalogId": "aw-staude-flaechig",
+          "varianteIndex": null
+        }
+      ]
+    },
+    {
+      "katalogId": "aw-kraeuter-flaechig",
+      "varianteIndex": null,
+      "anzahl": 2,
+      "einheit": "m²",
+      "bezeichnung": "Kräuterbeet",
+      "zustand": "gut",
+      "unsicher": false,
+      "grund": "Kräuter flächig"
+    },
+    {
+      "katalogId": "aw-knollen-zwiebeln-flaechig",
+      "varianteIndex": null,
+      "anzahl": 4,
+      "einheit": "m²",
+      "bezeichnung": "Tulpen/Narzissen",
+      "zustand": "gut",
+      "unsicher": false,
+      "grund": "Zwiebeln flächig"
+    },
+    {
+      "katalogId": "aw-ziergehoelz",
+      "varianteIndex": 0,
+      "anzahl": 1,
+      "einheit": "Stück",
+      "bezeichnung": "Forsythie",
+      "zustand": "gut",
+      "unsicher": false,
+      "grund": "einfache Art"
+    },
+    {
+      "katalogId": "aw-ziergehoelz",
+      "varianteIndex": 0,
+      "anzahl": 1,
+      "einheit": "Stück",
+      "bezeichnung": "Flieder",
+      "zustand": "gut",
+      "unsicher": false,
+      "grund": "einfache Art"
+    },
+    {
+      "katalogId": "aw-schling-kletterpflanze",
+      "varianteIndex": 1,
+      "anzahl": 1,
+      "einheit": "Stück",
+      "bezeichnung": "Clematis",
+      "zustand": "gut",
+      "unsicher": false,
+      "grund": "wertvollere Art",
+      "alternativ": [
+        {
+          "katalogId": "aw-schling-kletterpflanze",
+          "varianteIndex": 0
+        }
+      ]
+    },
+    {
+      "katalogId": "aw-hecke",
+      "varianteIndex": 3,
+      "anzahl": 6,
+      "einheit": "m",
+      "bezeichnung": "Kirschlorbeer-Hecke",
+      "zustand": "gut",
+      "unsicher": false,
+      "grund": "immergrün, wertvoll, 1,10 m hoch"
+    },
+    {
+      "katalogId": null,
+      "varianteIndex": null,
+      "anzahl": 1,
+      "einheit": "Stück",
+      "bezeichnung": "Thuja, ca. 6 m",
+      "zustand": "schlecht",
+      "unsicher": false,
+      "grund": "nicht bewerten: Nadelgehölz über 4 m"
+    },
+    {
+      "katalogId": null,
+      "varianteIndex": null,
+      "anzahl": 1,
+      "einheit": "Stück",
+      "bezeichnung": "Riesenbärenklau",
+      "zustand": "schlecht",
+      "unsicher": false,
+      "grund": "nicht bewerten: invasive Art, entfernen"
+    },
+    {
+      "katalogId": "aw-rasen",
+      "varianteIndex": null,
+      "anzahl": 140,
+      "einheit": "m²",
+      "bezeichnung": "Rasen",
+      "zustand": "gut",
+      "unsicher": false,
+      "grund": "über 100 m² – App warnt"
+    }
+  ],
+  "kurzbeschreibung": "Außenanlagen: Holzzaun, Maschendrahtzaun durchwachsen (nicht bewertet), zwei Türen, Mulchweg, Wasserleitung mit Zapfventilen, Hochbeet, Insektenhotel; Asbest-Kompost nicht bewertet. Aufwuchs: Obstbäume, Beerenobst, Weinrebe, Kräuter, Zwiebelblumen, Ziergehölze, Clematis, Kirschlorbeerhecke, Rasen; Thuja (zu hoch) und Riesenbärenklau (invasiv) nicht bewertet, entfernen. KGN mittel, Beete teils verwildert."
+}
