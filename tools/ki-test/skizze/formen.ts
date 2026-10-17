@@ -25,6 +25,10 @@ export function ident(s: string): string {
     .replace(/[^\p{L}\p{N}_-]/gu, '')
 }
 
+/** Pflanzen (Stern + X beim Entfernen); alles andere (Holzpferd, Schuppen, Platte …) nur Hinweis + Marker. */
+const PFLANZE = /baum|bäume|strauch|sträucher|busch|hecke|konifere|nadelbaum|wacholder|thuja|zypresse|fichte|tanne|kiefer|flieder|jasmin|ahorn|buche|birke|eiche|linde|obst|apfel|birne|kirsche|pflaume|rose|hortensie|bambus|forsythie|liguster|hainbuche|lebensbaum/i
+export const istPflanze = (...texte: string[]) => PFLANZE.test(texte.join(' '))
+
 const kasten = (r: Rechteck): Kasten => ({ x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.w), h: Math.round(r.h) })
 const mitteVon = (r: Rechteck) => ({ x: Math.round(r.x + r.w / 2), y: Math.round(r.y + r.h / 2) })
 
@@ -69,7 +73,7 @@ export function zuordnungenZuFormen(a: Pick<Ausrichtung, 'zuordnungen'>): FormEl
       }
       case 'entfernen': {
         const stamm = ident(e.bezug || text.split(/\s+/)[0] || 'Entfernen') || 'Entfernen'
-        out.push({ typ: 'entfernen', name: nummer(stamm, false), kasten: k, text })
+        out.push({ typ: 'entfernen', name: nummer(stamm, false), kasten: k, text, pflanze: istPflanze(e.bezug, text) })
         break
       }
       case 'baum':

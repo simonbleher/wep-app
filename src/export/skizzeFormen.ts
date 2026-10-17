@@ -24,8 +24,10 @@ import {
   NS_REL,
   REL_IMAGE,
   SKIZZE_BLATTNAME,
+  ANKER_REGEX,
   WEP_APP_MARKER,
   einpassen,
+  istEigenerAnker,
   entferneEigeneFormen,
   ergaenzeContentType,
   fuegeBeziehungHinzu,
@@ -94,6 +96,11 @@ export interface FormElement {
   text?: string
   /** hecke: „flieder“ | „gruen“; baum: „bergahorn“ | „buche“. */
   variante?: string
+  /**
+   * entfernen: Pflanze (Baum, Strauch, Hecke, Konifere) → Stern mit rotem X.
+   * Sonst (Holzpferd, Schuppen, Platte …) nur Hinweis + Pfeil auf die Stelle mit kleinem rotem X.
+   */
+  pflanze?: boolean
   /** Schriftgröße in pt (Standard 9). */
   schriftPt?: number
 }
@@ -126,6 +133,10 @@ export interface SkizzeFormenErgebnis {
   graswiese: boolean
   /** Piktogramme als SVG-Bild mit PNG-Fallback (sonst einfache Formen). */
   svgBilder: number
+  /** Beschriftungen, die wegen vorhandener Beschriftungen verschoben wurden (Formnamen). */
+  verschoben: string[]
+  /** Formen, die eine vorhandene Beschriftung überdecken und nicht verschoben werden können. */
+  ueberdeckt: string[]
 }
 
 // ---------------------------------------------------------------------------
@@ -626,22 +637,33 @@ function formenFuer(el: FormElement, mitSvg: boolean): Form[] {
 
     case 'entfernen': {
       if (!k) return []
-      const d = Math.round(Math.min(44 * PT, Math.max(30 * PT, Math.min(k.w, k.h))))
       const m = mitte(k)
-      const stern: Kasten = { x: Math.round(m.x - d / 2), y: Math.round(m.y - d / 2), w: d, h: d }
-      const r = d * 0.3
-      const f: Form[] = [
-        { art: 'sp', name: n, ebene: EBENE.entfernen, kasten: stern, prst: 'star16', fuellung: FARBE.sternFuellung, linie: linie(FARBE.sternLinie) },
-        { art: 'cxn', name: `${n}_X1`, ebene: EBENE.entfernen, von: { x: m.x - r, y: m.y - r }, nach: { x: m.x + r, y: m.y + r }, linie: linie(FARBE.rot, 2) },
-        { art: 'cxn', name: `${n}_X2`, ebene: EBENE.entfernen, von: { x: m.x + r, y: m.y - r }, nach: { x: m.x - r, y: m.y + r }, linie: linie(FARBE.rot, 2) },
-      ]
+      const f: Form[] = []
+      let oben: number // Oberkante der Markierung (Stern bzw. X)
+      const kreuz = (r: number) => {
+        f.push(
+          { art: 'cxn', name: `${n}_X1`, ebene: EBENE.entfernen, von: { x: m.x - r, y: m.y - r }, nach: { x: m.x + r, y: m.y + r }, linie: linie(FARBE.rot, 2) },
+          { art: 'cxn', name: `${n}_X2`, ebene: EBENE.entfernen, von: { x: m.x + r, y: m.y - r }, nach: { x: m.x - r, y: m.y + r }, linie: linie(FARBE.rot, 2) },
+        )
+      }
+      if (el.pflanze) {
+        const d = Math.round(Math.min(44 * PT, Math.max(30 * PT, Math.min(k.w, k.h))))
+        const stern: Kasten = { x: Math.round(m.x - d / 2), y: Math.round(m.y - d / 2), w: d, h: d }
+        f.push({ art: 'sp', name: n, ebene: EBENE.entfernen, kasten: stern, prst: 'star16', fuellung: FARBE.sternFuellung, linie: linie(FARBE.sternLinie) })
+        kreuz(d * 0.3)
+        oben = stern.y
+      } else {
+        // kein Pflanzen-Stern: nur ein kleines rotes X als Marker auf der Stelle
+        kreuz(5 * PT)
+        oben = Math.round(m.y - 7 * PT)
+      }
       if (text) {
         const h = Math.round(16 * PT)
         const w = textBreite(text, pt)
-        const hinweis: Kasten = { x: Math.round(m.x - w / 2), y: Math.max(0, Math.round(stern.y - h - 12 * PT)), w, h }
+        const hinweis: Kasten = { x: Math.round(m.x - w / 2), y: Math.max(0, Math.round(oben - h - 12 * PT)), w, h }
         f.push(
           hinweisFeld(`${n}_Hinweis`, hinweis, text, pt),
-          pfeil(`${n}_Pfeil`, { x: m.x, y: hinweis.y + hinweis.h }, { x: m.x, y: stern.y }, FARBE.rot, EBENE.hinweis),
+          pfeil(`${n}_Pfeil`, { x: m.x, y: hinweis.y + hinweis.h }, { x: m.x, y: oben }, FARBE.rot, EBENE.hinweis),
         )
       }
       return f
@@ -862,6 +884,75 @@ export function skizzeDatenZuFormen(daten: SkizzeDaten, bereich: Kasten): FormEl
 // Einfügen ins Zip
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Beschriftungen nicht über vorhandene Beschriftungen legen
+// ---------------------------------------------------------------------------
+
+/** Rechtecke fremder Formen mit sichtbarem Text (z. B. Beschriftungen der Bau-Skizze). */
+export function fremdeBeschriftungen(drawingXml: string): { name: string; kasten: Kasten }[] {
+  const out: { name: string; kasten: Kasten }[] = []
+  for (const m of drawingXml.matchAll(ANKER_REGEX)) {
+    const anker = m[0]
+    if (istEigenerAnker(anker)) continue
+    const texte = [...anker.matchAll(/<a:t(?:\s[^>]*)?>([^<]*)<\/a:t>/g)].map((t) => t[1].trim()).filter(Boolean)
+    if (!texte.length) continue
+    const off = /<a:off x="(-?\d+)" y="(-?\d+)"\/>/.exec(anker)
+    const ext = /<a:ext cx="(\d+)" cy="(\d+)"\/>/.exec(anker)
+    if (!off || !ext) continue
+    out.push({
+      name: texte.join(' '),
+      kasten: { x: Number(off[1]), y: Number(off[2]), w: Number(ext[1]), h: Number(ext[2]) },
+    })
+  }
+  return out
+}
+
+/** Überlappen sich die Rechtecke (mit 1 pt Toleranz am Rand)? */
+function ueberlappt(a: Kasten, b: Kasten): boolean {
+  const t = PT
+  return a.x + t < b.x + b.w && b.x + t < a.x + a.w && a.y + t < b.y + b.h && b.y + t < a.y + a.h
+}
+
+const kastenVon = (f: Form): Kasten =>
+  f.art === 'cxn'
+    ? { x: Math.min(f.von.x, f.nach.x), y: Math.min(f.von.y, f.nach.y), w: Math.abs(f.nach.x - f.von.x), h: Math.abs(f.nach.y - f.von.y) }
+    : f.kasten
+
+/**
+ * Verschiebt eigene Beschriftungen (Textfelder), die vorhandene Beschriftungen, eigene
+ * Formen oder bereits gesetzte Beschriftungen überdecken würden – bevorzugt nach rechts,
+ * dann unten, links, oben. Vorhandene Formen werden nie angefasst. Gibt die Namen der
+ * verschobenen Beschriftungen zurück.
+ */
+export function weicheBeschriftungenAus(formen: Form[], fremd: Kasten[]): string[] {
+  const verschoben: string[] = []
+  const gesetzt: Kasten[] = []
+  const koerper = formen.filter((f) => !(f.art === 'sp' && f.textfeld) && f.ebene > EBENE.gras && f.art !== 'cxn').map(kastenVon)
+  for (const f of formen) {
+    if (f.art !== 'sp' || !f.textfeld) continue
+    const hindernisse = [...fremd, ...koerper, ...gesetzt]
+    const frei = (k: Kasten) => k.x >= 0 && k.y >= 0 && !hindernisse.some((h) => ueberlappt(k, h))
+    if (!frei(f.kasten)) {
+      const { w, h } = f.kasten
+      const luecke = 2 * PT
+      const kandidat = (dx: number, dy: number): Kasten => ({ ...f.kasten, x: f.kasten.x + dx, y: f.kasten.y + dy })
+      const versuche: Kasten[] = []
+      for (const stufe of [1, 2, 3]) {
+        const sx = (w + luecke) * stufe
+        const sy = (h + luecke) * stufe
+        versuche.push(kandidat(sx, 0), kandidat(0, sy), kandidat(-sx, 0), kandidat(0, -sy), kandidat(sx, sy), kandidat(-sx, sy), kandidat(sx, -sy), kandidat(-sx, -sy))
+      }
+      const neu = versuche.find(frei)
+      if (neu) {
+        f.kasten = neu
+        verschoben.push(f.name)
+      }
+    }
+    gesetzt.push(f.kasten)
+  }
+  return verschoben
+}
+
 function naechsterMediaName(zip: JSZip, stamm: string, endung: string): string {
   let n = 1
   while (zip.file(`xl/media/${stamm}${n}.${endung}`)) n++
@@ -907,6 +998,14 @@ export async function fuegeSkizzeFormenEin(
   formen.push(...elementeZuFormen(elemente, mitSvg))
   formen.sort((a, b) => a.ebene - b.ebene)
 
+  // Beschriftungen nicht über vorhandene (Bau-)Beschriftungen legen; Formen, die eine
+  // vorhandene Beschriftung überdecken, bleiben stehen (Lage = Skizze) und werden gemeldet.
+  const fremd = fremdeBeschriftungen(drawingXml)
+  const verschoben = weicheBeschriftungenAus(formen, fremd.map((x) => x.kasten))
+  const ueberdeckt = formen
+    .filter((f) => !(f.art === 'sp' && f.textfeld) && f.art !== 'cxn' && f.ebene > EBENE.gras)
+    .flatMap((f) => fremd.filter((x) => ueberlappt(kastenVon(f), x.kasten)).map((x) => `${f.name} überdeckt „${x.name}“`))
+
   // Bilder (SVG + PNG-Fallback) ablegen und verknüpfen
   const relsDatei = relsPfad(drawingPfad)
   let rels = (await zip.file(relsDatei)?.async('string')) ?? LEERE_RELS
@@ -942,5 +1041,5 @@ export async function fuegeSkizzeFormenEin(
 
   drawingXml = drawingXml.replace('</xdr:wsDr>', `${anker}</xdr:wsDr>`)
   zip.file(drawingPfad, drawingXml)
-  return { anzahlFormen: formen.length, entfernt, graswiese, svgBilder }
+  return { anzahlFormen: formen.length, entfernt, graswiese, svgBilder, verschoben, ueberdeckt }
 }

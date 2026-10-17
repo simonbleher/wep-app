@@ -51,6 +51,7 @@ const BEISPIEL: FormElement[] = [
   { typ: 'hochbeet', name: 'Hochbeet_0', kasten: { x: 1_500_000, y: 6_000_000, w: 400_000, h: 600_000 } },
   { typ: 'hochbeet', name: 'Hochbeet_1', kasten: { x: 2_000_000, y: 6_000_000, w: 400_000, h: 600_000 } },
   { typ: 'entfernen', name: 'Holzpferd', kasten: { x: 3_000_000, y: 3_000_000, w: 500_000, h: 400_000 }, text: 'Holzpferd entfernen' },
+  { typ: 'entfernen', name: 'Wacholder', kasten: { x: 3_800_000, y: 3_000_000, w: 500_000, h: 400_000 }, text: 'Wacholder entfernen', pflanze: true },
   { typ: 'baum', name: 'Bergahorn', kasten: { x: 4_000_000, y: 4_000_000, w: 500_000, h: 600_000 }, text: 'Bergahorn', variante: 'bergahorn' },
   { typ: 'hecke', name: 'Fliederhecke', kasten: { x: 1_000_000, y: 2_500_000, w: 2_000_000, h: 300_000 }, text: 'Flieder', variante: 'flieder' },
   { typ: 'kompost', name: 'Kompost', kasten: { x: 4_500_000, y: 2_500_000, w: 600_000, h: 400_000 } },
@@ -125,7 +126,8 @@ describe('Elemente → Formen', () => {
     const namen = formNamen(BEISPIEL)
     for (const n of [
       'Hochbeet_0', 'Hochbeet_1',
-      'Holzpferd', 'Holzpferd_X1', 'Holzpferd_X2', 'Holzpferd_Hinweis',
+      'Holzpferd_X1', 'Holzpferd_X2', 'Holzpferd_Hinweis', 'Holzpferd_Pfeil',
+      'Wacholder', 'Wacholder_X1', 'Wacholder_Hinweis',
       'Bergahorn', 'Bergahorn_Text',
       'Fliederhecke_0', 'Fliederhecke_Text',
       'Kompost', 'Kompost_Latte_0', 'Kompost_Latte_1', 'Kompost_Latte_2', 'Kompost_Text',
@@ -137,18 +139,28 @@ describe('Elemente → Formen', () => {
     expect(new Set(namen).size).toBe(namen.length)
   })
 
+  it('entfernen: Pflanze = Stern + X, Nicht-Pflanze = nur kleines X + Hinweis + Pfeil', () => {
+    const formen = elementeZuFormen(BEISPIEL, false)
+    const namen = formen.map((f) => f.name)
+    expect(namen).toContain('Wacholder')
+    expect(namen).not.toContain('Holzpferd') // kein Stern
+    expect(formen.some((f) => f.name.startsWith('Holzpferd') && f.art === 'sp' && f.prst === 'star16')).toBe(false)
+    const x1 = formen.find((f) => f.name === 'Holzpferd_X1')!
+    expect(x1.art === 'cxn' && Math.abs(x1.nach.x - x1.von.x)).toBeLessThanOrEqual(12 * PT)
+  })
+
   it('ordnet die Ebenen: Grün unten, Beschriftung, Hinweise, Maße oben', () => {
     const namen = formNamen(BEISPIEL)
     const pos = (n: string) => namen.indexOf(n)
     expect(pos('Fliederhecke_0')).toBeLessThan(pos('Kompost'))
-    expect(pos('Kompost')).toBeLessThan(pos('Holzpferd'))
-    expect(pos('Holzpferd')).toBeLessThan(pos('Bergahorn_Text'))
+    expect(pos('Kompost')).toBeLessThan(pos('Holzpferd_X1'))
+    expect(pos('Holzpferd_X1')).toBeLessThan(pos('Bergahorn_Text'))
     expect(pos('Bergahorn_Text')).toBeLessThan(pos('Rueckschnitt'))
     expect(pos('Rueckschnitt')).toBeLessThan(pos('Maß_Laube_Breite'))
   })
 
   it('zeichnet die Hecke als versetzte, überlappende Ellipsen', () => {
-    const formen = elementeZuFormen([BEISPIEL[4]], false).filter((f) => f.name.startsWith('Fliederhecke_') && f.art === 'sp')
+    const formen = elementeZuFormen(BEISPIEL.filter((e) => e.name === 'Fliederhecke'), false).filter((f) => f.name.startsWith('Fliederhecke_') && f.art === 'sp')
     const ellipsen = formen.filter((f) => f.name !== 'Fliederhecke_Text')
     expect(ellipsen.length).toBeGreaterThanOrEqual(5)
     for (const e of ellipsen) {
@@ -160,7 +172,7 @@ describe('Elemente → Formen', () => {
   })
 
   it('Baum ohne SVG: Krone aus Kreisen + Stamm', () => {
-    const namen = formNamen([BEISPIEL[3]], false)
+    const namen = formNamen(BEISPIEL.filter((e) => e.name === 'Bergahorn'), false)
     expect(namen).toEqual(expect.arrayContaining(['Bergahorn_Stamm', 'Bergahorn_Krone_0', 'Bergahorn_Krone_1', 'Bergahorn_Krone_2']))
   })
 })
@@ -187,7 +199,8 @@ describe('Export als Excel-Formen', () => {
     const r = await exportWep(wep, vorlage, { skizzeFormen: { elemente: BEISPIEL, rasterisiere: raster } })
     const drawing = await (await alsZip(r.blob)).file(DRAWING)!.async('string')
     const form = (name: string) => anker(drawing).find((a) => a.includes(`name="${name}"`))!
-    expect(form('Holzpferd')).toContain('prst="star16"')
+    expect(form('Wacholder')).toContain('prst="star16"')
+    expect(form('Holzpferd_X1')).not.toContain('star16')
     expect(form('Holzpferd_X1')).toMatch(/<a:ln w="25400"><a:solidFill><a:srgbClr val="C00000"/)
     expect(form('Holzpferd_Hinweis')).toContain('prst="roundRect"')
     expect(form('Holzpferd_Hinweis')).toContain('<a:srgbClr val="FFFFFF"/>')
@@ -364,13 +377,44 @@ describe('Blatt mit fremden Formen', () => {
     const zip = await alsZip(zweit.blob)
     const drawing = await zip.file(DRAWING)!.async('string')
     for (const f of FREMDE) expect(drawing).toContain(f)
-    expect(drawing).not.toContain('name="Holzpferd"')
+    expect(drawing).not.toContain('name="Wacholder"')
     expect(drawing).toContain('name="Hochbeet_1"')
     expect(drawing.match(/name="Hochbeet_0"/g)).toHaveLength(1)
     // keine Bild-Leichen: nur Bilder, die noch verwendet werden (hier: keine Pikto­gramme mehr)
     expect(zip.file(/^xl\/media\//)).toHaveLength(0)
     const rels = await zip.file('xl/drawings/_rels/drawing9.xml.rels')?.async('string')
     expect(rels ?? '').not.toContain('wep-skizze')
+  })
+
+  it('Beschriftungen weichen vorhandenen Beschriftungen aus (Bau-Formen bleiben)', async () => {
+    // Bau-Beschriftung „Brunnen“ genau dort, wo die Beschriftung unter dem Baum läge
+    const baum: FormElement = { typ: 'baum', name: 'Buche', kasten: { x: 2_000_000, y: 2_000_000, w: 500_000, h: 600_000 }, text: 'Buche' }
+    const leer = await exportWep(wep, vorlage, { skizzeFormen: { elemente: [baum], graswiese: false } })
+    const mitte = /name="Buche_Text"[\s\S]*?<a:off x="(\d+)" y="(\d+)"\/>/.exec(await (await alsZip(leer.blob)).file(DRAWING)!.async('string'))!
+    const label = { x: Number(mitte[1]), y: Number(mitte[2]) }
+    const brunnen = fremdForm(2, 'Textfeld 39', 'Brunnen').replace(
+      '<a:prstGeom',
+      `<a:xfrm><a:off x="${label.x}" y="${label.y}"/><a:ext cx="700000" cy="280000"/></a:xfrm><a:prstGeom`,
+    )
+    const quelle = KOPF + brunnen + '</xdr:wsDr>'
+    const r = await exportWep(wep, await vorlageMit(quelle), { skizzeFormen: { elemente: [baum] } })
+    expect(r.skizzeFormen!.verschoben).toEqual(['Buche_Text'])
+    const drawing = await (await alsZip(r.blob)).file(DRAWING)!.async('string')
+    expect(drawing).toContain(brunnen) // Bau-Form unverändert
+    const neu = /name="Buche_Text"[\s\S]*?<a:off x="(\d+)" y="(\d+)"\/><a:ext cx="(\d+)" cy="(\d+)"\/>/.exec(drawing)!
+    const [nx, ny, nw, nh] = neu.slice(1).map(Number)
+    const frei = nx >= label.x + 700000 || nx + nw <= label.x || ny >= label.y + 280000 || ny + nh <= label.y
+    expect(frei).toBe(true)
+  })
+
+  it('meldet Formen, die eine vorhandene Beschriftung überdecken', async () => {
+    const beet: FormElement = { typ: 'hochbeet', name: 'Hochbeet_0', kasten: { x: 2_000_000, y: 2_000_000, w: 400_000, h: 600_000 } }
+    const bau = fremdForm(2, 'Textfeld 39', 'Brunnen').replace(
+      '<a:prstGeom',
+      '<a:xfrm><a:off x="2100000" y="2200000"/><a:ext cx="700000" cy="280000"/></a:xfrm><a:prstGeom',
+    )
+    const r = await exportWep(wep, await vorlageMit(KOPF + bau + '</xdr:wsDr>'), { skizzeFormen: { elemente: [beet] } })
+    expect(r.skizzeFormen!.ueberdeckt).toEqual(['Hochbeet_0 überdeckt „Brunnen“'])
   })
 
   it('ein früherer Export zählt nicht als „Blatt hat Formen“', async () => {
@@ -463,7 +507,7 @@ describe('LibreOffice', () => {
       // 1. Flat-ODS: LibreOffice hat die Formen als Zeichenobjekte gelesen (Name erhalten)
       execFileSync(soffice, [profil, '--headless', '--convert-to', 'fods', '--outdir', dir, xlsx], { stdio: 'pipe', timeout: 120000 })
       const fods = fs.readFileSync(path.join(dir, 'formen.fods'), 'utf8')
-      for (const n of ['Hochbeet_0', 'Holzpferd', 'Holzpferd_X1', 'Holzpferd_Hinweis', 'Kompost_Latte_1', 'Maß_Laube_Breite', 'Rechteck 8']) {
+      for (const n of ['Hochbeet_0', 'Wacholder', 'Holzpferd_X1', 'Holzpferd_Hinweis', 'Kompost_Latte_1', 'Maß_Laube_Breite', 'Rechteck 8']) {
         expect(fods, n).toContain(`draw:name="${n}"`)
       }
       // 2. PDF entsteht (alle Blätter, inkl. Skizzen-Blatt mit den Formen)
