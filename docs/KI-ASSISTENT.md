@@ -38,6 +38,25 @@ in der App sichtbar und editierbar.
 - Modus Bau: Gebäude aus Blatt „Skizze Bau“ der Bau-Excel als Grundlage übernehmen.
 - Später optional: Export als bearbeitbare Excel-Formen statt PNG.
 
+## Erkenntnis aus echter Bau-Excel (17.10.2026)
+
+- Die Bau-Skizze liegt in der Bau-Excel als **native Excel-Formen** (Rechtecke, Ellipsen,
+  Linien, Pfeile, Textfelder mit Maßen) im Blatt „Skizze Bau“ – nicht im Skill-Stil.
+- Der Bau-Wertermittler **kopiert sie bereits** ins Blatt „Skizze Außenanlage-Aufwuchs“
+  (ohne Maße). Grün ergänzt nur noch: Bäume, Hecken, Beete, Brunnen, Zugang, Mängel …
+- Folgen:
+  1. **Export ändern:** Das bisherige PNG (E2) würde die vorhandenen Bau-Formen
+     überdecken. Grün-Elemente müssen als **eigene Excel-Formen** in das vorhandene
+     Drawing angehängt werden (Bau-Formen bleiben unangetastet), mindestens aber als
+     transparentes PNG ohne Hintergrund/Raster.
+  2. **Import:** Lädt man die Bau-Excel hoch, liest die App die Formen aus „Skizze Bau“
+     (bzw. dem schon vorbereiteten Außen-Blatt) und zeigt sie im Editor als feste
+     Hintergrund-Ebene.
+  3. **KI-Ausrichtung:** Gemini erkennt im Foto auch die Gebäude (Laube, LVP, ASG …).
+     Die App richtet das Foto über diese Bezugsgebäude an den Excel-Formen aus und setzt
+     nur die neuen Grün-Elemente.
+- Testfall: tools/ki-test/faelle-skizze/fall1/.
+
 ## Anbindung
 
 - Cloudflare Pages Function `/api/ki`; API-Key als Cloudflare-Secret (`GEMINI_API_KEY`),

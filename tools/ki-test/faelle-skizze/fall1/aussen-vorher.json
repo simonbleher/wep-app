@@ -1,0 +1,583 @@
+{
+ "quelle": "Bau-Excel, Blatt „Skizze Außenanlage-Aufwuchs“ wie vom Bau-Wertermittler vorbereitet (Kopie der Bau-Skizze ohne Maße) – anonymisiert.",
+ "formen": [
+  {
+   "name": "Textfeld 1",
+   "typ": "rect",
+   "x": 4739640,
+   "y": 2392680,
+   "w": 184731,
+   "h": 264560,
+   "textfeld": true,
+   "fuellung": "keine"
+  },
+  {
+   "name": "Textfeld 2",
+   "typ": "rect",
+   "x": 4747260,
+   "y": 2392680,
+   "w": 184731,
+   "h": 264560,
+   "textfeld": true,
+   "fuellung": "keine"
+  },
+  {
+   "name": "Rechteck 3",
+   "typ": "rect",
+   "x": 556260,
+   "y": 2011680,
+   "w": 5257800,
+   "h": 5654040
+  },
+  {
+   "name": "Gerader Verbinder 4",
+   "typ": "line",
+   "x": 8801100,
+   "y": 7399020,
+   "w": 0,
+   "h": 419100,
+   "flipV": true
+  },
+  {
+   "name": "Gerader Verbinder 5",
+   "typ": "line",
+   "x": 8374380,
+   "y": 7391400,
+   "w": 426720,
+   "h": 434340,
+   "flipH": true
+  },
+  {
+   "name": "Textfeld 6",
+   "typ": "rect",
+   "x": 8191500,
+   "y": 7818120,
+   "w": 944105,
+   "h": 264560,
+   "textfeld": true,
+   "text": "Zugang Parz.",
+   "fuellung": "keine"
+  },
+  {
+   "name": "Ellipse 7",
+   "typ": "ellipse",
+   "x": 9227820,
+   "y": 5379720,
+   "w": 495300,
+   "h": 350520
+  },
+  {
+   "name": "Rechteck 8",
+   "typ": "rect",
+   "x": 1531620,
+   "y": 5341620,
+   "w": 2133600,
+   "h": 1158240
+  },
+  {
+   "name": "Rechteck 9",
+   "typ": "rect",
+   "x": 3512820,
+   "y": 5494020,
+   "w": 1150620,
+   "h": 861060
+  },
+  {
+   "name": "Rechteck 10",
+   "typ": "rect",
+   "x": 8382000,
+   "y": 3505200,
+   "w": 1310640,
+   "h": 1181100
+  },
+  {
+   "name": "Rechteck 11",
+   "typ": "rect",
+   "x": 9243060,
+   "y": 6210300,
+   "w": 373380,
+   "h": 312420
+  },
+  {
+   "name": "Textfeld 12",
+   "typ": "rect",
+   "x": 9243060,
+   "y": 6720840,
+   "w": 504305,
+   "h": 311496,
+   "textfeld": true,
+   "text": "WM",
+   "fuellung": "keine"
+  },
+  {
+   "name": "Textfeld 13",
+   "typ": "rect",
+   "x": 9250680,
+   "y": 5730240,
+   "w": 492699,
+   "h": 311496,
+   "textfeld": true,
+   "text": "ASG",
+   "fuellung": "keine"
+  },
+  {
+   "name": "Textfeld 14",
+   "typ": "rect",
+   "x": 3893820,
+   "y": 5669280,
+   "w": 412998,
+   "h": 342786,
+   "textfeld": true,
+   "text": "A1",
+   "fuellung": "keine"
+  },
+  {
+   "name": "Textfeld 15",
+   "typ": "rect",
+   "x": 2529840,
+   "y": 5684520,
+   "w": 271421,
+   "h": 342786,
+   "textfeld": true,
+   "text": "L",
+   "fuellung": "keine"
+  },
+  {
+   "name": "Rechteck 16",
+   "typ": "rect",
+   "x": 6545580,
+   "y": 3040380,
+   "w": 205740,
+   "h": 213360
+  },
+  {
+   "name": "Gerader Verbinder 17",
+   "typ": "line",
+   "x": 7025640,
+   "y": 3162300,
+   "w": 175260,
+   "h": 190500
+  },
+  {
+   "name": "Gerader Verbinder 18",
+   "typ": "line",
+   "x": 6896100,
+   "y": 3048000,
+   "w": 175260,
+   "h": 160020,
+   "flipH": true
+  },
+  {
+   "name": "Textfeld 19",
+   "typ": "rect",
+   "x": 7200900,
+   "y": 2918460,
+   "w": 871585,
+   "h": 436786,
+   "textfeld": true,
+   "text": "Schornstein geschlossen",
+   "fuellung": "keine"
+  },
+  {
+   "name": "Textfeld 20",
+   "typ": "rect",
+   "x": 2263140,
+   "y": 5890260,
+   "w": 872034,
+   "h": 264560,
+   "textfeld": true,
+   "text": "FOK=+46cm",
+   "fuellung": "keine"
+  },
+  {
+   "name": "Rechteck 21",
+   "typ": "rect",
+   "x": 1531620,
+   "y": 4533900,
+   "w": 2125980,
+   "h": 815340
+  },
+  {
+   "name": "Textfeld 22",
+   "typ": "rect",
+   "x": 2606040,
+   "y": 4533900,
+   "w": 723853,
+   "h": 280205,
+   "textfeld": true,
+   "text": "Terrasse",
+   "fuellung": "keine"
+  },
+  {
+   "name": "Textfeld 23",
+   "typ": "rect",
+   "x": 8702040,
+   "y": 4724400,
+   "w": 527388,
+   "h": 264560,
+   "textfeld": true,
+   "text": "Beton",
+   "fuellung": "keine"
+  },
+  {
+   "name": "Textfeld 24",
+   "typ": "rect",
+   "x": 6873240,
+   "y": 5791200,
+   "w": 184731,
+   "h": 264560,
+   "textfeld": true,
+   "fuellung": "keine"
+  },
+  {
+   "name": "Textfeld 25",
+   "typ": "rect",
+   "x": 2247900,
+   "y": 4724400,
+   "w": 1465658,
+   "h": 264560,
+   "textfeld": true,
+   "text": "Gehwegplatten/Beton",
+   "fuellung": "keine"
+  },
+  {
+   "name": "Textfeld 26",
+   "typ": "rect",
+   "x": 8816340,
+   "y": 3840480,
+   "w": 412998,
+   "h": 342786,
+   "textfeld": true,
+   "text": "A1",
+   "fuellung": "keine"
+  },
+  {
+   "name": "Rechteck 27",
+   "typ": "rect",
+   "x": 1226820,
+   "y": 6111240,
+   "w": 266700,
+   "h": 304800
+  },
+  {
+   "name": "Textfeld 28",
+   "typ": "rect",
+   "x": 1158240,
+   "y": 6111240,
+   "w": 421206,
+   "h": 280205,
+   "textfeld": true,
+   "text": "HW",
+   "fuellung": "keine"
+  },
+  {
+   "name": "Textfeld 29",
+   "typ": "rect",
+   "x": 906780,
+   "y": 6377940,
+   "w": 668260,
+   "h": 264560,
+   "textfeld": true,
+   "text": "PVC-Box",
+   "fuellung": "keine"
+  },
+  {
+   "name": "Ellipse 30",
+   "typ": "ellipse",
+   "x": 693420,
+   "y": 5638800,
+   "w": 434340,
+   "h": 434340
+  },
+  {
+   "name": "Textfeld 31",
+   "typ": "rect",
+   "x": 670560,
+   "y": 5722620,
+   "w": 492699,
+   "h": 311496,
+   "textfeld": true,
+   "text": "ASG",
+   "fuellung": "keine"
+  },
+  {
+   "name": "Gerader Verbinder 32",
+   "typ": "line",
+   "x": 640080,
+   "y": 7200900,
+   "w": 0,
+   "h": 457200,
+   "flipV": true
+  },
+  {
+   "name": "Gerader Verbinder 33",
+   "typ": "line",
+   "x": 1493520,
+   "y": 7216140,
+   "w": 0,
+   "h": 449580,
+   "flipV": true
+  },
+  {
+   "name": "Gerader Verbinder 34",
+   "typ": "line",
+   "x": 640080,
+   "y": 7208520,
+   "w": 434340,
+   "h": 441960
+  },
+  {
+   "name": "Gerader Verbinder 35",
+   "typ": "line",
+   "x": 1074420,
+   "y": 7231380,
+   "w": 419100,
+   "h": 426720,
+   "flipV": true
+  },
+  {
+   "name": "Gerader Verbinder 36",
+   "typ": "line",
+   "x": 5448300,
+   "y": 7231380,
+   "w": 7620,
+   "h": 426720,
+   "flipH": true,
+   "flipV": true
+  },
+  {
+   "name": "Gerader Verbinder 37",
+   "typ": "line",
+   "x": 5006340,
+   "y": 7216140,
+   "w": 441960,
+   "h": 419100,
+   "flipH": true
+  },
+  {
+   "name": "Ellipse 38",
+   "typ": "ellipse",
+   "x": 2430780,
+   "y": 7292340,
+   "w": 167640,
+   "h": 160020
+  },
+  {
+   "name": "Textfeld 39",
+   "typ": "rect",
+   "x": 2148840,
+   "y": 7033260,
+   "w": 733406,
+   "h": 280205,
+   "textfeld": true,
+   "text": "Brunnen",
+   "fuellung": "keine"
+  },
+  {
+   "name": "Rechteck 40",
+   "typ": "rect",
+   "x": 1584960,
+   "y": 4594860,
+   "w": 716280,
+   "h": 685800
+  },
+  {
+   "name": "Textfeld 41",
+   "typ": "rect",
+   "x": 1623060,
+   "y": 4785360,
+   "w": 693973,
+   "h": 280205,
+   "textfeld": true,
+   "text": "Pavillon",
+   "fuellung": "keine"
+  },
+  {
+   "name": "Gerader Verbinder 42",
+   "typ": "line",
+   "x": 1531620,
+   "y": 6537960,
+   "w": 0,
+   "h": 251460
+  },
+  {
+   "name": "Gerader Verbinder 56",
+   "typ": "line",
+   "x": 1531620,
+   "y": 5082540,
+   "w": 2133600,
+   "h": 7620,
+   "gestrichelt": true
+  },
+  {
+   "name": "Textfeld 57",
+   "typ": "rect",
+   "x": 3642360,
+   "y": 5478780,
+   "w": 184731,
+   "h": 264560,
+   "textfeld": true,
+   "fuellung": "keine"
+  },
+  {
+   "name": "Textfeld 58",
+   "typ": "rect",
+   "x": 3642360,
+   "y": 6080760,
+   "w": 184731,
+   "h": 264560,
+   "textfeld": true,
+   "fuellung": "keine"
+  },
+  {
+   "name": "Gerader Verbinder 59",
+   "typ": "line",
+   "x": 7338060,
+   "y": 3764280,
+   "w": 914400,
+   "h": 914400
+  },
+  {
+   "name": "Textfeld 60",
+   "typ": "rect",
+   "x": 3238500,
+   "y": 5486400,
+   "w": 184731,
+   "h": 264560,
+   "textfeld": true,
+   "fuellung": "keine"
+  },
+  {
+   "name": "Textfeld 61",
+   "typ": "rect",
+   "x": 3253740,
+   "y": 6088380,
+   "w": 184731,
+   "h": 264560,
+   "textfeld": true,
+   "fuellung": "keine"
+  },
+  {
+   "name": "Textfeld 62",
+   "typ": "rect",
+   "x": 6934200,
+   "y": 5989320,
+   "w": 184731,
+   "h": 264560,
+   "textfeld": true,
+   "fuellung": "keine"
+  },
+  {
+   "name": "Textfeld 63",
+   "typ": "rect",
+   "x": 2484120,
+   "y": 6522720,
+   "w": 184731,
+   "h": 264560,
+   "textfeld": true,
+   "fuellung": "keine"
+  },
+  {
+   "name": "Textfeld 64",
+   "typ": "rect",
+   "x": 4620609,
+   "y": 5737860,
+   "w": 184731,
+   "h": 264560,
+   "textfeld": true,
+   "fuellung": "keine"
+  },
+  {
+   "name": "Textfeld 65",
+   "typ": "rect",
+   "x": 4597749,
+   "y": 4800600,
+   "w": 184731,
+   "h": 264560,
+   "textfeld": true,
+   "fuellung": "keine"
+  },
+  {
+   "name": "Textfeld 66",
+   "typ": "rect",
+   "x": 2286000,
+   "y": 5044440,
+   "w": 1405834,
+   "h": 264560,
+   "textfeld": true,
+   "text": "Dachüberstand 70cm",
+   "fuellung": "keine"
+  },
+  {
+   "name": "Textfeld 67",
+   "typ": "rect",
+   "x": 548640,
+   "y": 6507480,
+   "w": 1042721,
+   "h": 264560,
+   "textfeld": true,
+   "text": "0,80/0,60/0,85",
+   "fuellung": "keine"
+  },
+  {
+   "name": "Textfeld 43",
+   "typ": "rect",
+   "x": 4671060,
+   "y": 7680960,
+   "w": 1087092,
+   "h": 264560,
+   "textfeld": true,
+   "text": "Zugang Parz. X",
+   "fuellung": "keine"
+  },
+  {
+   "name": "Gerader Verbinder 45",
+   "typ": "line",
+   "x": 1562100,
+   "y": 4556760,
+   "w": 739140,
+   "h": 7620,
+   "flipH": true,
+   "flipV": true
+  },
+  {
+   "name": "Gerader Verbinder 47",
+   "typ": "line",
+   "x": 1554480,
+   "y": 4526280,
+   "w": 7620,
+   "h": 792480,
+   "flipH": true,
+   "flipV": true
+  },
+  {
+   "name": "Textfeld 49",
+   "typ": "rect",
+   "x": 990600,
+   "y": 3970020,
+   "w": 855683,
+   "h": 609013,
+   "textfeld": true,
+   "text": "Schilfrohr- verkleidung",
+   "fuellung": "keine"
+  },
+  {
+   "name": "Gerader Verbinder 51",
+   "typ": "line",
+   "x": 1356360,
+   "y": 4343400,
+   "w": 419100,
+   "h": 236220,
+   "flipH": true,
+   "flipV": true
+  },
+  {
+   "name": "Gerader Verbinder 54",
+   "typ": "line",
+   "x": 1287780,
+   "y": 4366260,
+   "w": 243840,
+   "h": 575310
+  }
+ ]
+}
