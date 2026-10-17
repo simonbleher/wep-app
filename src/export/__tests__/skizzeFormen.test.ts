@@ -407,14 +407,97 @@ describe('Blatt mit fremden Formen', () => {
     expect(frei).toBe(true)
   })
 
-  it('meldet Formen, die eine vorhandene Beschriftung überdecken', async () => {
-    const beet: FormElement = { typ: 'hochbeet', name: 'Hochbeet_0', kasten: { x: 2_000_000, y: 2_000_000, w: 400_000, h: 600_000 } }
-    const bau = fremdForm(2, 'Textfeld 39', 'Brunnen').replace(
+  /** Bau-Beschriftung (Textfeld mit xfrm) an fester Stelle. */
+  const bauLabel = (x: number, y: number, w: number, h: number, text = 'Brunnen') =>
+    fremdForm(2, 'Textfeld 39', text).replace(
       '<a:prstGeom',
-      '<a:xfrm><a:off x="2100000" y="2200000"/><a:ext cx="700000" cy="280000"/></a:xfrm><a:prstGeom',
+      `<a:xfrm><a:off x="${x}" y="${y}"/><a:ext cx="${w}" cy="${h}"/></a:xfrm><a:prstGeom`,
     )
-    const r = await exportWep(wep, await vorlageMit(KOPF + bau + '</xdr:wsDr>'), { skizzeFormen: { elemente: [beet] } })
-    expect(r.skizzeFormen!.ueberdeckt).toEqual(['Hochbeet_0 überdeckt „Brunnen“'])
+  const lage = (drawing: string, name: string) => {
+    const m = new RegExp(`name="${name}"[\\s\\S]*?<a:off x="(\\d+)" y="(\\d+)"/><a:ext cx="(\\d+)" cy="(\\d+)"/>`).exec(drawing)!
+    const [x, y, w, h] = m.slice(1).map(Number)
+    return { x, y, w, h }
+  }
+  const schneiden = (a: { x: number; y: number; w: number; h: number }, b: typeof a) =>
+    a.x + 12_700 < b.x + b.w && b.x + 12_700 < a.x + a.w && a.y + 12_700 < b.y + b.h && b.y + 12_700 < a.y + a.h // 1 pt Toleranz
+
+  const beete: FormElement[] = [0, 1, 2, 3].map((i) => ({
+    typ: 'hochbeet' as const,
+    name: `Hochbeet_${i}`,
+    gruppe: 'Hochbeet',
+    kasten: { x: 2_000_000 + i * 450_000, y: 3_000_000, w: 300_000, h: 500_000 },
+  }))
+
+  it('Körper-Formen, die ein Bau-Label überdecken, werden minimal versetzt – Gruppe gemeinsam', async () => {
+    // Label über dem zweiten und dritten Beet
+    const label = { x: 2_300_000, y: 3_300_000, w: 900_000, h: 280_000 }
+    const r = await exportWep(wep, await vorlageMit(KOPF + bauLabel(label.x, label.y, label.w, label.h) + '</xdr:wsDr>'), {
+      skizzeFormen: { elemente: beete },
+    })
+    expect(r.skizzeFormen!.versetzt).toEqual(['Hochbeet'])
+    expect(r.skizzeFormen!.ueberdeckt).toEqual([])
+    const drawing = await (await alsZip(r.blob)).file(DRAWING)!.async('string')
+    const neu = beete.map((b) => lage(drawing, b.name))
+    for (const n of neu) expect(schneiden(n, label)).toBe(false)
+    // Reihenfolge und Abstände bleiben (gemeinsam verschoben, höchstens eine Elementhöhe)
+    expect(neu.map((n) => n.x)).toEqual([...neu.map((n) => n.x)].sort((a, b) => a - b))
+    const abstaende = neu.slice(1).map((n, i) => n.x - neu[i].x)
+    expect(new Set(abstaende).size).toBe(1)
+    expect(Math.abs(neu[0].y - 3_000_000)).toBeLessThanOrEqual(500_000)
+    expect(Math.abs(neu[0].x - 2_000_000)).toBeLessThanOrEqual(500_000)
+    // Bau-Form unverändert
+    expect(drawing).toContain(bauLabel(label.x, label.y, label.w, label.h))
+  })
+
+  it('reicht Verschieben nicht, wird die Gruppe um höchstens 20 % verkleinert', async () => {
+    // Hindernis-Streifen darüber und darunter: nur Verkleinern passt dazwischen
+    const oben = bauLabel(1_500_000, 2_700_000, 4_000_000, 290_000)
+    const unten = fremdForm(3, 'Textfeld 40', 'Weg').replace(
+      '<a:prstGeom',
+      '<a:xfrm><a:off x="1500000" y="3_480_000"/><a:ext cx="4000000" cy="290000"/></a:xfrm><a:prstGeom'.replace('3_480_000', '3480000'),
+    )
+    const r = await exportWep(wep, await vorlageMit(KOPF + oben + unten + '</xdr:wsDr>'), {
+      skizzeFormen: { elemente: beete },
+    })
+    expect(r.skizzeFormen!.versetzt).toEqual(['Hochbeet'])
+    expect(r.skizzeFormen!.verkleinert).toEqual(['Hochbeet'])
+    const drawing = await (await alsZip(r.blob)).file(DRAWING)!.async('string')
+    const n = beete.map((b) => lage(drawing, b.name))
+    expect(n[0].h).toBeGreaterThanOrEqual(500_000 * 0.8 - 1)
+    expect(n[0].h).toBeLessThan(500_000)
+  })
+
+  it('Bäume und Hecken werden nie bewegt, nur gemeldet', async () => {
+    const baum: FormElement = { typ: 'baum', name: 'Buche', kasten: { x: 2_000_000, y: 3_000_000, w: 500_000, h: 600_000 }, text: 'Buche' }
+    const r = await exportWep(wep, await vorlageMit(KOPF + bauLabel(2_100_000, 3_200_000, 700_000, 280_000) + '</xdr:wsDr>'), {
+      skizzeFormen: { elemente: [baum] },
+    })
+    expect(r.skizzeFormen!.versetzt).toEqual([])
+    expect(r.skizzeFormen!.ueberdeckt).toEqual(['Buche überdeckt „Brunnen“'])
+    const drawing = await (await alsZip(r.blob)).file(DRAWING)!.async('string')
+    expect(lage(drawing, 'Buche_Krone_0')).toMatchObject({ x: 2_000_000 })
+  })
+
+  it('geht nichts, bleibt die Gruppe stehen und wird als überdeckt gemeldet', async () => {
+    const riegel = bauLabel(0, 0, 12_000_000, 12_000_000) // Blatt voller Hindernisse (Beete liegen innen: enthält → zählt nicht)
+    const klein = bauLabel(2_300_000, 3_300_000, 900_000, 280_000)
+    // Hindernisse rundum, die das Beet nicht umschließen
+    const rundum = [
+      [1_000_000, 2_000_000, 1_000_000, 4_000_000],
+      [3_700_000, 2_000_000, 1_000_000, 4_000_000],
+      [1_000_000, 2_000_000, 4_000_000, 900_000],
+      [1_000_000, 4_100_000, 4_000_000, 900_000],
+    ].map(([x, y, w, h], i) =>
+      fremdForm(10 + i, `Zaun ${i}`).replace('<a:prstGeom', `<a:xfrm><a:off x="${x}" y="${y}"/><a:ext cx="${w}" cy="${h}"/></a:xfrm><a:prstGeom`),
+    )
+    void riegel
+    const r = await exportWep(wep, await vorlageMit(KOPF + klein + rundum.join('') + '</xdr:wsDr>'), {
+      skizzeFormen: { elemente: beete },
+    })
+    expect(r.skizzeFormen!.versetzt).toEqual([])
+    expect(r.skizzeFormen!.ueberdeckt.length).toBeGreaterThan(0)
+    const drawing = await (await alsZip(r.blob)).file(DRAWING)!.async('string')
+    expect(lage(drawing, 'Hochbeet_0')).toMatchObject({ x: 2_000_000, y: 3_000_000 })
   })
 
   it('ein früherer Export zählt nicht als „Blatt hat Formen“', async () => {

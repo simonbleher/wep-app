@@ -62,6 +62,9 @@ describe('Fall 1: Export in das Blatt mit den Bau-Formen', () => {
 
     const r = await exportWep(wep, basis, { skizzeFormen: { elemente, rasterisiere: svgZuPngNode } })
     expect(r.skizzeFormen!.graswiese).toBe(false) // Blatt hat Bau-Formen
+    // Hochbeete überdeckten das Bau-Label „Brunnen“ → gemeinsam versetzt/verkleinert, nichts überdeckt
+    expect(r.skizzeFormen!.versetzt).toEqual(['Hochbeet'])
+    expect(r.skizzeFormen!.ueberdeckt).toEqual([])
     const zip = await JSZip.loadAsync(await r.blob.arrayBuffer())
     const nachher = await zip.file('xl/drawings/drawing9.xml')!.async('string')
     expect(nachher.startsWith(vorher.slice(0, vorher.indexOf('</xdr:wsDr>')))).toBe(true)

@@ -65,7 +65,7 @@ export function zuordnungenZuFormen(a: Pick<Ausrichtung, 'zuordnungen'>): FormEl
       case 'hochbeet':
       case 'beet': {
         const basis = e.typ === 'hochbeet' ? 'Hochbeet' : 'Beet'
-        out.push({ typ: e.typ, name: nummer(basis), kasten: k })
+        out.push({ typ: e.typ, name: nummer(basis), kasten: k, gruppe: basis })
         const g = gruppen.get(basis) ?? { label: e.bezug || text || basis, kasten: [] }
         g.kasten.push(z.emu)
         gruppen.set(basis, g)
@@ -125,7 +125,7 @@ export function zuordnungenZuFormen(a: Pick<Ausrichtung, 'zuordnungen'>): FormEl
   }
 
   // Sammelbeschriftung rechts neben einer Gruppe gleicher Beete („Hochbeete“)
-  for (const g of gruppen.values()) {
+  for (const [basis, g] of gruppen) {
     const x2 = Math.max(...g.kasten.map((r) => r.x + r.w))
     const y1 = Math.min(...g.kasten.map((r) => r.y))
     const y2 = Math.max(...g.kasten.map((r) => r.y + r.h))
@@ -134,6 +134,7 @@ export function zuordnungenZuFormen(a: Pick<Ausrichtung, 'zuordnungen'>): FormEl
       name: `${ident(g.label)}_Text`,
       kasten: { x: Math.round(x2 + 3 * PT), y: Math.round((y1 + y2) / 2 - 7.5 * PT), w: Math.round((g.label.length * 5 + 8) * PT), h: 15 * PT },
       text: g.label,
+      gruppe: basis, // wandert mit den Beeten
     })
   }
   return out

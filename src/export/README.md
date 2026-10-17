@@ -89,6 +89,11 @@ await exportWep(wep, excel, {
   Schuppen, Platte …) nur Hinweis + Pfeil + kleines rotes X als Marker.
 - Eigene Beschriftungen (Textfelder) weichen vorhandenen Beschriftungen aus (rechts, unten, links, oben);
   vorhandene Formen werden nie verschoben. `ergebnis.verschoben` / `ergebnis.ueberdeckt` melden das.
+- Körper-Formen (Beete, Hochbeete, Kompost, Gegenstände …), die eine Bau-Beschriftung oder Bau-Form
+  überdecken, werden minimal versetzt: Gruppe (`FormElement.gruppe`) gemeinsam, zuerst weg vom
+  Hindernis, höchstens eine Elementhöhe; reicht das nicht, bis 20 % verkleinert. Geht beides nicht,
+  bleibt sie stehen (`ueberdeckt`). Bäume, Sträucher, Hecken werden nie bewegt, nur gemeldet.
+  Eine Bau-Form, die das Element ganz umschließt (Grundstück), zählt nicht als Hindernis.
 - Gras + Grundstück (Wiese) nur, wenn das Blatt noch leer ist (`graswiese: false` schaltet ab).
 - Ohne `rasterisiere` werden Baum/Strauch/Tor aus einfachen Formen gezeichnet, ohne Bilddateien.
 - Positionen: absolute EMU → `twoCellAnchor editAs="oneCell"` über Spaltenbreiten/Zeilenhöhen des

@@ -103,6 +103,11 @@ export interface FormElement {
   pflanze?: boolean
   /** Schriftgröße in pt (Standard 9). */
   schriftPt?: number
+  /**
+   * Gruppe (z. B. „Hochbeet“ für 4 Hochbeete): wird beim Ausweichen gemeinsam versetzt/verkleinert,
+   * Reihenfolge und relative Lage bleiben erhalten.
+   */
+  gruppe?: string
 }
 
 /** Wandelt SVG in PNG (Fallback für Excel-Versionen ohne SVG). Im Browser: `svgZuPngBrowser`. */
@@ -135,7 +140,11 @@ export interface SkizzeFormenErgebnis {
   svgBilder: number
   /** Beschriftungen, die wegen vorhandener Beschriftungen verschoben wurden (Formnamen). */
   verschoben: string[]
-  /** Formen, die eine vorhandene Beschriftung überdecken und nicht verschoben werden können. */
+  /** Gruppen/Elemente, die eine Bau-Beschriftung oder Bau-Form überdeckt haben und minimal versetzt wurden. */
+  versetzt: string[]
+  /** davon zusätzlich leicht verkleinert (max. 20 %) */
+  verkleinert: string[]
+  /** Formen, die eine vorhandene Beschriftung oder Bau-Form überdecken und nicht verschoben werden konnten. */
   ueberdeckt: string[]
 }
 
@@ -286,6 +295,12 @@ interface SpForm {
   art: 'sp'
   name: string
   ebene: number
+  /** Herkunft: Index des Elements, Gruppe und Typ (für das gemeinsame Versetzen) */
+  elem?: number
+  gruppe?: string
+  quelle?: FormTyp
+  /** Name des Elements (Meldungen) */
+  ename?: string
   kasten: Kasten
   prst: string
   fuellung?: string
@@ -303,6 +318,12 @@ interface CxnForm {
   art: 'cxn'
   name: string
   ebene: number
+  /** Herkunft: Index des Elements, Gruppe und Typ (für das gemeinsame Versetzen) */
+  elem?: number
+  gruppe?: string
+  quelle?: FormTyp
+  /** Name des Elements (Meldungen) */
+  ename?: string
   von: Punkt
   nach: Punkt
   linie: Linienstil
@@ -313,6 +334,12 @@ interface PicForm {
   art: 'pic'
   name: string
   ebene: number
+  /** Herkunft: Index des Elements, Gruppe und Typ (für das gemeinsame Versetzen) */
+  elem?: number
+  gruppe?: string
+  quelle?: FormTyp
+  /** Name des Elements (Meldungen) */
+  ename?: string
   kasten: Kasten
   svg: string
 }
@@ -819,7 +846,9 @@ function picXml(f: PicForm, id: number, geo: BlattGeometrie, pngRel: string, svg
  * Mit `mitSvg=false` entstehen nur einfache Formen ohne Bilder.
  */
 export function elementeZuFormen(elemente: FormElement[], mitSvg: boolean): Form[] {
-  const alle = elemente.flatMap((e) => formenFuer(e, mitSvg))
+  const alle = elemente.flatMap((e, i) =>
+    formenFuer(e, mitSvg).map((f): Form => ({ ...f, elem: i, gruppe: e.gruppe ?? `#${i}`, quelle: e.typ, ename: e.name })),
+  )
   // stabil nach Ebene sortieren (Array.sort ist stabil)
   return alle.sort((a, b) => a.ebene - b.ebene)
 }
@@ -888,20 +917,32 @@ export function skizzeDatenZuFormen(daten: SkizzeDaten, bereich: Kasten): FormEl
 // Beschriftungen nicht über vorhandene Beschriftungen legen
 // ---------------------------------------------------------------------------
 
-/** Rechtecke fremder Formen mit sichtbarem Text (z. B. Beschriftungen der Bau-Skizze). */
-export function fremdeBeschriftungen(drawingXml: string): { name: string; kasten: Kasten }[] {
-  const out: { name: string; kasten: Kasten }[] = []
+export interface Hindernis {
+  /** Text der Form (Beschriftung) oder ihr Name */
+  name: string
+  kasten: Kasten
+  /** Form enthält sichtbaren Text (Beschriftung) */
+  beschriftung: boolean
+}
+
+/**
+ * Rechtecke fremder Formen (Lage aus `a:xfrm`): Beschriftungen mit sichtbarem Text und
+ * Körper-Formen (Gebäude …). Linien/Verbinder und leere Textfelder zählen nicht.
+ */
+export function fremdeHindernisse(drawingXml: string): Hindernis[] {
+  const out: Hindernis[] = []
   for (const m of drawingXml.matchAll(ANKER_REGEX)) {
     const anker = m[0]
-    if (istEigenerAnker(anker)) continue
+    if (istEigenerAnker(anker) || anker.includes('<xdr:cxnSp')) continue
     const texte = [...anker.matchAll(/<a:t(?:\s[^>]*)?>([^<]*)<\/a:t>/g)].map((t) => t[1].trim()).filter(Boolean)
-    if (!texte.length) continue
+    if (!texte.length && /<xdr:cNvSpPr\b[^>]*\btxBox="1"/.test(anker)) continue
     const off = /<a:off x="(-?\d+)" y="(-?\d+)"\/>/.exec(anker)
     const ext = /<a:ext cx="(\d+)" cy="(\d+)"\/>/.exec(anker)
     if (!off || !ext) continue
     out.push({
-      name: texte.join(' '),
+      name: texte.join(' ') || /<xdr:cNvPr\b[^>]*\sname="([^"]*)"/.exec(anker)?.[1] || 'Bau-Form',
       kasten: { x: Number(off[1]), y: Number(off[2]), w: Number(ext[1]), h: Number(ext[2]) },
+      beschriftung: texte.length > 0,
     })
   }
   return out
@@ -953,6 +994,117 @@ export function weicheBeschriftungenAus(formen: Form[], fremd: Kasten[]): string
   return verschoben
 }
 
+/** Typen, die der Export versetzen/verkleinern darf (Bäume, Hecken, Sträucher nur melden). */
+const BEWEGLICH = new Set<FormTyp>(['hochbeet', 'beet', 'kompost', 'schacht', 'brunnen', 'rechteck', 'kreis', 'text'])
+
+const enthaelt = (aussen: Kasten, innen: Kasten) =>
+  aussen.x <= innen.x && aussen.y <= innen.y && aussen.x + aussen.w >= innen.x + innen.w && aussen.y + aussen.h >= innen.y + innen.h
+
+const istKoerper = (f: Form) => !(f.art === 'sp' && f.textfeld) && f.art !== 'cxn' && f.ebene > EBENE.gras
+
+const vereinigung = (ks: Kasten[]): Kasten => {
+  const x1 = Math.min(...ks.map((k) => k.x))
+  const y1 = Math.min(...ks.map((k) => k.y))
+  const x2 = Math.max(...ks.map((k) => k.x + k.w))
+  const y2 = Math.max(...ks.map((k) => k.y + k.h))
+  return { x: x1, y: y1, w: x2 - x1, h: y2 - y1 }
+}
+
+/**
+ * Bau-Hindernisse, die ein Körper `k` überdeckt. Eine Bau-Form, die den ganzen Körper
+ * umschließt (Grundstück/Wiese), zählt nicht.
+ */
+function ueberdecktVon(k: Kasten, hindernisse: Hindernis[], umschliessend: Kasten = k): Hindernis[] {
+  return hindernisse.filter((h) => ueberlappt(k, h.kasten) && !enthaelt(h.kasten, umschliessend))
+}
+
+/**
+ * Körper-Formen (Beete, Hochbeete, Kompost, Gegenstände …), die eine Bau-Beschriftung oder
+ * Bau-Form überdecken, minimal versetzen. Eine Gruppe wird gemeinsam bewegt (Reihenfolge und
+ * relative Lage bleiben): zuerst in freie Fläche, bevorzugt weg vom Hindernis, höchstens
+ * eine Elementhöhe weit; reicht das nicht, wird die Gruppe um bis zu 20 % verkleinert
+ * (um ihre Mitte) und erneut versetzt. Geht beides nicht, bleibt sie stehen. Beschriftungen
+ * der Elemente wandern mit. Bäume, Hecken, Sträucher werden nie bewegt.
+ */
+export function versetzeGruppen(formen: Form[], hindernisse: Hindernis[]): { versetzt: string[]; verkleinert: string[] } {
+  const versetzt: string[] = []
+  const verkleinert: string[] = []
+  const gruppen = new Map<string, Form[]>()
+  for (const f of formen) gruppen.set(f.gruppe ?? f.name, [...(gruppen.get(f.gruppe ?? f.name) ?? []), f])
+
+  for (const [id, fs] of gruppen) {
+    const koerper = fs.filter(istKoerper) as (SpForm | PicForm)[]
+    if (!koerper.length || !fs.every((f) => f.quelle && BEWEGLICH.has(f.quelle))) continue
+    const bbox = vereinigung(koerper.map((f) => f.kasten))
+    const stoert = [...new Set(koerper.flatMap((f) => ueberdecktVon(f.kasten, hindernisse, bbox)))]
+    if (!stoert.length) continue
+
+    const andere = formen.filter((f) => istKoerper(f) && !fs.includes(f)).map(kastenVon)
+    const vorher = koerper.map((f) => new Set(andere.map((a, i) => (ueberlappt(f.kasten, a) ? i : -1)).filter((i) => i >= 0)))
+    const relevant = hindernisse.filter((h) => !enthaelt(h.kasten, bbox))
+    const m = { x: bbox.x + bbox.w / 2, y: bbox.y + bbox.h / 2 }
+    const hoehe = Math.max(...koerper.map((f) => f.kasten.h))
+
+    // „weg vom Hindernis“: Richtung vom Schwerpunkt der überdeckten Hindernisse zur Gruppenmitte
+    const hx = stoert.reduce((s, h) => s + h.kasten.x + h.kasten.w / 2, 0) / stoert.length
+    const hy = stoert.reduce((s, h) => s + h.kasten.y + h.kasten.h / 2, 0) / stoert.length
+    const weg = { x: m.x - hx, y: m.y - hy }
+    const richtungen = Array.from({ length: 8 }, (_, k) => ({ x: Math.cos((k * Math.PI) / 4), y: Math.sin((k * Math.PI) / 4) })).sort(
+      (a, b) => b.x * weg.x + b.y * weg.y - (a.x * weg.x + a.y * weg.y),
+    )
+
+    const proben = (faktor: number, dx: number, dy: number): Kasten[] | undefined => {
+      const neu = koerper.map((f) => ({
+        x: Math.round(m.x + (f.kasten.x - m.x) * faktor + dx),
+        y: Math.round(m.y + (f.kasten.y - m.y) * faktor + dy),
+        w: Math.round(f.kasten.w * faktor),
+        h: Math.round(f.kasten.h * faktor),
+      }))
+      const ok = neu.every(
+        (k, i) =>
+          k.x >= 0 &&
+          k.y >= 0 &&
+          !relevant.some((h) => ueberlappt(k, h.kasten)) &&
+          !andere.some((a, j) => ueberlappt(k, a) && !vorher[i].has(j)),
+      )
+      return ok ? neu : undefined
+    }
+
+    let treffer: { faktor: number; dx: number; dy: number; neu: Kasten[] } | undefined
+    for (const faktor of [1, 0.9, 0.8]) {
+      const kandidaten: [number, number][] = faktor === 1 ? [] : [[0, 0]]
+      for (let j = 1; j <= 8; j++) for (const r of richtungen) kandidaten.push([r.x * ((hoehe * j) / 8), r.y * ((hoehe * j) / 8)])
+      for (const [dx, dy] of kandidaten) {
+        const neu = proben(faktor, dx, dy)
+        if (neu) {
+          treffer = { faktor, dx, dy, neu }
+          break
+        }
+      }
+      if (treffer) break
+    }
+    if (!treffer) continue
+
+    // anwenden: Körper setzen, Beschriftungen um die Verschiebung ihres Elements mitnehmen
+    const delta = new Map<number | undefined, { x: number; y: number }>()
+    koerper.forEach((f, i) => {
+      const alt = f.kasten
+      const neu = treffer!.neu[i]
+      if (!delta.has(f.elem)) delta.set(f.elem, { x: neu.x + neu.w / 2 - (alt.x + alt.w / 2), y: neu.y + neu.h / 2 - (alt.y + alt.h / 2) })
+      f.kasten = neu
+    })
+    for (const f of fs) {
+      if (f.art !== 'sp' || !f.textfeld) continue
+      const d = delta.get(f.elem) ?? { x: treffer.dx, y: treffer.dy }
+      f.kasten = { ...f.kasten, x: Math.max(0, Math.round(f.kasten.x + d.x)), y: Math.max(0, Math.round(f.kasten.y + d.y)) }
+    }
+    const anzeige = id.startsWith('#') ? koerper[0].name : id
+    versetzt.push(anzeige)
+    if (treffer.faktor < 1) verkleinert.push(anzeige)
+  }
+  return { versetzt, verkleinert }
+}
+
 function naechsterMediaName(zip: JSZip, stamm: string, endung: string): string {
   let n = 1
   while (zip.file(`xl/media/${stamm}${n}.${endung}`)) n++
@@ -998,13 +1150,19 @@ export async function fuegeSkizzeFormenEin(
   formen.push(...elementeZuFormen(elemente, mitSvg))
   formen.sort((a, b) => a.ebene - b.ebene)
 
-  // Beschriftungen nicht über vorhandene (Bau-)Beschriftungen legen; Formen, die eine
-  // vorhandene Beschriftung überdecken, bleiben stehen (Lage = Skizze) und werden gemeldet.
-  const fremd = fremdeBeschriftungen(drawingXml)
-  const verschoben = weicheBeschriftungenAus(formen, fremd.map((x) => x.kasten))
+  // Bau-Beschriftungen und Bau-Formen nie überdecken: Körper-Formen minimal versetzen
+  // (Gruppen gemeinsam, notfalls leicht verkleinert), danach eigene Beschriftungen verschieben.
+  // Was nicht ausweichen kann (z. B. Bäume), bleibt stehen und wird gemeldet.
+  const hindernisse = fremdeHindernisse(drawingXml)
+  const { versetzt, verkleinert } = versetzeGruppen(formen, hindernisse)
+  const verschoben = weicheBeschriftungenAus(
+    formen,
+    hindernisse.filter((h) => h.beschriftung).map((h) => h.kasten),
+  )
   const ueberdeckt = formen
-    .filter((f) => !(f.art === 'sp' && f.textfeld) && f.art !== 'cxn' && f.ebene > EBENE.gras)
-    .flatMap((f) => fremd.filter((x) => ueberlappt(kastenVon(f), x.kasten)).map((x) => `${f.name} überdeckt „${x.name}“`))
+    .filter(istKoerper)
+    .flatMap((f) => ueberdecktVon(kastenVon(f), hindernisse).map((h) => `${f.ename ?? f.name} überdeckt „${h.name}“`))
+    .filter((m, i, alle) => alle.indexOf(m) === i)
 
   // Bilder (SVG + PNG-Fallback) ablegen und verknüpfen
   const relsDatei = relsPfad(drawingPfad)
@@ -1041,5 +1199,5 @@ export async function fuegeSkizzeFormenEin(
 
   drawingXml = drawingXml.replace('</xdr:wsDr>', `${anker}</xdr:wsDr>`)
   zip.file(drawingPfad, drawingXml)
-  return { anzahlFormen: formen.length, entfernt, graswiese, svgBilder, verschoben, ueberdeckt }
+  return { anzahlFormen: formen.length, entfernt, graswiese, svgBilder, verschoben, versetzt, verkleinert, ueberdeckt }
 }

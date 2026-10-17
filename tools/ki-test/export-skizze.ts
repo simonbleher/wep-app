@@ -54,6 +54,7 @@ async function main() {
   )
 
   if (r.skizzeFormen?.verschoben.length) console.log(`Beschriftungen verschoben: ${r.skizzeFormen.verschoben.join(', ')}`)
+  if (r.skizzeFormen?.versetzt.length) console.log(`Versetzt: ${r.skizzeFormen.versetzt.join(', ')}${r.skizzeFormen.verkleinert.length ? ` (verkleinert: ${r.skizzeFormen.verkleinert.join(', ')})` : ''}`)
   if (r.skizzeFormen?.ueberdeckt.length) console.log(`Überdeckt (nicht verschiebbar): ${r.skizzeFormen.ueberdeckt.join('; ')}`)
 
   const ziel = join(HIER, 'ergebnis-skizze', fall)
