@@ -26,12 +26,16 @@ Stand: Branch katalog/bewrl-katalog – katalog.json (52 Positionen inkl. S. 18 
 > data/invasive.json aus der Unionsliste (Anlage, S. 25) an. Prüfe jeden Höchstwert
 > gegen das PDF. Erstelle einen PR.
 
-### K2 · Suche & Sortierung ✅ (#katalog) – Nachbesserungen offen (Invasiv-Falschalarm, Synonyme), siehe K2b
+### K2 · Suche & Sortierung ✅ (#katalog) – inkl. Nachbesserungen (PR #5)
 > Implementiere in src/katalog/ eine Suchfunktion über data/katalog.json:
 > tippfehlertolerant, findet auch Arten-Namen (Apfel → Obstgehölz), sortiert ohne
 > Suchbegriff nach relevanz und "zuletzt verwendet". Mit Unit-Tests. PR.
 
-### A1 · PWA-Grundgerüst 👀 (#app-gruen)
+### K3 · Kleinigkeit Suche ⬜ (#katalog)
+> „Insektenhotel“ findet das Ökologische Objekt nicht: Varianten-Feld `typ` in die
+> Suche aufnehmen (src/katalog/suche.ts) und testen. PR.
+
+### A1 · PWA-Grundgerüst ✅ (#app-gruen)
 > Lies CLAUDE.md und docs/ARCHITEKTUR.md. Lege das PWA-Grundgerüst an (TypeScript,
 > Vite, installierbar, offline per Service Worker, IndexedDB). Begründe die
 > Framework-Wahl in docs/ENTSCHEIDUNGEN.md. Ziel-Geräte: Handy und Tablet im
@@ -44,7 +48,7 @@ Stand: Branch katalog/bewrl-katalog – katalog.json (52 Positionen inkl. S. 18 
 > (Vorschlag = Höchstwert × Zustand, überschreibbar), eigene Pflanze per Freitext.
 > Regel-Warnungen anzeigen, nicht blockieren. Live-Summe. PR.
 
-### E1 · Excel-Export: Bau-Excel + App → fertiges WEP ⬜ (#export) – nach A1
+### E1 · Excel-Export: Bau-Excel + App → fertiges WEP 👀 (#export) – PR #7
 > Lies CLAUDE.md und docs/ARCHITEKTUR.md (Abschnitte „Beta-Umfang“ und Zellen-Mapping).
 > Schreibe src/export/: Eingabe ist ein Wep-Objekt aus der App plus **optional eine
 > Bau-Excel** (die WEP-Vorlage, in der der Bau-Wertermittler seine Blätter schon
@@ -64,7 +68,7 @@ Stand: Branch katalog/bewrl-katalog – katalog.json (52 Positionen inkl. S. 18 
 > Text, Maßangabe, Rückgängig. Speichern als JSON, Export als PNG für die Vorlage.
 > Touch-tauglich. Vorläufige Lösung, wird später ersetzt – also schlank halten. PR.
 
-### Y1 · Sync über Simons privates OneDrive 👀 (#sync) – PR offen, Anleitung in docs/SYNC.md
+### Y1 · Sync über Simons privates OneDrive 👀 (#sync) – PR #8, Anleitung in docs/SYNC.md
 > Lies CLAUDE.md und docs/ARCHITEKTUR.md (Abschnitt „Beta-Umfang“). Implementiere in
 > src/sync/ die Synchronisation der WEPs zwischen Simons Geräten über sein privates
 > OneDrive: Microsoft Graph, Anmeldung mit MSAL.js (Authorization Code + PKCE, privates
