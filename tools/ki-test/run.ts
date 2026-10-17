@@ -14,6 +14,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Katalog, Position as KatalogPosition } from '@/katalog/types'
 import { bewerte, type Bewertung, type Erwartet } from './auswertung'
+import { docxZuText } from './docx'
 import { GeminiClient, GeminiFehler, leseApiKey, type Teil } from './gemini'
 import { ermittleKette, type Kandidat } from './modelle'
 import { antwortSchema, baueSystemPrompt, type KiAntwort } from './prompt'
@@ -47,7 +48,7 @@ interface Fall {
 /** Grobe Sperre gegen Formalien/Personendaten in Text-Eingaben. */
 const FORMALIEN = /(unterp[äa]chter|p[äa]chter|stra(ß|ss)e|str\.|telefon|tel\.|e-?mail|@|vorgangs|rechtsanwalt|geb\.)/i
 
-function ladeFaelle(): Fall[] {
+async function ladeFaelle(): Promise<Fall[]> {
   const ordner = join(HIER, 'faelle')
   const faelle: Fall[] = []
   for (const name of readdirSync(ordner).sort()) {
@@ -55,30 +56,25 @@ function ladeFaelle(): Fall[] {
     const dir = join(ordner, name)
     if (!existsSync(join(dir, 'erwartet.json'))) continue
     const erwartet = JSON.parse(readFileSync(join(dir, 'erwartet.json'), 'utf8')) as Erwartet
-    const bild = ['eingabe.jpg', 'eingabe.jpeg', 'eingabe.png'].find((f) => existsSync(join(dir, f)))
-    let teile: Teil[]
+    // Eingabe nur als Text oder Word-Datei (.docx, per mammoth) – kein Foto.
+    let text: string
     let quelle: string
     if (existsSync(join(dir, 'eingabe.txt'))) {
-      const text = readFileSync(join(dir, 'eingabe.txt'), 'utf8')
-      const treffer = text.match(FORMALIEN)
-      if (treffer) {
-        console.warn(`⚠ Fall ${name} übersprungen: Eingabe enthält vermutlich Formalien („${treffer[0]}“).`)
-        continue
-      }
-      teile = [{ text: `Aufnahmeliste:\n\n${text}` }]
+      text = readFileSync(join(dir, 'eingabe.txt'), 'utf8')
       quelle = 'Text'
-    } else if (bild) {
-      const mimeType = bild.endsWith('.png') ? 'image/png' : 'image/jpeg'
-      const data = readFileSync(join(dir, bild)).toString('base64')
-      teile = [
-        { text: 'Aufnahmeliste als Foto (handschriftlich). Lies sie vollständig. Kopfdaten wie Namen oder Adressen ignorieren.' },
-        { inlineData: { mimeType, data } },
-      ]
-      quelle = 'Foto'
+    } else if (existsSync(join(dir, 'eingabe.docx'))) {
+      text = await docxZuText(readFileSync(join(dir, 'eingabe.docx')))
+      quelle = 'Word'
     } else {
-      console.warn(`⚠ Fall ${name}: keine eingabe.txt/.jpg/.png`)
+      console.warn(`⚠ Fall ${name}: keine eingabe.txt/.docx`)
       continue
     }
+    const treffer = text.match(FORMALIEN)
+    if (treffer) {
+      console.warn(`⚠ Fall ${name} übersprungen: Eingabe enthält vermutlich Formalien („${treffer[0]}“).`)
+      continue
+    }
+    const teile: Teil[] = [{ text: `Aufnahmeliste:\n\n${text}` }]
     faelle.push({ name, teile, quelle, erwartet })
   }
   return faelle
@@ -303,7 +299,7 @@ async function main() {
   const katalog = new Map(katalogDatei.positionen.map((p) => [p.id, p]))
   const system = baueSystemPrompt(join(HIER, 'prompt-aufnahme.md'), katalogDatei.positionen)
   const schema = antwortSchema(katalogDatei.positionen.map((p) => p.id))
-  const faelle = ladeFaelle()
+  const faelle = await ladeFaelle()
   console.log(`${faelle.length} Fälle × ${kette.length} Modelle, Prompt ${system.length} Zeichen\n`)
 
   const gesperrt = new Set<string>()

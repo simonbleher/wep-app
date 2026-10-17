@@ -7,6 +7,7 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { execSync } from 'node:child_process'
 import os from 'node:os'
 import JSZip from 'jszip'
@@ -22,7 +23,7 @@ import { patchCell, readCellRawValue, xmlEscape } from '../xmlPatcher'
 // ---------------------------------------------------------------------------
 
 const VORLAGE_PATH = path.resolve(
-  path.dirname(new URL(import.meta.url).pathname),
+  path.dirname(fileURLToPath(import.meta.url)),
   '../../../docs/WEP_Vorlage.xlsx',
 )
 

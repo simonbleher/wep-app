@@ -64,6 +64,21 @@ describe('skizzeAufContext – Raster', () => {
   })
 })
 
+describe('skizzeAufContext – transparent', () => {
+  it('ohne Hintergrund und ohne Raster, Elemente werden gezeichnet', () => {
+    const ctx = erstelleMockCtx()
+    const daten: SkizzeDaten = {
+      elemente: [{ id: 'r1', typ: 'rechteck', x: 10, y: 20, breite: 100, hoehe: 50 }],
+      raster: true,
+      rasterGroesse: 40,
+    }
+    skizzeAufContext(ctx as unknown as CanvasRenderingContext2D, daten, 400, 400, { transparent: true })
+    expect(ctx.fillRect).not.toHaveBeenCalled()
+    expect(ctx.stroke).not.toHaveBeenCalled()
+    expect(ctx.strokeRect).toHaveBeenCalledWith(10, 20, 100, 50)
+  })
+})
+
 describe('skizzeAufContext – Elemente', () => {
   it('zeichnet Rechteck mit strokeRect', () => {
     const ctx = erstelleMockCtx()

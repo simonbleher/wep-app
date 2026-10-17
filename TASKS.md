@@ -115,3 +115,9 @@ ergänzt Simon in `tools/ki-test/faelle/<name>/eingabe.jpg`.
 - Geräte vor Ort: Handy oder Tablet?
 - ~~OneDrive des BV~~ → Beta: privates OneDrive von Simon (BV-OneDrive später)
 - Blätter „Anl IV Schuppen“ / „Anl IV Dach“ (versteckt, viele #REF!): noch gebraucht?
+
+### K-B0 · Skizzen-Testlauf 👀 (#00-leitung) – Branch ki/skizze-test
+Ergebnis: `npm run ki-test-skizze`, Übersicht `tools/ki-test/ergebnis-skizze.html`, Fall 1 mit
+`soll.json` (Entwurf, offene Fragen im PR). Assistent A: Eingabe nur Text/.docx (Fall 04).
+Export-Sofortfix: PNG transparent, wenn das Blatt schon Formen hat. Offen als eigene Aufgabe:
+„Grün als Excel-Formen“.

@@ -12,7 +12,7 @@ Vorlagen: die beiden Claude-Skills liegen als Referenz in `docs/skills/`.
 
 | Aufgabe | Wer |
 |---|---|
-| Foto/Notiz/Diktat lesen, Position erkennen, Katalog-ID + Variante zuordnen, Menge/Alter/Zustand schätzen, Unsicheres markieren | KI |
+| Notiz/Diktat/Word-Text lesen, Position erkennen, Katalog-ID + Variante zuordnen, Menge/Alter/Zustand schätzen, Unsicheres markieren | KI |
 | Höchstwert, Zustandsfaktor, Preis, Regelhinweise, Summen | App (vorhandener Code) |
 | Skizze: Elemente mit Typ, Lage, Beschriftung, Maß | KI |
 | Skizze: Stil (Farben, Gras, Baum-Piktogramme, rote Maßlinien, Mängelkästen) | App (Stil-Spezifikation aus dem Skill) |
@@ -23,7 +23,12 @@ in der App sichtbar und editierbar.
 
 ## Assistent A – Aufnahmeliste
 
-- Eingabe: Foto, eingefügter Text oder Diktat (Web Speech API).
+- Eingabe **nur Text oder Word-Datei**: eingetippter/eingefügter Text, Diktat (wird zu
+  Text) oder `.docx`. Die Word-Datei wandelt **mammoth** im Browser in Text um
+  (Tabellenzeilen als „Position | Menge | Bemerkung“). **Kein Foto** (Entscheidung
+  17.10.2026): Handschrift-Fotos der Liste sind unzuverlässig und teurer; die Aufnahmeliste
+  liegt in der Praxis ohnehin als Word-Datei oder Notiz vor.
+  Testlauf: `tools/ki-test/faelle/04-word-tabelle/` (`eingabe.docx`).
 - Prompt enthält: Katalog (IDs, Bezeichnungen, Varianten, Synonyme), Regeln aus dem Skill
   (eine Zeile = eine Sache, Reihenfolge, „nicht bewerten“-Liste, Richtwerte), Kürzel.
 - Antwort je Zeile: `katalogId | null`, `varianteIndex`, `anzahl`, `einheit`,
