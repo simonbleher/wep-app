@@ -81,6 +81,11 @@ Stand: Branch katalog/bewrl-katalog – katalog.json (52 Positionen inkl. S. 18 
 > Text, Maßangabe, Rückgängig. Speichern als JSON, Export als PNG für die Vorlage.
 > Touch-tauglich. Vorläufige Lösung, wird später ersetzt – also schlank halten. PR.
 
+### S2 · Skizze in die Erfassung einbauen 👀 (#skizze) – von der Leitung umgesetzt (Agent-PR #15 lag auf veraltetem Stand)
+> Tab „Skizze“ zwischen Beseitigung und Export mit dem SkizzeEditor, Speichern
+> entprellt in `wep.skizze` (beim Verlassen sofort), Excel-Export fügt die Skizze
+> automatisch ins Blatt „Skizze Außenanlage-Aufwuchs“ ein (E2).
+
 ### Y1 · Sync über Simons privates OneDrive 👀 (#sync) – PR #8, Anleitung in docs/SYNC.md
 > Lies CLAUDE.md und docs/ARCHITEKTUR.md (Abschnitt „Beta-Umfang“). Implementiere in
 > src/sync/ die Synchronisation der WEPs zwischen Simons Geräten über sein privates

@@ -28,6 +28,8 @@ import type {
 } from '@/katalog'
 import { sucheKatalog } from '@/katalog'
 import { ladeWep, speichereWep } from './db'
+import { SkizzeTab } from './SkizzeTab'
+import { skizzeAlsPng } from '@/skizze/skizzePng'
 import { exportWep, type ExportResult } from '@/export'
 import { berechnePreisvorschlag } from '@/gruen/preisvorschlag'
 import { berechneRegelhinweise } from '@/gruen/regelhinweise'
@@ -55,7 +57,7 @@ const INVASIVE_ARTEN = (invasiveRaw as unknown as InvasiveListe).arten
 // Typen
 // ---------------------------------------------------------------------------
 
-type Tab = 'formalien' | 'aussenanlagen' | 'aufwuchs' | 'beseitigung' | 'export'
+type Tab = 'formalien' | 'aussenanlagen' | 'aufwuchs' | 'beseitigung' | 'skizze' | 'export'
 
 type Abschnitt = 'aussenanlagen' | 'aufwuchs'
 
@@ -186,6 +188,7 @@ export function WepDetail({ wepId, onZurueck }: Props) {
       {aktuellerTab === 'beseitigung' && (
         <BeseitigungTab wep={wep} onSpeichern={speichere} />
       )}
+      {aktuellerTab === 'skizze' && <SkizzeTab wep={wep} onSpeichern={speichere} />}
       {aktuellerTab === 'export' && (
         <ExportTab
           wep={wep}
@@ -207,6 +210,7 @@ const TAB_LABELS: Record<Tab, string> = {
   aussenanlagen: 'Außenanlagen',
   aufwuchs: 'Aufwuchs',
   beseitigung: 'Beseitigung',
+  skizze: 'Skizze',
   export: 'Export',
 }
 
@@ -1142,7 +1146,12 @@ function ExportTab({
         sourceBuffer = await resp.arrayBuffer()
       }
 
-      const result = await exportWep(wep, sourceBuffer)
+      // Skizze (falls gezeichnet) als PNG mitgeben → Blatt „Skizze Außenanlage-Aufwuchs“
+      const skizzePng = wep.skizze?.elemente.length
+        ? await (await skizzeAlsPng(wep.skizze)).arrayBuffer()
+        : undefined
+
+      const result = await exportWep(wep, sourceBuffer, { skizzePng })
 
       // Datei-Download auslösen
       const url = URL.createObjectURL(result.blob)
@@ -1203,6 +1212,9 @@ function ExportTab({
           <p className="hinweis hinweis-ok">
             ✅ Export erfolgreich: {exportZustand.result.filename}
           </p>
+          {exportZustand.result.skizzeEingefuegt && (
+            <p className="hinweis-klein">🖍️ Skizze ins Blatt „Skizze Außenanlage-Aufwuchs“ eingefügt.</p>
+          )}
 
           {exportZustand.result.konflikte.length > 0 && (
             <div>
