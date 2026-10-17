@@ -504,3 +504,15 @@ textarea.eingabe {
   font-weight: 600;
   margin: 0;
 }
+
+/* A3: eingeklappte Richtlinien-Hinweise in der Positionsliste */
+.hinweis-details {
+  margin-top: 0.25rem;
+}
+.hinweis-details > summary {
+  cursor: pointer;
+  min-height: 2.75rem;
+  display: flex;
+  align-items: center;
+  list-style-position: inside;
+}

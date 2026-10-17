@@ -9,6 +9,7 @@ import {
   useEffect,
   useCallback,
   useRef,
+  useId,
   type ChangeEvent,
 } from 'react'
 import type {
@@ -32,6 +33,15 @@ import { berechnePreisvorschlag } from '@/gruen/preisvorschlag'
 import { berechneRegelhinweise } from '@/gruen/regelhinweise'
 import { berechneAbschnittSumme } from '@/gruen/summen'
 import { merkeZuletztVerwendet, ladeZuletztVerwendet } from '@/gruen/zuletzt'
+import {
+  gefundeneArt,
+  kurzeBezeichnung,
+  leseZahl,
+  leseZahlOder,
+  variantenMerkmale,
+  zahlDe,
+  zahlFuerEingabe,
+} from '@/gruen/format'
 
 // Statische Daten (wird einmalig beim Modulladen gelesen)
 import katalogRaw from '../../data/katalog.json'
@@ -56,12 +66,15 @@ type HinzufuegenDialog =
       schritt: 'variante'
       abschnitt: Abschnitt
       katalogPos: KatalogPosition
+      /** Über die Suche gefundene Art, z. B. „Liguster“ bei der Hecke */
+      art?: string
     }
   | {
       schritt: 'formular'
       abschnitt: Abschnitt
       katalogPos?: KatalogPosition
       variante?: KatalogVariante
+      art?: string
     }
 
 type ExportZustand =
@@ -89,22 +102,6 @@ function neuePositionId(): string {
 
 function neueBeseitigungsId(): string {
   return `bes-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
-}
-
-/** Erzeugt Bezeichnung aus KatalogPosition + optionaler Variante. */
-function bauBezeichnung(katalogPos: KatalogPosition, variante?: KatalogVariante): string {
-  if (!variante) return katalogPos.bezeichnung
-  const merkmale = [
-    variante.form,
-    variante.altersstufe,
-    variante.groesse,
-    variante.material,
-    variante.ausfuehrung,
-    variante.typ,
-  ]
-    .filter(Boolean)
-    .join(', ')
-  return merkmale ? `${katalogPos.bezeichnung} (${merkmale})` : katalogPos.bezeichnung
 }
 
 function euroFormat(wert: number): string {
@@ -282,11 +279,10 @@ function FormalienTab({
         wert={f.unterpaechter}
         onChange={(v) => setFeld('unterpaechter', v)}
       />
-      <Eingabe
+      <ZahlEingabe
         label="Parzellenfläche (m²)"
-        typ="number"
-        wert={String(f.parzellenflaecheM2 || '')}
-        onChange={(v) => setFeld('parzellenflaecheM2', parseFloat(v) || 0)}
+        wert={f.parzellenflaecheM2 || undefined}
+        onChange={(v) => setFeld('parzellenflaecheM2', v ?? 0)}
       />
       <Eingabe
         label="Wertermittlung am (Datum)"
@@ -462,7 +458,7 @@ function PositionsKarte({
       <div className="pos-karte-kopf">
         <div className="pos-karte-info">
           <span className="pos-anzahl">
-            {pos.anzahl} {pos.einheit}
+            {zahlDe(pos.anzahl)} {pos.einheit}
           </span>
           <span className="pos-bezeichnung">{pos.bezeichnung}</span>
           {pos.zustand && (
@@ -488,10 +484,7 @@ function PositionsKarte({
         </button>
       </div>
 
-      {/* Regelhinweise */}
-      {hinweise.map((h, i) => (
-        <HinweisAnzeige key={i} hinweis={h} />
-      ))}
+      <HinweisListe hinweise={hinweise} />
     </li>
   )
 }
@@ -559,18 +552,32 @@ function PositionHinzufuegenPanel({
                 className="suche-eintrag"
                 onClick={() => {
                   merkeZuletztVerwendet(t.position.id)
-                  if (t.position.varianten && t.position.varianten.length > 0) {
-                    setDialog({ schritt: 'variante', abschnitt, katalogPos: t.position })
+                  const art = gefundeneArt(t.position, suchbegriff)
+                  if (t.variante) {
+                    // Suchtreffer nennt schon die Variante (z. B. „Apfel Halbstamm“)
+                    setDialog({
+                      schritt: 'formular',
+                      abschnitt,
+                      katalogPos: t.position,
+                      variante: t.variante,
+                      art,
+                    })
+                  } else if (t.position.varianten && t.position.varianten.length > 0) {
+                    setDialog({ schritt: 'variante', abschnitt, katalogPos: t.position, art })
                   } else {
-                    setDialog({ schritt: 'formular', abschnitt, katalogPos: t.position })
+                    setDialog({ schritt: 'formular', abschnitt, katalogPos: t.position, art })
                   }
                 }}
               >
-                <span className="suche-bezeichnung">{t.position.bezeichnung}</span>
+                <span className="suche-bezeichnung">
+                  {t.variante
+                    ? kurzeBezeichnung(t.position, t.variante, gefundeneArt(t.position, suchbegriff))
+                    : t.position.bezeichnung}
+                </span>
                 <span className="suche-meta">
                   {t.position.kategorie}
-                  {t.position.hoechstwert !== undefined
-                    ? ` · bis ${euroFormat(t.position.hoechstwert)}`
+                  {(t.variante?.hoechstwert ?? t.position.hoechstwert) !== undefined
+                    ? ` · bis ${euroFormat((t.variante?.hoechstwert ?? t.position.hoechstwert) as number)}`
                     : ''}
                 </span>
               </button>
@@ -592,11 +599,13 @@ function PositionHinzufuegenPanel({
   }
 
   if (dialog.schritt === 'variante') {
-    const { katalogPos } = dialog
+    const { katalogPos, art } = dialog
     return (
       <div className="panel">
         <div className="panel-kopf">
-          <h3 className="panel-titel">{katalogPos.bezeichnung}</h3>
+          <h3 className="panel-titel">
+            {art ? `${art} – ${katalogPos.bezeichnung}` : katalogPos.bezeichnung}
+          </h3>
           <button
             type="button"
             className="btn"
@@ -609,16 +618,7 @@ function PositionHinzufuegenPanel({
         <p className="hinweis-klein">Variante wählen:</p>
         <ul className="suche-liste">
           {(katalogPos.varianten ?? []).map((v, i) => {
-            const merkmale = [
-              v.form,
-              v.altersstufe,
-              v.groesse,
-              v.material,
-              v.ausfuehrung,
-              v.typ,
-            ]
-              .filter(Boolean)
-              .join(', ')
+            const merkmale = variantenMerkmale(v)
             return (
               <li key={i}>
                 <button
@@ -630,6 +630,7 @@ function PositionHinzufuegenPanel({
                       abschnitt,
                       katalogPos,
                       variante: v,
+                      art,
                     })
                   }
                 >
@@ -650,6 +651,7 @@ function PositionHinzufuegenPanel({
       abschnitt={abschnitt}
       katalogPos={dialog.katalogPos}
       variante={dialog.variante}
+      art={dialog.art}
       wep={wep}
       onZurueck={() => setDialog({ schritt: 'suche', abschnitt })}
       onAbbrechen={() => setDialog(null)}
@@ -666,6 +668,7 @@ function PositionFormular({
   abschnitt: _abschnitt,
   katalogPos,
   variante,
+  art,
   wep,
   onZurueck,
   onAbbrechen,
@@ -674,15 +677,17 @@ function PositionFormular({
   abschnitt: Abschnitt
   katalogPos?: KatalogPosition
   variante?: KatalogVariante
+  art?: string
   wep: Wep
   onZurueck: () => void
   onAbbrechen: () => void
   onHinzufuegen: (pos: Position) => void
 }) {
   const hoechstwert = variante?.hoechstwert ?? katalogPos?.hoechstwert
+  const id = useId()
 
   const [bezeichnung, setBezeichnung] = useState(
-    katalogPos ? bauBezeichnung(katalogPos, variante) : '',
+    katalogPos ? kurzeBezeichnung(katalogPos, variante, art) : '',
   )
   const [anzahl, setAnzahl] = useState('1')
   const [einheit, setEinheit] = useState<string>(katalogPos?.einheit ?? 'Stück')
@@ -694,7 +699,7 @@ function PositionFormular({
   const vorschlauPos: Position = {
     id: 'tmp',
     bezeichnung,
-    anzahl: parseFloat(anzahl) || 0,
+    anzahl: leseZahlOder(anzahl, 0),
     einheit,
     zustand,
     hoechstwert,
@@ -706,19 +711,19 @@ function PositionFormular({
 
   // Regelhinweise für Vorschau
   const vorschauHinweise = berechneRegelhinweise(
-    { ...vorschlauPos, einzelpreis: preisManuell ? parseFloat(preisEingabe) || 0 : preisVorschlag },
+    { ...vorschlauPos, einzelpreis: preisManuell ? leseZahlOder(preisEingabe, 0) : preisVorschlag },
     wep,
     KATALOG_POSITIONEN,
     INVASIVE_ARTEN,
   )
 
   function bestaetigen() {
-    const einzelpreis = preisManuell ? parseFloat(preisEingabe) || 0 : preisVorschlag
+    const einzelpreis = preisManuell ? leseZahlOder(preisEingabe, 0) : preisVorschlag
     const pos: Position = {
       id: neuePositionId(),
       katalogId: katalogPos?.id,
-      bezeichnung,
-      anzahl: parseFloat(anzahl) || 0,
+      bezeichnung: bezeichnung.trim(),
+      anzahl: leseZahlOder(anzahl, 0),
       einheit,
       zustand,
       hoechstwert,
@@ -733,7 +738,7 @@ function PositionFormular({
     <div className="panel">
       <div className="panel-kopf">
         <h3 className="panel-titel">
-          {katalogPos ? bauBezeichnung(katalogPos, variante) : 'Eigene Position'}
+          {katalogPos ? kurzeBezeichnung(katalogPos, variante, art) : 'Eigene Position'}
         </h3>
         {katalogPos ? (
           <button type="button" className="btn" onClick={onZurueck}>
@@ -746,34 +751,40 @@ function PositionFormular({
         )}
       </div>
 
-      {!katalogPos && (
-        <div className="eingabe-gruppe">
-          <label className="eingabe-label">Bezeichnung</label>
-          <input
-            type="text"
-            className="eingabe"
-            value={bezeichnung}
-            onChange={(e) => setBezeichnung(e.target.value)}
-            placeholder="z. B. Kirschbaum, alt"
-          />
-        </div>
-      )}
+      <div className="eingabe-gruppe">
+        <label className="eingabe-label" htmlFor={`${id}-bez`}>
+          Bezeichnung (steht so in der Excel)
+        </label>
+        <input
+          id={`${id}-bez`}
+          type="text"
+          className="eingabe"
+          value={bezeichnung}
+          onChange={(e) => setBezeichnung(e.target.value)}
+          placeholder="z. B. Kirschbaum, alt"
+        />
+      </div>
 
       <div className="eingabe-gruppe">
-        <label className="eingabe-label">Anzahl / Menge</label>
+        <label className="eingabe-label" htmlFor={`${id}-anz`}>
+          Anzahl / Menge
+        </label>
         <input
-          type="number"
+          id={`${id}-anz`}
+          type="text"
+          inputMode="decimal"
           className="eingabe"
-          min="0"
-          step="0.1"
           value={anzahl}
           onChange={(e) => setAnzahl(e.target.value)}
         />
       </div>
 
       <div className="eingabe-gruppe">
-        <label className="eingabe-label">Einheit</label>
+        <label className="eingabe-label" htmlFor={`${id}-einh`}>
+          Einheit
+        </label>
         <select
+          id={`${id}-einh`}
           className="eingabe"
           value={einheit}
           onChange={(e) => setEinheit(e.target.value)}
@@ -787,8 +798,11 @@ function PositionFormular({
       </div>
 
       <div className="eingabe-gruppe">
-        <label className="eingabe-label">Zustand</label>
+        <label className="eingabe-label" htmlFor={`${id}-zust`}>
+          Zustand
+        </label>
         <select
+          id={`${id}-zust`}
           className="eingabe"
           value={zustand ?? ''}
           onChange={(e) => setZustand(e.target.value as Position['zustand'])}
@@ -802,14 +816,16 @@ function PositionFormular({
       </div>
 
       <div className="eingabe-gruppe">
-        <label className="eingabe-label">Einzelpreis</label>
+        <label className="eingabe-label" htmlFor={`${id}-preis`}>
+          Einzelpreis
+        </label>
         {preisManuell ? (
           <div className="preis-zeile">
             <input
-              type="number"
+              id={`${id}-preis`}
+              type="text"
+              inputMode="decimal"
               className="eingabe"
-              min="0"
-              step="0.01"
               value={preisEingabe}
               onChange={(e) => setPreisEingabe(e.target.value)}
               placeholder="0,00"
@@ -831,7 +847,7 @@ function PositionFormular({
             {hoechstwert !== undefined && (
               <span className="preis-basis">
                 (Höchstwert {euroFormat(hoechstwert)} × Faktor{' '}
-                {ZUSTANDSSTUFEN[zustand ?? 'gut'].faktor})
+                {zahlDe(ZUSTANDSSTUFEN[zustand ?? 'gut'].faktor)})
               </span>
             )}
             <button
@@ -839,7 +855,7 @@ function PositionFormular({
               className="btn"
               onClick={() => {
                 setPreisManuell(true)
-                setPreisEingabe(String(preisVorschlag))
+                setPreisEingabe(zahlFuerEingabe(preisVorschlag))
               }}
             >
               ✏️ Überschreiben
@@ -849,15 +865,17 @@ function PositionFormular({
       </div>
 
       {/* Vorschau-Regelhinweise */}
-      {vorschauHinweise.map((h, i) => (
-        <HinweisAnzeige key={i} hinweis={h} />
-      ))}
+      <HinweisListe hinweise={vorschauHinweise} />
 
       <div className="panel-fuss">
         <button
           type="button"
           className="btn btn-primary"
-          disabled={!bezeichnung.trim() || !(parseFloat(anzahl) > 0)}
+          disabled={
+            !bezeichnung.trim() ||
+            !(leseZahl(anzahl) > 0) ||
+            (preisManuell && !Number.isFinite(leseZahl(preisEingabe)))
+          }
           onClick={bestaetigen}
         >
           ✓ Hinzufügen
@@ -888,6 +906,8 @@ function BeseitigungTab({
   const [einzelpreis, setEinzelpreis] = useState('')
   const [faktor, setFaktor] = useState('1')
   const [begruendung, setBegruendung] = useState('')
+  const id = useId()
+  const faktorZahl = leseZahlOder(faktor, 1)
 
   const positionen = wep.gruen.beseitigungAA
 
@@ -895,11 +915,11 @@ function BeseitigungTab({
     const pos: BeseitigungsPosition = {
       id: neueBeseitigungsId(),
       gegenstand,
-      menge: parseFloat(menge) || 0,
+      menge: leseZahlOder(menge, 0),
       einheit,
-      einzelpreis: parseFloat(einzelpreis) || 0,
-      faktor: parseFloat(faktor) || 1,
-      begruendung: parseFloat(faktor) > 1 ? begruendung : undefined,
+      einzelpreis: leseZahlOder(einzelpreis, 0),
+      faktor: faktorZahl,
+      begruendung: faktorZahl > 1 ? begruendung : undefined,
     }
     const neu: Wep = {
       ...wep,
@@ -941,10 +961,10 @@ function BeseitigungTab({
                 <div className="pos-karte-info">
                   <span className="pos-bezeichnung">{pos.gegenstand}</span>
                   <span className="pos-anzahl">
-                    {pos.menge} {pos.einheit}
+                    {zahlDe(pos.menge)} {pos.einheit}
                   </span>
                   <span className="pos-preis">
-                    {euroFormat(pos.einzelpreis)} · Faktor {pos.faktor}
+                    {euroFormat(pos.einzelpreis)} · Faktor {zahlDe(pos.faktor)}
                   </span>
                   <span className="pos-gesamt">
                     = {euroFormat(pos.menge * pos.einzelpreis * pos.faktor)}
@@ -985,8 +1005,11 @@ function BeseitigungTab({
           </div>
 
           <div className="eingabe-gruppe">
-            <label className="eingabe-label">Gegenstand / Beschreibung</label>
+            <label className="eingabe-label" htmlFor={`${id}-geg`}>
+              Gegenstand / Beschreibung
+            </label>
             <input
+              id={`${id}-geg`}
               type="text"
               className="eingabe"
               value={gegenstand}
@@ -996,20 +1019,25 @@ function BeseitigungTab({
           </div>
 
           <div className="eingabe-gruppe">
-            <label className="eingabe-label">Menge</label>
+            <label className="eingabe-label" htmlFor={`${id}-menge`}>
+              Menge
+            </label>
             <input
-              type="number"
+              id={`${id}-menge`}
+              type="text"
+              inputMode="decimal"
               className="eingabe"
-              min="0"
-              step="0.1"
               value={menge}
               onChange={(e) => setMenge(e.target.value)}
             />
           </div>
 
           <div className="eingabe-gruppe">
-            <label className="eingabe-label">Einheit</label>
+            <label className="eingabe-label" htmlFor={`${id}-einh`}>
+              Einheit
+            </label>
             <select
+              id={`${id}-einh`}
               className="eingabe"
               value={einheit}
               onChange={(e) => setEinheit(e.target.value)}
@@ -1021,12 +1049,14 @@ function BeseitigungTab({
           </div>
 
           <div className="eingabe-gruppe">
-            <label className="eingabe-label">Einzelpreis (€)</label>
+            <label className="eingabe-label" htmlFor={`${id}-preis`}>
+              Einzelpreis (€)
+            </label>
             <input
-              type="number"
+              id={`${id}-preis`}
+              type="text"
+              inputMode="decimal"
               className="eingabe"
-              min="0"
-              step="0.01"
               value={einzelpreis}
               onChange={(e) => setEinzelpreis(e.target.value)}
               placeholder="0,00"
@@ -1034,21 +1064,26 @@ function BeseitigungTab({
           </div>
 
           <div className="eingabe-gruppe">
-            <label className="eingabe-label">Faktor (Standard 1)</label>
+            <label className="eingabe-label" htmlFor={`${id}-faktor`}>
+              Faktor (Standard 1)
+            </label>
             <input
-              type="number"
+              id={`${id}-faktor`}
+              type="text"
+              inputMode="decimal"
               className="eingabe"
-              min="0"
-              step="0.01"
               value={faktor}
               onChange={(e) => setFaktor(e.target.value)}
             />
           </div>
 
-          {parseFloat(faktor) > 1 && (
+          {faktorZahl > 1 && (
             <div className="eingabe-gruppe">
-              <label className="eingabe-label">Begründung (Faktor &gt; 1)</label>
+              <label className="eingabe-label" htmlFor={`${id}-begr`}>
+                Begründung (Faktor &gt; 1)
+              </label>
               <input
+                id={`${id}-begr`}
                 type="text"
                 className="eingabe"
                 value={begruendung}
@@ -1138,10 +1173,11 @@ function ExportTab({
       </p>
 
       <div className="eingabe-gruppe">
-        <label className="eingabe-label">
+        <label className="eingabe-label" htmlFor="bau-excel">
           Bau-Excel (optional, bereits ausgefüllte Vorlage)
         </label>
         <input
+          id="bau-excel"
           type="file"
           className="eingabe"
           accept=".xlsx"
@@ -1221,11 +1257,15 @@ function Eingabe({
   typ?: string
   mehrzeilig?: boolean
 }) {
+  const id = useId()
   return (
     <div className="eingabe-gruppe">
-      <label className="eingabe-label">{label}</label>
+      <label className="eingabe-label" htmlFor={id}>
+        {label}
+      </label>
       {mehrzeilig ? (
         <textarea
+          id={id}
           className="eingabe"
           rows={3}
           value={wert}
@@ -1233,6 +1273,7 @@ function Eingabe({
         />
       ) : (
         <input
+          id={id}
           type={typ}
           className="eingabe"
           value={wert}
@@ -1240,6 +1281,69 @@ function Eingabe({
         />
       )}
     </div>
+  )
+}
+
+/**
+ * Zahlenfeld mit deutschem Komma. Hält den eingegebenen Text lokal, damit
+ * „12,“ beim Tippen nicht sofort zu „12“ umformatiert wird.
+ */
+function ZahlEingabe({
+  label,
+  wert,
+  onChange,
+}: {
+  label: string
+  wert: number | undefined
+  onChange: (v: number | undefined) => void
+}) {
+  const id = useId()
+  const [text, setText] = useState(wert === undefined ? '' : zahlFuerEingabe(wert))
+  return (
+    <div className="eingabe-gruppe">
+      <label className="eingabe-label" htmlFor={id}>
+        {label}
+      </label>
+      <input
+        id={id}
+        type="text"
+        inputMode="decimal"
+        className="eingabe"
+        value={text}
+        onChange={(e) => {
+          setText(e.target.value)
+          const n = leseZahl(e.target.value)
+          if (e.target.value.trim() === '') onChange(undefined)
+          else if (Number.isFinite(n)) onChange(n)
+        }}
+      />
+    </div>
+  )
+}
+
+/**
+ * Regelhinweise: Warnungen immer sichtbar, reine Info-Texte (Richtlinien-
+ * Erläuterungen) eingeklappt, damit die Positionsliste übersichtlich bleibt.
+ */
+function HinweisListe({ hinweise }: { hinweise: Hinweis[] }) {
+  const warnungen = hinweise.filter((h) => h.schwere === 'warnung')
+  const infos = hinweise.filter((h) => h.schwere !== 'warnung')
+  return (
+    <>
+      {warnungen.map((h, i) => (
+        <HinweisAnzeige key={`w${i}`} hinweis={h} />
+      ))}
+      {infos.length > 0 && (
+        <details className="hinweis-details">
+          <summary className="hinweis-klein">
+            ℹ️ {infos.length === 1 ? '1 Hinweis' : `${infos.length} Hinweise`} zur Richtlinie
+          </summary>
+          {infos.map((h, i) => (
+            <HinweisAnzeige key={`i${i}`} hinweis={h} />
+          ))}
+        </details>
+      )}
+    </>
   )
 }
 
