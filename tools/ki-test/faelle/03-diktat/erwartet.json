@@ -1,0 +1,231 @@
+{
+  "positionen": [
+    {
+      "katalogId": "aa-einfriedung",
+      "varianteIndex": 2,
+      "anzahl": 18,
+      "einheit": "m",
+      "bezeichnung": "Stabgitterzaun",
+      "zustand": "sehr gut",
+      "unsicher": false,
+      "grund": "recht neu"
+    },
+    {
+      "katalogId": "aa-tueranlage",
+      "varianteIndex": null,
+      "anzahl": 1,
+      "einheit": "Stück",
+      "bezeichnung": "Tor, Stabgitter",
+      "zustand": "sehr gut",
+      "unsicher": false,
+      "grund": "neu"
+    },
+    {
+      "katalogId": "aa-wegebelag",
+      "varianteIndex": 2,
+      "anzahl": 12,
+      "einheit": "m²",
+      "bezeichnung": "Plattenweg",
+      "zustand": "mittel",
+      "unsicher": false,
+      "grund": "1 × 12 m"
+    },
+    {
+      "katalogId": "aa-fruehbeet",
+      "varianteIndex": null,
+      "anzahl": 1.5,
+      "einheit": "m²",
+      "bezeichnung": "Frühbeet",
+      "zustand": "mittel",
+      "unsicher": false,
+      "grund": "1,5 m²"
+    },
+    {
+      "katalogId": "aa-regenwasserbehaelter",
+      "varianteIndex": 2,
+      "anzahl": 1,
+      "einheit": "Stück",
+      "bezeichnung": "Regentonne 500 l",
+      "zustand": "mittel",
+      "unsicher": false,
+      "grund": "bis 500 l"
+    },
+    {
+      "katalogId": "aa-regenwasserbehaelter",
+      "varianteIndex": 0,
+      "anzahl": 1,
+      "einheit": "Stück",
+      "bezeichnung": "Regentonne 200 l",
+      "zustand": "mittel",
+      "unsicher": false,
+      "grund": "bis 200 l"
+    },
+    {
+      "katalogId": "aa-rankgeruest-bogen",
+      "varianteIndex": null,
+      "anzahl": 1,
+      "einheit": "Stück",
+      "bezeichnung": "Rosenbogen",
+      "zustand": "mittel",
+      "unsicher": false,
+      "grund": "Bogen"
+    },
+    {
+      "katalogId": "aa-rankgeruest-flaechig",
+      "varianteIndex": null,
+      "anzahl": 4,
+      "einheit": "m²",
+      "bezeichnung": "Rankgitter am Schuppen",
+      "zustand": "mittel",
+      "unsicher": false,
+      "grund": "flächig"
+    },
+    {
+      "katalogId": "aw-baum-geschuetzt",
+      "varianteIndex": null,
+      "anzahl": 1,
+      "einheit": "Stück",
+      "bezeichnung": "Walnuss, geschützt",
+      "zustand": "sehr gut",
+      "unsicher": false,
+      "grund": "geschützter Baum, 1 €"
+    },
+    {
+      "katalogId": "aw-obstgehoelz",
+      "varianteIndex": 9,
+      "anzahl": 1,
+      "einheit": "Stück",
+      "bezeichnung": "Apfel, Säule, bis 4 J.",
+      "zustand": "gut",
+      "unsicher": false,
+      "grund": "Säule 3 J."
+    },
+    {
+      "katalogId": "aw-obstgehoelz",
+      "varianteIndex": 4,
+      "anzahl": 1,
+      "einheit": "Stück",
+      "bezeichnung": "Sauerkirsche, Halbstamm, 5–30 J.",
+      "zustand": "gut",
+      "unsicher": false,
+      "grund": "HS 20 J."
+    },
+    {
+      "katalogId": null,
+      "varianteIndex": null,
+      "anzahl": 1,
+      "einheit": "Stück",
+      "bezeichnung": "Sauerkirsche, krank",
+      "zustand": "schlecht",
+      "unsicher": false,
+      "grund": "nicht bewerten: krank, halb abgestorben"
+    },
+    {
+      "katalogId": "aw-beerenobst",
+      "varianteIndex": 1,
+      "anzahl": 3,
+      "einheit": "Stück",
+      "bezeichnung": "Johannisbeere, Busch, 5–20 J.",
+      "zustand": "mittel",
+      "unsicher": false,
+      "grund": "schon älter"
+    },
+    {
+      "katalogId": "aw-kiwi",
+      "varianteIndex": 1,
+      "anzahl": 1,
+      "einheit": "Stück",
+      "bezeichnung": "Kiwi, 6 J.",
+      "zustand": "gut",
+      "unsicher": false,
+      "grund": "5 J. und älter"
+    },
+    {
+      "katalogId": "aw-spargel",
+      "varianteIndex": 1,
+      "anzahl": 5,
+      "einheit": "m",
+      "bezeichnung": "Spargel",
+      "zustand": "gut",
+      "unsicher": true,
+      "grund": "Alter unbekannt",
+      "alternativ": [
+        {
+          "katalogId": "aw-spargel",
+          "varianteIndex": 0
+        }
+      ]
+    },
+    {
+      "katalogId": "aw-gemuese",
+      "varianteIndex": null,
+      "anzahl": 20,
+      "einheit": "m²",
+      "bezeichnung": "Gemüse",
+      "zustand": "gut",
+      "unsicher": false,
+      "grund": "Gemüse"
+    },
+    {
+      "katalogId": "aw-rose",
+      "varianteIndex": 2,
+      "anzahl": 1,
+      "einheit": "Stück",
+      "bezeichnung": "Kletterrose",
+      "zustand": "gut",
+      "unsicher": false,
+      "grund": "Kletterrose"
+    },
+    {
+      "katalogId": "aw-rose",
+      "varianteIndex": 1,
+      "anzahl": 2,
+      "einheit": "Stück",
+      "bezeichnung": "Strauchrose",
+      "zustand": "gut",
+      "unsicher": false,
+      "grund": "Strauchrose"
+    },
+    {
+      "katalogId": "aw-ziergehoelz",
+      "varianteIndex": 1,
+      "anzahl": 1,
+      "einheit": "Stück",
+      "bezeichnung": "Japanischer Fächerahorn",
+      "zustand": "gut",
+      "unsicher": false,
+      "grund": "wertvollere Art"
+    },
+    {
+      "katalogId": "aw-schling-kletterpflanze",
+      "varianteIndex": 0,
+      "anzahl": 1,
+      "einheit": "Stück",
+      "bezeichnung": "Wilder Wein",
+      "zustand": "gut",
+      "unsicher": false,
+      "grund": "einfache Art"
+    },
+    {
+      "katalogId": "aw-hecke",
+      "varianteIndex": 1,
+      "anzahl": 15,
+      "einheit": "m",
+      "bezeichnung": "Buchen-Hecke",
+      "zustand": "gut",
+      "unsicher": false,
+      "grund": "Laub, wertvoll, 1,20 m"
+    },
+    {
+      "katalogId": "aw-wiese",
+      "varianteIndex": null,
+      "anzahl": 60,
+      "einheit": "m²",
+      "bezeichnung": "Blumenwiese",
+      "zustand": "gut",
+      "unsicher": false,
+      "grund": "Wiese"
+    }
+  ],
+  "kurzbeschreibung": "Außenanlagen: neuer Stabgitterzaun mit Tor, Plattenweg, Regentonnen, Frühbeet, Rankgitter, Rosenbogen. Aufwuchs: geschützter Walnussbaum, Säulenapfel, Sauerkirsche (eine krank, nicht bewertet), Johannisbeeren, Kiwi, Spargel, Gemüse, Rosen, Fächerahorn, Wilder Wein, Buchenhecke, Blumenwiese; KGN gut."
+}

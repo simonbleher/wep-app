@@ -9,3 +9,8 @@ dev-dist/
 ~$*.xlsx
 # Lokale Umgebungsvariablen (z. B. VITE_MS_CLIENT_ID)
 *.local
+
+# Lokale Secrets (z. B. GEMINI_API_KEY für den KI-Testlauf)
+.dev.vars
+# Rohantworten des KI-Testlaufs
+/tools/ki-test/ausgaben/

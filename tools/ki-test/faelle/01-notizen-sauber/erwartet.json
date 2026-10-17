@@ -1,0 +1,201 @@
+{
+  "positionen": [
+    {
+      "katalogId": "aa-einfriedung",
+      "varianteIndex": 0,
+      "anzahl": 32,
+      "einheit": "m",
+      "bezeichnung": "Maschendrahtzaun",
+      "zustand": "mittel",
+      "unsicher": false,
+      "grund": "Maschendraht, alt"
+    },
+    {
+      "katalogId": "aa-tueranlage",
+      "varianteIndex": null,
+      "anzahl": 1,
+      "einheit": "Stück",
+      "bezeichnung": "Gartentor, Metall",
+      "zustand": "mittel",
+      "unsicher": false,
+      "grund": "Türanlage einflügelig"
+    },
+    {
+      "katalogId": "aa-wegebelag",
+      "varianteIndex": 2,
+      "anzahl": 14,
+      "einheit": "m²",
+      "bezeichnung": "Plattenweg",
+      "zustand": "mittel",
+      "unsicher": false,
+      "grund": "Platten = Steinbelag"
+    },
+    {
+      "katalogId": "aa-beeteinfassung",
+      "varianteIndex": null,
+      "anzahl": 18,
+      "einheit": "m",
+      "bezeichnung": "Kantensteine",
+      "zustand": "mittel",
+      "unsicher": false,
+      "grund": "Beeteinfassung"
+    },
+    {
+      "katalogId": "aa-regenwasserbehaelter",
+      "varianteIndex": 1,
+      "anzahl": 1,
+      "einheit": "Stück",
+      "bezeichnung": "Regentonne 300 l",
+      "zustand": "mittel",
+      "unsicher": false,
+      "grund": "bis 300 l"
+    },
+    {
+      "katalogId": "aa-regenwasserbehaelter",
+      "varianteIndex": 0,
+      "anzahl": 2,
+      "einheit": "Stück",
+      "bezeichnung": "Regentonne 200 l",
+      "zustand": "mittel",
+      "unsicher": false,
+      "grund": "bis 200 l"
+    },
+    {
+      "katalogId": "aa-rankgeruest-bogen",
+      "varianteIndex": null,
+      "anzahl": 1,
+      "einheit": "Stück",
+      "bezeichnung": "Rosenbogen",
+      "zustand": "mittel",
+      "unsicher": false,
+      "grund": "Rankgerüst Bogen"
+    },
+    {
+      "katalogId": "aa-kompostanlage",
+      "varianteIndex": null,
+      "anzahl": 1,
+      "einheit": "m³",
+      "bezeichnung": "Komposter, Holz",
+      "zustand": "mittel",
+      "unsicher": false,
+      "grund": "1 cbm"
+    },
+    {
+      "katalogId": "aw-obstgehoelz",
+      "varianteIndex": 4,
+      "anzahl": 2,
+      "einheit": "Stück",
+      "bezeichnung": "Apfel, Halbstamm, 5–30 J.",
+      "zustand": "gut",
+      "unsicher": false,
+      "grund": "HS ca. 15 J."
+    },
+    {
+      "katalogId": "aw-obstgehoelz",
+      "varianteIndex": 8,
+      "anzahl": 1,
+      "einheit": "Stück",
+      "bezeichnung": "Birne, Hochstamm, über 30 J.",
+      "zustand": "gut",
+      "unsicher": false,
+      "grund": "HST 35 J., gut"
+    },
+    {
+      "katalogId": "aw-obstgehoelz",
+      "varianteIndex": 0,
+      "anzahl": 1,
+      "einheit": "Stück",
+      "bezeichnung": "Kirsche, Buschbaum, bis 4 J.",
+      "zustand": "gut",
+      "unsicher": false,
+      "grund": "BB 3 J."
+    },
+    {
+      "katalogId": "aw-beerenobst",
+      "varianteIndex": 1,
+      "anzahl": 4,
+      "einheit": "Stück",
+      "bezeichnung": "Johannisbeere, Busch, 5–20 J.",
+      "zustand": "gut",
+      "unsicher": false,
+      "grund": "Joha Busch 10 J."
+    },
+    {
+      "katalogId": "aw-beerenobst",
+      "varianteIndex": 3,
+      "anzahl": 2,
+      "einheit": "Stück",
+      "bezeichnung": "Stachelbeere, Stamm, 5–20 J.",
+      "zustand": "gut",
+      "unsicher": false,
+      "grund": "Stamm 6 J."
+    },
+    {
+      "katalogId": "aw-erdbeere",
+      "varianteIndex": 1,
+      "anzahl": 6,
+      "einheit": "m²",
+      "bezeichnung": "Erdbeeren, 2 J.",
+      "zustand": "gut",
+      "unsicher": false,
+      "grund": "2 J."
+    },
+    {
+      "katalogId": "aw-rhabarber",
+      "varianteIndex": 2,
+      "anzahl": 3,
+      "einheit": "Stück",
+      "bezeichnung": "Rhabarber",
+      "zustand": "gut",
+      "unsicher": true,
+      "grund": "Alter nicht angegeben",
+      "alternativ": [
+        {
+          "katalogId": "aw-rhabarber",
+          "varianteIndex": 1
+        }
+      ]
+    },
+    {
+      "katalogId": "aw-staude-flaechig",
+      "varianteIndex": null,
+      "anzahl": 12,
+      "einheit": "m²",
+      "bezeichnung": "Stauden",
+      "zustand": "mittel",
+      "unsicher": false,
+      "grund": "einfache Stauden"
+    },
+    {
+      "katalogId": "aw-rose",
+      "varianteIndex": 1,
+      "anzahl": 5,
+      "einheit": "Stück",
+      "bezeichnung": "Edelrose",
+      "zustand": "gut",
+      "unsicher": false,
+      "grund": "Edelrose"
+    },
+    {
+      "katalogId": "aw-hecke",
+      "varianteIndex": 0,
+      "anzahl": 12,
+      "einheit": "m",
+      "bezeichnung": "Liguster-Hecke",
+      "zustand": "gut",
+      "unsicher": false,
+      "grund": "Laub, einfache Art"
+    },
+    {
+      "katalogId": "aw-rasen",
+      "varianteIndex": null,
+      "anzahl": 80,
+      "einheit": "m²",
+      "bezeichnung": "Rasen",
+      "zustand": "gut",
+      "unsicher": false,
+      "grund": "Rasen"
+    }
+  ],
+  "kurzbeschreibung": "Außenanlagen: Maschendrahtzaun (alt), Metalltor, Plattenweg mit Kantensteinen, Regentonnen, Holzkomposter, Rosenbogen; Alter meist unbekannt, pauschal ca. 50 %. Aufwuchs: Obstbäume (Apfel, Birne, Kirsche), Beerenobst, Erdbeeren, Rhabarber, Stauden, Edelrosen, Ligusterhecke, Rasen; KGN gut."
+}
