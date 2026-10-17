@@ -48,6 +48,13 @@ Stand: Branch katalog/bewrl-katalog – katalog.json (52 Positionen inkl. S. 18 
 > (Vorschlag = Höchstwert × Zustand, überschreibbar), eigene Pflanze per Freitext.
 > Regel-Warnungen anzeigen, nicht blockieren. Live-Summe. PR.
 
+### A3 · Verbesserungen Erfassung 👀 (#app-gruen) – nach A2 (von der Leitung selbst umgesetzt)
+> Kürzere Bezeichnungen mit gefundener Art („Liguster-Hecke (Laub, einfache Art)“,
+> „Apfel, Halbstamm, 5–30 J.“), Bezeichnung immer editierbar; Variante aus dem
+> Suchtreffer übernehmen (Variantenschritt überspringen); Richtlinien-Infos in der
+> Positionsliste einklappbar, Warnungen bleiben sichtbar; deutsche Zahlen (Komma
+> bei Eingabe und Anzeige, Faktor 0,75); alle Labels mit ihren Feldern verknüpft. PR.
+
 ### E1 · Excel-Export: Bau-Excel + App → fertiges WEP 👀 (#export) – PR #7
 > Lies CLAUDE.md und docs/ARCHITEKTUR.md (Abschnitte „Beta-Umfang“ und Zellen-Mapping).
 > Schreibe src/export/: Eingabe ist ein Wep-Objekt aus der App plus **optional eine
