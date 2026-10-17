@@ -42,7 +42,7 @@ Stand: Branch katalog/bewrl-katalog – katalog.json (52 Positionen inkl. S. 18 
 > Freien → große Bedienelemente, hoher Kontrast. Lege src/model/ mit den Typen aus
 > der Architektur an. Startseite: Liste der WEPs + „Neues WEP“. PR.
 
-### A2 · Erfassung Formalien + Aufwuchs + Außenanlagen ⬜ (#app-gruen) – nach A1, K2
+### A2 · Erfassung Formalien + Aufwuchs + Außenanlagen 👀 (#app-gruen) – nach A1, K2
 > Baue die Erfassungsmasken: Formalien, Außenanlagen, Aufwuchs. Position hinzufügen
 > über Schnellsuche (src/katalog), dann Anzahl, Einheit, Zustand, Preis
 > (Vorschlag = Höchstwert × Zustand, überschreibbar), eigene Pflanze per Freitext.

@@ -200,3 +200,280 @@ h1 {
   border-color: #b26a00;
   background: #fff4e0;
 }
+
+/* ── Tab-Navigation ──────────────────────────────────────────────────────── */
+
+.tab-nav {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  border-bottom: 2px solid var(--farbe-rand);
+  padding-bottom: 4px;
+}
+
+.tab-btn {
+  min-height: 48px;
+  padding: 0 16px;
+  font-size: 1rem;
+  font-weight: 500;
+  border: 2px solid var(--farbe-rand);
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: var(--farbe-hintergrund);
+  color: var(--farbe-text);
+  cursor: pointer;
+}
+
+.tab-btn-aktiv {
+  background: var(--farbe-flaeche);
+  border-bottom-color: var(--farbe-flaeche);
+  border-top-color: var(--farbe-primaer);
+  color: var(--farbe-primaer);
+  font-weight: 700;
+}
+
+.tab-inhalt {
+  background: var(--farbe-flaeche);
+  border: 2px solid var(--farbe-rand);
+  border-top: none;
+  border-radius: 0 0 var(--radius) var(--radius);
+  padding: var(--abstand);
+  display: flex;
+  flex-direction: column;
+  gap: var(--abstand);
+}
+
+/* ── Formulare ────────────────────────────────────────────────────────────── */
+
+.feld-gruppe {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.feld-label {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--farbe-text);
+}
+
+.feld-hint {
+  font-weight: 400;
+  font-size: 0.85rem;
+  color: var(--farbe-text-schwach);
+}
+
+.feld-input,
+.feld-select {
+  min-height: var(--touch-min);
+  padding: 10px 14px;
+  font-size: 1.05rem;
+  border: 2px solid var(--farbe-rand);
+  border-radius: var(--radius);
+  background: var(--farbe-flaeche);
+  color: var(--farbe-text);
+  width: 100%;
+}
+
+.feld-input:focus,
+.feld-select:focus {
+  outline: 3px solid var(--farbe-fokus);
+  outline-offset: 2px;
+}
+
+textarea.feld-input {
+  min-height: 80px;
+  resize: vertical;
+}
+
+/* ── Schnellsuche ─────────────────────────────────────────────────────────── */
+
+.such-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  position: relative;
+}
+
+.such-feld {
+  min-height: var(--touch-min);
+  padding: 10px 14px;
+  font-size: 1.05rem;
+  border: 2px solid var(--farbe-primaer);
+  border-radius: var(--radius);
+  background: var(--farbe-flaeche);
+  color: var(--farbe-text);
+  width: 100%;
+}
+
+.treffer-liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 2px solid var(--farbe-rand);
+  border-radius: var(--radius);
+  background: var(--farbe-flaeche);
+  overflow: hidden;
+}
+
+.treffer-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  min-height: 52px;
+  padding: 10px 14px;
+  border: none;
+  border-bottom: 1px solid var(--farbe-rand);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  color: var(--farbe-text);
+}
+
+.treffer-btn:active {
+  background: var(--farbe-hintergrund);
+}
+
+.treffer-bez {
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.treffer-kat {
+  font-size: 0.85rem;
+  color: var(--farbe-text-schwach);
+}
+
+/* ── Positionsliste ────────────────────────────────────────────────────────── */
+
+.pos-liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pos-zeile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1px solid var(--farbe-rand);
+  border-radius: var(--radius);
+  background: var(--farbe-flaeche);
+}
+
+.pos-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pos-bez {
+  font-weight: 600;
+  font-size: 1rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pos-detail {
+  font-size: 0.875rem;
+  color: var(--farbe-text-schwach);
+}
+
+.pos-betrag {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.pos-loeschen {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 10px;
+  flex-shrink: 0;
+}
+
+/* ── Neue Position Formular ────────────────────────────────────────────────── */
+
+.neue-pos-formular {
+  display: flex;
+  flex-direction: column;
+  gap: var(--abstand);
+  border: 2px solid var(--farbe-primaer);
+  border-radius: var(--radius);
+  padding: var(--abstand);
+  background: var(--farbe-flaeche);
+}
+
+.formular-titel {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--farbe-primaer);
+}
+
+.formular-aktionen {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ── Summe ─────────────────────────────────────────────────────────────────── */
+
+.summe-zeile {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  border-top: 2px solid var(--farbe-rand);
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.summe-wert {
+  font-variant-numeric: tabular-nums;
+  color: var(--farbe-primaer);
+}
+
+/* ── Sekundärer Button ─────────────────────────────────────────────────────── */
+
+.btn-sekundaer {
+  background: var(--farbe-hintergrund);
+  border-color: var(--farbe-primaer);
+  color: var(--farbe-primaer);
+  font-weight: 600;
+  width: 100%;
+  min-height: 52px;
+}
+
+/* ── Hinweis-Liste (Regel-Warnungen) ──────────────────────────────────────── */
+
+.hinweis-liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hinweis-regel {
+  font-size: 0.825rem;
+  color: var(--farbe-text-schwach);
+}
+
+/* ── Formalien ─────────────────────────────────────────────────────────────── */
+
+.formalien-bereich,
+.positions-abschnitt,
+.export-bereich {
+  display: flex;
+  flex-direction: column;
+  gap: var(--abstand);
+}
