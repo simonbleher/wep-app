@@ -31,7 +31,7 @@ Stand: Branch katalog/bewrl-katalog – katalog.json (52 Positionen inkl. S. 18 
 > tippfehlertolerant, findet auch Arten-Namen (Apfel → Obstgehölz), sortiert ohne
 > Suchbegriff nach relevanz und "zuletzt verwendet". Mit Unit-Tests. PR.
 
-### K3 · Kleinigkeit Suche ⬜ (#katalog)
+### K3 · Kleinigkeit Suche 👀 (#katalog)
 > „Insektenhotel“ findet das Ökologische Objekt nicht: Varianten-Feld `typ` in die
 > Suche aufnehmen (src/katalog/suche.ts) und testen. PR.
 

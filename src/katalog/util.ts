@@ -67,8 +67,9 @@ function wortQualitaet(token: string, wort: string): number {
   if (!token || !wort) return 0;
   if (token === wort) return 1;
   if (wort.startsWith(token) && token.length >= 2) return 0.9;
-  // Suchbegriff länger als das Zielwort, Zielwort ist Präfix (z. B. „apfelbaum“ → „apfel“).
-  if (token.startsWith(wort) && wort.length >= 2) return 0.85;
+  // Suchbegriff länger als das Zielwort, Zielwort ist Präfix (z. B. „apfelbaum” → „apfel”).
+  // Mindestlänge 3, damit kurze Präpositionen (z. B. „in”) keine Falsch-Treffer erzeugen.
+  if (token.startsWith(wort) && wort.length >= 3) return 0.85;
   if (wort.includes(token) && token.length >= 3) return 0.75;
   const d = levenshtein(token, wort);
   if (d <= schwelle(token.length)) return Math.max(0.5, 0.72 - (d - 1) * 0.1);

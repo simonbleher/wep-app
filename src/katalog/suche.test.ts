@@ -34,6 +34,27 @@ describe('sucheKatalog – konkrete Variante', () => {
   });
 });
 
+describe('sucheKatalog – Variante typ (K3: Ökologische Objekte)', () => {
+  it('"Insektenhotel" findet das Ökologische Objekt als Top-Treffer', () => {
+    const treffer = sucheKatalog(positionen, 'Insektenhotel');
+    expect(treffer[0].position.id).toBe('aa-oekologisches-objekt');
+    expect(treffer[0].trefferGrund).toBe('variante');
+    expect(treffer[0].variante?.typ).toBe('Insektenhotel');
+  });
+
+  it('"Benjeshecke" findet das Ökologische Objekt als Top-Treffer', () => {
+    const treffer = sucheKatalog(positionen, 'Benjeshecke');
+    expect(treffer[0].position.id).toBe('aa-oekologisches-objekt');
+    expect(treffer[0].trefferGrund).toBe('variante');
+  });
+
+  it('"Totholz" findet das Ökologische Objekt als Top-Treffer', () => {
+    const treffer = sucheKatalog(positionen, 'Totholz');
+    expect(treffer[0].position.id).toBe('aa-oekologisches-objekt');
+    expect(treffer[0].trefferGrund).toBe('variante');
+  });
+});
+
 describe('sucheKatalog – Tippfehler-Toleranz', () => {
   it('Tippfehler im Arten-Namen ("Ligustar") findet trotzdem die Hecke zuerst', () => {
     const treffer = sucheKatalog(positionen, 'Ligustar');
