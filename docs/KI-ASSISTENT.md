@@ -6,6 +6,8 @@ ohne Claude-API, mit **Google AI Studio (Gemini, kostenloser Tarif)**.
 - `/wertermittlung-aussen-aufwuchs` → **Assistent A: Aufnahmeliste übernehmen**
 - `/parzellen-skizze` → **Assistent B: Skizze aus Foto**
 
+Vorlagen: die beiden Claude-Skills liegen als Referenz in `docs/skills/`.
+
 ## Grundsatz: KI liest, App rechnet
 
 | Aufgabe | Wer |
