@@ -4,6 +4,13 @@
 // definierten Typen sind für alle Bereiche verbindlich (siehe
 // docs/ARCHITEKTUR.md). Änderungen nur per PR mit Begründung.
 
+// SkizzeDaten wird im Bereich `skizze` (Aufgabe S1) vollständig definiert und
+// hier importiert, damit der Wep-Typ es referenzieren kann. Außerdem wird es
+// re-exportiert, damit bestehende Importpfade über src/model/types.ts weiterhin
+// funktionieren (kein Breaking Change für andere Bereiche).
+import type { SkizzeDaten } from '../skizze/types.js'
+export type { SkizzeDaten } from '../skizze/types.js'
+
 /**
  * Ein vollständiges Wertermittlungsprotokoll.
  * `id` entspricht der Vorgangs-Nr., z. B. "2026-999".
@@ -84,13 +91,6 @@ export interface BeseitigungsPosition {
   einzelpreis: number // Spalte H
   faktor: number // Spalte J (Standard 1); Begründung bei > 1 in F53
   begruendung?: string // F53 – Begründung bei Faktor > 100 %
-}
-
-// OFFENE FRAGE: `SkizzeDaten` wird in docs/ARCHITEKTUR.md referenziert, aber nicht
-// als Typ definiert. Vorläufig nur ein minimaler Stub – die eigentliche Struktur
-// (Formen, Maße, Bild-Export) legt der Bereich `skizze` (Aufgabe S1) fest.
-export interface SkizzeDaten {
-  notiz?: string
 }
 
 // OFFENE FRAGE: Die Zuordnung Zustand → Faktor ist vorläufig. Die BewRL nennt nur
