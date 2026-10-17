@@ -20,3 +20,5 @@ npm run build      # Produktions-Build (dist/) erstellen
 npm run preview    # Produktions-Build lokal testen
 npm run typecheck  # TypeScript ohne Ausgabe prüfen
 ```
+
+OneDrive-Sync (optional): Client-ID in `.env.local` eintragen – Anleitung in [docs/SYNC.md](docs/SYNC.md).

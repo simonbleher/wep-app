@@ -7,3 +7,5 @@ dev-dist/
 /wep-export/
 *.befuellt.xlsx
 ~$*.xlsx
+# Lokale Umgebungsvariablen (z. B. VITE_MS_CLIENT_ID)
+*.local

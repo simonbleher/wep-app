@@ -1,7 +1,8 @@
 // Startseite: Liste aller WEPs + Button „Neues WEP".
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { neuerWep, type Wep } from '@/model'
 import { alleWeps, speichereWep, loescheWep } from './db'
+import { SyncLeiste } from './SyncLeiste'
 
 interface Props {
   /** Öffnet die Detailansicht des WEP mit der angegebenen id. */
@@ -34,12 +35,14 @@ export function Startseite({ onOeffnen }: Props) {
   const [weps, setWeps] = useState<Wep[]>([])
   const [geladen, setGeladen] = useState(false)
 
-  useEffect(() => {
+  const neuLaden = useCallback(() => {
     void alleWeps().then((liste) => {
       setWeps(liste)
       setGeladen(true)
     })
   }, [])
+
+  useEffect(neuLaden, [neuLaden])
 
   async function neuesWep() {
     const id = naechsteId(weps)
@@ -60,6 +63,8 @@ export function Startseite({ onOeffnen }: Props) {
       <header className="kopf">
         <h1>Wertermittlungsprotokolle</h1>
       </header>
+
+      <SyncLeiste onGeaendert={neuLaden} />
 
       <button type="button" className="btn btn-primary btn-gross" onClick={neuesWep}>
         ➕ Neues WEP
