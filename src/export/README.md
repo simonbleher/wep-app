@@ -85,6 +85,10 @@ await exportWep(wep, excel, {
 - Sprechende Namen wie im Skill: `Hochbeet_0`, `Holzpferd`, `Holzpferd_X1`, `Holzpferd_Hinweis`,
   `Fliederhecke_0`, `Kompost_Latte_1`, `Maß_Laube_Breite` …
 - Stil (Farben, Ebenen) siehe `docs/skills/parzellen-skizze.md`; Elementtypen in `FormTyp`.
+- `entfernen`: mit `pflanze: true` (Baum, Strauch, Hecke, Konifere) Stern + rotes X, sonst (Holzpferd,
+  Schuppen, Platte …) nur Hinweis + Pfeil + kleines rotes X als Marker.
+- Eigene Beschriftungen (Textfelder) weichen vorhandenen Beschriftungen aus (rechts, unten, links, oben);
+  vorhandene Formen werden nie verschoben. `ergebnis.verschoben` / `ergebnis.ueberdeckt` melden das.
 - Gras + Grundstück (Wiese) nur, wenn das Blatt noch leer ist (`graswiese: false` schaltet ab).
 - Ohne `rasterisiere` werden Baum/Strauch/Tor aus einfachen Formen gezeichnet, ohne Bilddateien.
 - Positionen: absolute EMU → `twoCellAnchor editAs="oneCell"` über Spaltenbreiten/Zeilenhöhen des

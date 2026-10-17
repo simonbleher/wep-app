@@ -53,6 +53,9 @@ async function main() {
     `Export: ${r.skizzeFormen?.anzahlFormen} Formen (${r.skizzeFormen?.svgBilder} SVG-Bilder), Wiese ergänzt: ${r.skizzeFormen?.graswiese}`,
   )
 
+  if (r.skizzeFormen?.verschoben.length) console.log(`Beschriftungen verschoben: ${r.skizzeFormen.verschoben.join(', ')}`)
+  if (r.skizzeFormen?.ueberdeckt.length) console.log(`Überdeckt (nicht verschiebbar): ${r.skizzeFormen.ueberdeckt.join('; ')}`)
+
   const ziel = join(HIER, 'ergebnis-skizze', fall)
   mkdirSync(ziel, { recursive: true })
   const xlsx = new Uint8Array(await r.blob.arrayBuffer())
