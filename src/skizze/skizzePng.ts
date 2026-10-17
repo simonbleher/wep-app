@@ -8,6 +8,16 @@
 
 import type { SkizzeDaten, SkizzeElement } from './types.js'
 
+/** Optionen für den PNG-Export. */
+export interface PngOptionen {
+  /**
+   * Transparenter Hintergrund und kein Raster – für Excel-Blätter, die schon
+   * eigene Formen haben (z. B. die kopierte Bau-Skizze), damit das Bild sie
+   * nicht verdeckt.
+   */
+  transparent?: boolean
+}
+
 // ---------------------------------------------------------------------------
 // Öffentliche API
 // ---------------------------------------------------------------------------
@@ -20,19 +30,23 @@ import type { SkizzeDaten, SkizzeElement } from './types.js'
  * @param daten  - Skizze-Daten
  * @param breite - Breite der Zeichenfläche in Pixeln
  * @param hoehe  - Höhe der Zeichenfläche in Pixeln
+ * @param optionen - transparent: ohne Hintergrund und ohne Raster
  */
 export function skizzeAufContext(
   ctx: CanvasRenderingContext2D,
   daten: SkizzeDaten,
   breite: number,
   hoehe: number,
+  optionen: PngOptionen = {},
 ): void {
-  // Hintergrund
-  ctx.fillStyle = '#ffffff'
-  ctx.fillRect(0, 0, breite, hoehe)
+  // Hintergrund (transparent: Canvas bleibt leer → Alpha 0)
+  if (!optionen.transparent) {
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, breite, hoehe)
+  }
 
-  // Optional: Raster einzeichnen
-  if (daten.raster) {
+  // Optional: Raster einzeichnen (nie beim transparenten Export)
+  if (daten.raster && !optionen.transparent) {
     const g = daten.rasterGroesse ?? 40
     ctx.strokeStyle = '#e0e0e0'
     ctx.lineWidth = 0.5
@@ -63,11 +77,13 @@ export function skizzeAufContext(
  * @param daten  - Skizze-Daten
  * @param breite - Breite des Ausgabebilds in Pixeln (überschreibt daten.breite)
  * @param hoehe  - Höhe des Ausgabebilds in Pixeln (überschreibt daten.hoehe)
+ * @param optionen - transparent: ohne Hintergrund und ohne Raster
  */
 export async function skizzeAlsPng(
   daten: SkizzeDaten,
   breite?: number,
   hoehe?: number,
+  optionen: PngOptionen = {},
 ): Promise<Blob> {
   const w = breite ?? daten.breite ?? 800
   const h = hoehe ?? daten.hoehe ?? 600
@@ -79,7 +95,7 @@ export async function skizzeAlsPng(
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('Canvas 2D-Kontext nicht verfügbar')
 
-  skizzeAufContext(ctx, daten, w, h)
+  skizzeAufContext(ctx, daten, w, h, optionen)
 
   return new Promise<Blob>((resolve, reject) => {
     canvas.toBlob((blob) => {

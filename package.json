@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "ki-test": "vite-node --config tools/ki-test/vite.config.ts tools/ki-test/run.ts --",
-    "ki-test:typecheck": "tsc -p tools/ki-test/tsconfig.json --noEmit"
+    "ki-test:typecheck": "tsc -p tools/ki-test/tsconfig.json --noEmit",
+    "ki-test-skizze": "vite-node --config tools/ki-test/vite.config.ts tools/ki-test/run-skizze.ts --"
   },
   "dependencies": {
     "@azure/msal-browser": "^4.30.0",
@@ -20,10 +21,12 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@napi-rs/canvas": "^1.0.11",
     "@types/node": "^26.6.5",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",
+    "mammoth": "^1.13.0",
     "typescript": "^5.7.3",
     "vite": "^6.0.11",
     "vite-plugin-pwa": "^0.21.1",

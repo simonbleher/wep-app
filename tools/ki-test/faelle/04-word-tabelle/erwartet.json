@@ -1,0 +1,18 @@
+{
+  "positionen": [
+    { "katalogId": "aa-einfriedung", "varianteIndex": 2, "anzahl": 18, "einheit": "m", "bezeichnung": "Stabgitterzaun", "zustand": "gut", "unsicher": false, "grund": "Metallzaun/Stabgitter, gut erhalten" },
+    { "katalogId": "aa-tueranlage", "varianteIndex": null, "anzahl": 1, "einheit": "Stück", "bezeichnung": "Gartentür Stabgitter", "zustand": "mittel", "unsicher": false, "grund": "Türanlage" },
+    { "katalogId": "aa-wegebelag", "varianteIndex": 2, "anzahl": 20, "einheit": "m²", "bezeichnung": "Gehwegplatten", "zustand": "mittel", "unsicher": false, "grund": "Steinbelag, teils lose" },
+    { "katalogId": "aa-regenwasserbehaelter", "varianteIndex": 2, "anzahl": 1, "einheit": "Stück", "bezeichnung": "Regentonne 500 l", "zustand": "mittel", "unsicher": false, "grund": "bis 500 l" },
+    { "katalogId": "aa-hochbeet", "varianteIndex": null, "anzahl": 3, "einheit": "m²", "bezeichnung": "Hochbeet Holz, 80 cm", "zustand": "mittel", "unsicher": false, "grund": "mind. 50 cm hoch" },
+    { "katalogId": "aa-oekologisches-objekt", "varianteIndex": 0, "anzahl": 1, "einheit": "Stück", "bezeichnung": "Insektenhotel", "zustand": "mittel", "unsicher": false, "grund": "Insektenhotel, selbst gebaut" },
+    { "katalogId": "aw-obstgehoelz", "varianteIndex": 9, "anzahl": 3, "einheit": "Stück", "bezeichnung": "Apfel, Säule, bis 4 J.", "zustand": "gut", "unsicher": false, "grund": "Säulenapfel 3 J." },
+    { "katalogId": "aw-obstgehoelz", "varianteIndex": 4, "anzahl": 1, "einheit": "Stück", "bezeichnung": "Sauerkirsche, Halbstamm, 5–30 J.", "zustand": "gut", "unsicher": false, "grund": "HS ca. 20 J." },
+    { "katalogId": "aw-beerenobst", "varianteIndex": 3, "anzahl": 2, "einheit": "Stück", "bezeichnung": "Johannisbeere, Stamm, 5–20 J.", "zustand": "gut", "unsicher": false, "grund": "Stamm 8 J." },
+    { "katalogId": "aw-ziergehoelz", "varianteIndex": 1, "anzahl": 1, "einheit": "Stück", "bezeichnung": "Zaubernuss", "zustand": "gut", "unsicher": false, "grund": "wertvollere Art (Beispiel im Katalog)" },
+    { "katalogId": "aw-hecke", "varianteIndex": 1, "anzahl": 9, "einheit": "m", "bezeichnung": "Rotbuchenhecke, 1,20 m", "zustand": "gut", "unsicher": false, "grund": "Laub, wertvollere Art; Höhe unter 1,25 m" },
+    { "katalogId": "aw-gemuese", "varianteIndex": null, "anzahl": 15, "einheit": "m²", "bezeichnung": "Gemüsebeete", "zustand": "gut", "unsicher": false, "grund": "gepflegt" },
+    { "katalogId": "aw-rasen", "varianteIndex": null, "anzahl": 60, "einheit": "m²", "bezeichnung": "Rasen", "zustand": "gut", "unsicher": false, "grund": "Rasen" }
+  ],
+  "kurzbeschreibung": "Außenanlagen: Stabgitterzaun mit Tür, Plattenweg (teils lose), Regentonne, Holz-Hochbeet, Insektenhotel. Aufwuchs: Säulenäpfel, Sauerkirsche, Stamm-Johannisbeeren, Zaubernuss, Rotbuchenhecke, Gemüsebeete, Rasen; KGN gut."
+}

@@ -11,9 +11,14 @@
  * Beibehaltung des Seitenverhältnisses eingepasst. Ein Bild aus einem
  * früheren App-Export (Name „WEP-App Skizze“) wird vorher entfernt, damit
  * sich beim erneuten Export nichts stapelt.
+ *
+ * Bau-Excel: Der Bau-Wertermittler kopiert seine Skizze oft schon als
+ * Excel-Formen in dieses Blatt. Dann darf das PNG sie nicht verdecken –
+ * `skizzeBlattHatFormen` erkennt das, und die App rendert das PNG mit
+ * transparentem Hintergrund und ohne Raster.
  */
 
-import type JSZip from 'jszip'
+import JSZip from 'jszip'
 
 export const SKIZZE_BLATTNAME = 'Skizze Außenanlage-Aufwuchs'
 export const SKIZZE_BILDNAME = 'WEP-App Skizze'
@@ -277,6 +282,48 @@ export async function fuegeSkizzeEin(zip: JSZip, png: Uint8Array): Promise<boole
   zip.file(drawingPfad, drawingXml)
 
   return true
+}
+
+/** Leeres Textfeld der Vorlage („Textfeld 1/2“, „TextBox 8“ …) ohne sichtbaren Text. */
+function istLeeresTextfeld(anker: string): boolean {
+  if (!/<xdr:cNvSpPr\b[^>]*\btxBox="1"/.test(anker)) return false
+  const texte = [...anker.matchAll(/<a:t(?:\s[^>]*)?>([^<]*)<\/a:t>/g)].map((m) => m[1].trim())
+  return texte.every((t) => t === '')
+}
+
+/**
+ * Zählt die Formen im Drawing, die weder ein früheres App-Bild noch ein leeres
+ * Textfeld der Vorlage sind – also z. B. die kopierte Bau-Skizze.
+ */
+export function zaehleFremdeFormen(drawingXml: string): number {
+  let n = 0
+  for (const m of drawingXml.matchAll(
+    /<xdr:(oneCellAnchor|twoCellAnchor|absoluteAnchor)\b(?:(?!<\/xdr:\1>)[\s\S])*?<\/xdr:\1>/g,
+  )) {
+    const anker = m[0]
+    if (anker.includes(`name="${SKIZZE_BILDNAME}"`) || istLeeresTextfeld(anker)) continue
+    n++
+  }
+  return n
+}
+
+/**
+ * true, wenn das Blatt „Skizze Außenanlage-Aufwuchs“ schon eigene Formen hat
+ * (außer den leeren Textfeldern der Vorlage). Dann muss das Skizzen-PNG
+ * transparent und ohne Raster sein, damit es nichts verdeckt.
+ */
+export async function skizzeBlattHatFormen(quelle: JSZip | ArrayBuffer | Uint8Array): Promise<boolean> {
+  const zip = quelle instanceof ArrayBuffer || quelle instanceof Uint8Array ? await JSZip.loadAsync(quelle) : quelle
+  const blattPfad = await findeBlattPfad(zip, SKIZZE_BLATTNAME)
+  const blattXml = blattPfad ? await zip.file(blattPfad)?.async('string') : undefined
+  if (!blattPfad || !blattXml) return false
+  const drawingRef = /<drawing\b[^>]*>/.exec(blattXml)
+  if (!drawingRef) return false
+  const rels = (await zip.file(relsPfad(blattPfad))?.async('string')) ?? LEERE_RELS
+  const rel = leseBeziehungen(rels).find((r) => r.id === xmlAttr(drawingRef[0], 'r:id'))
+  if (!rel) return false
+  const drawingXml = await zip.file(aufloesen(verzeichnis(blattPfad), rel.target))?.async('string')
+  return drawingXml ? zaehleFremdeFormen(drawingXml) > 0 : false
 }
 
 async function ergaenzeContentType(zip: JSZip, eintrag: string): Promise<void> {

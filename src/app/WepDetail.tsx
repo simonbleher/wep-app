@@ -1146,9 +1146,12 @@ function ExportTab({
         sourceBuffer = await resp.arrayBuffer()
       }
 
-      // Skizze (falls gezeichnet) als PNG mitgeben → Blatt „Skizze Außenanlage-Aufwuchs“
-      const skizzePng = wep.skizze?.elemente.length
-        ? await (await skizzeAlsPng(wep.skizze)).arrayBuffer()
+      // Skizze (falls gezeichnet) als PNG mitgeben → Blatt „Skizze Außenanlage-Aufwuchs“.
+      // Der Export entscheidet, ob das PNG transparent sein muss (Bau-Formen im Blatt).
+      const skizze = wep.skizze
+      const skizzePng = skizze?.elemente.length
+        ? async (o: { transparent: boolean }) =>
+            (await skizzeAlsPng(skizze, undefined, undefined, o)).arrayBuffer()
         : undefined
 
       const result = await exportWep(wep, sourceBuffer, { skizzePng })

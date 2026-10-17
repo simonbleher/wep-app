@@ -6,6 +6,7 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import os from 'node:os'
 import zlib from 'node:zlib'
 import { execSync } from 'node:child_process'
@@ -19,11 +20,13 @@ import {
   einpassen,
   findeBlattPfad,
   pngGroesse,
+  skizzeBlattHatFormen,
+  zaehleFremdeFormen,
   zelleUndVersatz,
 } from '../skizzeBild'
 
 const VORLAGE_PATH = path.resolve(
-  path.dirname(new URL(import.meta.url).pathname),
+  path.dirname(fileURLToPath(import.meta.url)),
   '../../../docs/WEP_Vorlage.xlsx',
 )
 
@@ -191,4 +194,91 @@ describe('Export mit Skizze', () => {
       fs.rmSync(dir, { recursive: true, force: true })
     }
   }, 120000)
+})
+
+// --- Blatt mit vorhandenen Formen (kopierte Bau-Skizze, erfunden) -------------
+
+function form(id: number, name: string, inhalt: string, txBox = false): string {
+  return (
+    '<xdr:twoCellAnchor><xdr:from><xdr:col>1</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>8</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>' +
+    '<xdr:to><xdr:col>3</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>20</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to>' +
+    `<xdr:sp macro="" textlink=""><xdr:nvSpPr><xdr:cNvPr id="${id}" name="${name}"/><xdr:cNvSpPr${txBox ? ' txBox="1"' : ''}/></xdr:nvSpPr>` +
+    '<xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr>' +
+    `<xdr:txBody><a:bodyPr/><a:lstStyle/><a:p>${inhalt}</a:p></xdr:txBody></xdr:sp><xdr:clientData/></xdr:twoCellAnchor>`
+  )
+}
+
+const DRAWING_KOPF =
+  '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+  '<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" ' +
+  'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">'
+
+/** Drawing wie in einer Bau-Excel: leere Vorlagen-Textfelder + Grundstück, Laube, Beschriftung. */
+const DRAWING_MIT_FORMEN =
+  DRAWING_KOPF +
+  form(2, 'Textfeld 1', '<a:endParaRPr lang="de-DE"/>', true) +
+  form(3, 'Textfeld 2', '<a:r><a:t> </a:t></a:r>', true) +
+  form(4, 'Rechteck 3', '') +
+  form(5, 'Rechteck 8', '') +
+  form(6, 'Textfeld 15', '<a:r><a:rPr lang="de-DE"/><a:t>L</a:t></a:r>', true) +
+  '</xdr:wsDr>'
+
+async function vorlageMitDrawing(drawingXml: string): Promise<ArrayBuffer> {
+  const zip = await JSZip.loadAsync(vorlage)
+  zip.file('xl/drawings/drawing9.xml', drawingXml)
+  return zip.generateAsync({ type: 'arraybuffer' })
+}
+
+describe('Skizzen-Blatt mit vorhandenen Formen', () => {
+  const wep = neuerWep('test-skizze-formen')
+  wep.formalien.unterpaechter = 'Erika Musterfrau'
+
+  it('zählt nur Formen, die keine leeren Vorlagen-Textfelder oder App-Bilder sind', async () => {
+    const orig = await JSZip.loadAsync(vorlage)
+    expect(zaehleFremdeFormen(await orig.file('xl/drawings/drawing9.xml')!.async('string'))).toBe(0)
+    expect(zaehleFremdeFormen(DRAWING_MIT_FORMEN)).toBe(3)
+  })
+
+  it('erkennt Formen im Blatt (Vorlage: nein, Bau-Skizze: ja)', async () => {
+    expect(await skizzeBlattHatFormen(vorlage)).toBe(false)
+    expect(await skizzeBlattHatFormen(await vorlageMitDrawing(DRAWING_MIT_FORMEN))).toBe(true)
+  })
+
+  it('ein früheres App-Bild allein zählt nicht als Form', async () => {
+    const erst = await exportWep(wep, vorlage, { skizzePng: testPng(100, 100) })
+    expect(await skizzeBlattHatFormen(await erst.blob.arrayBuffer())).toBe(false)
+  })
+
+  it('fordert ein transparentes PNG an und lässt die Formen stehen', async () => {
+    const aufrufe: boolean[] = []
+    const r = await exportWep(wep, await vorlageMitDrawing(DRAWING_MIT_FORMEN), {
+      skizzePng: async ({ transparent }) => {
+        aufrufe.push(transparent)
+        return testPng(400, 300)
+      },
+    })
+    expect(aufrufe).toEqual([true])
+    expect(r.skizzeEingefuegt).toBe(true)
+    expect(r.skizzeTransparent).toBe(true)
+    const drawing = await (await alsZip(r.blob)).file('xl/drawings/drawing9.xml')!.async('string')
+    for (const name of ['Textfeld 1', 'Textfeld 2', 'Rechteck 3', 'Rechteck 8', 'Textfeld 15']) {
+      expect(drawing).toContain(`name="${name}"`)
+    }
+    // Bild liegt als letzter Anker oben – sichtbar ist es nur, weil es transparent ist
+    expect(drawing.lastIndexOf(`name="${SKIZZE_BILDNAME}"`)).toBeGreaterThan(drawing.lastIndexOf('name="Textfeld 15"'))
+    // neue Shape-ID kollidiert nicht
+    expect(drawing).toMatch(new RegExp(`id="7" name="${SKIZZE_BILDNAME}"`))
+  })
+
+  it('leere Vorlage: PNG mit Hintergrund (transparent=false)', async () => {
+    const aufrufe: boolean[] = []
+    const r = await exportWep(wep, vorlage, {
+      skizzePng: async ({ transparent }) => {
+        aufrufe.push(transparent)
+        return testPng(400, 300)
+      },
+    })
+    expect(aufrufe).toEqual([false])
+    expect(r.skizzeTransparent).toBe(false)
+  })
 })

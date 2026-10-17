@@ -25,7 +25,9 @@ import {
   readCellRawValue,
   type CellPatch,
 } from './xmlPatcher'
-import { fuegeSkizzeEin } from './skizzeBild'
+import { fuegeSkizzeEin, skizzeBlattHatFormen } from './skizzeBild'
+
+export { skizzeBlattHatFormen } from './skizzeBild'
 
 // ---------------------------------------------------------------------------
 // Typen
@@ -49,13 +51,23 @@ export interface ExportOptionen {
   /**
    * Parzellenskizze als PNG (z. B. aus skizzeAlsPng). Wird in das Blatt
    * „Skizze Außenanlage-Aufwuchs“ in den Bereich B7:G48 eingepasst.
+   *
+   * Als Funktion übergeben, entscheidet der Export über den Hintergrund: Hat
+   * das Blatt schon eigene Formen (z. B. die kopierte Bau-Skizze), wird sie mit
+   * `transparent: true` aufgerufen – das PNG darf dann weder Hintergrund noch
+   * Raster haben, damit es die Formen nicht verdeckt.
    */
-  skizzePng?: ArrayBuffer | Uint8Array
+  skizzePng?:
+    | ArrayBuffer
+    | Uint8Array
+    | ((optionen: { transparent: boolean }) => Promise<ArrayBuffer | Uint8Array>)
 }
 
 export interface ExportResult {
   /** true, wenn eine Skizze ins Skizzen-Blatt eingefügt wurde */
   skizzeEingefuegt: boolean
+  /** true, wenn das Skizzen-Blatt schon eigene Formen hatte (PNG transparent angefordert) */
+  skizzeTransparent: boolean
   /** Das fertige XLSX als Blob (zum Download) */
   blob: Blob
   /** Vorgeschlagener Dateiname, z. B. "2026-999_WEP.xlsx" */
@@ -114,14 +126,16 @@ export async function exportWep(
 
   // 4b. Parzellenskizze als Bild ins Blatt „Skizze Außenanlage-Aufwuchs“
   //     (das PNG erzeugt die App im Browser mit skizzeAlsPng)
-  const skizzeEingefuegt = optionen.skizzePng
-    ? await fuegeSkizzeEin(
-        zip,
-        optionen.skizzePng instanceof Uint8Array
-          ? optionen.skizzePng
-          : new Uint8Array(optionen.skizzePng),
-      )
-    : false
+  //     Vorhandene Formen im Blatt (Bau-Skizze) → PNG transparent anfordern.
+  const skizzeTransparent = optionen.skizzePng ? await skizzeBlattHatFormen(zip) : false
+  let skizzeEingefuegt = false
+  if (optionen.skizzePng) {
+    const png =
+      typeof optionen.skizzePng === 'function'
+        ? await optionen.skizzePng({ transparent: skizzeTransparent })
+        : optionen.skizzePng
+    skizzeEingefuegt = await fuegeSkizzeEin(zip, png instanceof Uint8Array ? png : new Uint8Array(png))
+  }
 
   // 5. calcChain.xml entfernen und alle Querverweise bereinigen.
   //    Wenn nur die Datei gelöscht wird, bleiben Einträge in
@@ -165,6 +179,7 @@ export async function exportWep(
     aufwuchsUeberlauf,
     aufwuchsAbgeschnitten,
     skizzeEingefuegt,
+    skizzeTransparent,
   }
 }
 

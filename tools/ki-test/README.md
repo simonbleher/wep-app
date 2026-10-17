@@ -74,3 +74,34 @@ Dinge (Asbest, invasiv, krank, zu hoch) stehen mit `katalogId: null` drin.
 `prompt-aufnahme.md` – der Platzhalter `{{KATALOG}}` wird zur Laufzeit durch den
 kompakten Katalog ersetzt (id | Bezeichnung | Einheit | Varianten | Arten/Synonyme,
 ohne Höchstwerte). HTML-Kommentare werden nicht gesendet.
+
+## Assistent A: Eingabe nur Text oder Word
+
+Fall-Ordner haben `eingabe.txt` **oder** `eingabe.docx` (kein Foto mehr). Die Word-Datei
+wandelt `docx.ts` mit mammoth in Text um (Tabellenzeile = eine Zeile, Zellen mit „ | “).
+Beispiel: `faelle/04-word-tabelle/` (erfundene Daten).
+
+# Skizzen-Testlauf (Assistent B)
+
+`npm run ki-test-skizze` – Foto einer Handskizze → Elemente (Typ, `box_2d`, Beschriftung …)
+→ Ausrichtung an den Bau-Formen → Vergleichsbild je Modell.
+
+| Aufruf | Wirkung |
+|---|---|
+| `npm run ki-test-skizze` | alle Fälle × alle frei nutzbaren Modelle (ohne Gemma; 503 wie 429) |
+| `-- --modelle a,b` / `--fall fall1` / `--max-modelle 3` | wie `ki-test` |
+| `-- --nur-soll` | ohne KI: nur `soll.json` zeichnen |
+| `-- --wiederverwenden` | ohne KI: gespeicherte Rohantworten (`ausgaben/skizze/`) neu auswerten, z. B. nach Änderung an `skizze/ausrichtung.ts` |
+
+Ergebnis: `ergebnis-skizze.html` (Übersicht) und `ergebnis-skizze/<fall>/<modell>.png`
+(links Foto mit Kästen, rechts Bau-Formen + neue Elemente grün).
+
+`faelle-skizze/<fall>/`: `eingabe.jpg`, optional `bau-formen.json` / `aussen-vorher.json`,
+`soll.json` (gleiches Schema wie die Antwort, je Element `neu: true|false`).
+
+**Ausrichtung** (`skizze/ausrichtung.ts`): Gebäude, die im Foto und in den Bau-Formen vorkommen
+(Laube, LVP/Terrasse, Pavillon, ASG …), werden über die Beschriftung zugeordnet (Beschriftung
+schlägt den Typ: „Pavillon LVP“ = LVP). Daraus entsteht je Achse eine **stückweise lineare**
+Abbildung Foto → EMU (eine einzige Gerade schob neue Elemente in die Laube, weil Handskizzen
+nicht proportional sind). Mindestens 2 Bezugsgebäude, sonst Grundstücksrahmen. Was einem
+Bau-Objekt zugeordnet ist, gilt als vorhanden, der Rest als „neu“.
