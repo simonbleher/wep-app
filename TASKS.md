@@ -50,6 +50,13 @@ Ergebnis: `data/katalog.json` + `data/katalog.schema.json` + kurze Doku `data/RE
 > Text, Maßangabe, Rückgängig. Speichern als JSON, Export als PNG für die Vorlage.
 > Touch-tauglich. Vorläufige Lösung, wird später ersetzt – also schlank halten. PR.
 
+### S2 · Skizze-Tab in WepDetail einbauen 👀 (#skizze) – nach S1, A1
+Ergebnis: Tab „Skizze" in `src/app/WepDetail.tsx`, `src/skizze/` vollständig,
+`src/model/types.ts` mit `SkizzeDaten`, Tests, Export-Button.
+> Tab „Skizze" zwischen Beseitigung und Export. SkizzeEditor eingebunden,
+> Änderungen werden entprellt (300 ms) gespeichert. touch-action: none verhindert
+> Seitenscroll beim Zeichnen. Export-Tab: Schaltfläche „Skizze als PNG herunterladen".
+
 ### Y1 · Sync-Konzept OneDrive ⬜ (#sync)
 > Erstelle docs/SYNC.md: Wie synchronisiert die PWA die Rollen-Dateien
 > (<id>.gruen.json, <id>.bau.json, <id>.skizze.json) über Microsoft Graph mit einem
