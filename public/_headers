@@ -1,0 +1,12 @@
+# Cloudflare Pages: Service Worker und Manifest nie zwischenspeichern,
+# damit Updates der App sofort ankommen. Gehashte Assets dürfen lange gecacht werden.
+/sw.js
+  Cache-Control: no-cache
+/registerSW.js
+  Cache-Control: no-cache
+/manifest.webmanifest
+  Cache-Control: no-cache
+/index.html
+  Cache-Control: no-cache
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

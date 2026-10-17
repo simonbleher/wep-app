@@ -50,7 +50,7 @@ Microsoft-Konto (dem, mit dem du auch OneDrive nutzt).
    Client-ID (Form `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`). Sie ist kein Geheimnis.
 5. **Authentifizierung** → bei *Single-Page-Webanwendung* weitere Umleitungs-URIs
    hinzufügen, sobald die App veröffentlicht ist, z. B.
-   `https://simonbleher.github.io/wep-app/` (genau mit Schrägstrich am Ende).
+   `https://wep-pankow.pages.dev/` (genau mit Schrägstrich am Ende, siehe docs/HOSTING.md).
    Für einen Test im Heimnetz vom Handy aus zusätzlich die Adresse, unter der
    `npm run dev -- --host` erreichbar ist (Microsoft erlaubt `http` nur für
    `localhost`; fürs Handy daher besser die veröffentlichte `https`-Adresse).
