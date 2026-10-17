@@ -1,18 +1,161 @@
 {
-  "_hinweis": "ENTWURF (Claude, 17.10.2026) nach Ansicht von eingabe.jpg – offene Punkte siehe README.md. box_2d = [ymin, xmin, ymax, xmax], 0–1000 bezogen auf das ganze Foto.",
-  "grundstueck": [243, 197, 602, 882],
+  "_hinweis": "Soll (Claude, 17.10.2026; angepasst 18.10.2026 nach Simons Nachtrag). box_2d = [ymin, xmin, ymax, xmax], 0–1000 bezogen auf das ganze Foto. Streng bewertet werden nur Elemente mit neu=true; die übrigen stecken schon in den Bau-Formen.",
+  "grundstueck": [
+    243,
+    197,
+    602,
+    882
+  ],
   "elemente": [
-    { "typ": "entfernen", "box_2d": [279, 402, 310, 828], "beschriftung": "Holzpferd entfernen", "bezug": "Holzpferd", "wert": "", "unsicher": false, "grund": "Text oben, kein Symbol – Lage = Textposition", "neu": true },
-    { "typ": "lvp", "box_2d": [319, 290, 363, 636], "beschriftung": "LVP", "bezug": "", "wert": "", "unsicher": false, "grund": "Rechteck über der Laube = Laubenvorplatz (in Skizze Bau „Terrasse“)", "neu": false },
-    { "typ": "pavillon", "box_2d": [319, 290, 363, 460], "beschriftung": "Pavillon", "bezug": "LVP", "wert": "", "unsicher": true, "grund": "nur Beschriftung im linken Teil des LVP, keine eigene Umrandung", "neu": false },
-    { "typ": "laube", "box_2d": [372, 271, 504, 681], "beschriftung": "Laube", "bezug": "", "wert": "", "unsicher": false, "grund": "", "neu": false },
-    { "typ": "asg", "box_2d": [499, 213, 549, 290], "beschriftung": "ASG", "bezug": "", "wert": "", "unsicher": false, "grund": "Kasten links unter der Laube", "neu": false },
-    { "typ": "hochbeet", "box_2d": [517, 340, 569, 383], "beschriftung": "Hochbeet", "bezug": "Hochbeete", "wert": "", "unsicher": false, "grund": "Ellipse 1 von 4", "neu": true },
-    { "typ": "hochbeet", "box_2d": [517, 414, 568, 449], "beschriftung": "Hochbeet", "bezug": "Hochbeete", "wert": "", "unsicher": false, "grund": "Ellipse 2 von 4", "neu": true },
-    { "typ": "hochbeet", "box_2d": [517, 494, 562, 526], "beschriftung": "Hochbeet", "bezug": "Hochbeete", "wert": "", "unsicher": false, "grund": "Ellipse 3 von 4", "neu": true },
-    { "typ": "hochbeet", "box_2d": [512, 542, 562, 582], "beschriftung": "Hochbeet", "bezug": "Hochbeete", "wert": "", "unsicher": false, "grund": "Ellipse 4 von 4 (doppelt umrandet)", "neu": true },
-    { "typ": "brunnen", "box_2d": [581, 302, 598, 334], "beschriftung": "Brunnen", "bezug": "", "wert": "", "unsicher": false, "grund": "kleiner Kreis, Pfeil von der Beschriftung unten", "neu": false },
-    { "typ": "zugang", "box_2d": [606, 224, 619, 875], "beschriftung": "Zugang", "bezug": "", "wert": "", "unsicher": false, "grund": "Linie unten (laut Fall-README); in Skizze Bau „Zugang Parz. X“", "neu": false },
-    { "typ": "tor", "box_2d": [577, 635, 617, 739], "beschriftung": "", "bezug": "Zugang", "wert": "", "unsicher": true, "grund": "schräger Strich unten rechts auf der Zugangslinie – vermutlich Torflügel (Skizze Bau hat dort ein Tor); könnte auch Pfeil zu „Hochbeete“ sein", "neu": false }
+    {
+      "typ": "entfernen",
+      "box_2d": [
+        279,
+        402,
+        310,
+        828
+      ],
+      "beschriftung": "Holzpferd entfernen",
+      "bezug": "Holzpferd",
+      "wert": "",
+      "unsicher": false,
+      "grund": "Text oben, kein Symbol – Lage = Textposition",
+      "neu": true
+    },
+    {
+      "typ": "lvp",
+      "box_2d": [
+        319,
+        290,
+        363,
+        636
+      ],
+      "beschriftung": "Pavillon LVP",
+      "bezug": "",
+      "wert": "",
+      "unsicher": false,
+      "grund": "ein Kasten mit zwei Wörtern über der Laube; steckt schon in den Bau-Formen (Terrasse)",
+      "neu": false
+    },
+    {
+      "typ": "laube",
+      "box_2d": [
+        372,
+        271,
+        504,
+        681
+      ],
+      "beschriftung": "Laube",
+      "bezug": "",
+      "wert": "",
+      "unsicher": false,
+      "grund": "",
+      "neu": false
+    },
+    {
+      "typ": "asg",
+      "box_2d": [
+        499,
+        213,
+        549,
+        290
+      ],
+      "beschriftung": "ASG",
+      "bezug": "",
+      "wert": "",
+      "unsicher": false,
+      "grund": "Kasten links unter der Laube",
+      "neu": false
+    },
+    {
+      "typ": "hochbeet",
+      "box_2d": [
+        517,
+        340,
+        569,
+        383
+      ],
+      "beschriftung": "Hochbeet",
+      "bezug": "Hochbeete",
+      "wert": "",
+      "unsicher": false,
+      "grund": "Ellipse 1 von 4",
+      "neu": true
+    },
+    {
+      "typ": "hochbeet",
+      "box_2d": [
+        517,
+        414,
+        568,
+        449
+      ],
+      "beschriftung": "Hochbeet",
+      "bezug": "Hochbeete",
+      "wert": "",
+      "unsicher": false,
+      "grund": "Ellipse 2 von 4",
+      "neu": true
+    },
+    {
+      "typ": "hochbeet",
+      "box_2d": [
+        517,
+        494,
+        562,
+        526
+      ],
+      "beschriftung": "Hochbeet",
+      "bezug": "Hochbeete",
+      "wert": "",
+      "unsicher": false,
+      "grund": "Ellipse 3 von 4",
+      "neu": true
+    },
+    {
+      "typ": "hochbeet",
+      "box_2d": [
+        512,
+        542,
+        562,
+        582
+      ],
+      "beschriftung": "Hochbeet",
+      "bezug": "Hochbeete",
+      "wert": "",
+      "unsicher": false,
+      "grund": "Ellipse 4 von 4 (doppelt umrandet)",
+      "neu": true
+    },
+    {
+      "typ": "brunnen",
+      "box_2d": [
+        581,
+        302,
+        598,
+        334
+      ],
+      "beschriftung": "Brunnen",
+      "bezug": "",
+      "wert": "",
+      "unsicher": false,
+      "grund": "kleiner Kreis, Pfeil von der Beschriftung unten",
+      "neu": false
+    },
+    {
+      "typ": "zugang",
+      "box_2d": [
+        577,
+        635,
+        617,
+        739
+      ],
+      "beschriftung": "Zugang",
+      "bezug": "",
+      "wert": "",
+      "unsicher": false,
+      "grund": "schräger Strich unten rechts = Tor/Zugang; in Skizze Bau „Zugang Parz. X“",
+      "neu": false
+    }
   ]
 }
