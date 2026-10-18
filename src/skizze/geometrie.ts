@@ -42,6 +42,13 @@ const TREFFERRADIUS = 8
  */
 export function trifftElement(element: SkizzeElement, p: Punkt): boolean {
   switch (element.typ) {
+    case 'symbol':
+      return (
+        p.x >= element.x - 2 &&
+        p.x <= element.x + element.breite + 2 &&
+        p.y >= element.y - 2 &&
+        p.y <= element.y + element.hoehe + 2
+      )
     case 'rechteck': {
       const { x, y, breite, hoehe } = element
       const toleranz = TREFFERRADIUS
@@ -96,6 +103,7 @@ export function trefferSuchen(
 /** Verschiebt ein Element um den Vektor (dx, dy). */
 export function elementVerschieben(element: SkizzeElement, dx: number, dy: number): SkizzeElement {
   switch (element.typ) {
+    case 'symbol':
     case 'rechteck':
       return { ...element, x: element.x + dx, y: element.y + dy }
     case 'linie':

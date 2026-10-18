@@ -1,0 +1,11 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": "..",
+    "lib": ["ES2022", "DOM"],
+    "types": []
+  },
+  "include": ["./**/*.ts", "../src/vite-env.d.ts"],
+  "exclude": ["./**/__tests__/**"],
+  "references": []
+}

@@ -17,6 +17,7 @@ export type SkizzeWerkzeug =
   | 'kreis'
   | 'text'
   | 'massangabe'
+  | 'symbol'
   | 'auswahl'
 
 // ---------------------------------------------------------------------------
@@ -26,6 +27,8 @@ export type SkizzeWerkzeug =
 /** Basis-Felder, die alle Skizze-Elemente gemeinsam haben. */
 interface ElementBasis {
   id: string
+  /** Feste Elemente (z. B. Bau-Formen) ändert der Chat-Assistent nie. */
+  fest?: boolean
 }
 
 /** Gefülltes Rechteck (z. B. Gebäude, Beet). */
@@ -78,8 +81,44 @@ export interface SkizzeMassangabe extends ElementBasis {
   beschriftung: string
 }
 
+/** Piktogramme im Lageplan-Stil (Skill parzellen-skizze). */
+export const SYMBOL_ARTEN = [
+  'baum',
+  'strauch',
+  'wildling',
+  'kletterpflanze',
+  'hecke',
+  'beet',
+  'hochbeet',
+  'blumenbeet',
+  'rasen',
+  'kompost',
+  'brunnen',
+  'schacht',
+  'weg',
+  'tor',
+  'holzpferd',
+  'schaukel',
+  'gegenstand',
+  'entfernen',
+  'mangelhinweis',
+] as const
+export type SymbolArt = (typeof SYMBOL_ARTEN)[number]
+
+/** Piktogramm in einem Kasten, mit Beschriftung (bei „gegenstand“ der Name). */
+export interface SkizzeSymbol extends ElementBasis {
+  typ: 'symbol'
+  art: SymbolArt
+  x: number
+  y: number
+  breite: number
+  hoehe: number
+  beschriftung?: string
+}
+
 /** Vereinigungs-Typ aller Skizze-Elemente. */
 export type SkizzeElement =
+  | SkizzeSymbol
   | SkizzeRechteck
   | SkizzeLinie
   | SkizzeKreis

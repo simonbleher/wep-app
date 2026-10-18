@@ -6,8 +6,10 @@
  */
 
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
-import type { SkizzeDaten, SkizzeElement, SkizzeWerkzeug } from './types.js'
-import { leereSkizze, neueId } from './types.js'
+import type { SkizzeDaten, SkizzeElement, SkizzeWerkzeug, SymbolArt } from './types.js'
+import { SYMBOL_ARTEN, leereSkizze, neueId } from './types.js'
+import { primsZuSvg, symbolPrims } from './symbole.js'
+import { STANDARD_GROESSE } from './szene.js'
 import { trefferSuchen, elementVerschieben } from './geometrie.js'
 import {
   neuerVerlauf,
@@ -127,7 +129,31 @@ const WERKZEUGE: { id: SkizzeWerkzeug; label: string; titel: string }[] = [
   { id: 'kreis', label: '○', titel: 'Kreis / Baum zeichnen' },
   { id: 'text', label: 'T', titel: 'Text einfügen' },
   { id: 'massangabe', label: '↔', titel: 'Maßangabe zeichnen' },
+  { id: 'symbol', label: '🌳', titel: 'Symbol setzen (Baum, Beet, Hecke …)' },
 ]
+
+/** Anzeigenamen der Symbole im Auswahlfeld. */
+const SYMBOL_NAMEN: Record<SymbolArt, string> = {
+  baum: 'Baum',
+  strauch: 'Strauch',
+  wildling: 'Wildling',
+  kletterpflanze: 'Kletterpflanze / Wein',
+  hecke: 'Hecke',
+  beet: 'Beet',
+  hochbeet: 'Hochbeet',
+  blumenbeet: 'Blumenbeet',
+  rasen: 'Rasen (Beschriftung)',
+  kompost: 'Kompost',
+  brunnen: 'Brunnen',
+  schacht: 'Schacht',
+  weg: 'Weg',
+  tor: 'Tor',
+  holzpferd: 'Holzpferd',
+  schaukel: 'Schaukel',
+  gegenstand: 'Gegenstand (mit Name)',
+  entfernen: 'Entfernen-Markierung',
+  mangelhinweis: 'Mängelhinweis',
+}
 
 // ---------------------------------------------------------------------------
 // Hauptkomponente
@@ -164,6 +190,7 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
 
   const [aktivesWerkzeug, setAktivesWerkzeug] = useState<SkizzeWerkzeug>('auswahl')
   const [rasterSichtbar, setRasterSichtbar] = useState(daten.raster ?? true)
+  const [symbolArt, setSymbolArt] = useState<SymbolArt>('baum')
 
   // Zeige Dialog für Text-Eingabe
   const [textDialog, setTextDialog] = useState<{ x: number; y: number } | null>(null)
@@ -172,11 +199,13 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
     x1: number; y1: number; x2: number; y2: number
   } | null>(null)
   const [massEingabe, setMassEingabe] = useState('')
+  // Beschriftungs-Dialog für neue Kreise und Symbole
   const [kreisLabelDialog, setKreisLabelDialog] = useState<{
     id: string; beschriftung: string
   } | null>(null)
 
   const svgRef = useRef<SVGSVGElement>(null)
+  const ausgewaehltesEl = zustand.elemente.find((e) => e.id === zustand.ausgewaehlt)
 
   // Zeichnen-Status
   const zeichnenRef = useRef<{
@@ -211,12 +240,13 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
         dispatch({ typ: 'redo' })
       }
       if ((e.key === 'Delete' || e.key === 'Backspace') && zustand.ausgewaehlt) {
-        dispatch({ typ: 'element-loeschen', id: zustand.ausgewaehlt })
+        const el = zustand.elemente.find((x) => x.id === zustand.ausgewaehlt)
+        if (el && !el.fest) dispatch({ typ: 'element-loeschen', id: zustand.ausgewaehlt })
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [zustand.ausgewaehlt])
+  }, [zustand.ausgewaehlt, zustand.elemente])
 
   // ---------------------------------------------------------------------------
   // Pointer-Ereignisse
@@ -232,7 +262,7 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
       if (aktivesWerkzeug === 'auswahl') {
         const getroffen = trefferSuchen(zustand.elemente, { x, y })
         dispatch({ typ: 'element-auswaehlen', id: getroffen?.id ?? null })
-        if (getroffen) {
+        if (getroffen && !getroffen.fest) {
           verschiebenRef.current = {
             aktiv: true,
             elementId: getroffen.id,
@@ -240,6 +270,24 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
             letzteY: y,
           }
         }
+        return
+      }
+
+      // Symbol setzen: ein Tipp genügt, Größe nach Standard
+      if (aktivesWerkzeug === 'symbol') {
+        const faktor = breite / 445
+        const [sb, sh] = STANDARD_GROESSE[symbolArt]
+        const symbol: SkizzeElement = {
+          id: neueId(),
+          typ: 'symbol',
+          art: symbolArt,
+          x: x - (sb * faktor) / 2,
+          y: y - (sh * faktor) / 2,
+          breite: sb * faktor,
+          hoehe: sh * faktor,
+        }
+        dispatch({ typ: 'element-hinzufuegen', element: symbol })
+        setKreisLabelDialog({ id: symbol.id, beschriftung: '' })
         return
       }
 
@@ -252,7 +300,7 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
 
       zeichnenRef.current = { aktiv: true, startX: x, startY: y, vorschau: null }
     },
-    [aktivesWerkzeug, zustand.elemente],
+    [aktivesWerkzeug, zustand.elemente, symbolArt, breite],
   )
 
   const handlePointerMove = useCallback(
@@ -438,7 +486,7 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
     if (!kreisLabelDialog) return
     if (kreisLabelDialog.beschriftung.trim()) {
       const el = zustand.elemente.find((e) => e.id === kreisLabelDialog.id)
-      if (el && el.typ === 'kreis') {
+      if (el && (el.typ === 'kreis' || el.typ === 'symbol')) {
         dispatch({
           typ: 'element-aktualisieren',
           element: { ...el, beschriftung: kreisLabelDialog.beschriftung.trim() },
@@ -457,6 +505,26 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
     const hlBreite = istAusgewaehlt ? 2.5 : 1.5
 
     switch (el.typ) {
+      case 'symbol': {
+        const prims = symbolPrims(el.art, { x: el.x, y: el.y, w: el.breite, h: el.hoehe }, el.beschriftung ?? '', { schrift: 12 })
+        return (
+          <g key={el.id}>
+            <g dangerouslySetInnerHTML={{ __html: primsZuSvg(prims) }} />
+            {istAusgewaehlt && (
+              <rect
+                x={el.x - 2}
+                y={el.y - 2}
+                width={el.breite + 4}
+                height={el.hoehe + 4}
+                fill="none"
+                stroke="blue"
+                strokeWidth={1.5}
+                strokeDasharray="4 3"
+              />
+            )}
+          </g>
+        )
+      }
       case 'rechteck':
         return (
           <rect
@@ -569,8 +637,6 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
   // Render
   // ---------------------------------------------------------------------------
 
-  const ausgewaehltesEl = zustand.elemente.find((e) => e.id === zustand.ausgewaehlt)
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', userSelect: 'none' }}>
       {/* Werkzeugleiste */}
@@ -624,8 +690,24 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
           ↪
         </button>
 
+        {/* Symbol-Auswahl */}
+        {aktivesWerkzeug === 'symbol' && (
+          <select
+            aria-label="Symbol"
+            value={symbolArt}
+            onChange={(e) => setSymbolArt(e.target.value as SymbolArt)}
+            style={{ minHeight: 44, fontSize: 16, borderRadius: 6 }}
+          >
+            {SYMBOL_ARTEN.map((a) => (
+              <option key={a} value={a}>
+                {SYMBOL_NAMEN[a]}
+              </option>
+            ))}
+          </select>
+        )}
+
         {/* Löschen */}
-        {zustand.ausgewaehlt && (
+        {zustand.ausgewaehlt && !ausgewaehltesEl?.fest && (
           <button
             title="Ausgewähltes Element löschen (Entf)"
             onClick={() =>
@@ -680,7 +762,9 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
             color: '#1b5e20',
           }}
         >
-          Ausgewählt: {ausgewaehltesEl.typ} — Ziehen zum Verschieben, Entf zum Löschen
+          {ausgewaehltesEl.fest
+            ? `Ausgewählt: ${ausgewaehltesEl.typ} (fest, nicht änderbar)`
+            : `Ausgewählt: ${ausgewaehltesEl.typ === 'symbol' ? ausgewaehltesEl.art : ausgewaehltesEl.typ} — Ziehen zum Verschieben, Entf zum Löschen`}
         </div>
       )}
 
@@ -842,7 +926,7 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
           <div
             style={{ background: '#fff', padding: 24, borderRadius: 8, minWidth: 280, display: 'flex', flexDirection: 'column', gap: 12 }}
           >
-            <label style={{ fontWeight: 'bold' }}>Baumart / Beschriftung (optional)</label>
+            <label style={{ fontWeight: 'bold' }}>Beschriftung / Name (optional)</label>
             <input
               autoFocus
               value={kreisLabelDialog.beschriftung}

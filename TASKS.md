@@ -130,3 +130,9 @@ ergänzt Simon in `tools/ki-test/faelle/<name>/eingabe.jpg`.
 Ergebnis: `npm run ki-test-skizze`, Übersicht `tools/ki-test/ergebnis-skizze.html`, Fall 1 mit
 `soll.json` (Entwurf, offene Fragen im PR). Assistent A: Eingabe nur Text/.docx (Fall 04).
 Export-Sofortfix: PNG transparent, wenn das Blatt schon Formen hat. Weiterführung: E3.
+
+### K-B1 · Skizzen-Chat 👀 (#00-leitung) – Branch ki/skizze-chat
+Ergebnis: `functions/api/ki/skizze-chat.ts` (+ `functions/_lib/`), Szene-Modell und Operationen in
+`src/skizze/` (`szene.ts`, `operationen.ts`, `chatWerkzeuge.ts`, `chatAblauf.ts`), Chat-Leiste
+`SkizzeChat.tsx` im Skizze-Tab, neue Symbole (Editor, PNG, Excel-Formen), Replay `npm run ki-test-chat`
+→ `tools/ki-test/ergebnis-chat.html`. Offen: Vergleich mit `claude-ergebnis.json` (Datei fehlt noch).
