@@ -12,6 +12,8 @@
     "ki-test": "vite-node --config tools/ki-test/vite.config.ts tools/ki-test/run.ts --",
     "ki-test:typecheck": "tsc -p tools/ki-test/tsconfig.json --noEmit",
     "ki-test-skizze": "vite-node --config tools/ki-test/vite.config.ts tools/ki-test/run-skizze.ts --",
+    "ki-test-chat": "vite-node --config tools/ki-test/vite.config.ts tools/ki-test/run-chat.ts --",
+    "typecheck:functions": "tsc -p functions/tsconfig.json --noEmit",
     "ki-test-skizze-export": "vite-node --config tools/ki-test/vite.config.ts tools/ki-test/export-skizze.ts --"
   },
   "dependencies": {

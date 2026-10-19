@@ -92,3 +92,16 @@ Microsoft-365-Copilot-API verworfen (Vorschau, Copilot-Lizenz je Nutzer, nur Tex
 3. `/api/ki` mit Modellkette.
 4. Assistent A.
 5. Assistent B (zusammen mit dem Design-Durchgang).
+
+## Skizzen-Chat (gebaut, Branch ki/skizze-chat)
+
+- Chat-Leiste im Skizze-Tab: Text oder Diktat → KI antwortet **nur mit Function Calls**
+  (`hinzufuegen`, `aendern`, `verschieben`, `groesse`, `loeschen`, `beschriften`, `reihe`,
+  `entlangKante`, `neben`/`unter`/`ueber`, `hinweis`, `fertig`); der Code rechnet die Geometrie.
+- Szene in Promille des Grundstücks mit stabilen ids, Bau-Formen `fest`. Siehe `src/skizze/szene.ts`.
+- Schnittstelle `POST /api/ki/skizze-chat` (`functions/`), Secrets: `GEMINI_API_KEY`, optional
+  `KI_MODELLE` (kommagetrennt, bestes zuerst) und `APP_TOKEN` (Header `x-wep-token`, in der App
+  `VITE_KI_TOKEN`). Lokal: `.dev.vars` + `npx wrangler pages dev`.
+- Selbstprüfung: neu rendern → zweiter Aufruf mit Bild und Code-Befunden → höchstens 1 Korrekturrunde.
+- Test: `npm run ki-test-chat` (Replay, siehe `tools/ki-test/README.md`).
+

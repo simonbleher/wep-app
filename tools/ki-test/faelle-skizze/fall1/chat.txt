@@ -1,0 +1,8 @@
+# Selbst erfundene Chat-Sätze für Fall 1 (eine Zeile = eine Nachricht, # = Kommentar).
+# Ausgangslage: nur die Bau-Formen aus aussen-vorher.json, sonst leer.
+Oben rechts steht ein Holzpferd, das muss entfernt werden.
+Links neben das Holzpferd eine Hollywoodschaukel, entfernen.
+Oben drei Beete nebeneinander.
+Rechts eine Hecke am Zaun entlang.
+Walnuss-Wildling links neben ASG entfernen.
+Unter der Laube vier Hochbeete nebeneinander, beschriftet mit Hochbeete.

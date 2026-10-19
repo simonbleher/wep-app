@@ -38,6 +38,7 @@ import {
   zaehleFremdeFormen,
 } from './skizzeBild'
 import type { SkizzeDaten } from '../skizze/types'
+import { istPflanze, symbolSvg } from '../skizze/symbole'
 
 // ---------------------------------------------------------------------------
 // Eingabe-Modell
@@ -78,6 +79,14 @@ export type FormTyp =
   | 'brunnen'
   | 'entfernen'
   | 'mangelhinweis'
+  // weitere Lageplan-Elemente (Skizzen-Chat)
+  | 'blumenbeet'
+  | 'gegenstand'
+  | 'holzpferd'
+  | 'schaukel'
+  | 'wildling'
+  | 'kletterpflanze'
+  | 'rasen'
 
 /**
  * Ein Element der Grün-Skizze. Welche Felder gebraucht werden, hängt vom Typ ab:
@@ -615,6 +624,51 @@ function formenFuer(el: FormElement, mitSvg: boolean): Form[] {
       return f
     }
 
+    case 'blumenbeet': {
+      if (!k) return []
+      const f: Form[] = mitSvg
+        ? [{ art: 'pic', name: n, ebene: EBENE.gruen, kasten: k, svg: symbolSvg('blumenbeet', k.w / PT, k.h / PT) }]
+        : [{ art: 'sp', name: n, ebene: EBENE.gruen, kasten: k, prst: 'roundRect', fuellung: 'EBDDC7', linie: linie(FARBE.holz) }]
+      if (text) f.push(beschriftung(`${n}_Text`, text, mitte(k).x, k.y + k.h + 2 * PT, pt))
+      return f
+    }
+
+    case 'wildling':
+    case 'kletterpflanze':
+    case 'holzpferd':
+    case 'schaukel': {
+      if (!k) return []
+      const minimum: Record<string, [number, number]> = {
+        wildling: [22, 32], kletterpflanze: [24, 32], holzpferd: [32, 28], schaukel: [40, 34],
+      }
+      const b = mindestens(k, minimum[el.typ][0] * PT, minimum[el.typ][1] * PT)
+      const f: Form[] = mitSvg
+        ? [{ art: 'pic', name: n, ebene: EBENE.gruen, kasten: b, svg: symbolSvg(el.typ, b.w / PT, b.h / PT) }]
+        : [
+            {
+              art: 'sp', name: n, ebene: EBENE.gruen, kasten: b,
+              prst: el.typ === 'wildling' || el.typ === 'kletterpflanze' ? 'ellipse' : 'rect',
+              fuellung: el.typ === 'wildling' || el.typ === 'kletterpflanze' ? FARBE.gras : 'C9A27A',
+              linie: linie(el.typ === 'wildling' || el.typ === 'kletterpflanze' ? FARBE.sternLinie : FARBE.holz),
+            },
+          ]
+      if (text) f.push(beschriftung(`${n}_Text`, text, mitte(b).x, b.y + b.h + 1 * PT, pt))
+      return f
+    }
+
+    case 'gegenstand': {
+      if (!k) return []
+      const f: Form[] = [
+        { art: 'sp', name: n, ebene: EBENE.kleinteile, kasten: k, prst: 'rect', fuellung: 'F2F2F2', linie: linie(FARBE.schachtLinie) },
+      ]
+      if (text) f.push(beschriftung(`${n}_Text`, text, mitte(k).x, k.y + k.h + 2 * PT, pt))
+      return f
+    }
+
+    case 'rasen':
+      // nur Beschriftung, kein Symbol
+      return k && text ? [{ ...beschriftung(n, text, mitte(k).x, mitte(k).y - ((pt + 6) * PT) / 2, pt, k.w), kasten: { ...k, y: Math.round(mitte(k).y - ((pt + 6) * PT) / 2), h: Math.round((pt + 6) * PT) }, schriftFarbe: FARBE.heckeLinie }] : []
+
     case 'kompost': {
       if (!k) return []
       const f: Form[] = [
@@ -858,6 +912,13 @@ export function formNamen(elemente: FormElement[], mitSvg = true): string[] {
   return elementeZuFormen(elemente, mitSvg).map((f) => f.name)
 }
 
+/** Namensbestandteil: Leerzeichen → „_“, nur Buchstaben, Ziffern, „_“ und „-“. */
+const identOf = (s: string) =>
+  s
+    .trim()
+    .replace(/\s+/g, '_')
+    .replace(/[^\p{L}\p{N}_-]/gu, '')
+
 /**
  * Übersetzt die Elemente des einfachen Skizzen-Editors (Pixel) in `FormElement`e
  * und passt sie in `bereich` ein (Seitenverhältnis bleibt, zentriert).
@@ -875,6 +936,18 @@ export function skizzeDatenZuFormen(daten: SkizzeDaten, bereich: Kasten): FormEl
   const out: FormElement[] = []
   for (const e of daten.elemente) {
     switch (e.typ) {
+      case 'symbol': {
+        const text = e.beschriftung ?? ''
+        out.push({
+          typ: e.art,
+          name: nummer(identOf(text) || e.art[0].toUpperCase() + e.art.slice(1)),
+          kasten: { x: X(e.x), y: Y(e.y), w: Math.round(e.breite * faktor), h: Math.round(e.hoehe * faktor) },
+          text,
+          ...(e.art === 'entfernen' ? { pflanze: istPflanze(text) } : {}),
+          ...(e.art === 'hecke' && /flieder/i.test(text) ? { variante: 'flieder' } : {}),
+        })
+        break
+      }
       case 'rechteck':
         out.push({ typ: 'rechteck', name: nummer('Rechteck'), kasten: { x: X(e.x), y: Y(e.y), w: Math.round(e.breite * faktor), h: Math.round(e.hoehe * faktor) } })
         break
@@ -995,7 +1068,7 @@ export function weicheBeschriftungenAus(formen: Form[], fremd: Kasten[]): string
 }
 
 /** Typen, die der Export versetzen/verkleinern darf (Bäume, Hecken, Sträucher nur melden). */
-const BEWEGLICH = new Set<FormTyp>(['hochbeet', 'beet', 'kompost', 'schacht', 'brunnen', 'rechteck', 'kreis', 'text'])
+const BEWEGLICH = new Set<FormTyp>(['hochbeet', 'beet', 'blumenbeet', 'kompost', 'schacht', 'brunnen', 'gegenstand', 'holzpferd', 'schaukel', 'rechteck', 'kreis', 'text'])
 
 const enthaelt = (aussen: Kasten, innen: Kasten) =>
   aussen.x <= innen.x && aussen.y <= innen.y && aussen.x + aussen.w >= innen.x + innen.w && aussen.y + aussen.h >= innen.y + innen.h

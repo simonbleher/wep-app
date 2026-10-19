@@ -115,3 +115,15 @@ LibreOffice rendern. Ergebnis in `ergebnis-skizze/<fall>/`: `formen-export.xlsx`
 öffnen und Formen anklicken!), `formen-vorher.png`, `formen-export.png`, `formen-stilprobe.png`
 (alle Elementtypen auf leerem Blatt). Voraussetzung: LibreOffice (`SOFFICE=…` bei abweichendem
 Pfad) und PyMuPDF (`python -m pip install pymupdf`) für das PNG.
+
+## Chat-Replay (Skizzen-Chat)
+
+`npm run ki-test-chat [-- --modelle a,b] [-- --fall fall1]` – spielt `faelle-skizze/<fall>/chat.txt`
+(eine Zeile = eine Nachricht, `#` = Kommentar) Satz für Satz ein. Ausgangslage sind nur die festen
+Bau-Formen aus `aussen-vorher.json`. Jeder Satz geht durch denselben Server-Kern wie
+`POST /api/ki/skizze-chat` (`functions/_lib/skizzeChat.ts`) samt Selbstprüfung. Ergebnis:
+`ergebnis-chat.html` mit Vorher/Nachher je Modell (Excel-Export per LibreOffice und Modell-Sicht)
+und Protokoll je Satz. Standardmodelle: gemini-3.7-flash, gemini-3.8-flash, gemini-3-flash-preview.
+Vergleichszahlen gegen `claude-ergebnis.json` kommen, sobald die Datei vorliegt. Bei 503 („überlastet“)
+wartet der Test bis zu 2 × und meldet den Satz sonst als Fehler.
+

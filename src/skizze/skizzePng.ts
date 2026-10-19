@@ -7,6 +7,7 @@
  */
 
 import type { SkizzeDaten, SkizzeElement } from './types.js'
+import { symbolPrims, zeichnePrims } from './symbole.js'
 
 /** Optionen für den PNG-Export. */
 export interface PngOptionen {
@@ -117,6 +118,10 @@ function zeichneElement(ctx: CanvasRenderingContext2D, el: SkizzeElement): void 
   ctx.font = `${14}px sans-serif`
 
   switch (el.typ) {
+    case 'symbol':
+      zeichnePrims(ctx, symbolPrims(el.art, { x: el.x, y: el.y, w: el.breite, h: el.hoehe }, el.beschriftung ?? '', { schrift: 12 }))
+      break
+
     case 'rechteck':
       ctx.strokeRect(el.x, el.y, el.breite, el.hoehe)
       break
