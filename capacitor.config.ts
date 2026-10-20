@@ -6,9 +6,21 @@ const config: CapacitorConfig = {
   appId: 'de.wep.app',
   appName: 'WEP',
   webDir: 'dist',
+  // Hintergrund der WebView = App-Hintergrund (sichtbar unter den transparenten Systemleisten)
+  backgroundColor: '#f4f6f4',
   android: {
     // Test-APK: Chrome-Inspektion (chrome://inspect) erlaubt
     webContentsDebuggingEnabled: true,
+  },
+  plugins: {
+    // Randloser Modus (Android 15): Die WebView läuft unter den Systemleisten, die App
+    // berücksichtigt die Insets selbst (env(safe-area-inset-*), viewport-fit=cover).
+    // Helle App → dunkle Symbole in Status- und Navigationsleiste.
+    SystemBars: {
+      insetsHandling: 'native',
+      initialViewportFitValueHint: 'cover',
+      style: 'LIGHT',
+    },
   },
 }
 

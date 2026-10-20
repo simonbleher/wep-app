@@ -818,6 +818,8 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
           style={{
             position: 'fixed',
             inset: 0,
+            padding:
+              'env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px)',
             background: 'rgba(0,0,0,0.3)',
             display: 'flex',
             alignItems: 'center',
@@ -867,6 +869,8 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
           style={{
             position: 'fixed',
             inset: 0,
+            padding:
+              'env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px)',
             background: 'rgba(0,0,0,0.3)',
             display: 'flex',
             alignItems: 'center',
@@ -916,6 +920,8 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
           style={{
             position: 'fixed',
             inset: 0,
+            padding:
+              'env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px)',
             background: 'rgba(0,0,0,0.3)',
             display: 'flex',
             alignItems: 'center',

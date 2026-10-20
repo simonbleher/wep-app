@@ -114,3 +114,15 @@ npm ci && npm run build && npx cap sync android
 cd android && ./gradlew assembleDebug   # JDK 21 und Android SDK 36 nötig
 # APK: android/app/build/outputs/apk/debug/app-debug.apk
 ```
+
+## Randloser Modus (Android 15) und Systemleisten
+
+Ab Android 15 läuft die App randlos: Die WebView reicht unter Status- und Navigationsleiste.
+Darum gilt (ohne Wirkung im Browser, dort sind die Insets 0):
+
+- `viewport-fit=cover` in `index.html`; Capacitor (`SystemBars`, `insetsHandling: 'native'`)
+  setzt `env(safe-area-inset-*)` korrekt bzw. polstert die WebView bei älteren WebView-Versionen.
+- `.app` trägt das Safe-Area-Padding und die Höhe `100dvh`; Seiten wachsen im Flex-Layout
+  mit, ohne die Höhe zu überschreiten. Feste Dialoge (Skizze) polstern sich ebenfalls.
+- Hintergrund der WebView `#f4f6f4` (= App-Hintergrund), Symbole der Systemleisten dunkel
+  (`SystemBars.setStyle(Light)`), auch wenn das Gerät im Dunkelmodus ist.

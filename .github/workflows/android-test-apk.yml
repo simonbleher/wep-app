@@ -7,8 +7,8 @@ on:
   push:
     paths:
       - 'android/**'
-      - 'src/android/**'
-      - 'src/konto/**'
+      - 'src/**'
+      - 'index.html'
       - 'capacitor.config.ts'
       - '.github/workflows/android-test-apk.yml'
   workflow_dispatch:
