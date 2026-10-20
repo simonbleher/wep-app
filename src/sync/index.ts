@@ -13,6 +13,16 @@ import type { SyncErgebnis, SyncHinweis } from './types'
 export type { SyncErgebnis, SyncHinweis } from './types'
 export type { ExportStatus } from './exporte'
 
+/** Haken für die Android-App: vor/nach jedem Abgleich (Upload-Warteschlange abstimmen). */
+export interface SyncHaken {
+  vor?(): Promise<void>
+  nach?(): Promise<void>
+}
+let syncHaken: SyncHaken | undefined
+export function setzeSyncHaken(h: SyncHaken | undefined): void {
+  syncHaken = h
+}
+
 const GERAET_KEY = 'wep-geraet'
 const ORDNER_KEY = 'wep-ordner-eingerichtet'
 
@@ -49,6 +59,15 @@ export interface GesamtErgebnis extends SyncErgebnis {
 /** Führt einen vollständigen Abgleich mit OneDrive aus. */
 export async function jetztSynchronisieren(): Promise<GesamtErgebnis> {
   if (!navigator.onLine) throw new Error('Keine Internetverbindung – Änderungen warten.')
+  await syncHaken?.vor?.().catch((e) => console.warn('Vor dem Abgleich:', e))
+  try {
+    return await abgleichen()
+  } finally {
+    await syncHaken?.nach?.().catch((e) => console.warn('Nach dem Abgleich:', e))
+  }
+}
+
+async function abgleichen(): Promise<GesamtErgebnis> {
   const geraet = geraeteKennung()
   const wurzel = erstelleGraphClient(zugriffstoken)
   const daten = erstelleGraphClient(zugriffstoken, undefined, DATEN_ORDNER)

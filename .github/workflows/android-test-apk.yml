@@ -1,0 +1,62 @@
+name: Android Test-APK
+
+# Baut die Test-APK (Debug) der Android-App. Die APK liegt danach als Artefakt am Lauf.
+# Client-ID: Repository-Variable VITE_MS_CLIENT_ID (Settings → Secrets and variables →
+# Actions → Variables) – dieselbe ID wie für die Web-App, siehe docs/ANDROID.md.
+on:
+  push:
+    paths:
+      - 'android/**'
+      - 'src/**'
+      - 'index.html'
+      - 'capacitor.config.ts'
+      - '.github/workflows/android-test-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      VITE_MS_CLIENT_ID: ${{ vars.VITE_MS_CLIENT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      # Das Android SDK ist auf ubuntu-latest vorinstalliert (ANDROID_HOME); fehlende
+      # Pakete lädt Gradle nach, sobald die Lizenzen angenommen sind.
+      - name: Android-Lizenzen annehmen
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+
+      - name: Hinweis zur Client-ID
+        if: ${{ env.VITE_MS_CLIENT_ID == '' }}
+        run: echo "::warning::Repository-Variable VITE_MS_CLIENT_ID fehlt – die APK baut, hat aber keinen Login (siehe docs/ANDROID.md)."
+
+      - run: npm ci
+      - run: npm run build
+      - run: npx cap sync android
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: APK bauen
+        working-directory: android
+        run: ./gradlew assembleDebug --console=plain
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wep-test-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30

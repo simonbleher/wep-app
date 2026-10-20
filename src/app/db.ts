@@ -32,6 +32,19 @@ interface WepDB extends DBSchema {
   }
 }
 
+/**
+ * Haken für die Android-App: Jede Speicherung reiht das WEP zusätzlich in die
+ * Upload-Warteschlange des Hintergrunddienstes ein (src/android). Im Browser ungesetzt.
+ */
+export interface SpeicherHaken {
+  nachSpeichern?(wep: Wep): Promise<void>
+  nachLoeschen?(id: string): Promise<void>
+}
+let haken: SpeicherHaken | undefined
+export function setzeSpeicherHaken(h: SpeicherHaken | undefined): void {
+  haken = h
+}
+
 let dbPromise: Promise<IDBPDatabase<WepDB>> | undefined
 
 /** Öffnet die Datenbank (einmalig) und legt die Object-Stores an. */
@@ -78,6 +91,8 @@ export async function speichereWep(wep: Wep): Promise<void> {
     geloescht: false,
   })
   await tx.done
+  // Die lokale Speicherung hat Vorrang: ein Fehler der Warteschlange wird nur gemeldet.
+  await haken?.nachSpeichern?.(wep).catch((e) => console.warn('Warteschlange:', e))
 }
 
 /** Lädt ein einzelnes WEP anhand seiner id. */
@@ -103,6 +118,7 @@ export async function loescheWep(id: string): Promise<void> {
     geloescht: true,
   })
   await tx.done
+  await haken?.nachLoeschen?.(id).catch((e) => console.warn('Warteschlange:', e))
 }
 
 // --- Schnittstelle für src/sync -------------------------------------------

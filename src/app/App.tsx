@@ -42,7 +42,13 @@ export default function App() {
     setFehler('')
     speichereStartWahl('konto')
     try {
-      await anmelden() // im Web: Weiterleitung zu Microsoft
+      await anmelden() // im Web: Weiterleitung zu Microsoft (kehrt nicht zurück)
+      // Android: Rücksprung aus dem System-Browser ist verarbeitet → App starten
+      const s = await startZustand()
+      if (s.typ === 'start') {
+        setKonto(s.konto)
+        setPhase('bereit')
+      }
     } catch (e) {
       speichereStartWahl(null)
       setFehler(e instanceof Error ? e.message : String(e))

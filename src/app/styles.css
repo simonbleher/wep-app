@@ -39,17 +39,24 @@ body {
   background: var(--farbe-hintergrund);
 }
 
-body {
-  /* Safe-Area-Insets für Geräte mit Notch / abgerundeten Ecken */
-  padding: env(safe-area-inset-top) env(safe-area-inset-right)
-    env(safe-area-inset-bottom) env(safe-area-inset-left);
-}
-
+/* Safe Areas (Notch, abgerundete Ecken, Status-/Navigationsleiste im randlosen Modus der
+   Android-App): Das Padding sitzt auf .app und zählt in die Mindesthöhe, damit der Inhalt
+   nie unter den Systemleisten liegt. Im Browser sind die Insets 0 – dort ändert sich nichts. */
 .app {
   min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px)
+    env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+}
+
+.app > * {
+  flex: 1 0 auto;
 }
 
 .seite {
+  width: 100%;
   max-width: 720px;
   margin: 0 auto;
   padding: var(--abstand);
@@ -416,6 +423,7 @@ textarea.eingabe {
   flex-direction: column;
   gap: 6px;
   max-height: 50vh;
+  max-height: 50dvh;
   overflow-y: auto;
 }
 
@@ -549,7 +557,6 @@ textarea.eingabe {
 }
 
 .login {
-  min-height: 100dvh;
   justify-content: space-between;
 }
 
