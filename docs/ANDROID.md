@@ -164,7 +164,7 @@ Workflow **Android Release** die signierte APK zusätzlich in ein eigenes Cloudf
 Hinweise: Fehlen die Secrets, warnt der Lauf nur, das GitHub Release entsteht trotzdem. Schlägt
 nur der Cloudflare-Upload fehl, ebenfalls Warnung (Token-Rechte, Account ID prüfen). Ist der Name
 `wep-pankow-apk` bei Cloudflare schon vergeben, in `android-release.yml` (`APK_PROJEKT`) und in
-`src/android/update.ts` (`APK_BASIS_URL`) gleichzeitig ändern. Cloudflare erlaubt Dateien bis
+`src/android/update.ts` (`APK_BASIS_URL`) und `ApkInstaller.kt` (`APK_HOST`, dann auch `nativeVersion` erhöhen) gleichzeitig ändern. Cloudflare erlaubt Dateien bis
 25 MiB – die APK ist deutlich kleiner.
 
 ### Erster Umstieg (einmalig, von Hand)

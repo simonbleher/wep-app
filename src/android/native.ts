@@ -77,7 +77,7 @@ export interface WepNativePlugin {
   /** Nummer des nativen Teils (android/native-version.txt) und versionCode der installierten APK. */
   nativeVersion(): Promise<{ nativeVersion: number; versionCode: number }>
   /**
-   * Lädt die APK in den App-Cache (nur https, nur *.pages.dev) und prüft die SHA-256.
+   * Lädt die APK in den App-Cache (nur https, nur das eigene APK-Projekt) und prüft die SHA-256.
    * Fortschritt über das Ereignis `apkFortschritt`. Fehlercodes: KEIN_NETZ, PRUEFSUMME.
    */
   ladeApk(a: { url: string; sha256?: string }): Promise<{ groesse: number }>
