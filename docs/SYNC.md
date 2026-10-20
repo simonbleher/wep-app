@@ -140,6 +140,7 @@ gebaut, damit der Login-Bildschirm erscheint; angemeldet wird dabei nie.
 |-------|--------|
 | `src/konto/index.ts` | Schnittstelle: `anmelden`, `abmelden`, `aktuellesKonto`, `zugriffstoken`, `istAngemeldet` (Umsetzung austauschbar über `setzeKontoDienst`) |
 | `src/konto/web.ts` | Web-Umsetzung mit MSAL.js, Authority `consumers` |
+| `src/konto/android.ts` | Android-Umsetzung: System-Browser + PKCE, Token nativ (docs/ANDROID.md) |
 | `src/konto/startwahl.ts` | Gemerkte Wahl „mit Konto / ohne Konto“ und Start-Entscheidung |
 | `src/sync/engine.ts` | Abgleich-Logik für die WEPs (rein, getestet) |
 | `src/sync/graph.ts` | Microsoft-Graph-Zugriff auf einen Ordner im App-Ordner (`/me/drive/special/approot`) |
@@ -151,5 +152,5 @@ gebaut, damit der Login-Bildschirm erscheint; angemeldet wird dabei nie.
 | `src/app/SyncLeiste.tsx` | Statuszeile und Abgleich auf der Startseite |
 
 `src/sync` kennt nur die Schnittstelle aus `src/konto`. Die Android-Umsetzung
-(System-Browser + PKCE mit App-Rücksprung, Schritt 3 in `docs/PLAN-BETA2.md`)
-kommt als zweite `KontoDienst`-Umsetzung daneben.
+(System-Browser + PKCE mit App-Rücksprung, Schritt 3 in `docs/PLAN-BETA2.md`) ist die
+zweite `KontoDienst`-Umsetzung; Hintergrund-Upload und Test-APK: `docs/ANDROID.md`.

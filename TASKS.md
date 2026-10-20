@@ -116,7 +116,13 @@ Ergebnis: Konto-Modul `src/konto/` (Web/MSAL, Schnittstelle für die spätere An
 Login-Bildschirm mit „Ohne Konto fortfahren“, Profil-Bildschirm, Ordner `daten/` · `Exporte/` ·
 `LIESMICH.txt` im OneDrive (Migration beim ersten Abgleich), Excel-Export zusätzlich nach `Exporte/`
 (Warteschlange offline), Profil-Abgleich über `daten/profil.json`. Playwright-Durchlauf: `npm run e2e`.
-Details: docs/SYNC.md, docs/ENTSCHEIDUNGEN.md. Offen: Schritt 3 (Android-Anmeldung), Schritt 4 (Design).
+Details: docs/SYNC.md, docs/ENTSCHEIDUNGEN.md. Offen: Schritt 4 (Design).
+
+### B2-3 · Android-Test-APK 👀 (#app-gruen) – Branch android/test-apk
+Ergebnis: Capacitor-Hülle (`android/`, App-ID `de.wep.app`), Android-Anmeldung `src/konto/android.ts`
+(System-Browser + PKCE, Token nativ), Hintergrund-Upload (WorkManager, Warteschlange, eigenes
+Kotlin-Plugin), Test-Seite im Profil, Workflow „Android Test-APK“. **Nur Machbarkeitstest**, noch nicht
+auf einem Gerät erprobt. Anleitung und Grenzen: docs/ANDROID.md. Offen: Schritt 4 (Design), 5 (fertige APK).
 
 ## KI-Assistent (Plan: docs/KI-ASSISTENT.md)
 

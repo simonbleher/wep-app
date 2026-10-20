@@ -1,6 +1,7 @@
 // Profil und Einstellungen: Name, Rolle, Standard-Anlage (werden über OneDrive
 // abgeglichen), Geräte-Einstellungen (nur lokal), Konto, App-Version, Speicherort.
 import { useEffect, useId, useState } from 'react'
+import { Capacitor } from '@capacitor/core'
 import type { Konto } from '@/konto'
 import {
   ROLLEN,
@@ -11,6 +12,7 @@ import {
   type Profil as ProfilDaten,
   type Rolle,
 } from '@/profil'
+import { AndroidTest } from './AndroidTest'
 
 interface Props {
   konto: Konto | null
@@ -100,6 +102,9 @@ export function Profil({ konto, verfuegbar, onZurueck, onAnmelden, onAbmelden }:
             onChange={(e) => {
               setNurWlan(e.target.checked)
               speichereGeraeteEinstellungen({ nurWlan: e.target.checked })
+              if (Capacitor.isNativePlatform()) {
+                void import('@/android').then((m) => m.planeHintergrundUpload())
+              }
             }}
           />
           <span>Upload nur über WLAN</span>
@@ -128,6 +133,8 @@ export function Profil({ konto, verfuegbar, onZurueck, onAnmelden, onAbmelden }:
           <p>Die Anmeldung ist in dieser Installation nicht eingerichtet.</p>
         )}
       </section>
+
+      {Capacitor.isNativePlatform() && <AndroidTest />}
 
       <section className="formular">
         <h2 className="abschnitt-titel">Über die App</h2>

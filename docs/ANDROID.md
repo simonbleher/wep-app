@@ -1,0 +1,116 @@
+# Android-Test-APK (Beta 2, Schritt 3)
+
+**Ziel dieses Schritts ist ein Test der Machbarkeit, noch keine fertige App.** Die Test-APK
+soll zeigen, dass (1) die Anmeldung per System-Browser klappt und (2) WEPs, die offline
+erfasst wurden, im Hintergrund hochgeladen werden – bei geschlossener App, sobald WLAN da
+ist. Design, Signierung, Update-Hinweis und Release-Build kommen in Schritt 5.
+
+## Aufbau
+
+- **Capacitor** (App-ID `de.wep.app`, Name „WEP“) legt eine Android-Hülle um die
+  unveränderte Web-App (`npm run build` → `dist/` → `npx cap sync android`). Die Web-App im
+  Browser läuft wie bisher; der Cloudflare-Build ändert sich nicht.
+- **Anmeldung** (`src/konto/android.ts`, gleiche Schnittstelle wie `web.ts`): Authorization
+  Code + PKCE über den System-Browser (Custom Tab), Rücksprung `de.wep.app://auth`
+  (Intent-Filter in `AndroidManifest.xml`, `appUrlOpen`). Authority
+  `https://login.microsoftonline.com/consumers`, Scopes `Files.ReadWrite.AppFolder
+  offline_access` (dazu `openid profile` für den Anzeigenamen, wie auch MSAL im Web).
+  Die Plattform wird automatisch gewählt (`Capacitor.isNativePlatform()`).
+- **Token nativ**: Token-Tausch und -Erneuerung laufen im eigenen Plugin
+  (`WepNativePlugin.kt`, `HttpURLConnection`), nicht per `fetch` aus der WebView – die
+  schickt einen Origin-Header, und Microsoft lehnt Cross-Origin für Nicht-SPA-Registrierungen
+  ab. Der Refresh-Token liegt in `EncryptedSharedPreferences` (`TokenStore.kt`), damit auch
+  der Hintergrunddienst ihn lesen kann.
+- **Warteschlange** (`Warteschlange.kt`, JS-Teil `src/android/warteschlange.ts`): Jede
+  Speicherung (`speichereWep`) schreibt die fertige Sync-Datei (`wep-sync/1`) zusätzlich
+  in `files/upload-queue/` – je WEP eine Datei plus Meta mit dem letzten bekannten eTag.
+- **Worker** (`UploadWorker.kt`, WorkManager): Bedingung `NetworkType.UNMETERED`, bei
+  ausgeschaltetem „Upload nur über WLAN“ `CONNECTED`. Läuft auch bei geschlossener App
+  (zusätzlich alle 15 Min. als Sicherheitsnetz). Holt per Refresh-Token ein Zugriffstoken
+  und lädt nach `Apps/WEP-App/daten/<name>` hoch:
+  - mit `If-Match: <eTag>`; für Dateien, die noch nie hochgeladen wurden, mit
+    `@microsoft.graph.conflictBehavior=fail`, damit nie etwas überschrieben wird,
+  - bei **412/409** bleibt die Datei liegen („blockiert“); die App klärt den Konflikt beim
+    nächsten Abgleich (Regeln wie in `docs/SYNC.md`),
+  - bei Erfolg wird der Eintrag entfernt und der neue eTag in `ergebnisse.json` geschrieben;
+    die App übernimmt ihn beim Start, beim Zurückkehren in die App und vor jedem Abgleich in
+    `syncMeta`. Nach einem Abgleich in der App werden erledigte Einträge aus der Warteschlange
+    entfernt.
+  - Jeder Lauf schreibt Protokolleinträge.
+- **Test-Seite**: im Profil (nur in der Android-App) – Netztyp, Warteschlange, Protokoll der
+  letzten Läufe, Knopf „Jetzt versuchen“.
+
+## Einmalig einrichten
+
+1. **Azure-App-Registrierung** (dieselbe wie für die Web-App, siehe `docs/SYNC.md`):
+   *Authentifizierung* → *Plattform hinzufügen* → **Mobil- und Desktopanwendungen** →
+   benutzerdefinierter Umleitungs-URI `de.wep.app://auth`. Unter *Erweiterte Einstellungen*
+   „Öffentliche Clientflows zulassen“ auf **Ja**. Die SPA-Umleitung für die Web-App bleibt.
+2. **Client-ID im GitHub-Repo hinterlegen:** *Settings → Secrets and variables → Actions →
+   Variables → New repository variable*, Name `VITE_MS_CLIENT_ID`, Wert = Client-ID. Ohne
+   sie baut die APK, hat aber keinen Login.
+
+## Test-APK holen und installieren
+
+1. GitHub → Reiter **Actions** → Workflow **Android Test-APK** → neuester grüner Lauf →
+   unten **Artifacts → `wep-test-apk`** herunterladen (ZIP, darin `app-debug.apk`).
+   Neu bauen: *Run workflow* (oder Push auf `android/**`).
+2. ZIP entpacken, `app-debug.apk` aufs Tablet/Handy bringen (USB, OneDrive, Mail …).
+3. Datei öffnen → Android fragt einmalig, ob der Datei-Manager/Browser „Apps aus
+   unbekannten Quellen“ installieren darf → erlauben → installieren. (Debug-Signatur, daher
+   Warnung von Play Protect möglich: „Trotzdem installieren“.)
+
+## Was getestet werden soll
+
+1. **Login:** App öffnen → „Mit Microsoft anmelden“ → der System-Browser öffnet sich,
+   anmelden und zustimmen → du landest wieder in der App, im Profil steht dein Konto.
+2. **Offline erfassen:** Flugmodus an (oder WLAN und Mobildaten aus). Ein WEP anlegen und
+   ein paar Positionen erfassen. Im Profil → „Test: Hintergrund-Upload“ steht die Datei in
+   der Warteschlange.
+3. **App schließen:** App aus der Übersicht wegwischen (nicht nur in den Hintergrund).
+4. **WLAN an:** Flugmodus aus, WLAN verbinden, 1–15 Minuten warten (WorkManager startet nicht
+   sekundengenau; der Energiesparmodus kann verzögern).
+5. **Prüfen:** In OneDrive unter `Apps/WEP-App/daten/` liegt `<Vorgangs-Nr>.json`. In der App
+   (Profil → Test) steht im Protokoll „… hochgeladen (eTag …)“ und die Warteschlange ist leer.
+   Zum Beschleunigen: **„Jetzt versuchen“** (beachtet die WLAN-Einstellung).
+6. **Nur WLAN:** Mit Mobildaten statt WLAN darf nichts hochgeladen werden (Netz „Mobilfunk
+   (getaktet)“, die Datei bleibt in der Warteschlange). Schalter „Upload nur über WLAN“ im
+   Profil aus → der Upload läuft auch über Mobilfunk.
+7. **Konflikt:** Dasselbe WEP in OneDrive/auf einem anderen Gerät ändern, dann am Tablet
+   offline ändern und WLAN anschalten: Im Protokoll steht „in OneDrive geändert (412) – bleibt
+   liegen“. Beim Öffnen der App gleicht sie ab (Konflikt-Kopie wie in `docs/SYNC.md`).
+
+Rückmeldung bitte mit: Android-Version, Gerät, was im Protokoll steht, und ob die
+Uhrzeit des Uploads plausibel war.
+
+## Bekannte Grenzen (Test)
+
+- **Nicht auf einem echten Gerät erprobt**, als diese Umsetzung entstand: Gebaut und die
+  JS-Logik getestet (PKCE, Token, Warteschlange), aber die Anmeldung gegen Microsoft und der
+  Worker liefen noch nicht auf einem Gerät. Fehler im Protokoll sind genau das, was dieser
+  Test finden soll.
+- `If-Match` auf dem Graph-Pfad-Upload (`…:/content`) ist nach Dokumentation unterstützt,
+  aber hier noch nicht gegen OneDrive bestätigt – bei unerwarteten 412/400 bitte das
+  Protokoll schicken.
+- Debug-Build, Debug-Signatur, `versionName 1.0`; kein Update-Hinweis, kein Play Store.
+- Gelöschte WEPs werden (wie im Web) nicht abgeglichen; sie fliegen nur aus der Warteschlange.
+- Der Abgleich in der geöffneten App ist unverändert und beachtet „Upload nur über WLAN“
+  noch **nicht** – die Einstellung steuert nur den Hintergrunddienst.
+- Android kann Hintergrundarbeit verzögern (Doze, Akkusparmodus, „Apps im Standby“);
+  Hersteller wie Xiaomi/Huawei sind besonders streng. Bei Verzögerung: Akku-Optimierung für
+  „WEP“ ausschalten.
+- Sichern/Wiederherstellen per Android-Backup ist abgeschaltet (`allowBackup=false`), weil
+  verschlüsselte Anmeldedaten nicht auf ein anderes Gerät übertragbar sind.
+- Zugriffstoken und Refresh-Token werden von der App und vom Worker gemeinsam erneuert
+  (synchronisiert im Prozess); bei gleichzeitiger Erneuerung aus zwei Prozessen könnte
+  ein Refresh-Token einmal verworfen werden – dann hilft erneutes Anmelden.
+- Kein iPhone/iPad (nicht geplant).
+- Debuggen: `chrome://inspect` am PC (USB-Debugging am Gerät), die WebView ist freigegeben.
+
+## Selbst bauen (optional)
+
+```bash
+npm ci && npm run build && npx cap sync android
+cd android && ./gradlew assembleDebug   # JDK 21 und Android SDK 36 nötig
+# APK: android/app/build/outputs/apk/debug/app-debug.apk
+```
