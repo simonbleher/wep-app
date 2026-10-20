@@ -27,7 +27,7 @@ export async function startAndroid(): Promise<void> {
   // Jede Speicherung → Warteschlange. Fehler hier dürfen das Speichern nie stören.
   setzeSpeicherHaken({
     nachSpeichern: (wep) => q.einreihen(wep),
-    nachLoeschen: (id) => q.entfernen(id),
+    nachLoeschen: (id, geloeschtAm) => q.entfernen(id, geloeschtAm),
   })
   // Vor dem Abgleich: Worker-Ergebnisse übernehmen; danach erledigte Einträge entfernen.
   setzeSyncHaken({

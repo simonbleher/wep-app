@@ -4,7 +4,9 @@
 // Warnung und Summe → Position antippen, ändern und mit Rückfrage löschen (Richtlinie nur im
 // Formular) → Beseitigung hinzufügen/ändern/löschen → Export mit Bau-Excel → Skizze-Werkzeugleiste
 // und Dialoge → Status (exportiert nach Export, fertig, zurücksetzen, Filter in der Liste) →
-// WEP duplizieren → WEPs über das Menü „⋯“ mit Rückfrage löschen.
+// WEP duplizieren → WEPs über das Menü „⋯“ mit Rückfrage in den Papierkorb legen → Papierkorb:
+// Wiederherstellen, „Endgültig löschen“ mit Rückfrage, Frist von 30 Tagen, Umstieg der
+// Datenbank von Version 3 (Beta-Marke „gelöscht“).
 //
 // Start: npm run e2e  (baut mit einer Platzhalter-Client-ID nach dist-e2e/, damit der
 // Login-Bildschirm erscheint; es wird nie wirklich bei Microsoft angemeldet).
@@ -303,23 +305,119 @@ try {
   pruefe(await seite.getByText(/Kein Protokoll „exportiert“/).isVisible(), 'Filter ohne Treffer zeigt einen Hinweis')
   await filter.getByRole('button', { name: 'Alle' }).click()
 
-  // 11e. Löschen über „⋯“ mit Rückfrage (Kopie und Original)
+  // 11e. Löschen über „⋯“ mit Rückfrage: das WEP kommt in den Papierkorb (Kopie und Original)
   await seite.getByRole('button', { name: /KGA Musterwiese/ }).first().click()
   await seite.getByRole('button', { name: 'Weitere Aktionen' }).click()
-  await seite.getByRole('menuitem', { name: /WEP löschen/ }).click()
+  await seite.getByRole('menuitem', { name: /In den Papierkorb/ }).click()
   await seite.getByRole('alertdialog').waitFor()
+  pruefe(await seite.getByRole('alertdialog').getByText(/30 Tage lang im Papierkorb/).isVisible(), 'Rückfrage erklärt den Papierkorb')
   await seite.getByRole('button', { name: 'Abbrechen' }).click()
   pruefe((await seite.getByRole('alertdialog').count()) === 0, 'Rückfrage „Abbrechen“ löscht nicht')
   await seite.getByRole('button', { name: 'Weitere Aktionen' }).click()
-  await seite.getByRole('menuitem', { name: /WEP löschen/ }).click()
-  await seite.getByRole('alertdialog').getByRole('button', { name: 'Löschen' }).click()
+  await seite.getByRole('menuitem', { name: /In den Papierkorb/ }).click()
+  await seite.getByRole('alertdialog').getByRole('button', { name: 'In den Papierkorb' }).click()
   await seite.getByRole('heading', { name: 'Protokolle' }).waitFor()
+  pruefe(await anzahlEintraege(liste, 1), 'gelöschtes WEP ist aus der Liste verschwunden')
   await seite.getByRole('button', { name: /KGA Musterwiese/ }).click()
   await seite.getByRole('button', { name: 'Weitere Aktionen' }).click()
-  await seite.getByRole('menuitem', { name: /WEP löschen/ }).click()
-  await seite.getByRole('alertdialog').getByRole('button', { name: 'Löschen' }).click()
+  await seite.getByRole('menuitem', { name: /In den Papierkorb/ }).click()
+  await seite.getByRole('alertdialog').getByRole('button', { name: 'In den Papierkorb' }).click()
   await seite.getByRole('heading', { name: 'Protokolle' }).waitFor()
-  pruefe(await seite.getByText(/Noch kein Protokoll/).isVisible(), 'WEPs nach Rückfrage gelöscht')
+  pruefe(await seite.getByText(/Noch kein Protokoll/).isVisible(), 'WEPs nach Rückfrage in den Papierkorb gelegt')
+  pruefe(await seite.getByText('2 gelöschte Protokolle').isVisible(), 'Liste zeigt „2 gelöschte Protokolle“')
+
+  // 11f. Papierkorb: Liste, Wiederherstellen, Endgültig löschen mit Rückfrage
+  await seite.getByRole('list', { name: 'Papierkorb' }).getByRole('button', { name: /Papierkorb/ }).click()
+  await seite.locator('.kopf-titel', { hasText: 'Papierkorb' }).waitFor()
+  const korb = seite.getByRole('list', { name: 'Papierkorb' })
+  pruefe(await anzahlEintraege(korb, 2), 'Papierkorb zeigt beide gelöschten WEPs')
+  pruefe(await korb.getByText(/noch 30 Tage/).first().isVisible(), 'Papierkorb nennt die verbleibende Frist')
+  await seite.screenshot({ path: 'dist-e2e/papierkorb.png' })
+  await korb.getByRole('listitem').first().getByRole('button', { name: 'Endgültig löschen' }).click()
+  await seite.getByRole('alertdialog').waitFor()
+  await seite.getByRole('button', { name: 'Abbrechen' }).click()
+  pruefe(await anzahlEintraege(korb, 2), '„Endgültig löschen“ ohne Bestätigung löscht nichts')
+  await korb.getByRole('listitem').first().getByRole('button', { name: 'Endgültig löschen' }).click()
+  await seite.getByRole('alertdialog').getByRole('button', { name: 'Endgültig löschen' }).click()
+  pruefe(await anzahlEintraege(korb, 1), '„Endgültig löschen“ entfernt den Eintrag')
+  await korb.getByRole('button', { name: 'Wiederherstellen' }).click()
+  await seite.getByLabel('Vorgangs-Nr.').waitFor()
+  pruefe(/^\d{4}-00[12]$/.test(await seite.getByLabel('Vorgangs-Nr.').inputValue()), 'Wiederhergestelltes WEP öffnet sich')
+  await seite.getByRole('button', { name: 'Protokolle' }).click()
+  await seite.getByRole('heading', { name: 'Protokolle' }).waitFor()
+  pruefe(await anzahlEintraege(liste, 1), 'wiederhergestelltes WEP steht wieder in der Liste')
+  pruefe(await seite.getByText('leer', { exact: true }).isVisible(), 'Papierkorb ist danach leer (eins endgültig gelöscht, eins wiederhergestellt)')
+
+  // 11g. Zustand der Datenbank (Version 4)
+  const verspaetet = await seite.evaluate(async () => {
+    const db = await new Promise((ok, fehler) => {
+      const a = indexedDB.open('wep-db')
+      a.onsuccess = () => ok(a.result)
+      a.onerror = fehler
+    })
+    const lies = (store) =>
+      new Promise((ok) => {
+        const r = db.transaction(store).objectStore(store).getAll()
+        r.onsuccess = () => ok(r.result)
+      })
+    return { weps: (await lies('weps')).length, korb: (await lies('papierkorb')).length, version: db.version }
+  })
+  pruefe(verspaetet.weps === 1 && verspaetet.korb === 0 && verspaetet.version === 4, 'Datenbank Version 4: 1 WEP, Papierkorb leer')
+
+  // 11h. Umstieg der Datenbank (Version 3 → 4): die Beta-Marke „gelöscht“ bekommt einen Löschzeitpunkt
+  const alt = await kontext.browser().newContext({ serviceWorkers: 'block' })
+  const altSeite = await alt.newPage()
+  // Eine Seite ohne App-Code (keine offene Datenbankverbindung): nur der gleiche Ursprung
+  await altSeite.goto(`${URL}favicon.svg`)
+  await altSeite.evaluate(
+    () =>
+      new Promise((ok, fehler) => {
+        // Datenbank wie in Version 3 (ohne Papierkorb) neu aufbauen
+        const l = indexedDB.deleteDatabase('wep-db')
+        l.onerror = fehler
+        l.onblocked = () => undefined
+        l.onsuccess = () => {
+          const a = indexedDB.open('wep-db', 3)
+          a.onupgradeneeded = () => {
+            a.result.createObjectStore('weps', { keyPath: 'id' })
+            a.result.createObjectStore('syncMeta', { keyPath: 'id' })
+            a.result.createObjectStore('exporte', { keyPath: 'name' })
+          }
+          a.onerror = fehler
+          a.onsuccess = () => {
+            const tx = a.result.transaction('syncMeta', 'readwrite')
+            tx.objectStore('syncMeta').put({ id: '2026-009', lokalGeaendertAm: '2026-10-01T10:00:00.000Z', geloescht: true })
+            tx.objectStore('syncMeta').put({ id: '2026-010', lokalGeaendertAm: '2026-10-01T10:00:00.000Z', geloescht: false })
+            tx.oncomplete = () => {
+              a.result.close()
+              ok(undefined)
+            }
+            tx.onerror = fehler
+          }
+        }
+      }),
+  )
+  // „Ohne Konto“ vorgeben und die App starten: Die Datenbank wird auf Version 4 umgestellt
+  await altSeite.evaluate(() => localStorage.setItem('wep-start-wahl', 'ohne-konto'))
+  await altSeite.goto(URL)
+  await altSeite.getByRole('heading', { name: 'Protokolle' }).waitFor()
+  const migriert = await altSeite.evaluate(
+    () =>
+      new Promise((ok, fehler) => {
+        const a = indexedDB.open('wep-db')
+        a.onerror = fehler
+        a.onsuccess = () => {
+          const r = a.result.transaction('syncMeta').objectStore('syncMeta').getAll()
+          r.onsuccess = () => ok({ version: a.result.version, stores: [...a.result.objectStoreNames], meta: r.result })
+        }
+      }),
+  )
+  const m9 = migriert.meta.find((m) => m.id === '2026-009')
+  const m10 = migriert.meta.find((m) => m.id === '2026-010')
+  pruefe(migriert.version === 4 && migriert.stores.includes('papierkorb'), 'Umstieg: Datenbank hat Version 4 mit Papierkorb')
+  pruefe(m9?.geloescht === true && typeof m9.geloeschtAm === 'string', 'Umstieg: alte „gelöscht“-Marke bekommt einen Löschzeitpunkt')
+  pruefe(m10?.geloeschtAm === undefined, 'Umstieg: andere Einträge bleiben unverändert')
+  await alt.close()
 
   // 12. Keine Skriptfehler
   pruefe(fehler.length === 0, `keine Skriptfehler im Browser ${fehler.join('; ')}`)

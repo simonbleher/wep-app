@@ -8,9 +8,13 @@ import { erstelleWarteschlange } from './warteschlange'
 function aufbau(start: SyncMeta[] = []) {
   const metas = new Map(start.map((m) => [m.id, m]))
   const queue = new Map<string, WarteschlangenEintrag & { inhalt: string }>()
+  /** Löschsperre des nativen Teils (Warteschlange.kt): Name → Löschzeitpunkt. */
+  const gesperrt = new Map<string, string>()
   let ergebnisse: UploadErgebnis[] = []
   const native = {
-    async reiheEin(a: { name: string; inhalt: string; eTag?: string; geaendertAm: string }) {
+    async reiheEin(a: { name: string; inhalt: string; eTag?: string; geaendertAm: string; sperreAufheben?: boolean }) {
+      if (a.sperreAufheben) gesperrt.delete(a.name)
+      else if (gesperrt.has(a.name)) return // wie nativ: gesperrte Namen werden nicht eingereiht
       queue.set(a.name, {
         name: a.name,
         inhalt: a.inhalt,
@@ -23,6 +27,10 @@ function aufbau(start: SyncMeta[] = []) {
     },
     async entferne(a: { name: string }) {
       queue.delete(a.name)
+    },
+    async markiereGeloescht(a: { name: string; geloeschtAm: string }) {
+      queue.delete(a.name)
+      gesperrt.set(a.name, a.geloeschtAm)
     },
     async liste() {
       return { eintraege: [...queue.values()] }
@@ -39,7 +47,9 @@ function aufbau(start: SyncMeta[] = []) {
   }
   return {
     q: erstelleWarteschlange(native, meta, () => 'Testgerät'),
+    native,
     queue,
+    gesperrt,
     metas,
     setzeErgebnisse: (e: UploadErgebnis[]) => void (ergebnisse = e),
   }
@@ -106,16 +116,56 @@ describe('Upload-Warteschlange (JS-Teil)', () => {
       { id: 'erledigt', lokalGeaendertAm: '2026-10-20T10:00:00.000Z', letzterSyncAm: '2026-10-20T10:00:00.000Z' },
       { id: 'weg', lokalGeaendertAm: '2026-10-20T10:00:00.000Z', geloescht: true },
     ])
-    for (const id of ['wartet', 'erledigt', 'weg', 'ohne-meta']) await t.q.einreihen(neuerWep(id))
-    // einreihen legt ggf. Einträge für unbekannte Meta an; bereinigen entfernt sie
+    for (const id of ['wartet', 'erledigt', 'ohne-meta']) await t.q.einreihen(neuerWep(id))
+    // Ein Eintrag, der vor dem Löschen schon in der Warteschlange lag
+    await t.native.reiheEin({ name: 'weg.json', inhalt: '{}', geaendertAm: 'x', sperreAufheben: true })
     expect(await t.q.bereinige()).toBe(3)
     expect([...t.queue.keys()]).toEqual(['wartet.json'])
+    expect(t.gesperrt.has('weg.json')).toBe(true) // auch gesperrt, nicht nur entfernt
   })
 
-  it('entfernt die Datei eines gelöschten WEP', async () => {
+  it('entfernt die Datei eines gelöschten WEP und sperrt den Namen für Uploads', async () => {
     const t = aufbau([{ id: 'A', lokalGeaendertAm: '2026-10-20T10:00:00.000Z' }])
     await t.q.einreihen(neuerWep('A'))
-    await t.q.entfernen('A')
+    await t.q.entfernen('A', '2026-10-21T08:00:00.000Z')
     expect(t.queue.size).toBe(0)
+    expect(t.gesperrt.get('A.json')).toBe('2026-10-21T08:00:00.000Z')
+  })
+
+  it('reiht ein gelöschtes WEP nie wieder ein (verzögerte Speicherung, Abgleich, App-Neustart)', async () => {
+    const t = aufbau([{ id: 'A', lokalGeaendertAm: '2026-10-20T10:00:00.000Z' }])
+    await t.q.einreihen(neuerWep('A'))
+    t.metas.set('A', { id: 'A', lokalGeaendertAm: '2026-10-20T10:00:00.000Z', geloescht: true, geloeschtAm: '2026-10-21T08:00:00.000Z' })
+    await t.q.entfernen('A', '2026-10-21T08:00:00.000Z')
+
+    await t.q.einreihen(neuerWep('A')) // z. B. eine entprellte Speicherung, die zu spät kommt
+    await t.native.reiheEin({ name: 'A.json', inhalt: '{}', geaendertAm: 'x' }) // anderer Aufrufer ohne Aufhebung
+    expect(t.queue.size).toBe(0)
+    await t.q.bereinige()
+    expect(t.queue.size).toBe(0)
+  })
+
+  it('nach dem Wiederherstellen wartet der Abgleich der App, nicht der Hintergrunddienst', async () => {
+    const t = aufbau([
+      { id: 'A', lokalGeaendertAm: '2026-10-22T08:00:00.000Z', wiederhergestellt: true, letzterSyncAm: '2026-10-20T10:00:00.000Z' },
+    ])
+    await t.q.entfernen('A', '2026-10-21T08:00:00.000Z')
+    await t.q.einreihen(neuerWep('A'))
+    expect(t.queue.size).toBe(0) // die Papierkorb-Datei in OneDrive muss erst zurückgeholt werden
+
+    // Nach dem Abgleich ist die Marke weg: normale Speicherungen werden wieder eingereiht und heben die Sperre auf
+    t.metas.set('A', { id: 'A', lokalGeaendertAm: '2026-10-22T09:00:00.000Z', letzterSyncAm: '2026-10-22T08:30:00.000Z', remoteETag: '"E3"' })
+    await t.q.einreihen(neuerWep('A'))
+    expect(t.queue.get('A.json')?.eTag).toBe('"E3"')
+    expect(t.gesperrt.has('A.json')).toBe(false)
+  })
+
+  it('ein Name darf nach „Endgültig löschen“ für ein neues WEP wieder benutzt werden', async () => {
+    const t = aufbau([{ id: 'A', lokalGeaendertAm: '2026-10-20T10:00:00.000Z' }])
+    await t.q.entfernen('A', '2026-10-21T08:00:00.000Z')
+    t.metas.delete('A') // endgültig gelöscht, Meta weg
+    t.metas.set('A', { id: 'A', lokalGeaendertAm: '2026-11-25T10:00:00.000Z' }) // neues WEP gleicher Nummer
+    await t.q.einreihen(neuerWep('A'))
+    expect(t.queue.has('A.json')).toBe(true)
   })
 })

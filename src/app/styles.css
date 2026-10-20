@@ -411,6 +411,12 @@ button.zeile:active {
   color: var(--farbe-akzent-gedrueckt);
 }
 
+.status-konflikt {
+  border-color: var(--farbe-warnung);
+  background: var(--farbe-warnung-hell);
+  color: var(--farbe-warnung);
+}
+
 .status-exportiert {
   border-color: var(--farbe-akzent);
   background: var(--farbe-akzent);
@@ -1591,4 +1597,49 @@ select.eingabe {
   border-bottom: var(--linie) solid var(--farbe-linie);
   color: var(--farbe-text-2);
   font-size: var(--schrift-klein);
+}
+
+/* ---------------------------------------------------------------------------
+   Papierkorb und Konflikte (Beta 3, Paket 2)
+   ------------------------------------------------------------------------- */
+
+.papierkorb-zeile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--abstand-3);
+  padding: var(--abstand-3) 0;
+  border-bottom: var(--linie) solid var(--farbe-linie);
+}
+
+.papierkorb-zugang {
+  margin-top: var(--abstand-5);
+}
+
+.konflikt {
+  margin-bottom: var(--abstand-4);
+}
+
+.konflikt .warnung-text {
+  color: var(--farbe-text);
+}
+
+.konflikt strong {
+  color: var(--farbe-warnung);
+  font-size: var(--schrift-basis);
+}
+
+.konflikt-fassungen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--abstand-1);
+  margin: 0;
+}
+
+.konflikt-fassungen dt {
+  color: var(--farbe-text-2);
+  font-weight: var(--gewicht-mittel);
+}
+
+.konflikt-fassungen dd {
+  margin: 0;
 }

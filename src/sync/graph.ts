@@ -96,13 +96,19 @@ export function erstelleGraphClient(
     const vorhanden = await vorhandeneOrdnerId(name)
     if (vorhanden) return vorhanden
 
-    const wurzel = (await (await anfrage(`${BASIS}?$select=id`)).json()) as DriveItem
+    // Verschachtelt ('daten/papierkorb'): erst den übergeordneten Ordner sicherstellen
+    const teile = name.split('/')
+    const eigenerName = teile.pop() as string
+    const elternId =
+      teile.length > 0
+        ? await ordnerId(teile.join('/'))
+        : (((await (await anfrage(`${BASIS}?$select=id`)).json()) as DriveItem).id as string)
     try {
-      const r = await anfrage(`${LAUFWERK}/items/${encodeURIComponent(wurzel.id as string)}/children`, {
+      const r = await anfrage(`${LAUFWERK}/items/${encodeURIComponent(elternId)}/children`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name,
+          name: eigenerName,
           folder: {},
           '@microsoft.graph.conflictBehavior': 'fail',
         }),
@@ -168,6 +174,15 @@ export function erstelleGraphClient(
         body: inhalt,
       })
       return alsRemote((await antwort.json()) as DriveItem)
+    },
+
+    async loesche(name) {
+      try {
+        await anfrage(dateiUrl(name), { method: 'DELETE' })
+      } catch (e) {
+        if (e instanceof GraphFehler && e.status === 404) return // schon weg
+        throw e
+      }
     },
 
     async verschiebe(name, zielOrdner) {

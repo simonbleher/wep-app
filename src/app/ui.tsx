@@ -2,7 +2,7 @@
 // Seitenleiste (Tablet ≥ 900 px), Einträge darin und Zahlenformate.
 // Strich-Icons aus lucide-react, Farben nur über die Tokens (styles.css).
 import { useEffect, useId, type ReactNode } from 'react'
-import { CircleUser, FileText, TriangleAlert, type LucideIcon } from 'lucide-react'
+import { CircleUser, FileText, Trash2, TriangleAlert, type LucideIcon } from 'lucide-react'
 import type { WepStatus } from '@/model'
 
 /** Einheitliche Icon-Größe und Strichstärke. */
@@ -15,6 +15,14 @@ export function StatusMarke({ status }: { status: WepStatus }) {
 
 export function euroFormat(wert: number): string {
   return wert.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
+}
+
+/** ISO-Zeitpunkt → „20.10.2026, 14:05“ (Ortszeit); Unlesbares bleibt unverändert. */
+export function zeitDe(iso: string): string {
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime())
+    ? iso
+    : d.toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
 /** „2026-10-14“ → „14.10.2026“; anderes bleibt unverändert. */
@@ -74,11 +82,13 @@ export function SlEintrag({
 export function HauptSeitenleiste({
   aktiv,
   onProtokolle,
+  onPapierkorb,
   onProfil,
   fuss,
 }: {
-  aktiv: 'protokolle' | 'profil'
+  aktiv: 'protokolle' | 'papierkorb' | 'profil'
   onProtokolle: () => void
+  onPapierkorb?: () => void
   onProfil: () => void
   fuss?: ReactNode
 }) {
@@ -87,6 +97,7 @@ export function HauptSeitenleiste({
       <div className="sl-app">WEP</div>
       <nav className="sl-nav">
         <SlEintrag icon={FileText} text="Protokolle" aktiv={aktiv === 'protokolle'} onClick={onProtokolle} />
+        {onPapierkorb && <SlEintrag icon={Trash2} text="Papierkorb" aktiv={aktiv === 'papierkorb'} onClick={onPapierkorb} />}
         <SlEintrag icon={CircleUser} text="Profil und Einstellungen" aktiv={aktiv === 'profil'} onClick={onProfil} />
       </nav>
       {fuss && <div className="sl-fuss">{fuss}</div>}

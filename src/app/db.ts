@@ -8,14 +8,16 @@
 
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
 import type { Wep } from '@/model'
-import type { SyncMeta } from '@/sync/types'
+import type { LokaleAenderung, PapierkorbEintrag, SyncMeta } from '@/sync/types'
 import type { ExportEintrag } from '@/sync/exporte'
+import { metaMit, papierkorbMeta } from '@/sync/papierkorb'
 
 const DB_NAME = 'wep-db'
-const DB_VERSION = 3
+const DB_VERSION = 4
 const STORE = 'weps'
 const META = 'syncMeta'
 const EXPORTE = 'exporte'
+const PAPIERKORB = 'papierkorb'
 
 interface WepDB extends DBSchema {
   weps: {
@@ -30,6 +32,10 @@ interface WepDB extends DBSchema {
     key: string
     value: ExportEintrag
   }
+  papierkorb: {
+    key: string
+    value: PapierkorbEintrag
+  }
 }
 
 /**
@@ -38,7 +44,10 @@ interface WepDB extends DBSchema {
  */
 export interface SpeicherHaken {
   nachSpeichern?(wep: Wep): Promise<void>
-  nachLoeschen?(id: string): Promise<void>
+  /** Das WEP liegt jetzt im Papierkorb (hier gelöscht oder beim Abgleich von einem anderen Gerät). */
+  nachLoeschen?(id: string, geloeschtAm: string): Promise<void>
+  /** Das WEP wurde aus dem Papierkorb geholt und muss wieder hochgeladen werden. */
+  nachWiederherstellen?(wep: Wep): Promise<void>
 }
 let haken: SpeicherHaken | undefined
 export function setzeSpeicherHaken(h: SpeicherHaken | undefined): void {
@@ -51,7 +60,7 @@ let dbPromise: Promise<IDBPDatabase<WepDB>> | undefined
 function datenbank(): Promise<IDBPDatabase<WepDB>> {
   if (!dbPromise) {
     dbPromise = openDB<WepDB>(DB_NAME, DB_VERSION, {
-      upgrade(db) {
+      async upgrade(db, alteVersion, _neu, tx) {
         if (!db.objectStoreNames.contains(STORE)) {
           db.createObjectStore(STORE, { keyPath: 'id' })
         }
@@ -62,6 +71,22 @@ function datenbank(): Promise<IDBPDatabase<WepDB>> {
         // Version 3: Excel-Exporte, die noch nach OneDrive hochgeladen werden müssen
         if (!db.objectStoreNames.contains(EXPORTE)) {
           db.createObjectStore(EXPORTE, { keyPath: 'name' })
+        }
+        // Version 4: Papierkorb (gelöschte WEPs, 30 Tage). Die frühere Marke „auf diesem Gerät
+        // gelöscht“ (Löschen wurde nicht abgeglichen) bekommt einen Löschzeitpunkt (jetzt); der
+        // nächste Abgleich legt das WEP dann auch in OneDrive in den Papierkorb.
+        if (!db.objectStoreNames.contains(PAPIERKORB)) {
+          db.createObjectStore(PAPIERKORB, { keyPath: 'id' })
+        }
+        if (alteVersion >= 2 && alteVersion < 4) {
+          const jetzt = new Date().toISOString()
+          let zeiger = await tx.objectStore(META).openCursor()
+          while (zeiger) {
+            if (zeiger.value.geloescht && !zeiger.value.geloeschtAm) {
+              await zeiger.update({ ...zeiger.value, geloeschtAm: jetzt })
+            }
+            zeiger = await zeiger.continue()
+          }
         }
       },
     })
@@ -77,22 +102,31 @@ export async function alleWeps(): Promise<Wep[]> {
 
 /**
  * Speichert ein WEP (legt es an oder überschreibt es) und merkt die Änderung
- * für den nächsten OneDrive-Abgleich vor.
+ * für den nächsten OneDrive-Abgleich vor. Liegt das WEP im Papierkorb, wird nichts
+ * gespeichert (z. B. eine verzögerte Speicherung nach dem Löschen): Gelöschtes kommt nur
+ * durch „Wiederherstellen“ zurück. Liefert false, wenn nicht gespeichert wurde.
  */
-export async function speichereWep(wep: Wep): Promise<void> {
+export async function speichereWep(wep: Wep, jetzt: string = new Date().toISOString()): Promise<boolean> {
   const db = await datenbank()
-  const tx = db.transaction([STORE, META], 'readwrite')
+  const tx = db.transaction([STORE, META, PAPIERKORB], 'readwrite')
+  if (await tx.objectStore(PAPIERKORB).get(wep.id)) {
+    await tx.done
+    return false
+  }
   const alt = await tx.objectStore(META).get(wep.id)
   await tx.objectStore(STORE).put(wep)
-  await tx.objectStore(META).put({
-    ...alt,
-    id: wep.id,
-    lokalGeaendertAm: new Date().toISOString(),
-    geloescht: false,
-  })
+  await tx.objectStore(META).put(
+    metaMit(alt, wep.id, jetzt, {
+      lokalGeaendertAm: jetzt,
+      geloescht: false,
+      geloeschtAm: undefined,
+      endgueltig: undefined,
+    }),
+  )
   await tx.done
   // Die lokale Speicherung hat Vorrang: ein Fehler der Warteschlange wird nur gemeldet.
   await haken?.nachSpeichern?.(wep).catch((e) => console.warn('Warteschlange:', e))
+  return true
 }
 
 /** Lädt ein einzelnes WEP anhand seiner id. */
@@ -101,24 +135,58 @@ export async function ladeWep(id: string): Promise<Wep | undefined> {
   return db.get(STORE, id)
 }
 
-/**
- * Löscht ein WEP anhand seiner id – nur auf diesem Gerät. Löschen wird in der
- * Beta nicht mit OneDrive abgeglichen: Die Datei dort bleibt erhalten, wird auf
- * diesem Gerät aber nicht wieder heruntergeladen (Marke „geloescht“).
- */
-export async function loescheWep(id: string): Promise<void> {
+/** Alle WEPs im Papierkorb. */
+export async function alleImPapierkorb(): Promise<PapierkorbEintrag[]> {
   const db = await datenbank()
-  const tx = db.transaction([STORE, META], 'readwrite')
+  return db.getAll(PAPIERKORB)
+}
+
+/**
+ * Verschiebt ein WEP in den Papierkorb (nur auf diesem Gerät; der Abgleich überträgt es nach
+ * OneDrive). Das geschieht in einer Transaktion, damit keine Speicherung dazwischen verloren
+ * geht. Die Regeln dazu stehen in src/sync/papierkorb.ts.
+ */
+export async function legeInPapierkorb(
+  id: string,
+  geloeschtAm: string,
+  geloeschtVon: string,
+): Promise<PapierkorbEintrag | undefined> {
+  const db = await datenbank()
+  const tx = db.transaction([STORE, META, PAPIERKORB], 'readwrite')
+  const wep = await tx.objectStore(STORE).get(id)
+  if (!wep) {
+    await tx.done
+    return undefined
+  }
   const alt = await tx.objectStore(META).get(id)
+  const eintrag: PapierkorbEintrag = { id, wep, geloeschtAm, geloeschtVon }
+  await tx.objectStore(PAPIERKORB).put(eintrag)
   await tx.objectStore(STORE).delete(id)
-  await tx.objectStore(META).put({
-    ...alt,
-    id,
-    lokalGeaendertAm: alt?.lokalGeaendertAm ?? new Date().toISOString(),
-    geloescht: true,
-  })
+  await tx.objectStore(META).put(papierkorbMeta(alt, id, geloeschtAm))
   await tx.done
-  await haken?.nachLoeschen?.(id).catch((e) => console.warn('Warteschlange:', e))
+  await haken?.nachLoeschen?.(id, geloeschtAm).catch((e) => console.warn('Warteschlange:', e))
+  return eintrag
+}
+
+/** Schreibt zusammengehörige Änderungen (WEP, Papierkorb, Sync-Metadaten) in einer Transaktion. */
+export async function schreibeLokal(a: LokaleAenderung): Promise<void> {
+  const db = await datenbank()
+  const tx = db.transaction([STORE, META, PAPIERKORB], 'readwrite')
+  if (a.wep === null) await tx.objectStore(STORE).delete(a.id)
+  else if (a.wep) await tx.objectStore(STORE).put(a.wep)
+  if (a.papierkorb === null) await tx.objectStore(PAPIERKORB).delete(a.id)
+  else if (a.papierkorb) await tx.objectStore(PAPIERKORB).put(a.papierkorb)
+  if (a.meta === null) await tx.objectStore(META).delete(a.id)
+  else if (a.meta) await tx.objectStore(META).put(a.meta)
+  await tx.done
+  const melde = (f: Promise<void> | undefined) => f?.catch((e) => console.warn('Warteschlange:', e))
+  if (a.ereignis === 'geloescht') {
+    await melde(haken?.nachLoeschen?.(a.id, a.papierkorb?.geloeschtAm ?? new Date().toISOString()))
+  } else if (a.ereignis === 'wiederhergestellt' && a.wep) {
+    await melde(haken?.nachWiederherstellen?.(a.wep))
+  } else if (a.ereignis === 'geaendert' && a.wep) {
+    await melde(haken?.nachSpeichern?.(a.wep))
+  }
 }
 
 // --- Schnittstelle für src/sync -------------------------------------------
@@ -133,15 +201,6 @@ export async function alleSyncMeta(): Promise<SyncMeta[]> {
 export async function setzeSyncMeta(meta: SyncMeta): Promise<void> {
   const db = await datenbank()
   await db.put(META, meta)
-}
-
-/** Speichert ein aus OneDrive geladenes WEP samt Metadaten (ohne neue Änderungsmarke). */
-export async function speichereWepAusSync(wep: Wep, meta: SyncMeta): Promise<void> {
-  const db = await datenbank()
-  const tx = db.transaction([STORE, META], 'readwrite')
-  await tx.objectStore(STORE).put(wep)
-  await tx.objectStore(META).put(meta)
-  await tx.done
 }
 
 // --- Warteschlange für Excel-Exporte ----------------------------------------

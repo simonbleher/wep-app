@@ -210,3 +210,15 @@ die WEP-Datei); „⋯“ → „Duplizieren“ (`dupliziereWep`). Tests: `forma
 (`npm run paket1:screenshots`). `native-version` auf 2 (Icons liegen unter `android/`).
 **Noch offen:** Gerätetest (Icon im Launcher, Themen-Icon, Splash), Android-Test-Workflow am PR.
 
+### B3-2 · Papierkorb, Konflikte sichtbar 🔄 (PR offen) – Branch beta3/paket2
+Ergebnis: Löschen verschiebt nach `daten/papierkorb/` (Löschzeitpunkt, idempotent), andere Geräte legen das WEP
+beim Abgleich in ihren Papierkorb, ohne Konto lokaler Papierkorb; Papierkorb-Ansicht (Wiederherstellen,
+„Endgültig löschen“ mit Rückfrage, automatisch nach 30 Tagen); Änderung nach dem Löschzeitpunkt → Konflikt statt
+stillem Löschen; Konflikt-Hinweis am WEP („auf zwei Geräten geändert“: Diese Fassung behalten / Andere Fassung
+übernehmen, danach Konflikt-Kopie aufräumen); Android: Löschsperre in Warteschlange und Worker; Beta-Regel
+„Löschen wird nicht synchronisiert“ abgelöst, Daten migriert (DB-Version 4). `native-version` 3.
+Tests: `src/sync/papierkorb.test.ts` (zwei Geräte über FakeDrive), `graph.test.ts`, `android/warteschlange.test.ts`,
+`app/__tests__/paket2.test.tsx`; e2e um Papierkorb und DB-Umstieg erweitert. Screenshots: `docs/paket2/`
+(`npm run paket2:screenshots`).
+**Noch offen:** Gerätetest (Löschen auf Handy und Tablet mit echtem OneDrive, Android-Hintergrund-Upload während des
+Löschens), alle Geräte auf diese Version bringen.

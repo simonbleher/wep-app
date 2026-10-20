@@ -1,6 +1,7 @@
 // Ordnerstruktur im OneDrive-App-Ordner (Apps/WEP-App):
 //
 //   daten/        WEP-Dateien (<Vorgangs-Nr>.json), Konflikt-Kopien, profil.json
+//   daten/papierkorb/   gelöschte WEPs (30 Tage), mit Löschzeitpunkt
 //   Exporte/      fertige Excel-Dateien (<Vorgangs-Nr>_WEP.xlsx)
 //   LIESMICH.txt  Hinweis „bitte nichts von Hand ändern“
 //
@@ -10,6 +11,7 @@ import type { GraphClient } from './types'
 
 export const DATEN_ORDNER = 'daten'
 export const EXPORTE_ORDNER = 'Exporte'
+export const PAPIERKORB_ORDNER = 'daten/papierkorb'
 export const PROFIL_DATEI = 'profil.json'
 export const LIESMICH_DATEI = 'LIESMICH.txt'
 

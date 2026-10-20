@@ -9,7 +9,8 @@ import {
   wepIdAusName,
 } from './engine'
 import { erstelleGraphClient } from './graph'
-import type { GraphClient, LokalSpeicher, RemoteDatei, SyncMeta } from './types'
+import { FakeLokal as BasisLokal } from './testHilfen'
+import type { GraphClient, RemoteDatei } from './types'
 
 // --- Test-Doubles ----------------------------------------------------------
 
@@ -38,30 +39,18 @@ class FakeOneDrive implements GraphClient {
   async verschiebe(): Promise<'verschoben' | 'vorhanden'> {
     throw new Error('wird im Engine-Test nicht gebraucht')
   }
+  async loesche(name: string): Promise<void> {
+    this.dateien.delete(name)
+  }
 }
 
-class FakeLokal implements LokalSpeicher {
-  weps = new Map<string, Wep>()
-  meta = new Map<string, SyncMeta>()
-
+/** Wie FakeLokal aus testHilfen, mit der alten Test-Abkürzung `bearbeite(wep, zeit)`. */
+class FakeLokal extends BasisLokal {
   /** Simuliert speichereWep() der App (setzt die Änderungsmarke). */
   bearbeite(wep: Wep, zeit: string) {
     this.weps.set(wep.id, structuredClone(wep))
     const alt = this.meta.get(wep.id)
     this.meta.set(wep.id, { ...alt, id: wep.id, lokalGeaendertAm: zeit, geloescht: false })
-  }
-  async alleWeps() {
-    return [...this.weps.values()]
-  }
-  async alleMeta() {
-    return [...this.meta.values()]
-  }
-  async speichereAusSync(wep: Wep, meta: SyncMeta) {
-    this.weps.set(wep.id, structuredClone(wep))
-    this.meta.set(meta.id, meta)
-  }
-  async setzeMeta(meta: SyncMeta) {
-    this.meta.set(meta.id, meta)
   }
 }
 
@@ -75,7 +64,8 @@ let uhr = 0
 const jetzt = () => new Date(Date.UTC(2026, 9, 17, 13, 0, ++uhr)).toISOString()
 
 async function sync(drive: FakeOneDrive, lokal: FakeLokal, geraet: string) {
-  return synchronisiere({ client: drive, lokal, geraet, jetzt })
+  // Der Papierkorb gehört zu papierkorb.test.ts; hier bleibt er leer
+  return synchronisiere({ client: drive, papierkorb: new FakeOneDrive(), lokal, geraet, jetzt })
 }
 
 // --- Tests -----------------------------------------------------------------
@@ -137,7 +127,15 @@ describe('Abgleich zwischen zwei Geräten', () => {
     await sync(drive, handy, 'Handy')
     drive.aufrufe = []
     const e = await sync(drive, handy, 'Handy')
-    expect(e).toEqual({ hochgeladen: [], heruntergeladen: [], konflikte: [], fehler: [] })
+    expect(e).toEqual({
+      hochgeladen: [],
+      heruntergeladen: [],
+      konflikte: [],
+      fehler: [],
+      geloescht: [],
+      wiederhergestellt: [],
+      bereinigt: [],
+    })
     expect(drive.aufrufe).toEqual(['liste'])
   })
 
@@ -244,16 +242,16 @@ describe('Abgleich zwischen zwei Geräten', () => {
     expect([...drive.dateien.keys()]).toEqual(['2026-001.json'])
   })
 
-  it('lokal gelöschtes WEP wird nicht wieder heruntergeladen', async () => {
+  it('lokal gelöschtes WEP wird nicht wieder heruntergeladen (Papierkorb, siehe papierkorb.test.ts)', async () => {
     const drive = new FakeOneDrive()
     const handy = new FakeLokal()
     handy.bearbeite(wep('2026-001', 'A'), jetzt())
     await sync(drive, handy, 'Handy')
-    handy.weps.delete('2026-001')
-    handy.meta.set('2026-001', { ...handy.meta.get('2026-001')!, geloescht: true })
+    await handy.legeInPapierkorb('2026-001', jetzt(), 'Handy')
     const e = await sync(drive, handy, 'Handy')
     expect(e.heruntergeladen).toEqual([])
     expect(handy.weps.has('2026-001')).toBe(false)
+    expect(handy.korb.has('2026-001')).toBe(true)
   })
 
   it('Fehler bei einer Datei bricht den Abgleich der anderen nicht ab', async () => {

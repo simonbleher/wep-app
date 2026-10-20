@@ -46,4 +46,12 @@ object Http {
         kopfzeilen.forEach { (k, w) -> v.setRequestProperty(k, w) }
         return ausfuehren(v, body)
     }
+
+    fun delete(url: String, kopfzeilen: Map<String, String>): Antwort {
+        val v = URL(url).openConnection() as HttpURLConnection
+        v.requestMethod = "DELETE"
+        v.setRequestProperty("Accept", "application/json")
+        kopfzeilen.forEach { (k, w) -> v.setRequestProperty(k, w) }
+        return ausfuehren(v, null)
+    }
 }

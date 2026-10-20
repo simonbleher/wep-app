@@ -19,16 +19,21 @@ import java.util.concurrent.TimeUnit
 /**
  * Lädt die Warteschlange nach OneDrive (Apps/WEP-App/daten/<name>), auch bei
  * geschlossener App. Überschreibt nie eine neuere Fassung: mit If-Match (eTag) bzw.
- * conflictBehavior=fail für Dateien, die es noch nicht gab. Bei 412/409 bleibt die
+ * conflictBehavior=fail für Dateien, die es noch nicht gab. Bei 412/409/404 bleibt die
  * Datei liegen – die App klärt den Konflikt beim Öffnen.
+ *
+ * Gelöschte WEPs (Löschsperre, siehe Warteschlange.kt) lädt der Worker nie hoch. Ist während
+ * eines Uploads gelöscht worden, verschiebt er die eben geschriebene Datei sofort nach
+ * daten/papierkorb/ (mit Löschzeitpunkt) und entfernt sie aus daten/.
  */
 class UploadWorker(private val ctx: Context, params: WorkerParameters) : Worker(ctx, params) {
 
     override fun doWork(): Result {
         val offen = Warteschlange.liste(ctx).filter { !it.blockiert }
+        val aufraeumen = Warteschlange.offeneLoeschungen(ctx)
         val (netz, unmetered) = Netz.info(ctx)
-        if (offen.isEmpty()) return Result.success()
-        Protokoll.eintrag(ctx, "lauf", "Lauf gestartet (Netz: $netz${if (unmetered) ", unbegrenzt" else ", getaktet"}): ${offen.size} Datei(en)")
+        if (offen.isEmpty() && aufraeumen.isEmpty()) return Result.success()
+        Protokoll.eintrag(ctx, "lauf", "Lauf gestartet (Netz: $netz${if (unmetered) ", unbegrenzt" else ", getaktet"}): ${offen.size} Datei(en), ${aufraeumen.size} Löschung(en) nachzuziehen")
 
         var token = try {
             TokenStore.zugriffstoken(ctx)
@@ -42,10 +47,28 @@ class UploadWorker(private val ctx: Context, params: WorkerParameters) : Worker(
 
         var wiederholen = false
         var ok = 0
+        // Zuerst nachziehen, was während eines früheren Uploads gelöscht wurde
+        for (g in aufraeumen) {
+            try {
+                if (!entsorge(g, token)) wiederholen = true
+            } catch (e: AnmeldungAbgelaufen) {
+                Protokoll.eintrag(ctx, "fehler", "Anmeldung abgelaufen – bitte in der App erneut anmelden")
+                return Result.success()
+            } catch (e: Exception) {
+                wiederholen = true
+                Protokoll.eintrag(ctx, "fehler", "${g.name}: Löschung nachziehen: ${e.javaClass.simpleName}: ${e.message}")
+            }
+        }
         for (eintrag in offen) {
             if (isStopped) {
                 Protokoll.eintrag(ctx, "info", "Lauf unterbrochen")
                 return Result.retry()
+            }
+            // Gelöschte WEPs nie hochladen (die App hat den Eintrag meist schon entfernt)
+            if (Warteschlange.istGeloescht(ctx, eintrag.name)) {
+                Warteschlange.entferne(ctx, eintrag.name)
+                Protokoll.eintrag(ctx, "info", "${eintrag.name}: gelöscht – wird nicht hochgeladen")
+                continue
             }
             try {
                 var a = lade(eintrag, token)
@@ -57,13 +80,20 @@ class UploadWorker(private val ctx: Context, params: WorkerParameters) : Worker(
                     a.status in 200..201 -> {
                         val eTag = JSONObject(a.text).optString("eTag")
                         if (eTag.isEmpty()) throw IOException("Antwort ohne eTag")
-                        Warteschlange.erfolgreich(ctx, eintrag, eTag)
-                        ok++
-                        Protokoll.eintrag(ctx, "upload", "${eintrag.name} hochgeladen (eTag $eTag)")
+                        if (Warteschlange.erfolgreich(ctx, eintrag, eTag)) {
+                            ok++
+                            Protokoll.eintrag(ctx, "upload", "${eintrag.name} hochgeladen (eTag $eTag)")
+                        } else {
+                            // Während des Uploads gelöscht: die Datei darf nicht in daten/ liegen bleiben
+                            Protokoll.eintrag(ctx, "info", "${eintrag.name}: während des Uploads gelöscht – wird in den Papierkorb verschoben")
+                            val g = Warteschlange.offeneLoeschungen(ctx).firstOrNull { it.name == eintrag.name }
+                            if (g != null && !entsorge(g, token)) wiederholen = true
+                        }
                     }
-                    a.status == 412 || a.status == 409 -> {
+                    a.status == 412 || a.status == 409 || a.status == 404 -> {
+                        // 404: die Datei ist in OneDrive nicht mehr in daten/ (z. B. auf einem anderen Gerät gelöscht)
                         Warteschlange.markiereBlockiert(ctx, eintrag.name)
-                        Protokoll.eintrag(ctx, "fehler", "${eintrag.name}: in OneDrive geändert (${a.status}) – bleibt liegen, die App klärt es beim Öffnen")
+                        Protokoll.eintrag(ctx, "fehler", "${eintrag.name}: in OneDrive geändert oder gelöscht (${a.status}) – bleibt liegen, die App klärt es beim Öffnen")
                     }
                     a.status == 429 || a.status >= 500 -> {
                         wiederholen = true
@@ -84,6 +114,53 @@ class UploadWorker(private val ctx: Context, params: WorkerParameters) : Worker(
         }
         Protokoll.eintrag(ctx, "lauf", "Lauf beendet: $ok von ${offen.size} hochgeladen")
         return if (wiederholen) retry() else Result.success()
+    }
+
+    private fun graphPfad(pfad: String): String =
+        "https://graph.microsoft.com/v1.0/me/drive/special/approot:/$pfad:"
+
+    /**
+     * Die Datei wurde während des Löschens hochgeladen und liegt zu Unrecht in daten/: Erst die
+     * Fassung mit Löschzeitpunkt in daten/papierkorb/ ablegen (der Pfad-Upload legt fehlende
+     * Ordner an), dann aus daten/ entfernen – nur wenn dort noch unsere Fassung liegt (If-Match).
+     * Liefert true, wenn der Nachlauf erledigt ist.
+     */
+    private fun entsorge(g: Warteschlange.Geloescht, token: String): Boolean {
+        val inhalt = g.inhalt ?: run {
+            Warteschlange.nachlaufErledigt(ctx, g.name)
+            return true
+        }
+        val kopf = mutableMapOf("Authorization" to "Bearer $token", "Content-Type" to "application/json")
+        val datei = JSONObject(inhalt)
+            .put("geloeschtAm", g.geloeschtAm)
+            .put("geloeschtVon", "Android-Hintergrunddienst")
+        val name = Uri.encode(g.name)
+        val ablage = Http.put(graphPfad("daten/papierkorb/$name") + "/content", datei.toString().toByteArray(Charsets.UTF_8), kopf)
+        if (ablage.status !in 200..201) {
+            Protokoll.eintrag(ctx, "fehler", "${g.name}: Papierkorb-Ablage fehlgeschlagen (${ablage.status}), später erneut")
+            return false
+        }
+        val weg = Http.delete(
+            graphPfad("daten/$name"),
+            mutableMapOf("Authorization" to "Bearer $token").also { if (g.eTag != null) it["If-Match"] = g.eTag },
+        )
+        return when {
+            weg.status in 200..204 || weg.status == 404 -> {
+                Warteschlange.nachlaufErledigt(ctx, g.name)
+                Protokoll.eintrag(ctx, "info", "${g.name}: in den Papierkorb verschoben")
+                true
+            }
+            weg.status == 412 -> {
+                // In daten/ liegt inzwischen eine andere Fassung (anderes Gerät): die App klärt es beim Abgleich
+                Warteschlange.nachlaufErledigt(ctx, g.name)
+                Protokoll.eintrag(ctx, "fehler", "${g.name}: in daten/ inzwischen geändert (412) – die App klärt es beim Abgleich")
+                true
+            }
+            else -> {
+                Protokoll.eintrag(ctx, "fehler", "${g.name}: Entfernen aus daten/ fehlgeschlagen (${weg.status}), später erneut")
+                false
+            }
+        }
     }
 
     /** Nach mehreren Fehlversuchen aufgeben – der periodische Lauf probiert es später erneut. */

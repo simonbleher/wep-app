@@ -62,8 +62,18 @@ export interface WepNativePlugin {
   leseAnmeldung(): Promise<Partial<Anmeldung>>
   loescheAnmeldung(): Promise<void>
 
-  reiheEin(a: { name: string; inhalt: string; eTag?: string; geaendertAm: string }): Promise<void>
+  /**
+   * Reiht eine WEP-Datei ein. Ist ihr Name als gelöscht gesperrt (`markiereGeloescht`), wird sie
+   * ignoriert, außer die App hebt die Sperre ausdrücklich auf (`sperreAufheben`: das WEP lebt).
+   */
+  reiheEin(a: { name: string; inhalt: string; eTag?: string; geaendertAm: string; sperreAufheben?: boolean }): Promise<void>
   entferne(a: { name: string }): Promise<void>
+  /**
+   * Das WEP wurde gelöscht: Eintrag entfernen und diesen Dateinamen für Uploads sperren, auch
+   * für den Hintergrunddienst bei geschlossener App. Ein gerade laufender Upload wird danach
+   * sofort wieder aus daten/ nach daten/papierkorb/ verschoben.
+   */
+  markiereGeloescht(a: { name: string; geloeschtAm: string }): Promise<void>
   liste(): Promise<{ eintraege: WarteschlangenEintrag[] }>
   /** Liefert die Upload-Ergebnisse seit dem letzten Aufruf und leert die Ergebnisdatei. */
   holeErgebnisse(): Promise<{ ergebnisse: UploadErgebnis[] }>

@@ -5,7 +5,7 @@
 // ohne doppelt abzugleichen.
 import { useCallback, useEffect, useState } from 'react'
 import type { Konto } from '@/konto'
-import { jetztSynchronisieren, wartendeAenderungen, type SyncHinweis } from '@/sync'
+import { jetztSynchronisieren, lokalVeraendert, wartendeAenderungen, type SyncHinweis } from '@/sync'
 
 export interface Abgleich {
   laeuft: boolean
@@ -30,13 +30,14 @@ export function useAbgleich(konto: Konto | null, onGeaendert: () => void): Abgle
     setLaeuft(true)
     try {
       const e = await jetztSynchronisieren()
-      if (e.heruntergeladen.length) onGeaendert()
+      if (lokalVeraendert(e)) onGeaendert()
       setHinweise([...e.konflikte, ...e.fehler])
       const zeit = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
       setMeldung(
         `Abgeglichen um ${zeit}` +
           (e.hochgeladen.length ? ` · ${e.hochgeladen.length} hochgeladen` : '') +
-          (e.heruntergeladen.length ? ` · ${e.heruntergeladen.length} geladen` : ''),
+          (e.heruntergeladen.length ? ` · ${e.heruntergeladen.length} geladen` : '') +
+          (e.geloescht.length ? ` · ${e.geloescht.length} in den Papierkorb gelegt` : ''),
       )
     } catch (err) {
       setMeldung(err instanceof Error ? err.message : String(err))
