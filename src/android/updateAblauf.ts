@@ -42,7 +42,7 @@ export interface GemerkterStand {
 
 /** Der benutzte Ausschnitt von @capgo/capacitor-updater. */
 export interface UpdaterPlugin {
-  download(o: { url: string; version: string }): Promise<{ id: string; version: string }>
+  download(o: { url: string; version: string; checksum: string }): Promise<{ id: string; version: string }>
   next(o: { id: string }): Promise<unknown>
   list(): Promise<{ bundles: { id: string; version: string; status: string }[] }>
 }
@@ -110,7 +110,11 @@ export async function pruefeAufUpdate(d: UpdateDeps): Promise<UpdateStand> {
       if (d.nurWlan() && !netz.unmetered) {
         return stand('wartet-wlan', 'Update gefunden, wird im WLAN geladen (Einstellung „nur WLAN“).')
       }
-      const paket = await d.updater.download({ url: neueste.bundleUrl!, version: neueste.commit! })
+      const paket = await d.updater.download({
+        url: neueste.bundleUrl!,
+        version: neueste.commit!,
+        checksum: neueste.bundleSha256!,
+      })
       await d.updater.next({ id: paket.id })
       d.speichere({ ...d.lade(), bereitCommit: neueste.commit })
       return stand('live-bereit', 'Update geladen – wird beim nächsten Start der App angewendet.')

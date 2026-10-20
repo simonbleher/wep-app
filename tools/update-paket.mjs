@@ -3,6 +3,7 @@
 // Ohne bekannten Commit (lokaler Build) entsteht kein Paket; version.json hat dann auch keine
 // bundleUrl. Aufruf: node tools/update-paket.mjs [dist-Ordner]
 import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
 import { join, relative, sep } from 'node:path'
 import JSZip from 'jszip'
 
@@ -34,4 +35,7 @@ const inhalt = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLA
 await mkdir(join(dist, 'updates'), { recursive: true })
 const ziel = join(dist, 'updates', `${version.commit}.zip`)
 await writeFile(ziel, inhalt)
+// Prüfsumme in version.json eintragen (das Update-Plugin lädt ohne Prüfsumme nicht).
+version.bundleSha256 = createHash('sha256').update(inhalt).digest('hex')
+await writeFile(join(dist, 'version.json'), JSON.stringify(version, null, 2) + '\n')
 console.log(`update-paket: ${ziel} (${((await stat(ziel)).size / 1024 / 1024).toFixed(1)} MB)`)

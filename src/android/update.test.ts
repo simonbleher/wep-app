@@ -52,7 +52,7 @@ describe('entscheideUpdate: Live-Update oder natives Update', () => {
   const altZeit = '2026-10-20T12:00:00Z'
   const installiert = v('0.1.0', 0, { commit: 'a', gebautAm: altZeit, nativeVersion: 1 })
   const gehostet = (rest: Partial<VersionInfo> = {}) =>
-    v('0.1.0', 0, { commit: 'b', gebautAm: neuZeit, nativeVersion: 1, bundleUrl: 'https://x.pages.dev/updates/b.zip', ...rest })
+    v('0.1.0', 0, { commit: 'b', gebautAm: neuZeit, nativeVersion: 1, bundleUrl: 'https://x.pages.dev/updates/b.zip', bundleSha256: 'cd'.repeat(32), ...rest })
 
   it('neuer Commit, gleicher nativer Teil → Live-Update', () => {
     expect(entscheideUpdate(installiert, gehostet(), { nativInstalliert: 1 }).art).toBe('live')
@@ -73,6 +73,8 @@ describe('entscheideUpdate: Live-Update oder natives Update', () => {
   it('Paket ohne nativeVersion (alter Build) oder ohne bundleUrl → kein Live-Update', () => {
     expect(entscheideUpdate(installiert, gehostet({ nativeVersion: undefined }), { nativInstalliert: 1 }).art).toBe('keins')
     expect(entscheideUpdate(installiert, gehostet({ bundleUrl: undefined }), { nativInstalliert: 1 }).art).toBe('keins')
+    // ohne Prüfsumme lädt das Plugin nicht → gar nicht erst versuchen
+    expect(entscheideUpdate(installiert, gehostet({ bundleSha256: undefined }), { nativInstalliert: 1 }).art).toBe('keins')
   })
   it('Rückfall: zurückgerollter Commit wird nicht erneut geladen', () => {
     const e = entscheideUpdate(installiert, gehostet(), { nativInstalliert: 1, fehlgeschlagen: ['b'] })
