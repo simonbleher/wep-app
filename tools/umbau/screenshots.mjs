@@ -1,6 +1,6 @@
 // Screenshots der umgebauten App (Beta 2, Schritt 4, Teil A und B) für docs/umbau/.
 // Aufruf: npm run umbau:screenshots  (baut wie npm run e2e nach dist-e2e/, startet vite preview)
-// Testdaten sind erfunden (Erika Musterfrau …). Die Android-Test-Seite wird im Browser mit
+// Testdaten sind erfunden (Erika Musterfrau …). Der Bereich „Synchronisierung“ wird im Browser mit
 // einer nachgebauten Capacitor-Brücke gezeigt (nur für das Bild, nicht in der App).
 import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync, readdirSync } from 'node:fs'
@@ -347,15 +347,15 @@ try {
     await bild('13-leerzustand')
     await kontext.close()
 
-    // Android-Test-Seite im Profil (nachgebaute Brücke)
+    // Bereich „Synchronisierung“ im Profil (nachgebaute Brücke)
     const android = await browser.newContext({ viewport, deviceScaleFactor: 2, serviceWorkers: 'block' })
     await android.addInitScript(() => localStorage.setItem('wep-start-wahl', 'ohne-konto'))
     await android.addInitScript(androidBruecke)
     const s2 = await android.newPage()
     await s2.goto(URL)
     await s2.getByRole('button', { name: 'Profil und Einstellungen' }).filter({ visible: true }).click()
-    await s2.getByText('Test: Hintergrund-Upload').waitFor()
-    await s2.getByText('Test: Hintergrund-Upload').scrollIntoViewIfNeeded()
+    await s2.getByRole('heading', { name: 'Synchronisierung' }).waitFor()
+    await s2.getByRole('heading', { name: 'Synchronisierung' }).scrollIntoViewIfNeeded()
     await s2.waitForTimeout(300)
     await s2.screenshot({ path: `${ZIEL}/${groesse}-9-android-test.png` })
     console.log(`${ZIEL}/${groesse}-9-android-test.png`)

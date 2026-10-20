@@ -1,0 +1,58 @@
+name: Android-Schlüssel erzeugen
+
+# EINMALIG und nur manuell: erzeugt den Release-Schlüssel (Keystore) für die signierte APK.
+# Der Schlüssel liegt danach nur als Artefakt (1 Tag) am Lauf – Anleitung: docs/ANDROID.md.
+# Passwörter stehen nie im Log: Sie werden in Dateien geschrieben und mit ::add-mask::
+# zusätzlich geschwärzt; keytool bekommt sie über Umgebungsvariablen, nicht über die Befehlszeile.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  schluessel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Schlüssel erzeugen
+        run: |
+          set -euo pipefail
+          mkdir -p schluessel
+          ALIAS=wep-release
+          STORE_PW=$(openssl rand -hex 24)
+          # PKCS12 kennt nur ein Passwort: Schlüssel- und Keystore-Passwort sind gleich
+          # (Android/Gradle verlangen trotzdem beide Secrets).
+          KEY_PW=$STORE_PW
+          echo "::add-mask::$STORE_PW"
+          export STORE_PW KEY_PW
+          # 30 Jahre = 10950 Tage; Passwörter über :env, nicht als Argument
+          keytool -genkeypair -noprompt \
+            -keystore schluessel/wep-release.jks -storetype PKCS12 \
+            -alias "$ALIAS" -keyalg RSA -keysize 4096 -validity 10950 \
+            -dname "CN=WEP-App, O=BV Pankow Wertermittler, C=DE" \
+            -storepass:env STORE_PW -keypass:env KEY_PW > /dev/null 2>&1
+          base64 -w0 schluessel/wep-release.jks > schluessel/keystore.base64.txt
+          {
+            echo "ANDROID_KEY_ALIAS=$ALIAS"
+            echo "ANDROID_KEYSTORE_PASSWORT=$STORE_PW"
+            echo "ANDROID_KEY_PASSWORT=$KEY_PW"
+            echo
+            echo "ANDROID_KEYSTORE_BASE64 (eine Zeile, komplett kopieren):"
+            cat schluessel/keystore.base64.txt
+            echo
+          } > schluessel/zugangsdaten.txt
+          rm schluessel/keystore.base64.txt
+          echo "Schlüssel erzeugt ($(stat -c %s schluessel/wep-release.jks) Bytes)."
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wep-android-schluessel
+          path: schluessel/
+          if-no-files-found: error
+          retention-days: 1

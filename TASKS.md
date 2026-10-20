@@ -134,7 +134,7 @@ B2-4b · Umbau der App mit den Tokens.
 Ergebnis: App im freigegebenen Entwurfs-Stil (nur Tokens, lucide-Icons, keine Emojis): Rahmen mit Kopfzeile,
 Handy-Leiste (Formalien, Außenanlagen, Aufwuchs, Beseitigung, Skizze), Export als Aktion oben rechts,
 Tablet ≥ 900 px mit Seitenleiste; WEP-Liste mit Statuszeile Abgleich (Löschen jetzt im Menü „⋯“ der
-WEP-Ansicht mit Rückfrage); Login und Profil inkl. Android-Test-Seite; Außenanlagen/Aufwuchs mit Positionsliste,
+WEP-Ansicht mit Rückfrage); Login und Profil inkl. Android-Test-Seite (inzwischen „Synchronisierung“, B2-5); Außenanlagen/Aufwuchs mit Positionsliste,
 Warnungen, eingeklappten Hinweisen, Summe; „Position hinzufügen“ mit Varianten direkt in den Suchtreffern.
 Playwright-Durchlauf erweitert, Screenshots `docs/umbau/` (`npm run umbau:screenshots`).
 Offen (Teil B): Formalien, Beseitigung, Export und Skizze im Detail, Dunkelmodus.
@@ -149,6 +149,14 @@ Erläuterungen (Schwere „info“) nur noch im Formular unter „Richtlinie“,
 Aufgeräumt: `entwurf.html`, zweiter Vite-Einstieg, Service-Worker-Ausnahme, `src/design/entwurf/` und
 `tools/entwurf/` entfernt (`docs/entwurf/` bleibt als Referenz). Tests (`umbauB.test.tsx`), Playwright-Durchlauf
 und Screenshots (`docs/umbau/`) erweitert. Offen: Dunkelmodus.
+
+### B2-5 · Fertige APK 👀 (#app-gruen) – Branch android/release
+Ergebnis: Workflows „Android-Schlüssel erzeugen“ (einmalig, manuell) und „Android Release“ (Push auf
+`main` + manuell; signierte APK als GitHub Release „WEP <Version> (<Code>)“; ohne Secrets Abbruch mit
+Meldung), `version.json` im Web-Build, Update-Hinweis in der Android-App (`src/android/update.ts`,
+`UpdateHinweis.tsx`), Profil-Bereich „Synchronisierung“ statt Test-Seite (Protokoll nur per langem
+Drücken auf die Version); Update-Hinweis vergleicht Commit + Bauzeit, Release-Workflow bei jedem Push auf `main`. Anleitung, Umstieg von der Test-APK und Updates: docs/ANDROID.md.
+**Noch nicht gelaufen:** Release-Workflow (braucht die vier Secrets) – erster echter Lauf steht aus.
 
 ## KI-Assistent (Plan: docs/KI-ASSISTENT.md)
 

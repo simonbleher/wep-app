@@ -1,10 +1,47 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import type { Plugin } from 'vite'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath, URL } from 'node:url'
 
 const version = (JSON.parse(readFileSync('./package.json', 'utf-8')) as { version: string }).version
+
+/** Release-Seite, auf die der Update-Hinweis der Android-App verweist. */
+const RELEASE_URL = 'https://github.com/simonbleher/wep-app/releases/latest'
+
+/**
+ * Schreibt `version.json` in den Build: versionName aus package.json, versionCode aus
+ * WEP_VERSION_CODE (Release-Workflow: Lauf-Nummer, sonst 0 = unbekannt), `commit`
+ * (Cloudflare: CF_PAGES_COMMIT_SHA, GitHub Actions: GITHUB_SHA) und `gebautAm` (ISO-Zeit).
+ * Die Android-App liest die eingebaute Datei als „installiert“ und die gehostete als „neueste“
+ * und vergleicht über den Commit (siehe src/android/update.ts).
+ */
+function versionJson(): Plugin {
+  return {
+    name: 'wep-version-json',
+    generateBundle() {
+      const versionCode = Number.parseInt(process.env.WEP_VERSION_CODE ?? '', 10) || 0
+      const commit = process.env.CF_PAGES_COMMIT_SHA || process.env.GITHUB_SHA || ''
+      this.emitFile({
+        type: 'asset',
+        fileName: 'version.json',
+        source:
+          JSON.stringify(
+            {
+              versionName: version,
+              versionCode,
+              ...(commit ? { commit } : {}),
+              gebautAm: new Date().toISOString(),
+              releaseUrl: RELEASE_URL,
+            },
+            null,
+            2,
+          ) + '\n',
+      })
+    },
+  }
+}
 
 // Theme-Farbe der WEP-App: weiß wie Kopfzeile und Hintergrund (Design Beta 2)
 const THEME_COLOR = '#ffffff'
@@ -15,6 +52,7 @@ export default defineConfig({
   define: { __APP_VERSION__: JSON.stringify(version) },
   plugins: [
     react(),
+    versionJson(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'icon.svg'],

@@ -8,8 +8,9 @@ android {
         applicationId "de.wep.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        // Release-Workflow: -PwepVersionCode=<Lauf-Nummer> -PwepVersionName=<package.json>
+        versionCode Integer.parseInt((project.findProperty('wepVersionCode') ?: '1').toString())
+        versionName (project.findProperty('wepVersionName') ?: '1.0').toString()
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -21,8 +22,24 @@ android {
         sourceCompatibility JavaVersion.VERSION_21
         targetCompatibility JavaVersion.VERSION_21
     }
+    // Signierung nur, wenn der Release-Workflow den Keystore per Umgebung liefert
+    // (ANDROID_KEYSTORE_FILE, ANDROID_KEYSTORE_PASSWORT, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORT).
+    signingConfigs {
+        release {
+            def ksFile = System.getenv('ANDROID_KEYSTORE_FILE')
+            if (ksFile) {
+                storeFile file(ksFile)
+                storePassword System.getenv('ANDROID_KEYSTORE_PASSWORT')
+                keyAlias System.getenv('ANDROID_KEY_ALIAS')
+                keyPassword System.getenv('ANDROID_KEY_PASSWORT')
+            }
+        }
+    }
     buildTypes {
         release {
+            if (System.getenv('ANDROID_KEYSTORE_FILE')) signingConfig signingConfigs.release
+            // Bewusst ohne Verkleinern/Verschleiern: Capacitor und das eigene Plugin
+            // arbeiten mit Reflexion; der Gewinn (wenige MB) wiegt das Risiko nicht auf.
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
