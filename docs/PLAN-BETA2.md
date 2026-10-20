@@ -1,4 +1,4 @@
-# Plan Beta 2
+# Plan Beta 2 – abgeschlossen ✅
 
 Stand: 20.10.2026, mit Simon abgestimmt. Gebaut wird lokal mit Claude Code, **ein Schritt
 pro Sitzung**, jede Sitzung beginnt mit `git checkout main && git pull`.
@@ -42,13 +42,16 @@ pro Sitzung**, jede Sitzung beginnt mit `git checkout main && git pull`.
 
 ## Reihenfolge
 
-| Schritt | Inhalt |
-|---|---|
-| 1 | KI abschalten |
-| 2 | Login-Bildschirm, Profil, Ordnerstruktur, Konto-Modul (Web) |
-| 3 | Test-APK: Anmeldung per System-Browser + Hintergrund-Upload nur WLAN auf Simons Tablet |
-| 4 | Design: Entwürfe → Freigabe → Umbau |
-| 5 | Fertige APK: Hintergrund-Upload, automatischer Build, Update-Hinweis |
+| Schritt | Inhalt | Stand |
+|---|---|---|
+| 1 | KI abschalten | ✅ #28 |
+| 2 | Login-Bildschirm, Profil, Ordnerstruktur, Konto-Modul (Web) | ✅ #29, #30 |
+| 3 | Test-APK: Anmeldung per System-Browser + Hintergrund-Upload nur WLAN auf Simons Tablet | ✅ #31, auf dem Tablet getestet |
+| 4 | Design: Entwürfe → Freigabe → Umbau | ✅ #32, #33, #34 |
+| 5 | Fertige APK: Hintergrund-Upload, automatischer Build, Update-Hinweis | ✅ #35, #36 – erstes Release „WEP 0.1.0 (4)“ |
+
+**Beta 2 abgeschlossen am 20.10.2026.** Offen bleibt nur die Bestätigung des Update-Hinweises
+auf dem Gerät (erscheint beim ersten Merge nach Installation von Release 4).
 
 ## Ideen für später (nicht in Beta 2)
 
