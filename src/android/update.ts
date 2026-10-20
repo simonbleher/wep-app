@@ -1,8 +1,9 @@
 // Update-Hinweis der Android-App: vergleicht die eingebaute Version (version.json im APK)
 // mit der neuesten (version.json der gehosteten Seite, wird bei jedem Merge auf main neu
 // gebaut). Das Repo ist privat, deshalb gibt es keine anonyme Abfrage der GitHub-Releases.
-// Neuere Version = höherer versionName; bei gleichem Namen entscheidet versionCode,
-// sofern beide Seiten einen kennen (> 0).
+// Neuer ist die gehostete Fassung, wenn ihr Commit vom eingebauten abweicht UND sie später
+// gebaut wurde (gebautAm). Fehlt commit oder gebautAm auf einer Seite, gilt der frühere
+// Vergleich: höherer versionName, bei gleichem Namen höherer versionCode (wenn beide > 0).
 import { Capacitor } from '@capacitor/core'
 import { Browser } from '@capacitor/browser'
 
@@ -15,6 +16,10 @@ const TAG_MS = 24 * 60 * 60 * 1000
 export interface VersionInfo {
   versionName: string
   versionCode: number
+  /** Git-Commit, aus dem gebaut wurde (fehlt in alten Builds und lokalen Builds). */
+  commit?: string
+  /** Bauzeitpunkt (ISO). */
+  gebautAm?: string
   releaseUrl: string
 }
 
@@ -30,6 +35,11 @@ function teile(name: string): number[] {
 
 /** true, wenn `neu` neuer ist als `alt`. */
 export function istNeuer(neu: VersionInfo, alt: VersionInfo): boolean {
+  if (neu.commit && alt.commit && neu.gebautAm && alt.gebautAm) {
+    const t1 = Date.parse(neu.gebautAm)
+    const t0 = Date.parse(alt.gebautAm)
+    if (!Number.isNaN(t1) && !Number.isNaN(t0)) return neu.commit !== alt.commit && t1 > t0
+  }
   const a = teile(neu.versionName)
   const b = teile(alt.versionName)
   for (let i = 0; i < Math.max(a.length, b.length); i++) {
@@ -46,6 +56,8 @@ function alsVersion(d: unknown): VersionInfo | null {
   return {
     versionName: v.versionName,
     versionCode: typeof v.versionCode === 'number' ? v.versionCode : 0,
+    commit: typeof v.commit === 'string' && v.commit ? v.commit : undefined,
+    gebautAm: typeof v.gebautAm === 'string' && v.gebautAm ? v.gebautAm : undefined,
     releaseUrl: typeof v.releaseUrl === 'string' && v.releaseUrl.startsWith('https://') ? v.releaseUrl : '',
   }
 }
@@ -62,7 +74,7 @@ export async function pruefeAufUpdate(): Promise<UpdateStand> {
     const [installiert, neueste] = await Promise.all([holeJson('/version.json'), holeJson(NEUESTE_VERSION_URL)])
     if (!installiert || !neueste) return { verfuegbar: null, meldung: 'Versionsangabe nicht lesbar.' }
     if (istNeuer(neueste, installiert)) {
-      return { verfuegbar: neueste, meldung: `Version ${neueste.versionName} ist verfügbar.` }
+      return { verfuegbar: neueste, meldung: 'Eine neuere Version ist verfügbar.' }
     }
     return { verfuegbar: null, meldung: 'Die App ist auf dem neuesten Stand.' }
   } catch {

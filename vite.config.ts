@@ -11,19 +11,33 @@ const version = (JSON.parse(readFileSync('./package.json', 'utf-8')) as { versio
 const RELEASE_URL = 'https://github.com/simonbleher/wep-app/releases/latest'
 
 /**
- * Schreibt `version.json` in den Build (versionName aus package.json, versionCode aus
- * WEP_VERSION_CODE – der Release-Workflow setzt die Lauf-Nummer, sonst 0 = unbekannt).
- * Die Android-App liest die eingebaute Datei als „installiert“ und die gehostete als „neueste“.
+ * Schreibt `version.json` in den Build: versionName aus package.json, versionCode aus
+ * WEP_VERSION_CODE (Release-Workflow: Lauf-Nummer, sonst 0 = unbekannt), `commit`
+ * (Cloudflare: CF_PAGES_COMMIT_SHA, GitHub Actions: GITHUB_SHA) und `gebautAm` (ISO-Zeit).
+ * Die Android-App liest die eingebaute Datei als „installiert“ und die gehostete als „neueste“
+ * und vergleicht über den Commit (siehe src/android/update.ts).
  */
 function versionJson(): Plugin {
   return {
     name: 'wep-version-json',
     generateBundle() {
       const versionCode = Number.parseInt(process.env.WEP_VERSION_CODE ?? '', 10) || 0
+      const commit = process.env.CF_PAGES_COMMIT_SHA || process.env.GITHUB_SHA || ''
       this.emitFile({
         type: 'asset',
         fileName: 'version.json',
-        source: JSON.stringify({ versionName: version, versionCode, releaseUrl: RELEASE_URL }, null, 2) + '\n',
+        source:
+          JSON.stringify(
+            {
+              versionName: version,
+              versionCode,
+              ...(commit ? { commit } : {}),
+              gebautAm: new Date().toISOString(),
+              releaseUrl: RELEASE_URL,
+            },
+            null,
+            2,
+          ) + '\n',
       })
     },
   }

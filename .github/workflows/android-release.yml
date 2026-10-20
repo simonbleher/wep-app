@@ -7,18 +7,7 @@ name: Android Release
 # Versionsname: package.json, versionCode: Lauf-Nummer.
 on:
   push:
-    branches: [main]
-    paths:
-      - 'android/**'
-      - 'src/**'
-      - 'public/**'
-      - 'data/**'
-      - 'index.html'
-      - 'capacitor.config.ts'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'vite.config.ts'
-      - '.github/workflows/android-release.yml'
+    branches: [main] # jeder Commit auf main bekommt eine APK (Update-Hinweis vergleicht Commits)
   workflow_dispatch:
 
 permissions:

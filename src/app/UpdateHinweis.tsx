@@ -29,7 +29,7 @@ export function UpdateHinweis() {
   if (!nativ || !modul || !verfuegbar) return null
   return (
     <div className="update-hinweis" role="status">
-      <span>Update verfügbar: Version {verfuegbar.versionName}</span>
+      <span>Update verfügbar</span>
       <button type="button" className="knopf" onClick={() => void modul.oeffneReleaseSeite(verfuegbar)}>
         Zur Release-Seite
       </button>

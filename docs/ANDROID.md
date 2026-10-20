@@ -36,8 +36,7 @@ Der Schlüssel ist RSA 4096, 30 Jahre gültig.
 
 ## Release-APK: Bau und Veröffentlichung
 
-Workflow **Android Release** läuft bei jedem Push auf `main`, der `android/`, `src/`, `data/`,
-`public/`, `package.json` u. Ä. ändert, und manuell (*Run workflow*). Er
+Workflow **Android Release** läuft bei **jedem** Push auf `main` und manuell (*Run workflow*). Er
 
 - nimmt den **Versionsnamen aus `package.json`** (`version`) und als **versionCode die
   Lauf-Nummer** des Workflows,
@@ -75,15 +74,20 @@ lässt kein Drüberinstallieren zu. Deshalb:
 - Beim Start (online, höchstens einmal täglich) und über **Profil → Über die App → Nach
   Update suchen** vergleicht die App ihre Version mit der der gehosteten Seite
   (`https://wep-pankow.pages.dev/version.json`, entsteht bei jedem Web-Build aus
-  `package.json`). Ist die dort veröffentlichte Version neuer, erscheint oben auf der
+  `package.json`, Commit und Bauzeit). Ist die dort veröffentlichte Fassung neuer, erscheint oben auf der
   WEP-Liste und im Profil „Update verfügbar“ mit dem Knopf **Zur Release-Seite** (öffnet den
   System-Browser). Im Browser/PWA wird nichts angezeigt.
 - Dort die neue APK laden und **über die alte installieren** (gleicher Schlüssel → Daten
   bleiben).
-- **Wichtig:** Der Hinweis erscheint, wenn der **Versionsname** in `package.json` erhöht
-  wurde (Beispiel 0.1.0 → 0.2.0). Der Cloudflare-Build kennt die Lauf-Nummer nicht; der
-  versionCode ist deshalb nur für Android relevant (Update-Reihenfolge), nicht für den
-  Hinweis. Für einen Hinweis also vor dem Merge die Version erhöhen.
+- **Vergleich über den Commit:** `version.json` enthält `commit` (Cloudflare:
+  `CF_PAGES_COMMIT_SHA`, GitHub: `GITHUB_SHA`) und `gebautAm`. „Update verfügbar“, wenn der
+  Commit der gehosteten Datei vom eingebauten abweicht **und** die gehostete später gebaut
+  wurde. Fehlt der Commit auf einer Seite, gilt der Vergleich über Versionsname und
+  versionCode. Eine Erhöhung von `package.json` ist also nicht nötig.
+- Da der Workflow „Android Release“ bei **jedem** Push auf `main` läuft, gibt es zu jedem
+  Commit eine APK. Cloudflare ist meist schneller als der APK-Bau (einige Minuten): Der
+  Hinweis kann kurz erscheinen, bevor das passende Release fertig ist – dann auf der
+  Release-Seite einen Moment warten und neu laden.
 
 ## Fehlersuche
 

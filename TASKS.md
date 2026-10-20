@@ -155,7 +155,7 @@ Ergebnis: Workflows „Android-Schlüssel erzeugen“ (einmalig, manuell) und �
 `main` + manuell; signierte APK als GitHub Release „WEP <Version> (<Code>)“; ohne Secrets Abbruch mit
 Meldung), `version.json` im Web-Build, Update-Hinweis in der Android-App (`src/android/update.ts`,
 `UpdateHinweis.tsx`), Profil-Bereich „Synchronisierung“ statt Test-Seite (Protokoll nur per langem
-Drücken auf die Version). Anleitung, Umstieg von der Test-APK und Updates: docs/ANDROID.md.
+Drücken auf die Version); Update-Hinweis vergleicht Commit + Bauzeit, Release-Workflow bei jedem Push auf `main`. Anleitung, Umstieg von der Test-APK und Updates: docs/ANDROID.md.
 **Noch nicht gelaufen:** Release-Workflow (braucht die vier Secrets) – erster echter Lauf steht aus.
 
 ## KI-Assistent (Plan: docs/KI-ASSISTENT.md)
