@@ -41,6 +41,7 @@ src/export/
 ├── skizzeFormen.ts   – Grün-Skizze als native Excel-Formen (DrawingML)
 ├── skizzeBild.ts     – Fallback: Skizze als PNG, gemeinsame Drawing-Helfer
 ├── svgRaster.ts      – SVG → PNG im Browser (Fallback der Piktogramme)
+├── bauExcelLesen.ts  – Formalien (E3–E17) aus einer Bau-Excel lesen, Vergleichswerte
 └── __tests__/
     └── export.test.ts
 ```
@@ -107,6 +108,14 @@ await exportWep(wep, excel, {
 (`skizzeAlsPng`), der Export legt es unter `xl/media/` ab, ergänzt Beziehungen und
 `[Content_Types].xml` und passt es zentriert in den umrandeten Bereich ein. Ein Bild
 namens „WEP-App Skizze“ aus einem früheren Export wird vorher entfernt.
+
+## Bau-Excel am WEP (Paket 5)
+
+- `leseBauFormalien(excel)` liest die ausgefüllten Formalien (Shared Strings, Datum als Seriennummer oder Text); die App gleicht sie mit dem WEP ab
+  (`src/bauexcel/abgleich.ts`) und reicht beim Export die am WEP gemerkte Datei als `sourceExcel` weiter.
+- `ExportOptionen.formalienAbgeglichen`: Nach dem Abgleich gelten die WEP-Werte auch in Zellen, die in der Bau-Excel anders belegt sind (keine `konflikte`).
+- Überschrift des Blatts „Skizze Außenanlage-Aufwuchs“: steht in A1 „Baulichkeiten“ (Vorlage: „Skizze – Baulichkeiten“), wird A1 durch
+  `SKIZZE_AA_UEBERSCHRIFT` („Skizze – Außenanlagen und Aufwuchs“) ersetzt (`skizzeUeberschriftGeaendert`); „Skizze Bau“ bleibt unverändert.
 
 ## Regeln
 

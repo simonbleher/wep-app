@@ -21,15 +21,22 @@ import {
   type PositionsBereich,
 } from './cellMapper'
 import {
+  patchCell,
   patchCells,
-  readCellRawValue,
   type CellPatch,
 } from './xmlPatcher'
+import { blattPfadNachName, formalienBlattPfad, sharedStrings, vergleichsWert, zellenWert } from './bauExcelLesen'
 import { fuegeSkizzeEin, skizzeBlattHatFormen } from './skizzeBild'
 import { fuegeSkizzeFormenEin, type SkizzeFormenErgebnis, type SkizzeFormenOptionen } from './skizzeFormen'
 
 export { skizzeBlattHatFormen } from './skizzeBild'
 export * from './skizzeFormen'
+export { leseBauFormalien, vergleichsWert, type BauFormalien } from './bauExcelLesen'
+
+/** Blatt, dessen Überschrift in der Vorlage fälschlich „Skizze – Baulichkeiten“ lautet. */
+export const SKIZZE_AA_BLATT = 'Skizze Außenanlage-Aufwuchs'
+/** Neue Überschrift für das Skizzen-Blatt Außenanlage-Aufwuchs (statt „Skizze – Baulichkeiten“). */
+export const SKIZZE_AA_UEBERSCHRIFT = 'Skizze – Außenanlagen und Aufwuchs'
 
 // ---------------------------------------------------------------------------
 // Typen
@@ -76,11 +83,20 @@ export interface ExportOptionen {
     | ArrayBuffer
     | Uint8Array
     | ((optionen: { transparent: boolean }) => Promise<ArrayBuffer | Uint8Array>)
+  /**
+   * Die Formalien wurden schon mit der Bau-Excel abgeglichen (der Nutzer hat je Feld gewählt):
+   * Die Werte aus dem WEP gelten und werden auch in Zellen geschrieben, die in der Bau-Excel
+   * anders belegt sind; es gibt keine Konflikt-Meldung. Standard: Bau-Excel-Zellen bleiben, abweichende
+   * Werte kommen als `konflikte` zurück.
+   */
+  formalienAbgeglichen?: boolean
 }
 
 export interface ExportResult {
   /** Ergebnis des Formen-Exports (undefined: keine Formen geschrieben) */
   skizzeFormen?: SkizzeFormenErgebnis
+  /** true, wenn die Überschrift des Skizzen-Blatts „Außenanlage-Aufwuchs“ von „Baulichkeiten“ geändert wurde */
+  skizzeUeberschriftGeaendert: boolean
   /** true, wenn eine Skizze ins Skizzen-Blatt eingefügt wurde */
   skizzeEingefuegt: boolean
   /** true, wenn das Skizzen-Blatt schon eigene Formen hatte (PNG transparent angefordert) */
@@ -128,7 +144,10 @@ export async function exportWep(
   let aufwuchsAbgeschnitten = false
 
   // 1. Formalien-Blatt patchen
-  await patchFormalien(zip, wep, konflikte)
+  await patchFormalien(zip, wep, konflikte, optionen.formalienAbgeglichen === true)
+
+  // 1b. Überschrift des Skizzen-Blatts Außenanlage-Aufwuchs (Vorlage: „Skizze – Baulichkeiten“)
+  const skizzeUeberschriftGeaendert = await korrigiereSkizzeUeberschrift(zip)
 
   // 2. Außenanlagen-Blatt patchen
   await patchPositionen(zip, AUSSENANLAGEN, wep.gruen.aussenanlagen, wep.gruen.beschreibungAussen)
@@ -203,6 +222,7 @@ export async function exportWep(
     skizzeEingefuegt,
     skizzeTransparent,
     skizzeFormen,
+    skizzeUeberschriftGeaendert,
   }
 }
 
@@ -214,12 +234,14 @@ async function patchFormalien(
   zip: JSZip,
   wep: Wep,
   konflikte: FormalienKonflikt[],
+  abgeglichen: boolean,
 ): Promise<void> {
-  const sheetPath = 'xl/worksheets/sheet1.xml'
+  const sheetPath = await formalienBlattPfad(zip)
   const file = zip.file(sheetPath)
   if (!file) throw new Error(`Formalien-Blatt nicht gefunden: ${sheetPath}`)
 
   let xml = await file.async('string')
+  const geteilt = await sharedStrings(zip)
   const patches: CellPatch[] = []
 
   for (const key of Object.keys(FORMALIEN_MAP) as (keyof Formalien)[]) {
@@ -228,12 +250,12 @@ async function patchFormalien(
 
     if (!appWert) continue // Kein Wert in der App → nichts schreiben
 
-    if (def.bauExcelHasPriority) {
-      // Prüfen ob Bau-Excel dieses Feld bereits gefüllt hat
-      const vorhandenerWert = readCellRawValue(xml, def.cell)
+    if (def.bauExcelHasPriority && !abgeglichen) {
+      // Prüfen ob Bau-Excel dieses Feld bereits gefüllt hat (Texte aus sharedStrings aufgelöst)
+      const vorhandenerWert = zellenWert(xml, def.cell, geteilt)
       if (vorhandenerWert && vorhandenerWert.trim() !== '') {
         // Bau-Excel hat einen Wert → nur als Konflikt melden, nicht überschreiben
-        if (vorhandenerWert !== appWert) {
+        if (vergleichsWert(key, vorhandenerWert) !== vergleichsWert(key, wep.formalien[key] as string | number)) {
           konflikte.push({
             feld: key,
             zelle: def.cell,
@@ -268,6 +290,27 @@ async function patchFormalien(
 
   xml = patchCells(xml, patches)
   zip.file(sheetPath, xml)
+}
+
+// ---------------------------------------------------------------------------
+// Überschrift des Skizzen-Blatts Außenanlage-Aufwuchs
+// ---------------------------------------------------------------------------
+
+/**
+ * Die Vorlage nennt das Blatt „Skizze Außenanlage-Aufwuchs“ in A1 „Skizze – Baulichkeiten“ (Kopie
+ * des Bau-Blatts, beide zeigen auf denselben Shared String). Steht dort „Baulichkeiten“, wird nur A1
+ * dieses Blatts durch `SKIZZE_AA_UEBERSCHRIFT` ersetzt (als eigener Text, Format bleibt); der Shared
+ * String und das Bau-Blatt „Skizze Bau“ bleiben unverändert. Eine andere Überschrift bleibt stehen.
+ */
+async function korrigiereSkizzeUeberschrift(zip: JSZip): Promise<boolean> {
+  const pfad = await blattPfadNachName(zip, SKIZZE_AA_BLATT, 'xl/worksheets/sheet19.xml')
+  const file = zip.file(pfad)
+  if (!file) return false
+  const xml = await file.async('string')
+  const aktuell = zellenWert(xml, 'A1', await sharedStrings(zip))
+  if (!aktuell || !/baulichkeit/i.test(aktuell)) return false
+  zip.file(pfad, patchCell(xml, 'A1', SKIZZE_AA_UEBERSCHRIFT))
+  return true
 }
 
 // ---------------------------------------------------------------------------

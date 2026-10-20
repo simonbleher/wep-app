@@ -1,13 +1,19 @@
 // Anbindung der Sync-Logik an die IndexedDB der App (src/app/db.ts).
 import {
+  alleBauExcelRecords,
   alleExporte,
   alleImPapierkorb,
   alleSyncMeta,
   alleFotoRecords,
   alleWeps,
+  entferneBauExcelLokal,
   entferneFotoLokal,
+  ladeBauExcelDatei,
   ladeFotoDatei,
+  markiereBauExcelGeloescht,
+  setzeBauExcelRecord,
   setzeFotoRecord,
+  speichereBauExcel,
   entferneExport,
   legeExportAb,
   legeInPapierkorb,
@@ -15,6 +21,7 @@ import {
   setzeSyncMeta,
   speichereWep,
 } from '@/app/db'
+import type { BauExcelSpeicher } from '@/bauexcel/types'
 import type { ExportSpeicher } from './exporte'
 import type { AufraeumListe, FotoSpeicher } from './fotos'
 import type { LokalSpeicher } from './types'
@@ -42,24 +49,36 @@ export const fotoSpeicher: FotoSpeicher = {
   entferne: entferneFotoLokal,
 }
 
-const AUFRAEUMEN_KEY = 'wep-fotos-aufraeumen'
+export const bauSpeicher: BauExcelSpeicher = {
+  alleRecords: alleBauExcelRecords,
+  ladeDatei: ladeBauExcelDatei,
+  setzeRecord: setzeBauExcelRecord,
+  speichere: speichereBauExcel,
+  entferne: entferneBauExcelLokal,
+  markiereGeloescht: markiereBauExcelGeloescht,
+}
 
 /** Merkliste für endgültig gelöschte WEPs (localStorage; fehlt der Speicher, bleibt sie leer). */
-export const fotoAufraeumListe: AufraeumListe = {
-  lade() {
-    try {
-      const roh = localStorage.getItem(AUFRAEUMEN_KEY)
-      return roh ? (JSON.parse(roh) as string[]) : []
-    } catch {
-      return []
-    }
-  },
-  speichere(ids) {
-    try {
-      if (ids.length) localStorage.setItem(AUFRAEUMEN_KEY, JSON.stringify(ids))
-      else localStorage.removeItem(AUFRAEUMEN_KEY)
-    } catch {
-      /* nur Komfort: im schlimmsten Fall bleiben Fotos in OneDrive liegen */
-    }
-  },
+function aufraeumListe(key: string): AufraeumListe {
+  return {
+    lade() {
+      try {
+        const roh = localStorage.getItem(key)
+        return roh ? (JSON.parse(roh) as string[]) : []
+      } catch {
+        return []
+      }
+    },
+    speichere(ids) {
+      try {
+        if (ids.length) localStorage.setItem(key, JSON.stringify(ids))
+        else localStorage.removeItem(key)
+      } catch {
+        /* nur Komfort: im schlimmsten Fall bleiben Dateien in OneDrive liegen */
+      }
+    },
+  }
 }
+
+export const fotoAufraeumListe = aufraeumListe('wep-fotos-aufraeumen')
+export const bauAufraeumListe = aufraeumListe('wep-bau-aufraeumen')

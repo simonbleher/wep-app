@@ -1,13 +1,15 @@
 // Startseite: Liste aller WEPs, Statuszeile Abgleich und „Neues WEP“.
 // Gelöscht wird nicht hier, sondern in der WEP-Ansicht (Menü „⋯“, mit Rückfrage).
-import { useCallback, useEffect, useState } from 'react'
-import { ChevronRight, CircleUser, FileText, Plus, Trash2 } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { ChevronRight, CircleUser, FileSpreadsheet, FileText, Plus, Trash2 } from 'lucide-react'
 import { WEP_STATUS, naechsteVorgangsNr, wepStatus, type Wep, type WepStatus } from '@/model'
 import type { Konto } from '@/konto'
 import { lokalesProfil, neuerWepMitProfil } from '@/profil'
 import { belegteNummern, ladePapierkorb, offeneKonflikte, raeumePapierkorbAuf } from '@/sync/aktionen'
 import { alleWeps, speichereWep } from './db'
 import { UpdateHinweis } from './UpdateHinweis'
+import { BAU_EXCEL_ACCEPT } from './BauExcel'
+import { legeWepAusBauExcelAn } from '@/bauexcel/neu'
 import { StatusZeile, useAbgleich } from './SyncLeiste'
 import { HauptSeitenleiste, ICON, Laedt, LeerZustand, Meldung, StatusMarke, datumDe } from './ui'
 
@@ -40,6 +42,8 @@ export function Startseite({ konto, verfuegbar, onProfil, onOeffnen, onPapierkor
   const [filter, setFilter] = useState<WepStatus | 'alle'>('alle')
   const [konflikte, setKonflikte] = useState<ReadonlySet<string>>(new Set())
   const [imPapierkorb, setImPapierkorb] = useState(0)
+  const [fehler, setFehler] = useState<string>()
+  const bauEingabe = useRef<HTMLInputElement>(null)
 
   const neuLaden = useCallback(() => {
     // Was länger als 30 Tage im Papierkorb liegt, wird beim Öffnen der Liste endgültig gelöscht
@@ -65,6 +69,19 @@ export function Startseite({ konto, verfuegbar, onProfil, onOeffnen, onPapierkor
     onOeffnen(id)
   }
 
+  /** „Neues WEP aus Bau-Excel“: Datei prüfen, WEP anlegen, Formalien vorbefüllen, öffnen. */
+  async function neuesWepAusBauExcel(datei: File) {
+    setFehler(undefined)
+    try {
+      const id = naechsteVorgangsNr(await belegteNummern())
+      const wep = await legeWepAusBauExcelAn({ id, datei, profil: lokalesProfil.lade().profil })
+      setWeps((alt) => [wep, ...alt])
+      onOeffnen(id)
+    } catch (e) {
+      setFehler(e instanceof Error ? e.message : String(e))
+    }
+  }
+
   const sichtbar = filter === 'alle' ? weps : weps.filter((w) => wepStatus(w) === filter)
 
   const status = <StatusZeile konto={konto} verfuegbar={verfuegbar} abgleich={abgleich} />
@@ -80,10 +97,16 @@ export function Startseite({ konto, verfuegbar, onProfil, onOeffnen, onPapierkor
           <button type="button" className="symbolknopf nur-handy" aria-label="Profil und Einstellungen" onClick={onProfil}>
             <CircleUser {...ICON} size={26} />
           </button>
-          <button type="button" className="knopf knopf-primaer nur-tablet" onClick={() => void neuesWep()}>
-            <Plus {...ICON} />
-            Neues WEP
-          </button>
+          <div className="knopf-reihe nur-tablet">
+            <button type="button" className="knopf" onClick={() => bauEingabe.current?.click()}>
+              <FileSpreadsheet {...ICON} />
+              Neues WEP aus Bau-Excel
+            </button>
+            <button type="button" className="knopf knopf-primaer" onClick={() => void neuesWep()}>
+              <Plus {...ICON} />
+              Neues WEP
+            </button>
+          </div>
         </header>
 
         <div className="nur-handy block">
@@ -92,7 +115,29 @@ export function Startseite({ konto, verfuegbar, onProfil, onOeffnen, onPapierkor
             <Plus {...ICON} />
             Neues WEP
           </button>
+          <button type="button" className="knopf knopf-breit" onClick={() => bauEingabe.current?.click()}>
+            <FileSpreadsheet {...ICON} />
+            Neues WEP aus Bau-Excel
+          </button>
         </div>
+        <input
+          ref={bauEingabe}
+          type="file"
+          hidden
+          accept={BAU_EXCEL_ACCEPT}
+          aria-label="Bau-Excel für ein neues WEP wählen"
+          data-testid="neu-bau-excel-eingabe"
+          onChange={(e) => {
+            const datei = e.target.files?.[0]
+            e.target.value = ''
+            if (datei) void neuesWepAusBauExcel(datei)
+          }}
+        />
+        {fehler && (
+          <Meldung alarm>
+            <p>{fehler}</p>
+          </Meldung>
+        )}
 
         {abgleich.hinweise.map((h) => (
           <Meldung key={h.wepId + h.text}>

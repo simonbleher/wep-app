@@ -3,9 +3,12 @@
 import { neuerWep, type Foto, type Wep } from '@/model'
 import type { FotoAblage } from '@/fotos/ablage'
 import { loescheFoto } from '@/fotos'
+import { entferneBauExcel, ladeBauExcelNach, setzeBauExcel } from '@/bauexcel'
+import type { BauExcelRecord, BauExcelSpeicher } from '@/bauexcel/types'
 import { fotoKey, type FotoRecord } from '@/fotos/types'
 import { synchronisiere } from './engine'
 import { FakeDrive } from './fakeDrive'
+import { synchronisiereBauExcel, type BauSyncErgebnis } from './bauExcel'
 import { merkeEndgueltigGeloeschte, synchronisiereFotos, type AufraeumListe, type FotoSyncErgebnis } from './fotos'
 import * as regeln from './papierkorb'
 import { metaMit, papierkorbMeta } from './papierkorb'
@@ -122,6 +125,40 @@ export class FakeFotos implements FotoAblage {
   }
 }
 
+/** Bau-Excel-Ablage im Arbeitsspeicher (wie die IndexedDB-Stores „bauExcel“ und „bauExcelDaten“). */
+export class FakeBau implements BauExcelSpeicher {
+  records = new Map<string, BauExcelRecord>()
+  dateien = new Map<string, Blob>()
+
+  async alleRecords() {
+    return [...this.records.values()]
+  }
+  async ladeDatei(wepId: string) {
+    return this.dateien.get(wepId)
+  }
+  async setzeRecord(r: BauExcelRecord) {
+    this.records.set(r.wepId, r)
+  }
+  async speichere(r: BauExcelRecord, blob?: Blob) {
+    this.records.set(r.wepId, r)
+    if (blob) this.dateien.set(r.wepId, blob)
+    else if (!r.hatDatei) this.dateien.delete(r.wepId)
+  }
+  async entferne(wepId: string) {
+    this.records.delete(wepId)
+    this.dateien.delete(wepId)
+  }
+  async markiereGeloescht(wepId: string, zeit: string) {
+    const r = this.records.get(wepId)
+    if (!r) return
+    this.records.set(wepId, { ...r, geloescht: zeit, hatDatei: false })
+    this.dateien.delete(wepId)
+  }
+  record(wepId: string): BauExcelRecord | undefined {
+    return this.records.get(wepId)
+  }
+}
+
 export function speicherListe(): AufraeumListe & { ids: string[] } {
   const l = { ids: [] as string[], lade: () => [...l.ids], speichere: (ids: string[]) => void (l.ids = [...ids]) }
   return l
@@ -141,7 +178,9 @@ export function anlage(lokal: FakeLokal, id: string): string | undefined {
 export class Geraet {
   lokal = new FakeLokal()
   fotos = new FakeFotos()
+  bau = new FakeBau()
   aufraeumen = speicherListe()
+  bauAufraeumen = speicherListe()
   /** false = offline: sync() wirft wie im Browser. */
   online = true
   /** false = „nur WLAN“ und gerade Mobilfunk: Fotos werden nicht hochgeladen. */
@@ -259,6 +298,76 @@ export class Geraet {
       this.aufraeumen.speichere([...new Set([...this.aufraeumen.lade(), id])])
     }
     return ok
+  }
+
+  /** Wie die App: WEP-Abgleich, danach Foto- und Bau-Excel-Abgleich. */
+  async syncMitBau(): Promise<{ wep: SyncErgebnis; bau: BauSyncErgebnis }> {
+    if (!this.online) throw new Error('Keine Internetverbindung')
+    await this.raeumeAuf()
+    await merkeEndgueltigGeloeschte(this.lokal, this.bauAufraeumen)
+    const wepErgebnis = await synchronisiere({
+      client: this.drive.client('daten'),
+      papierkorb: this.drive.client('daten/papierkorb'),
+      lokal: this.lokal,
+      geraet: this.name,
+      jetzt: () => this.uhr.vor(1),
+      vorUmnummerieren: async (von, nach) => {
+        const r = this.bau.record(von)
+        if (r) await this.bau.speichere({ ...r, wepId: nach, hochgeladen: false }, this.bau.dateien.get(von))
+      },
+    })
+    const bau = await synchronisiereBauExcel({
+      daten: this.drive.client('daten/bau'),
+      papierkorb: this.drive.client('daten/papierkorb/bau'),
+      lokal: this.lokal,
+      bau: this.bau,
+      aufraeumen: this.bauAufraeumen,
+      uploadErlaubt: async () => this.wlan,
+      wepErgebnis,
+      jetzt: () => this.uhr.jetzt(),
+    })
+    return { wep: wepErgebnis, bau }
+  }
+
+  private aendereWep(wepId: string) {
+    return async (fn: (w: Wep) => Wep) => void (await this.bearbeite(fn(structuredClone(this.lokal.weps.get(wepId)) as Wep)))
+  }
+
+  /** Nutzer wählt eine Bau-Excel (die echte Funktion aus src/bauexcel, mit der Ablage dieses Geräts). */
+  waehleBauExcel(wepId: string, bytes: Uint8Array, name = 'Bau.xlsx') {
+    const blob = Object.assign(new Blob([bytes.slice().buffer]), { name })
+    return setzeBauExcel({
+      wepId,
+      datei: blob,
+      aktuell: this.lokal.weps.get(wepId)?.bauExcel,
+      aendere: this.aendereWep(wepId),
+      werkzeuge: { ablage: this.bau, jetzt: () => this.uhr.vor(1) },
+    })
+  }
+
+  entferneBauExcel(wepId: string) {
+    return entferneBauExcel({ wepId, aendere: this.aendereWep(wepId), werkzeuge: { ablage: this.bau, jetzt: () => this.uhr.vor(1) } })
+  }
+
+  /** Holt die Bau-Excel aus OneDrive auf das Gerät (wie das Öffnen des WEP). */
+  ladeBauExcel(wepId: string) {
+    const w = this.lokal.weps.get(wepId) ?? this.lokal.korb.get(wepId)?.wep
+    return ladeBauExcelNach({
+      wep: w!,
+      quelle: {
+        hole: async (id) => {
+          for (const ordner of ['daten/bau', 'daten/papierkorb/bau']) {
+            try {
+              return await this.drive.client(ordner).ladeBlob(`${id}.xlsx`)
+            } catch {
+              /* nächster Ordner */
+            }
+          }
+          return undefined
+        },
+      },
+      werkzeuge: { ablage: this.bau, jetzt: () => this.uhr.jetzt() },
+    })
   }
 
   meta(id: string): SyncMeta | undefined {

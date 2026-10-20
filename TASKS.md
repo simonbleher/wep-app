@@ -252,6 +252,18 @@ Duplizieren kopiert keine Fotos. Export: `Exporte/<Nr>_Fotos/` mit Namen wie `03
 OneDrive); der Kotlin-Teil wurde hier nicht kompiliert (kein Android-SDK) – der Workflow „Android Test-APK“ am PR prüft das.
 
 ### Beta 3b (Plan: docs/PLAN-BETA3.md, Abschnitt „Beta 3b“)
-- B3-5 · Bau-Excel am WEP, Formalien vorbefüllen ⏳ – Branch beta3/paket5
+
+### B3-5 · Bau-Excel am WEP, Formalien vorbefüllen ✅ PR offen – Branch beta3/paket5
+Ergebnis: Bau-Excel über die Dateiauswahl des Systems wählen (am WEP unter Formalien und Export, oder „Neues WEP aus Bau-Excel“ auf der
+Startseite); sie bleibt am WEP (`Wep.bauExcel`, lokal IndexedDB DB-Version 6, OneDrive `daten/bau/<Nr>.xlsx`, Papierkorb
+`daten/papierkorb/bau/`), austauschen/entfernen mit Rückfrage; Abgleich und Papierkorb wie bei Fotos (`src/sync/bauExcel.ts`, Kennung = Hash,
+„nur WLAN“, Konflikt, endgültig löschen, Umnummerieren). Formalien E3–E17 werden gelesen: leere Felder gefüllt, abweichende im Dialog „Bau-Excel
+sagt … / Im WEP steht …“ je Feld wählbar (Voreinstellung WEP); ausgetauschte Datei = derselbe Abgleich. Export nimmt die gemerkte Bau-Excel
+(WEP-Werte gelten nach dem Abgleich bis in die Datei). Überschrift im Blatt „Skizze Außenanlage-Aufwuchs“: „Skizze – Baulichkeiten“ → „Skizze –
+Außenanlagen und Aufwuchs“ (**Simon bestätigt Wortlaut noch**). Code: `src/bauexcel/`, `src/sync/bauExcel.ts`, `src/export/bauExcelLesen.ts`,
+`src/app/BauExcel.tsx`. Tests: `export/__tests__/bauExcelLesen.test.ts`, `bauexcel/__tests__/abgleich.test.ts`, `sync/bauExcel.test.ts` (zwei Geräte über
+FakeDrive), `app/__tests__/paket5.test.tsx`; e2e erweitert (DB 6). Test-Bau-Excel aus der Vorlage mit erfundenen Werten: `src/bauexcel/testBauExcel.ts`.
+Screenshots: `docs/paket5/` (`npm run paket5:screenshots`). `native-version` bleibt 4 (kein Android-Eingriff).
+**Noch offen:** Gerätetest (Dateiauswahl auf Android mit OneDrive-App, zwei Geräte mit echtem OneDrive).
 - B3-6 · Liste und Alltag (Suche, Problempflanzen, Sicherung, Sonnen-Kontrast) ⏳ – Branch beta3/paket6
 - B3-7 · Skizze bedienen (Zoomen, Einrasten, Auswählen) ⏳ – Branch beta3/paket7

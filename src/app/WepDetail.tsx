@@ -8,7 +8,7 @@
 // und „Löschen“ (mit Rückfrage) sind eigene Bildschirme, ohne untere Leiste.
 // Jede Änderung wird sofort in IndexedDB gespeichert.
 
-import { useState, useEffect, useCallback, useRef, useId, type ChangeEvent } from 'react'
+import { useState, useEffect, useCallback, useRef, useId } from 'react'
 import {
   Camera,
   Check,
@@ -26,8 +26,6 @@ import {
   Shovel,
   Sprout,
   Trash2,
-  Upload,
-  X,
   type LucideIcon,
 } from 'lucide-react'
 import { dupliziereWep, naechsteVorgangsNr, wepStatus, type Wep, type Position, type BeseitigungsPosition, type Formalien, type WepStatus } from '@/model'
@@ -36,6 +34,8 @@ import type { KonfliktInfo } from '@/sync/types'
 import { KonfliktHinweis } from './KonfliktHinweis'
 import { ladeWep, speichereWep } from './db'
 import { SkizzeTab } from './SkizzeTab'
+import { BauExcelBereich, useBauNachladen, useBauStand, type BauNachladeStand, type BauStand } from './BauExcel'
+import { bauExcelFuerExport } from '@/bauexcel'
 import { FotoGruppe, FotosTab, useFotoNachladen, useFotoRecords } from './Fotos'
 import { fotoOrdnerName, sammleExportFotos, zipDateien } from '@/fotos/exportOrdner'
 import { dbAblage } from '@/fotos/ablage'
@@ -50,7 +50,7 @@ import { skizzeAlsPng } from '@/skizze/skizzePng'
 import { skizzeDatenZuFormen, type Kasten } from '@/export/skizzeFormen'
 import { svgZuPngBrowser } from '@/export/svgRaster'
 import { exportWep, type ExportResult } from '@/export'
-import { exportFotosNachOneDrive, exportNachOneDrive, ladeFotoAusOneDrive } from '@/sync'
+import { exportFotosNachOneDrive, exportNachOneDrive, ladeBauExcelAusOneDrive, ladeFotoAusOneDrive } from '@/sync'
 import { berechneAbschnittSumme } from '@/gruen/summen'
 import { leseZahl, zahlDe, zahlFuerEingabe } from '@/gruen/format'
 
@@ -115,12 +115,13 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
   const [maske, setMaske] = useState<Maske | null>(null)
   const [loeschFrage, setLoeschFrage] = useState(false)
   const [exportZustand, setExportZustand] = useState<ExportZustand>({ typ: 'idle' })
-  const [bauExcel, setBauExcel] = useState<File | null>(null)
   const [konflikt, setKonflikt] = useState<KonfliktInfo | undefined>()
   // Immer der neueste Stand: Fotos werden asynchron (nach dem Verkleinern) eingetragen
   const wepRef = useRef<Wep | null>(null)
   const fotoRecords = useFotoRecords(wepId)
   const fotoNachladen = useFotoNachladen(wep, fotoRecords)
+  const bauStand = useBauStand(wep)
+  const bauNachladen = useBauNachladen(wep, bauStand)
 
   // WEP aus IndexedDB laden
   useEffect(() => {
@@ -374,7 +375,16 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
               />
             )}
 
-            {tab === 'formalien' && <FormalienTab wep={wep} onSpeichern={speichere} />}
+            {tab === 'formalien' && (
+              <FormalienTab
+                wep={wep}
+                onSpeichern={speichere}
+                aendere={aendere}
+                leseWep={() => wepRef.current}
+                bauStand={bauStand}
+                bauNachladen={bauNachladen}
+              />
+            )}
             {(tab === 'aussenanlagen' || tab === 'aufwuchs') && (
               <PositionenAbschnitt
                 key={tab}
@@ -400,8 +410,10 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
                 onSpeichern={speichere}
                 exportZustand={exportZustand}
                 setExportZustand={setExportZustand}
-                bauExcel={bauExcel}
-                setBauExcel={setBauExcel}
+                aendere={aendere}
+                leseWep={() => wepRef.current}
+                bauStand={bauStand}
+                bauNachladen={bauNachladen}
               />
             )}
           </>
@@ -554,7 +566,21 @@ function WepMenue({
 // Formalien
 // ---------------------------------------------------------------------------
 
-function FormalienTab({ wep, onSpeichern }: { wep: Wep; onSpeichern: (wep: Wep) => Promise<void> }) {
+function FormalienTab({
+  wep,
+  onSpeichern,
+  aendere,
+  leseWep,
+  bauStand,
+  bauNachladen,
+}: {
+  wep: Wep
+  onSpeichern: (wep: Wep) => Promise<void>
+  aendere: WepAendern
+  leseWep: () => Wep | null
+  bauStand: BauStand
+  bauNachladen: BauNachladeStand
+}) {
   function setFeld(key: keyof Formalien, wert: string | number) {
     void onSpeichern({ ...wep, formalien: { ...wep.formalien, [key]: wert } })
   }
@@ -567,6 +593,8 @@ function FormalienTab({ wep, onSpeichern }: { wep: Wep; onSpeichern: (wep: Wep) 
       <header className="seitenkopf">
         <h1 className="h1">Formalien</h1>
       </header>
+
+      <BauExcelBereich wep={wep} aendere={aendere} leseWep={leseWep} stand={bauStand} nachladen={bauNachladen} />
 
       <section className="abschnitt" aria-labelledby={`${id}-anlage`}>
         <h2 className="gruppenkopf" id={`${id}-anlage`}>
@@ -737,37 +765,30 @@ function ExportTab({
   onSpeichern,
   exportZustand,
   setExportZustand,
-  bauExcel,
-  setBauExcel,
+  aendere,
+  leseWep,
+  bauStand,
+  bauNachladen,
 }: {
   wep: Wep
   onSpeichern: (wep: Wep) => Promise<void>
   exportZustand: ExportZustand
   setExportZustand: (z: ExportZustand) => void
-  bauExcel: File | null
-  setBauExcel: (datei: File | null) => void
+  aendere: WepAendern
+  leseWep: () => Wep | null
+  bauStand: BauStand
+  bauNachladen: BauNachladeStand
 }) {
   // Standard: Skizze als bearbeitbare Excel-Formen; Fallback: Bild (PNG)
   const [skizzeAlsBild, setSkizzeAlsBild] = useState(false)
-  const dateiRef = useRef<HTMLInputElement>(null)
   const id = useId()
-
-  function onBauExcelChange(e: ChangeEvent<HTMLInputElement>) {
-    setBauExcel(e.target.files?.[0] ?? null)
-    // gleiche Datei erneut wählbar machen
-    e.target.value = ''
-  }
 
   async function exportieren() {
     setExportZustand({ typ: 'laedt' })
     try {
-      let sourceBuffer: ArrayBuffer
-
-      if (bauExcel) {
-        // Bau-Excel hochgeladen
-        sourceBuffer = await bauExcel.arrayBuffer()
-      } else {
-        // Leere Vorlage aus public/ laden
+      // Die am WEP gemerkte Bau-Excel (lokal, sonst aus OneDrive geholt); ohne sie die leere Vorlage
+      let sourceBuffer = await bauExcelFuerExport({ wep, quelle: { hole: ladeBauExcelAusOneDrive } })
+      if (!sourceBuffer) {
         const resp = await fetch('/WEP_Vorlage.xlsx')
         if (!resp.ok) throw new Error(`Vorlage nicht gefunden: ${resp.statusText}`)
         sourceBuffer = await resp.arrayBuffer()
@@ -790,7 +811,12 @@ function ExportTab({
           ? async (o: { transparent: boolean }) => (await skizzeAlsPng(skizze, undefined, undefined, o)).arrayBuffer()
           : undefined
 
-      const result = await exportWep(wep, sourceBuffer, { skizzeFormen, skizzePng, skizzeAlsBild })
+      const result = await exportWep(wep, sourceBuffer, {
+        skizzeFormen,
+        skizzePng,
+        skizzeAlsBild,
+        formalienAbgeglichen: wep.bauExcel?.abgeglichen === true,
+      })
 
       // Datei-Download auslösen
       const url = URL.createObjectURL(result.blob)
@@ -848,41 +874,7 @@ function ExportTab({
         Die App schreibt die Grün-Daten in die WEP-Vorlage. Bau-Blätter werden nicht verändert.
       </p>
 
-      <section className="abschnitt" aria-labelledby={`${id}-bau`}>
-        <h2 className="gruppenkopf" id={`${id}-bau`}>
-          Bau-Excel
-        </h2>
-        <p className="neben">
-          Falls der Bau-Wertermittler seine Excel-Datei bereits ausgefüllt hat, diese hier wählen. Ohne Datei wird die
-          leere Vorlage verwendet.
-        </p>
-        <input
-          ref={dateiRef}
-          id="bau-excel"
-          type="file"
-          hidden
-          accept=".xlsx"
-          aria-label="Bau-Excel (optional, bereits ausgefüllte Vorlage)"
-          onChange={onBauExcelChange}
-        />
-        {bauExcel ? (
-          <div className="zeile datei">
-            <FileSpreadsheet {...ICON} />
-            <span className="zeile-text">
-              <span className="zeile-titel einzeilig">{bauExcel.name}</span>
-              <span className="neben">{Math.max(1, Math.round(bauExcel.size / 1024))} KB · wird mit den Grün-Daten befüllt</span>
-            </span>
-            <button type="button" className="symbolknopf" aria-label="Bau-Excel entfernen" onClick={() => setBauExcel(null)}>
-              <X {...ICON} />
-            </button>
-          </div>
-        ) : (
-          <button type="button" className="knopf knopf-breit" onClick={() => dateiRef.current?.click()}>
-            <Upload {...ICON} />
-            Bau-Excel auswählen (optional)
-          </button>
-        )}
-      </section>
+      <BauExcelBereich wep={wep} aendere={aendere} leseWep={leseWep} stand={bauStand} nachladen={bauNachladen} />
 
       {hatSkizze && (
         <section className="abschnitt" aria-labelledby={`${id}-skizze`}>
@@ -1009,6 +1001,14 @@ function ZahlEingabe({
 }) {
   const id = useId()
   const [text, setText] = useState(wert === undefined ? '' : zahlFuerEingabe(wert))
+  // Ändert sich der Wert von außen (z. B. aus der Bau-Excel übernommen), zeigt das Feld ihn an;
+  // eigenes Tippen (z. B. „35,“) bleibt unberührt, solange es denselben Wert ergibt
+  useEffect(() => {
+    const aktuell = text.trim() === '' ? undefined : leseZahl(text)
+    if (aktuell !== wert) setText(wert === undefined ? '' : zahlFuerEingabe(wert))
+    // nur auf Änderungen des Werts reagieren
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wert])
   return (
     <div className="feld">
       <label className="label" htmlFor={id}>

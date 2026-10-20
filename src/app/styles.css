@@ -1138,6 +1138,52 @@ select.eingabe {
   margin-right: calc(-1 * var(--abstand-2));
 }
 
+/* Bau-Excel: Abgleich der Formalien, je Feld wählen */
+.abgleich-liste {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.abgleich-feld {
+  padding: var(--abstand-3) 0;
+  border-top: var(--linie) solid var(--farbe-linie);
+}
+
+.abgleich-feld fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: var(--abstand-1);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.abgleich-wahl {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--abstand-3);
+  min-height: var(--beruehr-min);
+  padding: var(--abstand-2) 0;
+}
+
+.abgleich-wahl input {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin-top: var(--abstand-1);
+  accent-color: var(--farbe-akzent);
+}
+
+.abgleich-wahl span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .ergebnis {
   display: flex;
   flex-direction: column;

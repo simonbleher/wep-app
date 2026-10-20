@@ -8,6 +8,7 @@ export type {
   SkizzeDaten,
   WepStatus,
   Foto,
+  BauExcel,
 } from './types'
 export { ZUSTANDSSTUFEN, neuerWep, WEP_STATUS, wepStatus, dupliziereWep, naechsteVorgangsNr } from './types'
 

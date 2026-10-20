@@ -4,7 +4,7 @@ import { aktuellesKonto, kontoVerfuegbar, zugriffstoken } from '@/konto'
 import { lokaleEigene } from '@/katalog'
 import { lokalesProfil } from '@/profil'
 import { fotoUploadErlaubt } from '@/fotos/netz'
-import { kopiereFotosLokal } from '@/app/db'
+import { kopiereBauExcelLokal, kopiereFotosLokal } from '@/app/db'
 import { synchronisiere, wartetAufUpload } from './engine'
 import { synchronisiereEigenePositionen } from './eigenePositionen'
 import {
@@ -22,13 +22,20 @@ import {
   synchronisiereFotos,
   type FotoSyncErgebnis,
 } from './fotos'
+import {
+  BAU_ORDNER,
+  BAU_PAPIERKORB_ORDNER,
+  offeneBauExcel,
+  synchronisiereBauExcel,
+  type BauSyncErgebnis,
+} from './bauExcel'
 import { erstelleGraphClient, GraphFehler } from './graph'
 import { geraeteKennung } from './geraet'
 import { DATEN_ORDNER, EXPORTE_ORDNER, PAPIERKORB_ORDNER, richteOrdnerEin } from './ordner'
 import { raeumePapierkorbAuf } from './aktionen'
 import { metaMit } from './papierkorb'
 import { synchronisiereProfil } from './profil'
-import { exportSpeicher, fotoAufraeumListe, fotoSpeicher, syncSpeicher } from './speicher'
+import { bauAufraeumListe, bauSpeicher, exportSpeicher, fotoAufraeumListe, fotoSpeicher, syncSpeicher } from './speicher'
 import type { SyncErgebnis, SyncHinweis } from './types'
 
 export type { SyncErgebnis, SyncHinweis } from './types'
@@ -53,12 +60,13 @@ const ORDNER_KEY = 'wep-ordner-eingerichtet'
  * Löschungen (Papierkorb), die noch nicht in OneDrive sind, und endgültig Gelöschtes.
  */
 export async function wartendeAenderungen(): Promise<number> {
-  const [weps, korb, metas, exporte, fotos] = await Promise.all([
+  const [weps, korb, metas, exporte, fotos, bauExcel] = await Promise.all([
     syncSpeicher.alleWeps(),
     syncSpeicher.alleImPapierkorb(),
     syncSpeicher.alleMeta(),
     exportSpeicher.alle(),
     fotoSpeicher.alleRecords(),
+    bauSpeicher.alleRecords(),
   ])
   const meta = new Map(metas.map((m) => [m.id, m]))
   return (
@@ -67,6 +75,7 @@ export async function wartendeAenderungen(): Promise<number> {
     metas.filter((m) => m.endgueltig).length +
     exporte.length +
     offeneFotos(fotos, new Set([...weps.map((w) => w.id), ...korb.map((e) => e.id)])) +
+    offeneBauExcel(bauExcel, new Set([...weps.map((w) => w.id), ...korb.map((e) => e.id)])) +
     (lokaleEigene.lade().wartet ? 1 : 0)
   )
 }
@@ -93,6 +102,7 @@ export interface GesamtErgebnis extends SyncErgebnis {
   profilGeaendert: boolean
   eigenePositionenGeaendert: boolean
   fotos: FotoSyncErgebnis
+  bauExcel: BauSyncErgebnis
 }
 
 /** Führt einen vollständigen Abgleich mit OneDrive aus. */
@@ -113,6 +123,8 @@ async function abgleichen(): Promise<GesamtErgebnis> {
   const papierkorb = erstelleGraphClient(zugriffstoken, undefined, PAPIERKORB_ORDNER)
   const exporte = erstelleGraphClient(zugriffstoken, undefined, EXPORTE_ORDNER)
   const fotoOrdner = (wepId: string) => erstelleGraphClient(zugriffstoken, undefined, `${FOTOS_ORDNER}/${wepId}`)
+  const bauOrdner = erstelleGraphClient(zugriffstoken, undefined, BAU_ORDNER)
+  const bauKorb = erstelleGraphClient(zugriffstoken, undefined, BAU_PAPIERKORB_ORDNER)
   const fotoKorb = (wepId: string) => erstelleGraphClient(zugriffstoken, undefined, `${FOTOS_PAPIERKORB_ORDNER}/${wepId}`)
 
   // Ordnerstruktur zuerst: schlägt das fehl, gleichen wir lieber gar nicht ab, statt
@@ -136,12 +148,16 @@ async function abgleichen(): Promise<GesamtErgebnis> {
   await raeumePapierkorbAuf()
   // Die Marke „endgültig gelöscht“ verschwindet im Abgleich: Nummern für die Fotos vormerken
   await merkeEndgueltigGeloeschte(syncSpeicher, fotoAufraeumListe)
+  await merkeEndgueltigGeloeschte(syncSpeicher, bauAufraeumListe)
   const ergebnis = await synchronisiere({
     client: daten,
     papierkorb,
     lokal: syncSpeicher,
     geraet,
-    vorUmnummerieren: kopiereFotosLokal,
+    vorUmnummerieren: async (von, nach) => {
+      await kopiereFotosLokal(von, nach)
+      await kopiereBauExcelLokal(von, nach)
+    },
   })
   const gesamt: GesamtErgebnis = {
     ...ergebnis,
@@ -149,6 +165,7 @@ async function abgleichen(): Promise<GesamtErgebnis> {
     profilGeaendert: false,
     eigenePositionenGeaendert: false,
     fotos: { hochgeladen: [], verschoben: 0, geloescht: 0, aufgeschoben: 0, fehler: [] },
+    bauExcel: { hochgeladen: [], verschoben: 0, geloescht: 0, aufgeschoben: 0, fehler: [] },
   }
 
   const fehler = (wepId: string, e: unknown): SyncHinweis => ({
@@ -180,6 +197,20 @@ async function abgleichen(): Promise<GesamtErgebnis> {
     gesamt.fehler.push(...gesamt.fotos.fehler)
   } catch (e) {
     gesamt.fehler.push(fehler('Fotos', e))
+  }
+  try {
+    gesamt.bauExcel = await synchronisiereBauExcel({
+      daten: bauOrdner,
+      papierkorb: bauKorb,
+      lokal: syncSpeicher,
+      bau: bauSpeicher,
+      aufraeumen: bauAufraeumListe,
+      uploadErlaubt: fotoUploadErlaubt,
+      wepErgebnis: ergebnis,
+    })
+    gesamt.fehler.push(...gesamt.bauExcel.fehler)
+  } catch (e) {
+    gesamt.fehler.push(fehler('Bau-Excel', e))
   }
   const q = await leereExportWarteschlange(exporte, exportSpeicher, (ordner) =>
     erstelleGraphClient(zugriffstoken, undefined, `${EXPORTE_ORDNER}/${ordner}`),
@@ -247,6 +278,19 @@ export async function ladeFotoAusOneDrive(wepId: string, fotoId: string): Promis
   return undefined
 }
 
+/** Holt die Bau-Excel eines WEP aus OneDrive: erst aus daten/bau/, sonst aus dem Papierkorb-Ordner. */
+export async function ladeBauExcelAusOneDrive(wepId: string): Promise<Blob | undefined> {
+  const name = `${wepId}.xlsx`
+  for (const ordner of [BAU_ORDNER, BAU_PAPIERKORB_ORDNER]) {
+    try {
+      return await erstelleGraphClient(zugriffstoken, undefined, ordner).ladeBlob(name)
+    } catch (e) {
+      if (!(e instanceof GraphFehler && e.status === 404)) throw e
+    }
+  }
+  return undefined
+}
+
 /**
  * Vergisst den Abgleich-Stand (beim Abmelden): Beim nächsten Konto wird alles Lokale
  * wieder als „wartet auf Upload“ behandelt und die Ordner werden neu eingerichtet.
@@ -278,6 +322,12 @@ export async function setzeAbgleichZurueck(): Promise<void> {
   for (const r of await fotoSpeicher.alleRecords()) {
     if (r.geloescht) await fotoSpeicher.entferne(r.wepId, r.id)
     else if (r.hochgeladen) await fotoSpeicher.setzeRecord({ ...r, hochgeladen: false })
+  }
+  // Bau-Excel ebenso
+  bauAufraeumListe.speichere([])
+  for (const r of await bauSpeicher.alleRecords()) {
+    if (r.geloescht) await bauSpeicher.entferne(r.wepId)
+    else if (r.hochgeladen) await bauSpeicher.setzeRecord({ ...r, hochgeladen: false })
   }
   const stand = lokalesProfil.lade()
   lokalesProfil.speichere({ ...stand, letzterSyncAm: undefined, remoteETag: undefined })
