@@ -1,12 +1,14 @@
 // Test-Seite für den Hintergrund-Upload (nur in der Android-App sichtbar, im Profil):
 // Warteschlange, letzte Worker-Läufe, aktueller Netztyp und „Jetzt versuchen“.
 import { useCallback, useEffect, useState } from 'react'
+import { TriangleAlert } from 'lucide-react'
 import {
   WepNative,
   type NetzInfo,
   type ProtokollEintrag,
   type WarteschlangenEintrag,
 } from '@/android/native'
+import { ICON } from './ui'
 
 function zeit(iso: string): string {
   const d = new Date(iso)
@@ -49,39 +51,58 @@ export function AndroidTest() {
   }
 
   return (
-    <section className="formular">
-      <h2 className="abschnitt-titel">Test: Hintergrund-Upload</h2>
-      <dl className="daten-liste">
-        <dt>Netz</dt>
-        <dd>
-          {netz ? `${netz.typ}${netz.unmetered ? ' (unbegrenzt)' : netz.typ === 'keins' ? '' : ' (getaktet)'}` : '…'}
-        </dd>
-        <dt>Warteschlange</dt>
-        <dd>{queue.length === 0 ? 'leer' : `${queue.length} Datei(en)`}</dd>
+    <section className="abschnitt" aria-labelledby="android-test">
+      <h2 className="gruppenkopf" id="android-test">
+        Test: Hintergrund-Upload
+      </h2>
+      <dl className="werte">
+        <div>
+          <dt>Netz</dt>
+          <dd>
+            {netz ? `${netz.typ}${netz.unmetered ? ' (unbegrenzt)' : netz.typ === 'keins' ? '' : ' (getaktet)'}` : '…'}
+          </dd>
+        </div>
+        <div>
+          <dt>Warteschlange</dt>
+          <dd>{queue.length === 0 ? 'leer' : `${queue.length} Datei(en)`}</dd>
+        </div>
       </dl>
-      {queue.map((e) => (
-        <p key={e.name} className="hinweis">
-          {e.name} · {Math.max(1, Math.round(e.groesse / 1024))} KB · geändert {zeit(e.geaendertAm)}
-          {e.blockiert ? ' · liegt (Konflikt, die App klärt es beim Abgleich)' : ''}
+      {queue.length > 0 && (
+        <ul className="liste">
+          {queue.map((e) => (
+            <li key={e.name} className="protokoll-zeile">
+              {e.name} · {Math.max(1, Math.round(e.groesse / 1024))} KB · geändert {zeit(e.geaendertAm)}
+              {e.blockiert ? ' · liegt (Konflikt, die App klärt es beim Abgleich)' : ''}
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="knopf-reihe">
+        <button type="button" className="knopf" onClick={() => void versuchen()}>
+          Jetzt versuchen
+        </button>
+        <button type="button" className="knopf" onClick={() => void laden()}>
+          Aktualisieren
+        </button>
+      </div>
+      {fehler && (
+        <p className="warnung" role="alert">
+          <TriangleAlert {...ICON} size={20} />
+          <span>{fehler}</span>
         </p>
-      ))}
-      <button type="button" className="btn" onClick={() => void versuchen()}>
-        Jetzt versuchen
-      </button>
-      <button type="button" className="btn" onClick={() => void laden()}>
-        Aktualisieren
-      </button>
-      {fehler && <p className="hinweis hinweis-warnung">{fehler}</p>}
-      <h3 className="abschnitt-titel">Protokoll (neueste zuerst)</h3>
-      {protokoll.length === 0 && <p className="hinweis">Noch keine Einträge.</p>}
-      {protokoll.map((p, i) => (
-        <p
-          key={`${p.zeit}-${i}`}
-          className={p.art === 'fehler' ? 'hinweis hinweis-warnung' : 'hinweis'}
-        >
-          {zeit(p.zeit)} · {p.text}
-        </p>
-      ))}
+      )}
+      <h3 className="gruppenkopf">Protokoll (neueste zuerst)</h3>
+      {protokoll.length === 0 ? (
+        <p className="neben">Noch keine Einträge.</p>
+      ) : (
+        <ul className="liste">
+          {protokoll.map((p, i) => (
+            <li key={`${p.zeit}-${i}`} className={p.art === 'fehler' ? 'protokoll-zeile ist-fehler' : 'protokoll-zeile'}>
+              {zeit(p.zeit)} · {p.text}
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   )
 }

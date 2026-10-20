@@ -63,9 +63,14 @@ export function SkizzeTab({
   const anzahl = wep.skizze?.elemente.length ?? 0
 
   return (
-    <section className="formular skizze-tab">
-      <h2 className="abschnitt-titel">Skizze Außenanlagen &amp; Aufwuchs</h2>
-      <p className="hinweis-klein">
+    <section className="skizze-tab">
+      <header className="seitenkopf">
+        <div>
+          <h1 className="h1">Skizze</h1>
+          <p className="neben">Außenanlagen &amp; Aufwuchs</p>
+        </div>
+      </header>
+      <p className="neben">
         Rechteck, Linie, Kreis, Text, Maßangabe und Symbole (Baum, Beet, Hecke …){KI_AKTIV && ' – oder per Beschreibung im Chat darunter'}. Die Skizze wird beim
         Excel-Export ins Blatt „Skizze Außenanlage-Aufwuchs“ eingefügt.
         {anzahl > 0 && ` · ${anzahl} ${anzahl === 1 ? 'Element' : 'Elemente'} gespeichert`}

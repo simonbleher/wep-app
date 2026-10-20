@@ -1,20 +1,25 @@
-// Statuszeile auf der Startseite: Konto-Status und Abgleich mit OneDrive.
-// Gleicht automatisch ab, wenn die Seite geöffnet wird und wenn das Gerät
-// wieder online geht.
+// Statuszeile Abgleich (Startseite): Konto-Status und Abgleich mit OneDrive.
+// Gleicht automatisch ab, wenn die Startseite geöffnet wird und wenn das Gerät
+// wieder online geht. Der Zustand liegt im Hook useAbgleich, damit die Startseite
+// die Zeile auf dem Handy oben und auf dem Tablet in der Seitenleiste zeigen kann,
+// ohne doppelt abzugleichen.
 import { useCallback, useEffect, useState } from 'react'
 import type { Konto } from '@/konto'
 import { jetztSynchronisieren, wartendeAenderungen, type SyncHinweis } from '@/sync'
 
-interface Props {
-  /** Angemeldetes Konto; null = „ohne Konto“ (nur auf diesem Gerät). */
-  konto: Konto | null
-  /** Ist die Anmeldung auf dieser Plattform überhaupt eingerichtet? */
-  verfuegbar: boolean
-  /** Wird nach einem Abgleich aufgerufen, der lokale Daten geändert hat. */
-  onGeaendert: () => void
+export interface Abgleich {
+  laeuft: boolean
+  meldung: string
+  hinweise: SyncHinweis[]
+  wartend: number
+  abgleichen: () => Promise<void>
 }
 
-export function SyncLeiste({ konto, verfuegbar, onGeaendert }: Props) {
+/**
+ * @param konto       angemeldetes Konto; null = „ohne Konto“ (kein Abgleich)
+ * @param onGeaendert wird nach einem Abgleich aufgerufen, der lokale Daten geändert hat
+ */
+export function useAbgleich(konto: Konto | null, onGeaendert: () => void): Abgleich {
   const [laeuft, setLaeuft] = useState(false)
   const [meldung, setMeldung] = useState('')
   const [hinweise, setHinweise] = useState<SyncHinweis[]>([])
@@ -54,33 +59,40 @@ export function SyncLeiste({ konto, verfuegbar, onGeaendert }: Props) {
     }
   }, [angemeldet, abgleichen])
 
+  return { laeuft, meldung, hinweise, wartend, abgleichen }
+}
+
+interface Props {
+  konto: Konto | null
+  /** Ist die Anmeldung auf dieser Plattform überhaupt eingerichtet? */
+  verfuegbar: boolean
+  abgleich: Abgleich
+}
+
+export function StatusZeile({ konto, verfuegbar, abgleich }: Props) {
   if (!verfuegbar) return null
 
-  if (!angemeldet) {
+  if (!konto) {
     return (
-      <p className="status-zeile" aria-live="polite">
-        Nur auf diesem Gerät gespeichert
-      </p>
+      <div className="status" aria-live="polite">
+        <span className="status-text">Nur auf diesem Gerät gespeichert</span>
+      </div>
     )
   }
 
+  const { laeuft, meldung, wartend } = abgleich
   return (
-    <section aria-live="polite">
-      <div className="status-zeile">
-        <span>
-          {konto.benutzername || konto.name} ·{' '}
-          {laeuft ? 'Gleiche ab …' : meldung || 'Verbunden'}
-          {wartend > 0 && !laeuft ? ` · ${wartend} warten auf Upload` : ''}
-        </span>
-        <button type="button" className="text-knopf" disabled={laeuft} onClick={() => void abgleichen()}>
-          Abgleichen
-        </button>
-      </div>
-      {hinweise.map((h) => (
-        <p key={h.wepId + h.text} className="hinweis hinweis-warnung">
-          {h.text}
-        </p>
-      ))}
-    </section>
+    <div className="status" aria-live="polite">
+      <span className="status-text">
+        <span>{konto.benutzername || konto.name}</span>
+        <span>{laeuft ? 'Gleiche ab …' : meldung || 'Verbunden'}</span>
+        {wartend > 0 && !laeuft && (
+          <span>{wartend === 1 ? '1 Änderung wartet auf Upload' : `${wartend} Änderungen warten auf Upload`}</span>
+        )}
+      </span>
+      <button type="button" className="textknopf" disabled={laeuft} onClick={() => void abgleich.abgleichen()}>
+        Abgleichen
+      </button>
+    </div>
   )
 }
