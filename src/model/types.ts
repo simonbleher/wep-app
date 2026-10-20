@@ -29,6 +29,26 @@ export interface Wep {
   skizze?: SkizzeDaten
   /** Bearbeitungsstand; fehlt = „in Arbeit“. Wird mit OneDrive abgeglichen. */
   status?: WepStatus
+  /**
+   * Fotos (nur die Angaben; die Bilddateien liegen in IndexedDB bzw. in OneDrive unter
+   * `daten/fotos/<Vorgangs-Nr>/<id>.jpg`, siehe src/fotos).
+   */
+  fotos?: Foto[]
+}
+
+/** Angaben zu einem Foto am WEP. */
+export interface Foto {
+  /** Kennung, zugleich Dateiname (<id>.jpg) in OneDrive. */
+  id: string
+  /** Position (Außenanlage, Aufwuchs oder Beseitigung), an der das Foto hängt; fehlt = WEP allgemein. */
+  positionId?: string
+  /** Kurzer Text zum Foto (optional). */
+  text?: string
+  aufgenommenAm: string
+  breite: number
+  hoehe: number
+  /** Größe der Bilddatei in Bytes. */
+  groesse: number
 }
 
 /** in Arbeit (Standard) · fertig (manuell) · exportiert (automatisch nach dem Excel-Export). */
@@ -42,10 +62,12 @@ export function wepStatus(wep: Pick<Wep, 'status'>): WepStatus {
 
 /**
  * Komplette Kopie eines WEP (Formalien, Positionen, Beschreibungen, Beseitigung, Skizze)
- * unter einer neuen Vorgangs-Nr.; Status „in Arbeit“.
+ * unter einer neuen Vorgangs-Nr.; Status „in Arbeit“. Fotos werden nicht kopiert
+ * (docs/ENTSCHEIDUNGEN.md, Beta 3 Paket 4).
  */
 export function dupliziereWep(wep: Wep, neueId: string): Wep {
   const kopie = JSON.parse(JSON.stringify(wep)) as Wep
+  delete kopie.fotos
   return { ...kopie, id: neueId, formalien: { ...kopie.formalien, vorgangsNr: neueId }, status: 'in Arbeit' }
 }
 

@@ -22,6 +22,9 @@ import java.util.concurrent.TimeUnit
  * conflictBehavior=fail für Dateien, die es noch nicht gab. Bei 412/409/404 bleibt die
  * Datei liegen – die App klärt den Konflikt beim Öffnen.
  *
+ * Fotos (FotoWarteschlange.kt) gehen nach daten/fotos/<WEP>/<Foto>.jpg; gesperrte WEPs (Papierkorb)
+ * nie, und ein Foto, das während des Löschens hochgeladen wurde, wandert sofort in den Papierkorb-Ordner.
+ *
  * Gelöschte WEPs (Löschsperre, siehe Warteschlange.kt) lädt der Worker nie hoch. Ist während
  * eines Uploads gelöscht worden, verschiebt er die eben geschriebene Datei sofort nach
  * daten/papierkorb/ (mit Löschzeitpunkt) und entfernt sie aus daten/.
@@ -31,9 +34,10 @@ class UploadWorker(private val ctx: Context, params: WorkerParameters) : Worker(
     override fun doWork(): Result {
         val offen = Warteschlange.liste(ctx).filter { !it.blockiert }
         val aufraeumen = Warteschlange.offeneLoeschungen(ctx)
+        val fotos = FotoWarteschlange.liste(ctx)
         val (netz, unmetered) = Netz.info(ctx)
-        if (offen.isEmpty() && aufraeumen.isEmpty()) return Result.success()
-        Protokoll.eintrag(ctx, "lauf", "Lauf gestartet (Netz: $netz${if (unmetered) ", unbegrenzt" else ", getaktet"}): ${offen.size} Datei(en), ${aufraeumen.size} Löschung(en) nachzuziehen")
+        if (offen.isEmpty() && aufraeumen.isEmpty() && fotos.isEmpty()) return Result.success()
+        Protokoll.eintrag(ctx, "lauf", "Lauf gestartet (Netz: $netz${if (unmetered) ", unbegrenzt" else ", getaktet"}): ${offen.size} Datei(en), ${fotos.size} Foto(s), ${aufraeumen.size} Löschung(en) nachzuziehen")
 
         var token = try {
             TokenStore.zugriffstoken(ctx)
@@ -112,7 +116,55 @@ class UploadWorker(private val ctx: Context, params: WorkerParameters) : Worker(
                 Protokoll.eintrag(ctx, "fehler", "${eintrag.name}: ${e.javaClass.simpleName}: ${e.message}")
             }
         }
-        Protokoll.eintrag(ctx, "lauf", "Lauf beendet: $ok von ${offen.size} hochgeladen")
+        // Fotos nach den WEP-Dateien: ein Foto ist groß, der Text soll zuerst ankommen
+        var okFotos = 0
+        for (foto in fotos) {
+            if (isStopped) {
+                Protokoll.eintrag(ctx, "info", "Lauf unterbrochen")
+                return Result.retry()
+            }
+            if (FotoWarteschlange.istGesperrt(ctx, foto.wepId)) {
+                foto.datei.delete()
+                Protokoll.eintrag(ctx, "info", "Foto ${foto.wepId}/${foto.fotoId}: WEP gelöscht – wird nicht hochgeladen")
+                continue
+            }
+            try {
+                val bytes = foto.datei.readBytes()
+                var a = ladeFoto(foto, bytes, token)
+                if (a.status == 401) {
+                    token = TokenStore.zugriffstoken(ctx, erzwingen = true)
+                    a = ladeFoto(foto, bytes, token)
+                }
+                when {
+                    a.status in 200..201 -> {
+                        val eTag = JSONObject(a.text).optString("eTag")
+                        if (FotoWarteschlange.erfolgreich(ctx, foto)) {
+                            okFotos++
+                            Protokoll.eintrag(ctx, "upload", "Foto ${foto.wepId}/${foto.fotoId} hochgeladen")
+                        } else {
+                            // Während des Uploads gelöscht: das Foto darf nicht in daten/fotos/ liegen bleiben
+                            Protokoll.eintrag(ctx, "info", "Foto ${foto.wepId}/${foto.fotoId}: während des Uploads gelöscht – wird in den Papierkorb verschoben")
+                            if (!entsorgeFoto(foto, bytes, eTag, token)) wiederholen = true
+                        }
+                    }
+                    a.status == 429 || a.status >= 500 -> {
+                        wiederholen = true
+                        Protokoll.eintrag(ctx, "fehler", "Foto ${foto.wepId}/${foto.fotoId}: OneDrive-Fehler ${a.status}, später erneut")
+                    }
+                    else -> {
+                        wiederholen = true
+                        Protokoll.eintrag(ctx, "fehler", "Foto ${foto.wepId}/${foto.fotoId}: Fehler ${a.status} ${a.text.take(160)}")
+                    }
+                }
+            } catch (e: AnmeldungAbgelaufen) {
+                Protokoll.eintrag(ctx, "fehler", "Anmeldung abgelaufen – bitte in der App erneut anmelden")
+                return Result.success()
+            } catch (e: Exception) {
+                wiederholen = true
+                Protokoll.eintrag(ctx, "fehler", "Foto ${foto.wepId}/${foto.fotoId}: ${e.javaClass.simpleName}: ${e.message}")
+            }
+        }
+        Protokoll.eintrag(ctx, "lauf", "Lauf beendet: $ok von ${offen.size} Datei(en), $okFotos von ${fotos.size} Foto(s) hochgeladen")
         return if (wiederholen) retry() else Result.success()
     }
 
@@ -161,6 +213,36 @@ class UploadWorker(private val ctx: Context, params: WorkerParameters) : Worker(
                 false
             }
         }
+    }
+
+    /** Foto nach daten/fotos/<WEP>/<Foto>.jpg; gleiche Id = gleiches Bild, Ersetzen ist ungefährlich. */
+    private fun ladeFoto(f: FotoWarteschlange.Eintrag, bytes: ByteArray, token: String): Http.Antwort {
+        val pfad = "daten/fotos/" + Uri.encode(f.wepId) + "/" + Uri.encode(f.fotoId + ".jpg")
+        val url = "https://graph.microsoft.com/v1.0/me/drive/special/approot:/$pfad:/content?@microsoft.graph.conflictBehavior=replace"
+        return Http.put(url, bytes, mapOf("Authorization" to "Bearer $token", "Content-Type" to "image/jpeg"))
+    }
+
+    /**
+     * Das WEP wurde gelöscht, während das Foto hochgeladen wurde: Erst im Papierkorb-Ordner ablegen
+     * (daten/papierkorb/fotos/<WEP>/), dann aus daten/fotos/ entfernen (nur wenn dort noch unsere Datei liegt).
+     * Liefert true, wenn es erledigt ist; sonst räumt der nächste Abgleich der App auf.
+     */
+    private fun entsorgeFoto(f: FotoWarteschlange.Eintrag, bytes: ByteArray, eTag: String, token: String): Boolean {
+        val name = Uri.encode(f.wepId) + "/" + Uri.encode(f.fotoId + ".jpg")
+        val ablage = Http.put(
+            graphPfad("daten/papierkorb/fotos/$name") + "/content",
+            bytes,
+            mapOf("Authorization" to "Bearer $token", "Content-Type" to "image/jpeg"),
+        )
+        if (ablage.status !in 200..201) {
+            Protokoll.eintrag(ctx, "fehler", "Foto ${f.wepId}/${f.fotoId}: Papierkorb-Ablage fehlgeschlagen (${ablage.status}), die App räumt beim Abgleich auf")
+            return false
+        }
+        val weg = Http.delete(
+            graphPfad("daten/fotos/$name"),
+            mutableMapOf("Authorization" to "Bearer $token").also { if (eTag.isNotEmpty()) it["If-Match"] = eTag },
+        )
+        return weg.status in 200..204 || weg.status == 404 || weg.status == 412
     }
 
     /** Nach mehreren Fehlversuchen aufgeben – der periodische Lauf probiert es später erneut. */

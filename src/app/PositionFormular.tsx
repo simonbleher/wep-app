@@ -1,7 +1,7 @@
 // Formular einer Position (Außenanlagen / Aufwuchs): Bezeichnung, Anzahl, Einheit,
 // Zustand, Preis (Vorschlag oder überschrieben). Dient zum Hinzufügen und – mit
 // `bearbeiten` – zum Ändern einer vorhandenen Position, dann mit „Löschen“ unten.
-import { useId, useState } from 'react'
+import { useId, useState, type ReactNode } from 'react'
 import { Trash2 } from 'lucide-react'
 import type { Position, Wep } from '@/model'
 import { ZUSTANDSSTUFEN } from '@/model'
@@ -50,6 +50,7 @@ export function PositionFormular({
   bearbeiten,
   onFertig,
   onLoeschen,
+  fotos,
 }: {
   auswahl: Auswahl
   wep: Wep
@@ -58,6 +59,8 @@ export function PositionFormular({
   onFertig: (pos: Position, merken?: MerkeDaten) => void
   /** Nur beim Ändern: Position nach der Rückfrage löschen */
   onLoeschen?: () => void
+  /** Fotos dieser Position (nur beim Ändern); werden sofort gespeichert, unabhängig von „Speichern“. */
+  fotos?: ReactNode
 }) {
   const { position: katalogPos, variante, art, eigene } = auswahl
   const hoechstwert = bearbeiten ? bearbeiten.hoechstwert : (variante?.hoechstwert ?? katalogPos?.hoechstwert)
@@ -298,6 +301,8 @@ export function PositionFormular({
           ))}
         </details>
       )}
+
+      {bearbeiten && fotos}
 
       {bearbeiten && onLoeschen && (
         <button type="button" className="knopf knopf-loeschen knopf-breit" onClick={() => setFrage(true)}>

@@ -234,8 +234,24 @@ guten Katalogtreffern (nur im passenden Abschnitt), Verwaltung im Profil (Liste,
 Screenshots: `docs/paket3/` (`npm run paket3:screenshots`). Kein `android/`-Eingriff, `native-version` unverändert.
 **Noch offen:** Gerätetest mit echtem OneDrive (zwei Geräte).
 
+### B3-4 · Fotos ✅ PR offen – Branch beta3/paket4
+Ergebnis: Fotos an Positionen (Außenanlagen, Aufwuchs, Beseitigung) und am WEP allgemein (Registerkarte „Fotos“, Gruppen
+je Position, Großansicht mit Text, Löschen mit Rückfrage; Kamera oder Galerie, mehrere auf einmal). Beim Speichern
+verkleinert (längste Seite 2000 px, JPEG, Ziel < 500 KB), EXIF-Ausrichtung korrigiert, Standortdaten/EXIF entfernt,
+Vorschaubild (360 px); lokal in IndexedDB (DB-Version 5: `fotos` + `fotoDaten`). OneDrive: `daten/fotos/<Nr>/<id>.jpg`,
+Papierkorb `daten/papierkorb/fotos/<Nr>/` (die Fotos ziehen mit um, Wiederherstellen holt sie zurück, endgültig löschen/30 Tage
+leert sie); Upload nur im WLAN (Einstellung „nur WLAN“) auch im Android-Hintergrunddienst (neue native Foto-Warteschlange
+mit Sperre für gelöschte WEPs), offene Fotos zählen in der Upload-Anzeige; andere Geräte laden Fotos beim Öffnen nach.
+Duplizieren kopiert keine Fotos. Export: `Exporte/<Nr>_Fotos/` mit Namen wie `03 Apfelbaum.jpg`, `00 Gesamtansicht 1.jpg`
+(ohne Konto ZIP). Code: `src/fotos/`, `src/sync/fotos.ts`, `src/app/Fotos.tsx`, `src/android/fotoWarteschlange.ts`,
+`android/…/FotoWarteschlange.kt`. Tests: `fotos/komprimieren.test.ts` (alle 8 Ausrichtungen, GPS weg, Größe),
+`fotos/benennung.test.ts`, `sync/fotos.test.ts` (zwei Geräte über FakeDrive, WLAN, Löschen, Papierkorb mit Fotos),
+`sync/exporte.test.ts` (Export-Ordner), `android/fotoWarteschlange.test.ts`, `app/__tests__/paket4.test.tsx`; e2e erweitert
+(DB-Umstieg auf 5). Screenshots: `docs/paket4/` (`npm run paket4:screenshots`). **`native-version` auf 4** (Android-Änderung).
+**Noch offen:** Gerätetest (Kamera-Intent auf dem Handy, Foto-Upload im Hintergrund nur im WLAN, zwei Geräte mit echtem
+OneDrive); der Kotlin-Teil wurde hier nicht kompiliert (kein Android-SDK) – der Workflow „Android Test-APK“ am PR prüft das.
+
 ### Beta 3b (Plan: docs/PLAN-BETA3.md, Abschnitt „Beta 3b“)
-- B3-4 · Fotos ⏳ – Branch beta3/paket4
 - B3-5 · Bau-Excel am WEP, Formalien vorbefüllen ⏳ – Branch beta3/paket5
 - B3-6 · Liste und Alltag (Suche, Problempflanzen, Sicherung, Sonnen-Kontrast) ⏳ – Branch beta3/paket6
 - B3-7 · Skizze bedienen (Zoomen, Einrasten, Auswählen) ⏳ – Branch beta3/paket7

@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { FakeDrive } from './fakeDrive'
-import { exportHochladen, leereExportWarteschlange, type ExportEintrag, type ExportSpeicher } from './exporte'
+import {
+  exportHochladen,
+  exportOrdnerHochladen,
+  leereExportWarteschlange,
+  type ExportEintrag,
+  type ExportSpeicher,
+} from './exporte'
 import type { GraphClient } from './types'
 
 function speicher(): ExportSpeicher & { eintraege: Map<string, ExportEintrag> } {
@@ -73,5 +79,89 @@ describe('Excel-Export nach OneDrive (Exporte/)', () => {
     const drive = new FakeDrive()
     await exportHochladen({ client: drive.client('Exporte'), speicher: sp, name: 'a.xlsx', blob: blob('neuer') })
     expect(sp.eintraege.size).toBe(0)
+  })
+})
+
+describe('Foto-Ordner im Export (Exporte/<Nr>_Fotos/)', () => {
+  const dateien = [
+    { name: '00 Gesamtansicht 1.jpg', blob: blob('g1') },
+    { name: '03 Apfelbaum.jpg', blob: blob('a') },
+  ]
+  const ordner = '2026-001_Fotos'
+
+  it('online: legt den Ordner mit sprechenden Namen an und entfernt Reste eines früheren Exports', async () => {
+    const drive = new FakeDrive()
+    drive.lege(`Exporte/${ordner}/07 Alter Name.jpg`, blob('alt'))
+    drive.lege(`Exporte/${ordner}/03 Apfelbaum.jpg`, blob('uralt'))
+    const sp = speicher()
+    const r = await exportOrdnerHochladen({
+      client: drive.client('Exporte'),
+      ordnerClient: (o) => drive.client(`Exporte/${o}`),
+      speicher: sp,
+      ordner,
+      dateien,
+    })
+    expect(r).toEqual({ status: 'hochgeladen', wartend: 0 })
+    expect(drive.namen(`Exporte/${ordner}`)).toEqual(['00 Gesamtansicht 1.jpg', '03 Apfelbaum.jpg'])
+    expect(await (drive.dateien.get(`Exporte/${ordner}/03 Apfelbaum.jpg`)?.inhalt as Blob).text()).toBe('a')
+    expect(sp.eintraege.size).toBe(0)
+  })
+
+  it('offline: wartet in der Warteschlange und geht beim nächsten Abgleich hoch', async () => {
+    const drive = new FakeDrive()
+    drive.lege(`Exporte/${ordner}/07 Alter Name.jpg`, blob('alt'))
+    const sp = speicher()
+    const r = await exportOrdnerHochladen({ client: null, ordnerClient: null, speicher: sp, ordner, dateien })
+    expect(r).toEqual({ status: 'wartet', wartend: 2 })
+    expect(drive.namen(`Exporte/${ordner}`)).toEqual(['07 Alter Name.jpg'])
+
+    const q = await leereExportWarteschlange(drive.client('Exporte'), sp, (o) => drive.client(`Exporte/${o}`))
+    expect(q.fehler).toEqual([])
+    expect(drive.namen(`Exporte/${ordner}`)).toEqual(['00 Gesamtansicht 1.jpg', '03 Apfelbaum.jpg'])
+    expect(sp.eintraege.size).toBe(0)
+  })
+
+  it('bricht der Upload mittendrin ab, wartet nur der Rest; aufgeräumt wird erst danach', async () => {
+    const drive = new FakeDrive()
+    drive.lege(`Exporte/${ordner}/07 Alter Name.jpg`, blob('alt'))
+    const echt = drive.client('Exporte')
+    let n = 0
+    const wackelig = {
+      ...echt,
+      schreibe: async (...a: Parameters<typeof echt.schreibe>) => {
+        if (++n === 2) throw new Error('503')
+        return echt.schreibe(...a)
+      },
+    }
+    const sp = speicher()
+    const r = await exportOrdnerHochladen({
+      client: wackelig,
+      ordnerClient: (o) => drive.client(`Exporte/${o}`),
+      speicher: sp,
+      ordner,
+      dateien,
+    })
+    expect(r).toEqual({ status: 'wartet', wartend: 1 })
+    expect(drive.namen(`Exporte/${ordner}`)).toEqual(['00 Gesamtansicht 1.jpg', '07 Alter Name.jpg'])
+
+    await leereExportWarteschlange(drive.client('Exporte'), sp, (o) => drive.client(`Exporte/${o}`))
+    expect(drive.namen(`Exporte/${ordner}`)).toEqual(['00 Gesamtansicht 1.jpg', '03 Apfelbaum.jpg'])
+    expect(sp.eintraege.size).toBe(0)
+  })
+
+  it('ein neuerer Export ersetzt die wartende ältere Fassung des Ordners', async () => {
+    const sp = speicher()
+    await exportOrdnerHochladen({ client: null, ordnerClient: null, speicher: sp, ordner, dateien })
+    await exportOrdnerHochladen({ client: null, ordnerClient: null, speicher: sp, ordner, dateien: [dateien[0]] })
+    expect([...sp.eintraege.keys()].sort()).toEqual([`${ordner}/`, `${ordner}/00 Gesamtansicht 1.jpg`])
+    expect(sp.eintraege.get(`${ordner}/`)?.behalte).toEqual(['00 Gesamtansicht 1.jpg'])
+  })
+
+  it('Fotos haben den Medientyp JPEG, Excel bleibt Excel', async () => {
+    const sp = speicher()
+    await exportOrdnerHochladen({ client: null, ordnerClient: null, speicher: sp, ordner, dateien })
+    expect(sp.eintraege.get(`${ordner}/03 Apfelbaum.jpg`)?.typ).toBe('image/jpeg')
+    await exportHochladen({ client: null, speicher: sp, name: 'a.xlsx', blob: blob('x') })
+    expect(sp.eintraege.get('a.xlsx')?.typ).toBeUndefined()
   })
 })

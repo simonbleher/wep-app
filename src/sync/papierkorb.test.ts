@@ -89,6 +89,7 @@ describe('Löschen gilt auf allen Geräten', () => {
         geloescht: [],
         wiederhergestellt: [],
         bereinigt: [],
+        umnummeriert: [],
       })
     }
     expect(drive.aufrufe.filter((a) => a.startsWith('verschiebe') || a.startsWith('schreibe'))).toEqual([])

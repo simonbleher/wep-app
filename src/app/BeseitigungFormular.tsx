@@ -1,7 +1,7 @@
 // Formular einer Beseitigungsposition (Abschnitt „Beseitigung“): Gegenstand, Menge,
 // Einheit, Einzelpreis, Faktor (bei Faktor > 1 mit Begründung). Zum Hinzufügen und – mit
 // `bearbeiten` – zum Ändern, dann mit „Löschen“ unten (mit Rückfrage).
-import { useId, useState } from 'react'
+import { useId, useState, type ReactNode } from 'react'
 import { Trash2 } from 'lucide-react'
 import type { BeseitigungsPosition } from '@/model'
 import { leseZahl, leseZahlOder, zahlFuerEingabe } from '@/gruen/format'
@@ -22,11 +22,14 @@ export function BeseitigungFormular({
   onAbbrechen,
   onFertig,
   onLoeschen,
+  fotos,
 }: {
   bearbeiten?: BeseitigungsPosition
   onAbbrechen: () => void
   onFertig: (pos: BeseitigungsPosition) => void
   onLoeschen?: () => void
+  /** Fotos dieser Position (nur beim Ändern); werden sofort gespeichert, unabhängig von „Speichern“. */
+  fotos?: ReactNode
 }) {
   const id = useId()
   const [gegenstand, setGegenstand] = useState(bearbeiten?.gegenstand ?? '')
@@ -168,6 +171,8 @@ export function BeseitigungFormular({
                 />
               </div>
             )}
+
+            {bearbeiten && fotos}
 
             {bearbeiten && onLoeschen && (
               <button type="button" className="knopf knopf-loeschen knopf-breit" onClick={() => setFrage(true)}>

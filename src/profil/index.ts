@@ -91,7 +91,7 @@ export function neuerWepMitProfil(id: string, profil: Profil): Wep {
 // --- Geräte-Einstellungen (nur lokal) -------------------------------------
 
 export interface GeraeteEinstellungen {
-  /** Upload nur über WLAN. Wirkt in der Android-App; im Browser nur gespeichert. */
+  /** Upload nur über WLAN. Wirkt in der Android-App (WEP-Dateien und Fotos); im Browser nur für Fotos, soweit der Browser die Verbindungsart meldet. */
   nurWlan: boolean
 }
 

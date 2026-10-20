@@ -11,13 +11,16 @@ import type { Wep } from '@/model'
 import type { LokaleAenderung, PapierkorbEintrag, SyncMeta } from '@/sync/types'
 import type { ExportEintrag } from '@/sync/exporte'
 import { metaMit, papierkorbMeta } from '@/sync/papierkorb'
+import type { FotoDatei, FotoRecord } from '@/fotos/types'
 
 const DB_NAME = 'wep-db'
-const DB_VERSION = 4
+const DB_VERSION = 5
 const STORE = 'weps'
 const META = 'syncMeta'
 const EXPORTE = 'exporte'
 const PAPIERKORB = 'papierkorb'
+const FOTOS = 'fotos'
+const FOTO_DATEN = 'fotoDaten'
 
 interface WepDB extends DBSchema {
   weps: {
@@ -36,6 +39,15 @@ interface WepDB extends DBSchema {
     key: string
     value: PapierkorbEintrag
   }
+  fotos: {
+    key: string
+    value: FotoRecord
+    indexes: { wepId: string }
+  }
+  fotoDaten: {
+    key: string
+    value: FotoDatei
+  }
 }
 
 /**
@@ -48,6 +60,10 @@ export interface SpeicherHaken {
   nachLoeschen?(id: string, geloeschtAm: string): Promise<void>
   /** Das WEP wurde aus dem Papierkorb geholt und muss wieder hochgeladen werden. */
   nachWiederherstellen?(wep: Wep): Promise<void>
+  /** Ein Foto wurde aufgenommen oder geladen und wartet auf den Upload (Android-Hintergrunddienst). */
+  nachFotoSpeichern?(wepId: string, fotoId: string, blob: Blob): Promise<void>
+  /** Ein Foto wurde gelöscht (oder ist hochgeladen): aus der Upload-Warteschlange nehmen. */
+  nachFotoEntfernen?(wepId: string, fotoId: string): Promise<void>
 }
 let haken: SpeicherHaken | undefined
 export function setzeSpeicherHaken(h: SpeicherHaken | undefined): void {
@@ -77,6 +93,13 @@ function datenbank(): Promise<IDBPDatabase<WepDB>> {
         // nächste Abgleich legt das WEP dann auch in OneDrive in den Papierkorb.
         if (!db.objectStoreNames.contains(PAPIERKORB)) {
           db.createObjectStore(PAPIERKORB, { keyPath: 'id' })
+        }
+        // Version 5: Fotos (Verwaltungseinträge mit Vorschau, getrennt davon die großen Dateien)
+        if (!db.objectStoreNames.contains(FOTOS)) {
+          db.createObjectStore(FOTOS, { keyPath: 'key' }).createIndex('wepId', 'wepId')
+        }
+        if (!db.objectStoreNames.contains(FOTO_DATEN)) {
+          db.createObjectStore(FOTO_DATEN, { keyPath: 'key' })
         }
         if (alteVersion >= 2 && alteVersion < 4) {
           const jetzt = new Date().toISOString()
@@ -218,4 +241,85 @@ export async function alleExporte(): Promise<ExportEintrag[]> {
 export async function entferneExport(name: string): Promise<void> {
   const db = await datenbank()
   await db.delete(EXPORTE, name)
+}
+
+// --- Fotos --------------------------------------------------------------------
+
+/** Alle Foto-Verwaltungseinträge (ohne die großen Dateien). */
+export async function alleFotoRecords(): Promise<FotoRecord[]> {
+  const db = await datenbank()
+  return db.getAll(FOTOS)
+}
+
+/** Foto-Einträge eines WEP. */
+export async function fotoRecordsVon(wepId: string): Promise<FotoRecord[]> {
+  const db = await datenbank()
+  return db.getAllFromIndex(FOTOS, 'wepId', wepId)
+}
+
+/** Die große Bilddatei auf diesem Gerät (undefined = noch nicht geladen). */
+export async function ladeFotoDatei(wepId: string, fotoId: string): Promise<Blob | undefined> {
+  const db = await datenbank()
+  return (await db.get(FOTO_DATEN, `${wepId}/${fotoId}`))?.blob
+}
+
+/** Legt Eintrag und (falls gegeben) Datei an bzw. ersetzt sie in einer Transaktion. */
+export async function speichereFoto(record: FotoRecord, blob?: Blob): Promise<void> {
+  const db = await datenbank()
+  const tx = db.transaction([FOTOS, FOTO_DATEN], 'readwrite')
+  await tx.objectStore(FOTOS).put(record)
+  if (blob) await tx.objectStore(FOTO_DATEN).put({ key: record.key, blob })
+  await tx.done
+  if (blob && record.hatDatei && !record.hochgeladen && !record.geloescht) {
+    await haken?.nachFotoSpeichern?.(record.wepId, record.id, blob).catch((e) => console.warn('Foto-Warteschlange:', e))
+  }
+}
+
+/** Ändert nur den Eintrag (z. B. „hochgeladen“). */
+export async function setzeFotoRecord(record: FotoRecord): Promise<void> {
+  const db = await datenbank()
+  await db.put(FOTOS, record)
+}
+
+/** Entfernt Eintrag und Datei eines Fotos von diesem Gerät. */
+export async function entferneFotoLokal(wepId: string, fotoId: string): Promise<void> {
+  const db = await datenbank()
+  const tx = db.transaction([FOTOS, FOTO_DATEN], 'readwrite')
+  await tx.objectStore(FOTOS).delete(`${wepId}/${fotoId}`)
+  await tx.objectStore(FOTO_DATEN).delete(`${wepId}/${fotoId}`)
+  await tx.done
+  await haken?.nachFotoEntfernen?.(wepId, fotoId).catch((e) => console.warn('Foto-Warteschlange:', e))
+}
+
+/** Entfernt alle Fotos eines WEP von diesem Gerät. */
+export async function entferneFotosLokal(wepId: string): Promise<void> {
+  for (const r of await fotoRecordsVon(wepId)) await entferneFotoLokal(wepId, r.id)
+}
+
+/** Kopiert alle Fotos eines WEP unter eine andere Nummer (Umnummerieren). Idempotent. */
+export async function kopiereFotosLokal(vonId: string, nachId: string): Promise<void> {
+  const db = await datenbank()
+  for (const r of await fotoRecordsVon(vonId)) {
+    const key = `${nachId}/${r.id}`
+    if (await db.get(FOTOS, key)) continue
+    const datei = await db.get(FOTO_DATEN, `${vonId}/${r.id}`)
+    // In OneDrive liegt es unter der alten Nummer: unter der neuen muss es neu hochgeladen werden
+    await speichereFoto({ ...r, key, wepId: nachId, hochgeladen: false }, datei?.blob)
+  }
+}
+
+/**
+ * Der Nutzer hat ein Foto gelöscht, das schon in OneDrive liegt: Datei und Vorschau verschwinden
+ * von diesem Gerät, der Eintrag bleibt als Löschmarke, bis der Abgleich die Datei in OneDrive entfernt hat.
+ */
+export async function markiereFotoGeloescht(wepId: string, fotoId: string, zeit: string): Promise<void> {
+  const db = await datenbank()
+  const tx = db.transaction([FOTOS, FOTO_DATEN], 'readwrite')
+  const alt = await tx.objectStore(FOTOS).get(`${wepId}/${fotoId}`)
+  if (alt) {
+    await tx.objectStore(FOTOS).put({ ...alt, geloescht: zeit, hatDatei: false, vorschau: undefined })
+    await tx.objectStore(FOTO_DATEN).delete(alt.key)
+  }
+  await tx.done
+  await haken?.nachFotoEntfernen?.(wepId, fotoId).catch((e) => console.warn('Foto-Warteschlange:', e))
 }

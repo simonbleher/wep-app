@@ -340,3 +340,23 @@ Themen-Icon `ic_launcher_monochrome.png`, Hintergrundfarbe in `values/ic_launche
 dazu die Vorschau `docs/icon/vorschau.png`. Da `android/` betroffen ist, `android/native-version.txt` erhöhen.
 Das Themen-Icon wirkt ab Android 13 (Einstellungen → Hintergrund und Stil → „Themen-Symbole“).
 
+
+## Fotos im Hintergrund-Upload (Beta 3, Paket 4)
+
+- Neben der WEP-Warteschlange gibt es eine **Foto-Warteschlange** (`FotoWarteschlange.kt`, Ordner `foto-queue/` im App-Speicher).
+  Jedes neue Foto reicht die App als Base64 an das Plugin (`reiheFotoEin`); der `UploadWorker` lädt es nach
+  `daten/fotos/<Nr>/<Foto-Id>.jpg` – nach den WEP-Dateien, mit `conflictBehavior=replace` (gleiche Id = gleiches Bild).
+- **Nur WLAN:** Es gilt dieselbe Bedingung wie für die WEP-Dateien (Einstellung „Upload nur über WLAN“ → WorkManager `UNMETERED`).
+  Auch der Foto-Upload im Vordergrund (Abgleich in der App) fragt dieselbe Einstellung ab (`WepNative.netzTyp`).
+  Offene Fotos zählen in der Upload-Anzeige (Statuszeile, Fotos-Ansicht).
+- **Papierkorb (Regeln aus Paket 2):** Beim Löschen eines WEP wird sein Name für Foto-Uploads gesperrt (`sperreFotos`, Datei
+  `fotos-gesperrt.json`); Einträge fliegen aus der Warteschlange, der Worker lädt nie etwas für ein gesperrtes WEP hoch.
+  Ging gerade ein Upload durch, legt der Worker das Foto sofort in `daten/papierkorb/fotos/<Nr>/` ab und entfernt es aus
+  `daten/fotos/`. Die Sperre fällt, sobald das WEP wieder lebt (Wiederherstellen und Abgleich abgeschlossen).
+  Nach jedem Abgleich stimmt `fotoWarteschlange.abstimmen()` die native Warteschlange mit dem lokalen Stand ab (Erledigtes,
+  Gelöschtes raus; Offenes einreihen).
+- Die Kamera öffnet das System (`<input type="file" capture>` → Kamera-App über Capacitor), die App braucht dafür **keine**
+  CAMERA-Berechtigung im Manifest.
+- `android/` hat sich geändert: **`native-version` ist 4.** Der Web-Teil (Foto-Ansicht) kommt zusammen mit der neuen APK; ältere
+  Apps ohne die Foto-Methoden im Plugin laden Fotos nur im Vordergrund hoch (die Live-Updates werden wegen `nativeVersion`
+  nicht auf eine alte APK angewendet).

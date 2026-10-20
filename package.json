@@ -20,7 +20,8 @@
     "icons": "node tools/icons/erzeuge-icons.mjs",
     "paket1:screenshots": "VITE_MS_CLIENT_ID=00000000-0000-0000-0000-000000000000 vite build --outDir dist-e2e && node tools/paket1/screenshots.mjs",
     "paket2:screenshots": "VITE_MS_CLIENT_ID=00000000-0000-0000-0000-000000000000 vite build --outDir dist-e2e && node tools/paket2/screenshots.mjs",
-    "paket3:screenshots": "VITE_MS_CLIENT_ID=00000000-0000-0000-0000-000000000000 vite build --outDir dist-e2e && node tools/paket3/screenshots.mjs"
+    "paket3:screenshots": "VITE_MS_CLIENT_ID=00000000-0000-0000-0000-000000000000 vite build --outDir dist-e2e && node tools/paket3/screenshots.mjs",
+    "paket4:screenshots": "VITE_MS_CLIENT_ID=00000000-0000-0000-0000-000000000000 vite build --outDir dist-e2e && node tools/paket4/screenshots.mjs"
   },
   "dependencies": {
     "@azure/msal-browser": "^4.30.0",

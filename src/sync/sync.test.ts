@@ -135,6 +135,7 @@ describe('Abgleich zwischen zwei Geräten', () => {
       geloescht: [],
       wiederhergestellt: [],
       bereinigt: [],
+      umnummeriert: [],
     })
     expect(drive.aufrufe).toEqual(['liste'])
   })

@@ -155,7 +155,7 @@ export function Profil({ konto, verfuegbar, onZurueck, onAnmelden, onAbmelden }:
               />
             </label>
           </div>
-          <p className="neben">Wirkt in der Android-App. Im Browser wird die Einstellung nur gespeichert.</p>
+          <p className="neben">Gilt für Fotos und den Hintergrund-Upload der Android-App. Im Browser wirkt sie für Fotos nur, wenn der Browser die Verbindungsart meldet.</p>
         </section>
 
         <section className="abschnitt" aria-labelledby={`${id}-konto`}>

@@ -7,14 +7,18 @@
 // WEP duplizieren → WEPs über das Menü „⋯“ mit Rückfrage in den Papierkorb legen → Papierkorb:
 // Wiederherstellen, „Endgültig löschen“ mit Rückfrage, Frist von 30 Tagen, Umstieg der
 // Datenbank von Version 3 (Beta-Marke „gelöscht“). Eigene Positionen: Freitext merken (Standard an),
-// „Eigene“ in der Suche, im Profil ändern und löschen.
+// „Eigene“ in der Suche, im Profil ändern und löschen. Fotos: aufnehmen/aus der Galerie (selbst erzeugte
+// Testbilder mit EXIF-Ausrichtung und GPS), Verkleinern, Standortdaten weg, Text, Löschen mit Rückfrage,
+// Fotos zur Position, Export als ZIP, Papierkorb nimmt die Fotos mit, Duplizieren ohne Fotos, endgültig löschen.
 //
 // Start: npm run e2e  (baut mit einer Platzhalter-Client-ID nach dist-e2e/, damit der
 // Login-Bildschirm erscheint; es wird nie wirklich bei Microsoft angemeldet).
 // Chromium kommt aus PLAYWRIGHT_BROWSERS_PATH (vorinstalliert), nicht „playwright install“.
 import { spawn } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import JSZip from 'jszip'
 import { chromium } from 'playwright'
+import { EXIF_GPS, EXIF_KAMERA, testFoto } from '../fotos/testbild.mjs'
 
 const PORT = 4173
 const URL = `http://localhost:${PORT}/`
@@ -84,7 +88,7 @@ try {
   await seite.getByLabel(/Standard-Kleingartenanlage/).fill('KGA Musterwiese')
   await seite.getByLabel('Rolle').selectOption('beides')
   pruefe(await seite.getByLabel('Upload nur über WLAN').isChecked(), 'Upload nur über WLAN ist standardmäßig an')
-  pruefe(await seite.getByText(/Wirkt in der Android-App/).isVisible(), 'Hinweis „wirkt in der Android-App“')
+  pruefe(await seite.getByText(/Gilt für Fotos und den Hintergrund-Upload der Android-App/).isVisible(), 'Hinweis zu „nur WLAN“ nennt Fotos und die Android-App')
   pruefe(await seite.getByText('Version', { exact: true }).isVisible(), 'App-Version wird angezeigt')
   pruefe(await seite.getByText(/Nicht angemeldet/).isVisible(), 'Konto: nicht angemeldet, Anmelden möglich')
   await seite.screenshot({ path: 'dist-e2e/profil.png' })
@@ -375,6 +379,182 @@ try {
   pruefe(await anzahlEintraege(liste, 1), 'wiederhergestelltes WEP steht wieder in der Liste')
   pruefe(await seite.getByText('leer', { exact: true }).isVisible(), 'Papierkorb ist danach leer (eins endgültig gelöscht, eins wiederhergestellt)')
 
+  // 11f3. Fotos (Paket 4): selbst erzeugte Testbilder, Verkleinern, Standortdaten, Position, Löschen, Export, Papierkorb
+  const idbLies = (store) =>
+    seite.evaluate(
+      (name) =>
+        new Promise((ok, fehler) => {
+          const a = indexedDB.open('wep-db')
+          a.onerror = fehler
+          a.onsuccess = () => {
+            const r = a.result.transaction(name).objectStore(name).getAll()
+            r.onsuccess = () => {
+              a.result.close()
+              ok(r.result.map((x) => ({ key: x.key, wepId: x.wepId, id: x.id, hatDatei: x.hatDatei, hochgeladen: x.hochgeladen, geloescht: x.geloescht, vorschau: !!x.vorschau })))
+            }
+          }
+        }),
+      store,
+    )
+  /** Prüft die Datei eines Fotos in IndexedDB: Größe, Maße, JPEG, keine Metadaten. */
+  const fotoDatei = (key, marker) =>
+    seite.evaluate(
+      async ({ key, marker }) => {
+        const db = await new Promise((ok, fehler) => {
+          const a = indexedDB.open('wep-db')
+          a.onsuccess = () => ok(a.result)
+          a.onerror = fehler
+        })
+        const eintrag = await new Promise((ok) => {
+          const r = db.transaction('fotoDaten').objectStore('fotoDaten').get(key)
+          r.onsuccess = () => ok(r.result)
+        })
+        db.close()
+        const bytes = new Uint8Array(await eintrag.blob.arrayBuffer())
+        const text = new TextDecoder('latin1').decode(bytes)
+        const bild = await createImageBitmap(eintrag.blob)
+        return {
+          groesse: bytes.length,
+          jpeg: bytes[0] === 0xff && bytes[1] === 0xd8,
+          exif: text.includes('Exif') || marker.some((m) => text.includes(m)),
+          breite: bild.width,
+          hoehe: bild.height,
+        }
+      },
+      { key, marker },
+    )
+
+  await seite.getByRole('button', { name: /KGA Musterwiese/ }).click()
+  await nav.getByRole('button', { name: 'Fotos' }).click()
+  await seite.getByRole('heading', { name: 'Fotos', exact: true }).waitFor()
+  pruefe(await seite.getByText('0 Fotos').isVisible(), 'Fotos: noch keine Fotos')
+  pruefe(await seite.getByRole('heading', { name: 'Gesamtansicht' }).isVisible(), 'Fotos: Gruppe „Gesamtansicht“')
+  const gesamt = seite.getByRole('region', { name: /Gesamtansicht/ })
+  // Hochformat-Foto (Ausrichtung 6, mit Kameramodell und GPS) aus der Galerie
+  await seite.locator('input[type=file][aria-label="Fotos aus der Galerie wählen: Gesamtansicht"]').setInputFiles({
+    name: 'IMG_0001.jpg',
+    mimeType: 'image/jpeg',
+    buffer: testFoto({ breite: 3000, hoehe: 2000, orientierung: 6, gps: true, variante: 0 }),
+  })
+  await gesamt.locator('.foto-kachel').first().waitFor({ timeout: 30000 })
+  pruefe(await seite.getByText('1 Foto', { exact: true }).isVisible(), 'Fotos: Foto wird gezählt')
+  const f1 = (await idbLies('fotos'))[0]
+  const d1 = await fotoDatei(f1.key, [EXIF_GPS, EXIF_KAMERA])
+  pruefe(d1.jpeg && d1.groesse <= 500 * 1024, `Foto ist JPEG und unter 500 KB (${Math.round(d1.groesse / 1024)} KB)`)
+  pruefe(d1.hoehe === 2000 && d1.breite === 1333, `Ausrichtung korrigiert (Hochformat 1333 × 2000, ist ${d1.breite} × ${d1.hoehe})`)
+  pruefe(!d1.exif, 'Standortdaten und Kameramodell sind entfernt')
+  pruefe(f1.vorschau && f1.hatDatei && f1.hochgeladen === false, 'Vorschaubild gespeichert, Foto wartet auf den Upload')
+
+  // Kamera: ein Querformat-Foto zu einer Position (Aufwuchs → Position antippen → Fotos zu dieser Position)
+  await nav.getByRole('button', { name: 'Aufwuchs' }).click()
+  await seite.getByRole('row', { name: /Apfel, Halbstamm/ }).click()
+  await seite.getByRole('heading', { name: 'Fotos zu dieser Position' }).waitFor()
+  await seite.locator('input[type=file][capture]').setInputFiles({
+    name: 'IMG_0002.jpg',
+    mimeType: 'image/jpeg',
+    buffer: testFoto({ breite: 2400, hoehe: 1600, variante: 1 }),
+  })
+  await seite.locator('.foto-kachel').first().waitFor({ timeout: 30000 })
+  pruefe((await seite.locator('.foto-kachel').count()) === 1, 'Position: Foto aufgenommen')
+  await seite.getByRole('button', { name: 'Abbrechen' }).filter({ visible: true }).first().click()
+  await nav.getByRole('button', { name: 'Fotos' }).click()
+  await seite.getByRole('heading', { name: /^01 Apfel, Halbstamm/ }).waitFor()
+  pruefe(await seite.getByText('2 Fotos', { exact: true }).isVisible(), 'Fotos: Gesamtansicht + Position = 2 Fotos')
+  pruefe(await seite.getByRole('heading', { name: /^01 Apfel, Halbstamm/ }).isVisible(), 'Fotos: Gruppe mit Positionsnummer')
+  await seite.screenshot({ path: 'dist-e2e/fotos.png' })
+
+  // Zweite Position über die Auswahl, mehrere Fotos auf einmal
+  await seite.getByLabel('Position wählen').selectOption({ label: '02 Rasen' })
+  await seite.locator('input[type=file][aria-label="Fotos aus der Galerie wählen: 02 Rasen"]').setInputFiles([
+    { name: 'a.jpg', mimeType: 'image/jpeg', buffer: testFoto({ breite: 1800, hoehe: 1200, variante: 2 }) },
+    { name: 'b.jpg', mimeType: 'image/jpeg', buffer: testFoto({ breite: 1800, hoehe: 1200, variante: 0 }) },
+  ])
+  await seite.getByRole('region', { name: /02 Rasen/ }).locator('.foto-kachel').nth(1).waitFor({ timeout: 30000 })
+  pruefe(await seite.getByText('4 Fotos', { exact: true }).isVisible(), 'Fotos: mehrere Fotos auf einmal')
+
+  // Großansicht: Text zum Foto, Schließen; Löschen mit Rückfrage
+  await gesamt.locator('.foto-kachel').first().click()
+  await seite.getByRole('dialog', { name: /Foto 1 von 1/ }).waitFor()
+  await seite.getByLabel('Text zum Foto (optional)').fill('Gesamtansicht Süd')
+  await seite.getByRole('dialog').getByRole('button', { name: 'Schließen' }).click()
+  pruefe(await gesamt.getByText('Gesamtansicht Süd').isVisible(), 'Text zum Foto steht unter der Vorschau')
+  await seite.getByRole('region', { name: /02 Rasen/ }).locator('.foto-kachel').first().click()
+  await seite.getByRole('dialog', { name: /Foto 1 von 2/ }).waitFor()
+  await seite.getByRole('button', { name: 'Foto löschen' }).click()
+  await seite.getByRole('alertdialog').waitFor()
+  await seite.getByRole('alertdialog').getByRole('button', { name: 'Abbrechen' }).click()
+  pruefe(await seite.getByText('4 Fotos', { exact: true }).isVisible(), 'Foto löschen: „Abbrechen“ löscht nicht')
+  await seite.getByRole('button', { name: 'Foto löschen' }).click()
+  await seite.getByRole('alertdialog').getByRole('button', { name: 'Foto löschen' }).click()
+  await seite.getByText('3 Fotos', { exact: true }).waitFor()
+  for (let i = 0; i < 30 && (await idbLies('fotos')).length !== 3; i++) await new Promise((r) => setTimeout(r, 100))
+  pruefe((await idbLies('fotos')).length === 3, 'Gelöschtes Foto ist auch aus dem lokalen Speicher weg')
+  await seite.getByRole('dialog').getByRole('button', { name: 'Schließen' }).click()
+
+  // Export: ohne Konto kommen die Fotos als ZIP neben der Excel-Datei
+  const downloads = []
+  seite.on('download', (d) => downloads.push(d))
+  await seite.getByRole('button', { name: 'Export', exact: true }).click()
+  await seite.getByRole('button', { name: 'Excel exportieren' }).click()
+  await seite.getByText(/als ZIP heruntergeladen/).waitFor({ timeout: 30000 })
+  const zipDatei = downloads.find((d) => d.suggestedFilename().endsWith('_Fotos.zip'))
+  pruefe(!!zipDatei && downloads.some((d) => d.suggestedFilename().endsWith('_WEP.xlsx')), 'Export: Excel und Foto-ZIP werden heruntergeladen')
+  const zip = await JSZip.loadAsync(readFileSync(await zipDatei.path()))
+  const namen = Object.keys(zip.files).sort()
+  pruefe(
+    namen.length === 3 &&
+      namen[0] === '00 Gesamtansicht 1.jpg' &&
+      namen[1] === '01 Apfel, Halbstamm, 5–30 J.jpg' &&
+      namen[2].startsWith('02 Rasen'),
+    `Export: sprechende Dateinamen mit Positionsnummer (${namen.join(' | ')})`,
+  )
+
+  // Papierkorb nimmt die Fotos mit; Wiederherstellen bringt sie zurück
+  await seite.getByRole('button', { name: 'Protokolle' }).click()
+  await seite.getByRole('heading', { name: 'Protokolle' }).waitFor()
+  await seite.getByRole('button', { name: /KGA Musterwiese/ }).click()
+  await seite.getByRole('button', { name: 'Weitere Aktionen' }).click()
+  await seite.getByRole('menuitem', { name: /In den Papierkorb/ }).click()
+  await seite.getByRole('alertdialog').getByRole('button', { name: 'In den Papierkorb' }).click()
+  await seite.getByRole('heading', { name: 'Protokolle' }).waitFor()
+  pruefe((await idbLies('fotos')).length === 3, 'Papierkorb: die Fotos bleiben erhalten (30 Tage)')
+  await seite.getByRole('list', { name: 'Papierkorb' }).getByRole('button', { name: /Papierkorb/ }).click()
+  await seite.getByRole('list', { name: 'Papierkorb' }).getByRole('button', { name: 'Wiederherstellen' }).click()
+  await seite.getByLabel('Vorgangs-Nr.').waitFor()
+  await nav.getByRole('button', { name: 'Fotos' }).click()
+  await seite.getByText('3 Fotos', { exact: true }).waitFor()
+  pruefe((await seite.locator('.foto-kachel img').count()) === 3, 'Wiederherstellen: alle Fotos mit Vorschau wieder da')
+
+  // Duplizieren kopiert die Fotos nicht
+  await seite.getByRole('button', { name: 'Weitere Aktionen' }).click()
+  await seite.getByRole('menuitem', { name: /Duplizieren/ }).click()
+  await seite.getByText('KGA Musterwiese · in Arbeit').waitFor()
+  await nav.getByRole('button', { name: 'Fotos' }).click()
+  await seite.getByText('0 Fotos', { exact: true }).waitFor()
+  pruefe(true, 'Duplizieren: die Kopie hat keine Fotos')
+  await seite.locator('input[type=file][aria-label="Fotos aus der Galerie wählen: Gesamtansicht"]').setInputFiles({
+    name: 'kopie.jpg',
+    mimeType: 'image/jpeg',
+    buffer: testFoto({ breite: 1600, hoehe: 1000, variante: 1 }),
+  })
+  await seite.getByText('1 Foto', { exact: true }).waitFor({ timeout: 30000 })
+  pruefe((await idbLies('fotos')).length === 4, 'Kopie hat ein eigenes Foto, das Original behält seine drei')
+
+  // Endgültig löschen entfernt die Fotos der Kopie, die des Originals bleiben
+  await seite.getByRole('button', { name: 'Weitere Aktionen' }).click()
+  await seite.getByRole('menuitem', { name: /In den Papierkorb/ }).click()
+  await seite.getByRole('alertdialog').getByRole('button', { name: 'In den Papierkorb' }).click()
+  await seite.getByRole('heading', { name: 'Protokolle' }).waitFor()
+  await seite.getByRole('list', { name: 'Papierkorb' }).getByRole('button', { name: /Papierkorb/ }).click()
+  await seite.getByRole('list', { name: 'Papierkorb' }).getByRole('button', { name: 'Endgültig löschen' }).click()
+  await seite.getByRole('alertdialog').getByRole('button', { name: 'Endgültig löschen' }).click()
+  await seite.getByText('Der Papierkorb ist leer').waitFor()
+  const uebrig = await idbLies('fotos')
+  pruefe(uebrig.length === 3 && uebrig.every((r) => r.wepId === f1.wepId), 'Endgültig löschen: Fotos der Kopie weg, die des Originals bleiben')
+  pruefe((await idbLies('fotoDaten')).length === 3, 'Endgültig löschen: auch die Bilddateien sind weg')
+  await seite.getByRole('button', { name: 'Protokolle' }).filter({ visible: true }).first().click()
+  await seite.getByRole('heading', { name: 'Protokolle' }).waitFor()
+
   // 11f2. Profil: eigene Positionen ändern und löschen
   await seite.getByRole('button', { name: 'Profil und Einstellungen' }).click()
   await seite.getByRole('heading', { name: 'Eigene Positionen' }).waitFor()
@@ -399,7 +579,7 @@ try {
   await seite.getByRole('button', { name: 'Protokolle' }).filter({ visible: true }).first().click()
   await seite.getByRole('heading', { name: 'Protokolle' }).waitFor()
 
-  // 11g. Zustand der Datenbank (Version 4)
+  // 11g. Zustand der Datenbank (Version 5)
   const verspaetet = await seite.evaluate(async () => {
     const db = await new Promise((ok, fehler) => {
       const a = indexedDB.open('wep-db')
@@ -413,9 +593,9 @@ try {
       })
     return { weps: (await lies('weps')).length, korb: (await lies('papierkorb')).length, version: db.version }
   })
-  pruefe(verspaetet.weps === 1 && verspaetet.korb === 0 && verspaetet.version === 4, 'Datenbank Version 4: 1 WEP, Papierkorb leer')
+  pruefe(verspaetet.weps === 1 && verspaetet.korb === 0 && verspaetet.version === 5, 'Datenbank Version 5: 1 WEP, Papierkorb leer')
 
-  // 11h. Umstieg der Datenbank (Version 3 → 4): die Beta-Marke „gelöscht“ bekommt einen Löschzeitpunkt
+  // 11h. Umstieg der Datenbank (Version 3 → 5): die Beta-Marke „gelöscht“ bekommt einen Löschzeitpunkt, Fotos-Stores entstehen
   const alt = await kontext.browser().newContext({ serviceWorkers: 'block' })
   const altSeite = await alt.newPage()
   // Eine Seite ohne App-Code (keine offene Datenbankverbindung): nur der gleiche Ursprung
@@ -448,7 +628,7 @@ try {
         }
       }),
   )
-  // „Ohne Konto“ vorgeben und die App starten: Die Datenbank wird auf Version 4 umgestellt
+  // „Ohne Konto“ vorgeben und die App starten: Die Datenbank wird auf Version 5 umgestellt
   await altSeite.evaluate(() => localStorage.setItem('wep-start-wahl', 'ohne-konto'))
   await altSeite.goto(URL)
   await altSeite.getByRole('heading', { name: 'Protokolle' }).waitFor()
@@ -465,7 +645,10 @@ try {
   )
   const m9 = migriert.meta.find((m) => m.id === '2026-009')
   const m10 = migriert.meta.find((m) => m.id === '2026-010')
-  pruefe(migriert.version === 4 && migriert.stores.includes('papierkorb'), 'Umstieg: Datenbank hat Version 4 mit Papierkorb')
+  pruefe(
+    migriert.version === 5 && migriert.stores.includes('papierkorb') && migriert.stores.includes('fotos') && migriert.stores.includes('fotoDaten'),
+    'Umstieg: Datenbank hat Version 5 mit Papierkorb und Fotos',
+  )
   pruefe(m9?.geloescht === true && typeof m9.geloeschtAm === 'string', 'Umstieg: alte „gelöscht“-Marke bekommt einen Löschzeitpunkt')
   pruefe(m10?.geloeschtAm === undefined, 'Umstieg: andere Einträge bleiben unverändert')
   await alt.close()

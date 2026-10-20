@@ -91,6 +91,8 @@ export interface GraphClient {
   /** Dateien (keine Unterordner) des Ordners; ein fehlender Ordner ergibt eine leere Liste. */
   liste(): Promise<RemoteDatei[]>
   lade(name: string): Promise<string>
+  /** Lädt eine Datei binär (Fotos). */
+  ladeBlob(name: string): Promise<Blob>
   /** Legt die Datei an oder ersetzt sie; fehlende Ordner entstehen dabei. */
   schreibe(name: string, inhalt: string | Blob, typ?: string): Promise<RemoteDatei>
   /**
@@ -152,4 +154,6 @@ export interface SyncErgebnis {
   wiederhergestellt: string[]
   /** Endgültig entfernt (Papierkorb abgelaufen oder anderswo endgültig gelöscht). */
   bereinigt: string[]
+  /** Neu nummeriert (Nummer gehörte in OneDrive einem gelöschten WEP): Fotos ziehen mit um. */
+  umnummeriert: { von: string; nach: string }[]
 }
