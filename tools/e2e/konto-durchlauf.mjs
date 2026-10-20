@@ -1,13 +1,15 @@
 // Durchlauf im echten Browser (Chromium): erster Start → „Ohne Konto fortfahren“ →
 // WEP anlegen → Profil öffnen, Name speichern → neues WEP ist vorbelegt →
 // Position über die Suche (Variante direkt im Treffer) hinzufügen, Preis überschreiben,
-// Warnung und Summe → WEP über das Menü „⋯“ mit Rückfrage löschen.
+// Warnung und Summe → Position antippen, ändern und mit Rückfrage löschen (Richtlinie nur im
+// Formular) → Beseitigung hinzufügen/ändern/löschen → Export mit Bau-Excel → Skizze-Werkzeugleiste
+// und Dialoge → WEP über das Menü „⋯“ mit Rückfrage löschen.
 //
 // Start: npm run e2e  (baut mit einer Platzhalter-Client-ID nach dist-e2e/, damit der
 // Login-Bildschirm erscheint; es wird nie wirklich bei Microsoft angemeldet).
 // Chromium kommt aus PLAYWRIGHT_BROWSERS_PATH (vorinstalliert), nicht „playwright install“.
 import { spawn } from 'node:child_process'
-import { existsSync, readdirSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { chromium } from 'playwright'
 
 const PORT = 4173
@@ -117,16 +119,134 @@ try {
   await seite.getByRole('button', { name: 'Hinzufügen', exact: true }).click()
   pruefe(await seite.getByText('3 Positionen').isVisible(), 'Freitext-Position gespeichert')
 
-  // 9. Position löschen (nach Antippen)
+  // 9. Position antippen → Formular zum Ändern (Bezeichnung, Anzahl, Zustand, Preis)
   await seite.getByRole('row', { name: /Zaubernuss/ }).click()
-  await seite.getByRole('button', { name: 'Position Zaubernuss löschen' }).click()
-  pruefe(await seite.getByText('2 Positionen').isVisible(), 'Position gelöscht')
+  await seite.getByLabel(/^Bezeichnung/).waitFor()
+  pruefe((await seite.getByLabel(/^Bezeichnung/).inputValue()) === 'Zaubernuss', 'Antippen öffnet das Formular mit den Werten')
+  pruefe((await seite.getByLabel('Einzelpreis').inputValue()) === '40', 'eigener Preis ist vorbelegt')
+  await seite.getByLabel(/^Bezeichnung/).fill('Zaubernuss, alt')
+  await seite.getByLabel('Anzahl').fill('2')
+  await seite.getByRole('button', { name: 'mittel', exact: true }).click()
+  await seite.getByLabel('Einzelpreis').fill('35')
+  await seite.getByRole('button', { name: 'Speichern' }).click()
+  await seite.getByText(/Zaubernuss, alt/).waitFor()
+  pruefe(await seite.getByText(/2.Stück · mittel · je 35,00/).isVisible(), 'geänderte Position steht in der Liste')
+  pruefe(await seite.getByText('3 Positionen').isVisible(), 'Ändern legt keine zweite Position an')
+
+  // 9b. Richtlinien-Erläuterung nur im Formular, nicht in der Liste; Warnung bleibt in der Liste
+  const rasenRegeln = JSON.parse(readFileSync('data/katalog.json', 'utf-8')).positionen.find((p) => p.id === 'aw-rasen').regeln
+  const regelnStart = rasenRegeln.slice(0, 30)
+  pruefe((await seite.getByText(regelnStart, { exact: false }).count()) === 0, 'Richtlinientext steht nicht in der Positionsliste')
+  pruefe(await seite.getByText(/Nur bis max\. 100/).first().isVisible(), 'Warnung steht weiter in der Liste')
+  await seite.getByRole('row', { name: /^Rasen/ }).click()
+  await seite.getByText('Richtlinie', { exact: true }).click()
+  pruefe(await seite.getByText(regelnStart, { exact: false }).first().isVisible(), 'Richtlinie steht im Formular')
+  await seite.getByRole('button', { name: 'Abbrechen' }).filter({ visible: true }).first().click()
+  pruefe(await seite.getByText('3 Positionen').isVisible(), 'Abbrechen ändert nichts')
+
+  // 9c. Löschen unten im Formular mit Rückfrage
+  await seite.getByRole('row', { name: /Zaubernuss/ }).click()
+  await seite.getByRole('button', { name: 'Löschen' }).click()
+  await seite.getByRole('alertdialog').waitFor()
+  await seite.getByRole('alertdialog').getByRole('button', { name: 'Abbrechen' }).click()
+  pruefe((await seite.getByRole('alertdialog').count()) === 0, 'Rückfrage „Abbrechen“ löscht nicht')
+  await seite.getByRole('button', { name: 'Löschen' }).click()
+  await seite.getByRole('alertdialog').getByRole('button', { name: 'Löschen' }).click()
+  await seite.getByText('2 Positionen').waitFor()
+  pruefe(await seite.getByText('2 Positionen').isVisible(), 'Position nach Rückfrage gelöscht')
 
   // 10. Gespeichert: nach Neuladen noch da
   await seite.reload()
   await seite.getByRole('button', { name: /KGA Musterwiese/ }).click()
   await seite.getByRole('navigation', { name: 'Abschnitte' }).getByRole('button', { name: 'Aufwuchs' }).click()
   pruefe(await seite.getByText('2 Positionen').isVisible(), 'Positionen nach Neuladen gespeichert')
+
+  // 10b. Beseitigung: leer → hinzufügen → ändern → löschen
+  const nav = seite.getByRole('navigation', { name: 'Abschnitte' })
+  await nav.getByRole('button', { name: 'Beseitigung' }).click()
+  await seite.getByRole('heading', { name: 'Beseitigung' }).waitFor()
+  pruefe(await seite.getByText('Noch keine Positionen').isVisible(), 'Beseitigung: Leerzustand')
+  await seite.getByRole('button', { name: 'Hinzufügen', exact: true }).click()
+  await seite.getByLabel(/^Gegenstand/).fill('Japanischer Knöterich entfernen')
+  await seite.getByLabel('Einzelpreis (€)').fill('90')
+  await seite.getByLabel('Menge').fill('2')
+  await seite.getByRole('button', { name: 'Hinzufügen', exact: true }).click()
+  await seite.getByText('Japanischer Knöterich entfernen').waitFor()
+  pruefe(await seite.getByRole('main').getByText('180,00').first().isVisible(), 'Beseitigung: 2 × 90 € = 180 €')
+  await seite.getByRole('button', { name: /Japanischer Knöterich entfernen/ }).click()
+  pruefe((await seite.getByLabel('Menge').inputValue()) === '2', 'Beseitigung antippen: Formular mit Werten')
+  await seite.getByLabel('Faktor (Standard 1)').fill('1,5')
+  await seite.getByLabel(/^Begründung/).fill('schwer zugänglich')
+  await seite.getByRole('button', { name: 'Speichern' }).click()
+  await seite.getByText(/Faktor 1,5/).waitFor()
+  pruefe(await seite.getByRole('main').getByText('270,00').first().isVisible(), 'Beseitigung geändert: 2 × 90 € × 1,5 = 270 €')
+  await seite.getByRole('button', { name: /Japanischer Knöterich entfernen/ }).click()
+  await seite.getByRole('button', { name: 'Löschen' }).click()
+  await seite.getByRole('alertdialog').getByRole('button', { name: 'Löschen' }).click()
+  await seite.getByText('Noch keine Positionen').waitFor()
+  pruefe(await seite.getByText('Noch keine Positionen').isVisible(), 'Beseitigung nach Rückfrage gelöscht')
+
+  // 10c. Formalien: gruppierte Felder, Eingaben werden gespeichert
+  await nav.getByRole('button', { name: 'Formalien' }).click()
+  await seite.getByRole('heading', { name: 'Beteiligte' }).waitFor()
+  await seite.getByLabel('Parzelle', { exact: true }).fill('Parzelle 42')
+  await seite.getByLabel('Parzellenfläche (m²)').fill('350')
+
+  // 10d. Export: Bau-Excel wählen und entfernen, Export mit Ergebnis
+  await seite.getByRole('button', { name: 'Export', exact: true }).click()
+  await seite.getByRole('heading', { name: 'Export als Excel' }).waitFor()
+  await seite.locator('#bau-excel').setInputFiles('public/WEP_Vorlage.xlsx')
+  pruefe(await seite.getByText('WEP_Vorlage.xlsx').isVisible(), 'Export: gewählte Bau-Excel wird angezeigt')
+  await seite.getByRole('button', { name: 'Bau-Excel entfernen' }).click()
+  pruefe(await seite.getByRole('button', { name: /Bau-Excel auswählen/ }).isVisible(), 'Export: Bau-Excel wieder entfernbar')
+  await seite.getByRole('button', { name: 'Excel exportieren' }).click()
+  await seite.getByText(/Export erfolgreich/).waitFor({ timeout: 30000 })
+  pruefe(await seite.getByText(/Export erfolgreich/).isVisible(), 'Export: Ergebnis wird angezeigt')
+
+  // 10e. Skizze: Werkzeugleiste mit Icons (≥ 48 px), Dialoge im neuen Stil
+  await nav.getByRole('button', { name: 'Skizze' }).click()
+  await seite.getByRole('toolbar', { name: 'Zeichenwerkzeuge' }).waitFor()
+  const kleinste = await seite.getByRole('toolbar').getByRole('button').evaluateAll((knoepfe) =>
+    Math.min(...knoepfe.map((k) => Math.min(k.getBoundingClientRect().width, k.getBoundingClientRect().height))),
+  )
+  pruefe(kleinste >= 48, `Skizze: Werkzeug-Knöpfe mindestens 48 px (kleinster: ${kleinste} px)`)
+  pruefe((await seite.getByRole('toolbar').locator('svg.lucide').count()) >= 10, 'Skizze: Werkzeuge sind lucide-Icons')
+  const flaeche = await seite.locator('.skizze-flaeche svg').boundingBox()
+  const zeichne = async (x1, y1, x2, y2) => {
+    await seite.mouse.move(flaeche.x + x1, flaeche.y + y1)
+    await seite.mouse.down()
+    await seite.mouse.move(flaeche.x + x2, flaeche.y + y2, { steps: 5 })
+    await seite.mouse.up()
+  }
+  await seite.getByRole('button', { name: 'Rechteck', exact: true }).click()
+  await zeichne(40, 40, 160, 120)
+  pruefe((await seite.locator('.skizze-flaeche svg rect[stroke]').count()) >= 1, 'Skizze: Rechteck gezeichnet')
+  await seite.getByRole('button', { name: 'Text', exact: true }).click()
+  await seite.mouse.click(flaeche.x + 200, flaeche.y + 60)
+  await seite.getByRole('dialog', { name: 'Text einfügen' }).waitFor()
+  await seite.getByRole('textbox', { name: 'Text', exact: true }).fill('Laube')
+  await seite.getByRole('button', { name: 'Einfügen' }).click()
+  pruefe(await seite.locator('.skizze-flaeche svg text', { hasText: 'Laube' }).isVisible(), 'Skizze: Text-Dialog fügt Text ein')
+  await seite.getByRole('button', { name: 'Maßangabe', exact: true }).click()
+  await zeichne(40, 160, 200, 160)
+  await seite.getByRole('dialog', { name: 'Maß eintragen' }).waitFor()
+  await seite.getByLabel('Maß (in m)').fill('3,5 m')
+  await seite.getByRole('button', { name: 'Übernehmen' }).click()
+  pruefe(await seite.locator('.skizze-flaeche svg text', { hasText: '3,5 m' }).isVisible(), 'Skizze: Maß-Dialog')
+  await seite.getByRole('button', { name: 'Symbol', exact: true }).click()
+  await seite.getByRole('combobox', { name: 'Symbol' }).waitFor()
+  await seite.mouse.click(flaeche.x + 260, flaeche.y + 200)
+  await seite.getByRole('dialog', { name: 'Beschriftung' }).waitFor()
+  await seite.getByLabel(/^Baumart oder Name/).fill('Apfel')
+  await seite.getByRole('button', { name: 'Übernehmen' }).click()
+  pruefe(await seite.locator('.skizze-flaeche svg text', { hasText: 'Apfel' }).first().isVisible(), 'Skizze: Beschriftungs-Dialog (Baumart)')
+  await seite.getByRole('button', { name: 'Text', exact: true }).click()
+  await seite.mouse.click(flaeche.x + 300, flaeche.y + 300)
+  await seite.getByRole('dialog', { name: 'Text einfügen' }).waitFor()
+  await seite.keyboard.press('Escape')
+  pruefe((await seite.getByRole('dialog').count()) === 0, 'Skizze: Escape schließt den Dialog')
+  await seite.getByRole('button', { name: 'Rückgängig' }).click()
+  pruefe((await seite.getByRole('main').getByText('Apfel').count()) === 0, 'Skizze: Rückgängig nimmt das Symbol zurück')
 
   // 11. WEP-Liste hat keinen Löschen-Knopf; Löschen über „⋯“ mit Rückfrage
   await seite.getByRole('button', { name: 'Protokolle' }).click()

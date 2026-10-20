@@ -1,9 +1,8 @@
-/* Design-Tokens der WEP-App (Entwurf Beta 2, Schritt 4).
+/* Design-Tokens der WEP-App (Beta 2, Schritt 4).
    Grundsatz: Schwarz/Grau/Weiß, eine ruhige Akzentfarbe (gedecktes Grün), Rot nur
    für Warnungen. Alle Farben sind volle Flächen (keine Transparenz) und erreichen
    auf ihrem Hintergrund mindestens WCAG AA, Text meist AAA – für Sonnenlicht.
-   Wird zuerst nur von der Vorschau entwurf.html genutzt; nach der Freigabe
-   übernimmt die App diese Datei. */
+   Wird in src/app/main.tsx geladen; src/app/styles.css nutzt nur diese Variablen. */
 
 :root {
   color-scheme: light;

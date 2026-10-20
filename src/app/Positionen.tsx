@@ -1,37 +1,31 @@
-// Erfassung Außenanlagen / Aufwuchs: Beschreibung, Positionsliste mit Warnungen
-// und eingeklappten Richtlinien-Hinweisen, Summe. Handy zweizeilig, Tablet als Tabelle.
-// Antippen einer Position zeigt ihre Aktionen (Löschen).
+// Erfassung Außenanlagen / Aufwuchs: Beschreibung, Positionsliste mit Warnungen, Summe.
+// Handy zweizeilig, Tablet als Tabelle. Antippen einer Position öffnet das Formular zum
+// Ändern (dort auch „Löschen“); Richtlinien-Erläuterungen stehen nur im Formular.
 import { useId, useState } from 'react'
-import { ChevronRight, Info, Plus, Trash2, TriangleAlert } from 'lucide-react'
+import { ChevronRight, Plus, Sprout, Fence, TriangleAlert } from 'lucide-react'
 import type { Hinweis, Position, Wep } from '@/model'
 import { berechneRegelhinweise } from '@/gruen/regelhinweise'
 import { berechneAbschnittSumme } from '@/gruen/summen'
 import { zahlDe } from '@/gruen/format'
 import { ABSCHNITT_TITEL, INVASIVE_ARTEN, KATALOG_POSITIONEN, type Abschnitt } from './katalogDaten'
-import { ICON, euroFormat } from './ui'
+import { ICON, LeerZustand, euroFormat } from './ui'
 
 export function PositionenAbschnitt({
   wep,
   abschnitt,
   onSpeichern,
   onHinzufuegen,
+  onBearbeiten,
 }: {
   wep: Wep
   abschnitt: Abschnitt
   onSpeichern: (wep: Wep) => Promise<void>
   onHinzufuegen: () => void
+  onBearbeiten: (posId: string) => void
 }) {
   const positionen = abschnitt === 'aussenanlagen' ? wep.gruen.aussenanlagen : wep.gruen.aufwuchs
   const titel = ABSCHNITT_TITEL[abschnitt]
   const summe = berechneAbschnittSumme(positionen)
-  const [offenId, setOffenId] = useState<string | null>(null)
-
-  function loeschePosition(posId: string) {
-    const neu = positionen.filter((p) => p.id !== posId)
-    void onSpeichern({ ...wep, gruen: { ...wep.gruen, [abschnitt]: neu } })
-    setOffenId(null)
-  }
-
   const beschreibungFeld = abschnitt === 'aussenanlagen' ? 'beschreibungAussen' : 'beschreibungAufwuchs'
 
   return (
@@ -52,6 +46,17 @@ export function PositionenAbschnitt({
         onChange={(v) => void onSpeichern({ ...wep, gruen: { ...wep.gruen, [beschreibungFeld]: v } })}
       />
 
+      {positionen.length === 0 ? (
+        <LeerZustand
+          icon={abschnitt === 'aufwuchs' ? Sprout : Fence}
+          titel="Noch keine Positionen"
+          text={
+            abschnitt === 'aufwuchs'
+              ? 'Bäume, Sträucher, Hecken und Rasen über die Suche im Katalog hinzufügen.'
+              : 'Wege, Einfriedung, Beete und mehr über die Suche im Katalog hinzufügen.'
+          }
+        />
+      ) : (
       <div className="tabelle" role="table" aria-label={`Positionen ${titel}`}>
         <div className="pos pos-kopf nur-tablet" role="row">
           <span role="columnheader" className="zahl">Anzahl</span>
@@ -61,22 +66,15 @@ export function PositionenAbschnitt({
           <span role="columnheader" className="zahl">Einzelpreis</span>
           <span role="columnheader" className="zahl">Summe</span>
         </div>
-        {positionen.length === 0 && <p className="leertext">Noch keine Positionen.</p>}
         {positionen.map((pos) => (
-          <PositionZeile
-            key={pos.id}
-            pos={pos}
-            wep={wep}
-            offen={offenId === pos.id}
-            onUmschalten={() => setOffenId(offenId === pos.id ? null : pos.id)}
-            onLoeschen={() => loeschePosition(pos.id)}
-          />
+          <PositionZeile key={pos.id} pos={pos} wep={wep} onOeffnen={() => onBearbeiten(pos.id)} />
         ))}
         <div className="summe" role="row">
           <span role="cell">Summe {titel}</span>
           <span role="cell" className="zahl">{euroFormat(summe)}</span>
         </div>
       </div>
+      )}
 
       <button type="button" className="zeile zeile-akzent" onClick={onHinzufuegen}>
         <Plus {...ICON} />
@@ -118,27 +116,15 @@ function Beschreibung({ wert, onChange }: { wert: string; onChange: (v: string) 
   )
 }
 
-function PositionZeile({
-  pos,
-  wep,
-  offen,
-  onUmschalten,
-  onLoeschen,
-}: {
-  pos: Position
-  wep: Wep
-  offen: boolean
-  onUmschalten: () => void
-  onLoeschen: () => void
-}) {
+function PositionZeile({ pos, wep, onOeffnen }: { pos: Position; wep: Wep; onOeffnen: () => void }) {
   const hinweise = berechneRegelhinweise(pos, wep, KATALOG_POSITIONEN, INVASIVE_ARTEN)
-  const neben = [`${zahlDe(pos.anzahl)} ${pos.einheit}`, pos.zustand, `je ${euroFormat(pos.einzelpreis)}`]
+  const neben = [`${zahlDe(pos.anzahl)} ${pos.einheit}`, pos.zustand, `je ${euroFormat(pos.einzelpreis)}`]
     .filter(Boolean)
     .join(' · ')
 
   return (
     <div className="pos-gruppe" role="rowgroup">
-      <button type="button" className="pos" role="row" aria-expanded={offen} onClick={onUmschalten}>
+      <button type="button" className="pos" role="row" onClick={onOeffnen}>
         <span role="cell" className="zahl c-anzahl">{zahlDe(pos.anzahl)}</span>
         <span role="cell" className="c-einheit">{pos.einheit}</span>
         <span role="cell" className="c-bez">
@@ -155,48 +141,26 @@ function PositionZeile({
         </span>
         <span role="cell" className="zahl c-summe">{euroFormat(pos.anzahl * pos.einzelpreis)}</span>
       </button>
-      {offen && (
-        <div className="pos-aktionen">
-          <button type="button" className="knopf" aria-label={`Position ${pos.bezeichnung} löschen`} onClick={onLoeschen}>
-            <Trash2 {...ICON} />
-            Löschen
-          </button>
-        </div>
-      )}
-      <HinweisListe hinweise={hinweise} />
+      <WarnListe hinweise={hinweise} />
     </div>
   )
 }
 
 /**
- * Regelhinweise: Warnungen immer sichtbar, reine Info-Texte (Richtlinien-
- * Erläuterungen) eingeklappt, damit die Positionsliste übersichtlich bleibt.
+ * Warnungen einer Position (Regelverstöße). Reine Richtlinien-Erläuterungen
+ * (Schwere „info“) stehen nicht in der Liste, sondern im Formular unter „Richtlinie“.
  */
-export function HinweisListe({ hinweise }: { hinweise: Hinweis[] }) {
-  const warnungen = hinweise.filter((h) => h.schwere === 'warnung')
-  const infos = hinweise.filter((h) => h.schwere !== 'warnung')
+export function WarnListe({ hinweise }: { hinweise: Hinweis[] }) {
   return (
     <>
-      {warnungen.map((h, i) => (
-        <p key={`w${i}`} className="warnung" role="note">
-          <TriangleAlert {...ICON} size={20} />
-          <span>{h.text}</span>
-        </p>
-      ))}
-      {infos.length > 0 && (
-        <details className="hinweise">
-          <summary>
-            <ChevronRight {...ICON} size={18} className="chevron-auf" />
-            {infos.length === 1 ? '1 Hinweis' : `${infos.length} Hinweise`} zur Richtlinie
-          </summary>
-          {infos.map((h, i) => (
-            <p key={`i${i}`} className="info">
-              <Info {...ICON} size={18} />
-              <span>{h.text}</span>
-            </p>
-          ))}
-        </details>
-      )}
+      {hinweise
+        .filter((h) => h.schwere === 'warnung')
+        .map((h, i) => (
+          <p key={i} className="warnung" role="note">
+            <TriangleAlert {...ICON} size={20} />
+            <span>{h.text}</span>
+          </p>
+        ))}
     </>
   )
 }

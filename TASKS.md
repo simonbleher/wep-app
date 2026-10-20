@@ -139,6 +139,17 @@ Warnungen, eingeklappten Hinweisen, Summe; „Position hinzufügen“ mit Varian
 Playwright-Durchlauf erweitert, Screenshots `docs/umbau/` (`npm run umbau:screenshots`).
 Offen (Teil B): Formalien, Beseitigung, Export und Skizze im Detail, Dunkelmodus.
 
+### B2-4c · Umbau der App, Teil B 👀 (#design) – Branch design/umbau-b
+Ergebnis: Formalien (gruppiert), Beseitigung (Liste + Formular), Export (bei gewählter Bau-Excel, Ergebnis,
+Hinweise) und Skizze (lucide-Werkzeugleiste, Dialoge Text/Baumart/Maß, Berührflächen ≥ 48 px, Zeichenfläche
+unverändert) im Entwurfs-Stil; gemeinsame Bausteine `Dialog`, `Rueckfrage`, `LeerZustand`, `Meldung` in
+`src/app/ui.tsx`; keine Emojis/Zeichen-Symbole mehr (Test). **Positionen ändern:** Antippen einer Position
+(Außenanlagen, Aufwuchs, Beseitigung) öffnet das Formular, „Löschen“ unten mit Rückfrage; Richtlinien-
+Erläuterungen (Schwere „info“) nur noch im Formular unter „Richtlinie“, Warnungen bleiben in der Liste.
+Aufgeräumt: `entwurf.html`, zweiter Vite-Einstieg, Service-Worker-Ausnahme, `src/design/entwurf/` und
+`tools/entwurf/` entfernt (`docs/entwurf/` bleibt als Referenz). Tests (`umbauB.test.tsx`), Playwright-Durchlauf
+und Screenshots (`docs/umbau/`) erweitert. Offen: Dunkelmodus.
+
 ## KI-Assistent (Plan: docs/KI-ASSISTENT.md)
 
 > **Abgeschaltet seit 20.10.2026** (Beta 2, Schritt 1 – Branch app/ki-aus 👀): Schalter `KI_AKTIV`,

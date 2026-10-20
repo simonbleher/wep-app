@@ -2,39 +2,16 @@
 // Handy: Suche → Formular (eigener Bildschirm, Fuß mit Gesamt und „Hinzufügen“).
 // Tablet: Suche links, Formular rechts. Die Varianten einer Katalog-Position stehen
 // direkt in den Suchtreffern – einen eigenen Variantenschritt gibt es nicht mehr.
-import { useId, useState } from 'react'
+import { useState } from 'react'
 import { ChevronLeft, Plus, Search, X } from 'lucide-react'
 import type { Position, Wep } from '@/model'
-import { ZUSTANDSSTUFEN } from '@/model'
 import type { Position as KatalogPosition, Variante as KatalogVariante } from '@/katalog'
 import { sucheKatalog } from '@/katalog'
-import { berechnePreisvorschlag } from '@/gruen/preisvorschlag'
-import { berechneRegelhinweise } from '@/gruen/regelhinweise'
 import { merkeZuletztVerwendet, ladeZuletztVerwendet } from '@/gruen/zuletzt'
-import {
-  gefundeneArt,
-  kurzeBezeichnung,
-  leseZahl,
-  leseZahlOder,
-  variantenMerkmale,
-  zahlDe,
-  zahlFuerEingabe,
-} from '@/gruen/format'
-import { ABSCHNITT_TITEL, INVASIVE_ARTEN, KATALOG_POSITIONEN, type Abschnitt } from './katalogDaten'
-import { HinweisListe } from './Positionen'
+import { gefundeneArt, kurzeBezeichnung } from '@/gruen/format'
+import { ABSCHNITT_TITEL, KATALOG_POSITIONEN, type Abschnitt } from './katalogDaten'
+import { PositionFormular, type Auswahl } from './PositionFormular'
 import { ICON, Kopf, euroFormat } from './ui'
-
-type Zustand = NonNullable<Position['zustand']>
-const ZUSTAENDE = Object.keys(ZUSTANDSSTUFEN) as Zustand[]
-const EINHEITEN = ['Stück', 'm', 'm²', 'm³', 'lfdm', 'Pauschale']
-
-/** Gewählter Eintrag: Katalog-Position (ggf. mit Variante) oder Freitext ({}). */
-interface Auswahl {
-  position?: KatalogPosition
-  variante?: KatalogVariante
-  /** Über die Suche gefundene Art, z. B. „Liguster“ bei der Hecke */
-  art?: string
-}
 
 /** Ein Suchtreffer mit allen Varianten, die direkt in der Liste stehen. */
 interface TrefferGruppe {
@@ -216,234 +193,13 @@ export function PositionHinzufuegen({
 
         <section className="split-formular" aria-label="Position">
           {auswahl ? (
-            <PositionFormular key={schluessel(auswahl)} auswahl={auswahl} wep={wep} onHinzufuegen={onHinzufuegen} />
+            <PositionFormular key={schluessel(auswahl)} auswahl={auswahl} wep={wep} onFertig={onHinzufuegen} />
           ) : (
             <p className="formular-leer">
               Position aus dem Katalog wählen oder eine eigene Position (Freitext) anlegen.
             </p>
           )}
         </section>
-      </div>
-    </div>
-  )
-}
-
-function neuePositionId(): string {
-  return `pos-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
-}
-
-/** Formular: Bezeichnung, Anzahl, Einheit, Zustand, Preis (Vorschlag oder überschrieben). */
-function PositionFormular({
-  auswahl,
-  wep,
-  onHinzufuegen,
-}: {
-  auswahl: Auswahl
-  wep: Wep
-  onHinzufuegen: (pos: Position) => void
-}) {
-  const { position: katalogPos, variante, art } = auswahl
-  const hoechstwert = variante?.hoechstwert ?? katalogPos?.hoechstwert
-  const id = useId()
-
-  const [bezeichnung, setBezeichnung] = useState(katalogPos ? kurzeBezeichnung(katalogPos, variante, art) : '')
-  const [anzahl, setAnzahl] = useState('1')
-  const [einheit, setEinheit] = useState<string>(katalogPos?.einheit ?? 'Stück')
-  const [zustand, setZustand] = useState<Zustand>('gut')
-  const [preisManuell, setPreisManuell] = useState(false)
-  const [preisEingabe, setPreisEingabe] = useState('')
-
-  // Vorgeschlagener Preis: Höchstwert × Zustandsstufe
-  const vorschauPos: Position = {
-    id: 'tmp',
-    bezeichnung,
-    anzahl: leseZahlOder(anzahl, 0),
-    einheit,
-    zustand,
-    hoechstwert,
-    einzelpreis: 0,
-    preisManuell: false,
-    hinweise: [],
-  }
-  const preisVorschlag = berechnePreisvorschlag(vorschauPos)
-  const einzelpreis = preisManuell ? leseZahlOder(preisEingabe, 0) : preisVorschlag
-  const gesamt = leseZahlOder(anzahl, 0) * einzelpreis
-
-  // Regelhinweise für die Vorschau
-  const vorschauHinweise = berechneRegelhinweise(
-    { ...vorschauPos, einzelpreis },
-    wep,
-    KATALOG_POSITIONEN,
-    INVASIVE_ARTEN,
-  )
-
-  const stufe = ZUSTANDSSTUFEN[zustand]
-  const ungueltig =
-    !bezeichnung.trim() ||
-    !(leseZahl(anzahl) > 0) ||
-    (preisManuell && !Number.isFinite(leseZahl(preisEingabe)))
-
-  function bestaetigen() {
-    onHinzufuegen({
-      id: neuePositionId(),
-      katalogId: katalogPos?.id,
-      bezeichnung: bezeichnung.trim(),
-      anzahl: leseZahlOder(anzahl, 0),
-      einheit,
-      zustand,
-      hoechstwert,
-      einzelpreis,
-      preisManuell,
-      hinweise: vorschauHinweise,
-    })
-  }
-
-  return (
-    <div className="formular formular-pos">
-      {katalogPos ? (
-        <p className="neben quelle">
-          Katalog: {katalogPos.bezeichnung}
-          {variante ? ` · ${variantenMerkmale(variante)}` : ''} · BewRL S. {katalogPos.seite}
-        </p>
-      ) : (
-        <p className="neben quelle">Eigene Position (Freitext)</p>
-      )}
-
-      <div className="feld">
-        <label className="label" htmlFor={`${id}-bez`}>
-          Bezeichnung (steht so in der Excel)
-        </label>
-        <input
-          id={`${id}-bez`}
-          className="eingabe"
-          value={bezeichnung}
-          placeholder="z. B. Kirschbaum, alt"
-          autoFocus={!katalogPos}
-          onChange={(e) => setBezeichnung(e.target.value)}
-        />
-      </div>
-
-      <div className="feld-reihe">
-        <div className="feld">
-          <label className="label" htmlFor={`${id}-anz`}>
-            Anzahl
-          </label>
-          <input
-            id={`${id}-anz`}
-            className="eingabe"
-            inputMode="decimal"
-            value={anzahl}
-            onChange={(e) => setAnzahl(e.target.value)}
-          />
-        </div>
-        <div className="feld">
-          <label className="label" htmlFor={`${id}-einh`}>
-            Einheit
-          </label>
-          <select id={`${id}-einh`} className="eingabe" value={einheit} onChange={(e) => setEinheit(e.target.value)}>
-            {EINHEITEN.map((u) => (
-              <option key={u} value={u}>
-                {u}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      <fieldset className="feld fieldset">
-        <legend className="label">Zustand</legend>
-        <div className="segmente">
-          {ZUSTAENDE.map((z) => (
-            <button key={z} type="button" className="segment" aria-pressed={z === zustand} onClick={() => setZustand(z)}>
-              {z}
-            </button>
-          ))}
-        </div>
-      </fieldset>
-
-      <div className="feld">
-        <span className="label" id={`${id}-preis-label`}>
-          Einzelpreis
-        </span>
-        <div className="preis">
-          {preisManuell ? (
-            <>
-              <div className="preis-zeile">
-                <div className="euro-eingabe">
-                  <input
-                    className="eingabe zahl"
-                    inputMode="decimal"
-                    aria-labelledby={`${id}-preis-label`}
-                    value={preisEingabe}
-                    placeholder="0,00"
-                    onChange={(e) => setPreisEingabe(e.target.value)}
-                    autoFocus
-                  />
-                  <span aria-hidden="true">€</span>
-                </div>
-                <button
-                  type="button"
-                  className="textknopf"
-                  onClick={() => {
-                    setPreisManuell(false)
-                    setPreisEingabe('')
-                  }}
-                >
-                  Vorschlag {euroFormat(preisVorschlag)}
-                </button>
-              </div>
-              <span className="neben">Eigener Preis – wird im WEP als „manuell“ vermerkt.</span>
-            </>
-          ) : (
-            <>
-              <div className="preis-zeile">
-                <span className="preis-wert zahl" aria-labelledby={`${id}-preis-label`}>
-                  {euroFormat(preisVorschlag)}
-                </span>
-                <button
-                  type="button"
-                  className="knopf"
-                  onClick={() => {
-                    setPreisManuell(true)
-                    setPreisEingabe(zahlFuerEingabe(preisVorschlag))
-                  }}
-                >
-                  Überschreiben
-                </button>
-              </div>
-              <span className="neben">
-                {hoechstwert === undefined
-                  ? 'Kein Höchstwert im Katalog – Preis bitte über „Überschreiben“ eintragen.'
-                  : stufe.festpreis !== undefined
-                    ? `Vorschlag: Erinnerungswert ${euroFormat(stufe.festpreis)} bei schlechtem Zustand`
-                    : `Vorschlag: Höchstwert ${euroFormat(hoechstwert)} × ${zahlDe(stufe.faktor)} (${zustand})`}
-              </span>
-            </>
-          )}
-        </div>
-      </div>
-
-      {vorschauHinweise.length > 0 && (
-        <div>
-          <HinweisListe hinweise={vorschauHinweise} />
-        </div>
-      )}
-
-      {katalogPos?.regeln && (
-        <details className="details">
-          <summary>Richtlinie</summary>
-          <p>{katalogPos.regeln}</p>
-        </details>
-      )}
-
-      <div className="formular-fuss">
-        <div className="summe summe-klein">
-          <span>Gesamt</span>
-          <span className="zahl">{euroFormat(gesamt)}</span>
-        </div>
-        <button type="button" className="knopf knopf-primaer knopf-breit" disabled={ungueltig} onClick={bestaetigen}>
-          Hinzufügen
-        </button>
       </div>
     </div>
   )
