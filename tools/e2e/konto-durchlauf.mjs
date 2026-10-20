@@ -3,7 +3,8 @@
 // Position über die Suche (Variante direkt im Treffer) hinzufügen, Preis überschreiben,
 // Warnung und Summe → Position antippen, ändern und mit Rückfrage löschen (Richtlinie nur im
 // Formular) → Beseitigung hinzufügen/ändern/löschen → Export mit Bau-Excel → Skizze-Werkzeugleiste
-// und Dialoge → WEP über das Menü „⋯“ mit Rückfrage löschen.
+// und Dialoge → Status (exportiert nach Export, fertig, zurücksetzen, Filter in der Liste) →
+// WEP duplizieren → WEPs über das Menü „⋯“ mit Rückfrage löschen.
 //
 // Start: npm run e2e  (baut mit einer Platzhalter-Client-ID nach dist-e2e/, damit der
 // Login-Bildschirm erscheint; es wird nie wirklich bei Microsoft angemeldet).
@@ -22,6 +23,15 @@ function chromiumPfad() {
     if (d.startsWith('chromium-')) kandidaten.push(`${basis}/${d}/chrome-linux/chrome`)
   }
   return kandidaten.find((p) => existsSync(p))
+}
+
+/** Wartet (bis 5 s), bis die Liste genau n Einträge hat – sie lädt asynchron aus IndexedDB. */
+async function anzahlEintraege(ort, n) {
+  for (let i = 0; i < 50; i++) {
+    if ((await ort.getByRole('listitem').count()) === n) return true
+    await new Promise((r) => setTimeout(r, 100))
+  }
+  return false
 }
 
 function pruefe(bedingung, text) {
@@ -103,6 +113,7 @@ try {
   await seite.getByRole('button', { name: 'Hinzufügen', exact: true }).click()
   await seite.getByLabel('Katalog durchsuchen').fill('rasen')
   await seite.getByRole('button', { name: /^Rasen/ }).first().click()
+  pruefe((await seite.getByLabel(/^Bezeichnung/).inputValue()) === 'Rasen', 'Suche „rasen“ behält den Positionsnamen (nicht „Rasengräser“)')
   await seite.getByLabel('Anzahl').fill('120')
   await seite.getByRole('button', { name: 'Hinzufügen', exact: true }).click()
   await seite.getByText(/Nur bis max\. 100/).first().waitFor()
@@ -114,6 +125,8 @@ try {
   await seite.getByRole('button', { name: 'Hinzufügen', exact: true }).click()
   await seite.getByRole('button', { name: 'Eigene Position (Freitext)' }).click()
   await seite.getByLabel(/^Bezeichnung/).fill('Zaubernuss')
+  await seite.getByRole('button', { name: 'schlecht', exact: true }).click()
+  pruefe(await seite.getByText(/Erinnerungswert 1,00\s€ bei schlechtem Zustand/).isVisible(), 'eigene Position, Zustand „schlecht“: Vorschlag 1,00 € ohne Höchstwert')
   await seite.getByRole('button', { name: 'Überschreiben' }).click()
   await seite.getByLabel('Einzelpreis').fill('40')
   await seite.getByRole('button', { name: 'Hinzufügen', exact: true }).click()
@@ -202,6 +215,7 @@ try {
   await seite.getByRole('button', { name: 'Excel exportieren' }).click()
   await seite.getByText(/Export erfolgreich/).waitFor({ timeout: 30000 })
   pruefe(await seite.getByText(/Export erfolgreich/).isVisible(), 'Export: Ergebnis wird angezeigt')
+  pruefe(await seite.getByText('KGA Musterwiese · exportiert').isVisible(), 'Status: nach dem Export automatisch „exportiert“')
 
   // 10e. Skizze: Werkzeugleiste mit Icons (≥ 48 px), Dialoge im neuen Stil
   await nav.getByRole('button', { name: 'Skizze' }).click()
@@ -248,11 +262,49 @@ try {
   await seite.getByRole('button', { name: 'Rückgängig' }).click()
   pruefe((await seite.getByRole('main').getByText('Apfel').count()) === 0, 'Skizze: Rückgängig nimmt das Symbol zurück')
 
-  // 11. WEP-Liste hat keinen Löschen-Knopf; Löschen über „⋯“ mit Rückfrage
+  // 11. WEP-Liste hat keinen Löschen-Knopf; Status sichtbar
+  const liste = seite.getByRole('list', { name: 'Protokolle' })
   await seite.getByRole('button', { name: 'Protokolle' }).click()
   await seite.getByRole('heading', { name: 'Protokolle' }).waitFor()
   pruefe((await seite.getByRole('button', { name: /löschen/i }).count()) === 0, 'WEP-Liste ohne Löschen-Knopf')
+  await anzahlEintraege(liste, 1)
+  pruefe(await liste.getByText('Exportiert', { exact: true }).isVisible(), 'Liste zeigt den Status „Exportiert“')
+
+  // 11b. Status zurücksetzen und manuell auf „fertig“ setzen
   await seite.getByRole('button', { name: /KGA Musterwiese/ }).click()
+  await seite.getByRole('button', { name: 'Weitere Aktionen' }).click()
+  pruefe((await seite.getByRole('menuitem', { name: /Duplizieren/ }).count()) === 1, 'Menü „⋯“ bietet „Duplizieren“')
+  await seite.getByRole('menuitem', { name: /Zurück auf „In Arbeit“/ }).click()
+  pruefe(await seite.getByText('KGA Musterwiese · in Arbeit').isVisible(), 'Status lässt sich auf „in Arbeit“ zurücksetzen')
+  await seite.getByRole('button', { name: 'Weitere Aktionen' }).click()
+  await seite.getByRole('menuitem', { name: /Als fertig markieren/ }).click()
+  pruefe(await seite.getByText('KGA Musterwiese · fertig').isVisible(), 'Status lässt sich manuell auf „fertig“ setzen')
+
+  // 11c. Duplizieren: öffnet die Kopie mit allen Daten, neuer Vorgangs-Nr., Status „in Arbeit“
+  await seite.getByRole('button', { name: 'Weitere Aktionen' }).click()
+  await seite.getByRole('menuitem', { name: /Duplizieren/ }).click()
+  await seite.getByText('KGA Musterwiese · in Arbeit').waitFor()
+  const jahr = new Date().getFullYear()
+  pruefe((await seite.getByLabel('Vorgangs-Nr.').inputValue()) === `${jahr}-002`, 'Kopie hat neue Vorgangs-Nr.')
+  pruefe((await seite.getByLabel('Parzelle', { exact: true }).inputValue()) === 'Parzelle 42', 'Kopie enthält die Formalien')
+  await nav.getByRole('button', { name: 'Aufwuchs' }).click()
+  pruefe(await seite.getByText('2 Positionen').isVisible(), 'Kopie enthält die Positionen')
+
+  // 11d. Liste nach Status filtern
+  await seite.getByRole('button', { name: 'Protokolle' }).click()
+  await seite.getByRole('heading', { name: 'Protokolle' }).waitFor()
+  pruefe(await anzahlEintraege(liste, 2), 'Liste zeigt Original und Kopie')
+  const filter = seite.getByRole('group', { name: 'Nach Status filtern' })
+  await filter.getByRole('button', { name: 'Fertig' }).click()
+  pruefe((await anzahlEintraege(liste, 1)) && (await liste.getByText('Fertig', { exact: true }).isVisible()), 'Filter „Fertig“ zeigt nur das Original')
+  await filter.getByRole('button', { name: 'In Arbeit' }).click()
+  pruefe((await anzahlEintraege(liste, 1)) && (await liste.getByText(`${jahr}-002`).count()) === 1, 'Filter „In Arbeit“ zeigt nur die Kopie')
+  await filter.getByRole('button', { name: 'Exportiert' }).click()
+  pruefe(await seite.getByText(/Kein Protokoll „exportiert“/).isVisible(), 'Filter ohne Treffer zeigt einen Hinweis')
+  await filter.getByRole('button', { name: 'Alle' }).click()
+
+  // 11e. Löschen über „⋯“ mit Rückfrage (Kopie und Original)
+  await seite.getByRole('button', { name: /KGA Musterwiese/ }).first().click()
   await seite.getByRole('button', { name: 'Weitere Aktionen' }).click()
   await seite.getByRole('menuitem', { name: /WEP löschen/ }).click()
   await seite.getByRole('alertdialog').waitFor()
@@ -262,7 +314,12 @@ try {
   await seite.getByRole('menuitem', { name: /WEP löschen/ }).click()
   await seite.getByRole('alertdialog').getByRole('button', { name: 'Löschen' }).click()
   await seite.getByRole('heading', { name: 'Protokolle' }).waitFor()
-  pruefe(await seite.getByText(/Noch kein Protokoll/).isVisible(), 'WEP nach Rückfrage gelöscht')
+  await seite.getByRole('button', { name: /KGA Musterwiese/ }).click()
+  await seite.getByRole('button', { name: 'Weitere Aktionen' }).click()
+  await seite.getByRole('menuitem', { name: /WEP löschen/ }).click()
+  await seite.getByRole('alertdialog').getByRole('button', { name: 'Löschen' }).click()
+  await seite.getByRole('heading', { name: 'Protokolle' }).waitFor()
+  pruefe(await seite.getByText(/Noch kein Protokoll/).isVisible(), 'WEPs nach Rückfrage gelöscht')
 
   // 12. Keine Skriptfehler
   pruefe(fehler.length === 0, `keine Skriptfehler im Browser ${fehler.join('; ')}`)

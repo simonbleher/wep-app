@@ -27,6 +27,37 @@ export interface Wep {
   }
   bau?: unknown // später
   skizze?: SkizzeDaten
+  /** Bearbeitungsstand; fehlt = „in Arbeit“. Wird mit OneDrive abgeglichen. */
+  status?: WepStatus
+}
+
+/** in Arbeit (Standard) · fertig (manuell) · exportiert (automatisch nach dem Excel-Export). */
+export type WepStatus = 'in Arbeit' | 'fertig' | 'exportiert'
+export const WEP_STATUS: readonly WepStatus[] = ['in Arbeit', 'fertig', 'exportiert']
+
+/** Status eines WEP; ältere WEPs ohne Angabe sind „in Arbeit“. */
+export function wepStatus(wep: Pick<Wep, 'status'>): WepStatus {
+  return wep.status ?? 'in Arbeit'
+}
+
+/**
+ * Komplette Kopie eines WEP (Formalien, Positionen, Beschreibungen, Beseitigung, Skizze)
+ * unter einer neuen Vorgangs-Nr.; Status „in Arbeit“.
+ */
+export function dupliziereWep(wep: Wep, neueId: string): Wep {
+  const kopie = JSON.parse(JSON.stringify(wep)) as Wep
+  return { ...kopie, id: neueId, formalien: { ...kopie.formalien, vorgangsNr: neueId }, status: 'in Arbeit' }
+}
+
+/** Nächste Vorgangs-Nr. der Form "<Jahr>-<lfd. Nummer>" aus den vorhandenen WEPs des Jahres. */
+export function naechsteVorgangsNr(vorhandene: Pick<Wep, 'id'>[], jahr = new Date().getFullYear()): string {
+  const prefix = `${jahr}-`
+  const nummern = vorhandene
+    .filter((w) => w.id.startsWith(prefix))
+    .map((w) => Number.parseInt(w.id.slice(prefix.length), 10))
+    .filter((n) => Number.isFinite(n))
+  const naechste = (nummern.length ? Math.max(...nummern) : 0) + 1
+  return `${prefix}${String(naechste).padStart(3, '0')}`
 }
 
 /**

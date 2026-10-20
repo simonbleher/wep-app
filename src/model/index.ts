@@ -6,8 +6,9 @@ export type {
   Formalien,
   BeseitigungsPosition,
   SkizzeDaten,
+  WepStatus,
 } from './types'
-export { ZUSTANDSSTUFEN, neuerWep } from './types'
+export { ZUSTANDSSTUFEN, neuerWep, WEP_STATUS, wepStatus, dupliziereWep, naechsteVorgangsNr } from './types'
 
 // Katalog- und Invasive-Typen (data/katalog.json, data/invasive.json).
 export type {

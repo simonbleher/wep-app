@@ -234,12 +234,12 @@ export function PositionFormular({
                 </button>
               </div>
               <span className="neben">
-                {hoechstwert === undefined
-                  ? 'Kein Höchstwert im Katalog – Preis bitte über „Überschreiben“ eintragen.'
-                  : !stufe || !zustand
-                    ? 'Zustand wählen, dann erscheint der Vorschlag.'
-                    : stufe.festpreis !== undefined
-                      ? `Vorschlag: Erinnerungswert ${euroFormat(stufe.festpreis)} bei schlechtem Zustand`
+                {stufe?.festpreis !== undefined
+                  ? `Vorschlag: Erinnerungswert ${euroFormat(stufe.festpreis)} bei schlechtem Zustand`
+                  : hoechstwert === undefined
+                    ? 'Kein Höchstwert im Katalog – Preis bitte über „Überschreiben“ eintragen.'
+                    : !stufe || !zustand
+                      ? 'Zustand wählen, dann erscheint der Vorschlag.'
                       : `Vorschlag: Höchstwert ${euroFormat(hoechstwert)} × ${zahlDe(stufe.faktor)} (${zustand})`}
               </span>
             </>

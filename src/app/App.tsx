@@ -109,7 +109,12 @@ export default function App() {
           onAbmelden={() => void abmelden_()}
         />
       ) : (
-        <WepDetail wepId={ansicht.wepId} onZurueck={() => setAnsicht({ typ: 'start' })} />
+        <WepDetail
+          key={ansicht.wepId}
+          wepId={ansicht.wepId}
+          onZurueck={() => setAnsicht({ typ: 'start' })}
+          onOeffnen={(wepId) => setAnsicht({ typ: 'detail', wepId })}
+        />
       )}
     </div>
   )

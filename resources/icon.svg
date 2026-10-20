@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="WEP – Klemmbrett mit Blatt">
+  <!-- Quelle des App-Icons. `npm run icons` erzeugt daraus alle Größen (tools/icons/erzeuge-icons.mjs).
+       Gruppen (der Name steht in der id, das Skript baut daraus die Varianten):
+       grund   – Fläche in --farbe-akzent (src/design/tokens.css)
+       symbol  – weißes Klemmbrett (liegt innerhalb des Sicherheitskreises r = 150)
+       details – Klammer-Rand, Blatt, Zeilen in Akzentfarbe (im Themen-Icon ausgespart)
+       adern   – Blattader in Weiß (bleibt im Themen-Icon stehen) -->
+  <rect id="grund" width="512" height="512" fill="#2e6640" />
+  <g id="symbol" fill="#ffffff">
+    <rect x="164" y="152" width="184" height="216" rx="24" />
+    <rect x="212" y="134" width="88" height="44" rx="14" />
+  </g>
+  <g id="details" fill="#2e6640">
+    <rect x="212" y="134" width="88" height="44" rx="14" fill="none" stroke="#2e6640" stroke-width="8" />
+    <path d="M214 318C210 258 246 218 300 214C304 270 270 314 214 318Z" />
+    <rect x="198" y="334" width="116" height="8" rx="4" />
+    <rect x="198" y="350" width="76" height="8" rx="4" />
+  </g>
+  <g id="adern" fill="none" stroke="#ffffff" stroke-width="7" stroke-linecap="round">
+    <path d="M222 310C240 276 264 248 290 228" />
+  </g>
+</svg>

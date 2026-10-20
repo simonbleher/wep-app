@@ -68,7 +68,7 @@ export default defineConfig({
     versionJson(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'icon.svg'],
+      includeAssets: ['favicon.svg', 'icon.svg', 'favicon-32x32.png', 'apple-touch-icon.png'],
       manifest: {
         name: 'WEP – Wertermittlungsprotokoll',
         short_name: 'WEP',

@@ -316,3 +316,18 @@ Darum gilt (ohne Wirkung im Browser, dort sind die Insets 0):
   mit, ohne die Höhe zu überschreiten. Feste Dialoge (Skizze) polstern sich ebenfalls.
 - Hintergrund der WebView `#f4f6f4` (= App-Hintergrund), Symbole der Systemleisten dunkel
   (`SystemBars.setStyle(Light)`), auch wenn das Gerät im Dunkelmodus ist.
+
+## App-Icon und Splash (Beta 3, Paket 1)
+
+Quelle: `resources/icon.svg` (Klemmbrett mit Blatt, weiß auf `--farbe-akzent`). Nach einer Änderung:
+
+```
+npm run icons      # erzeugt alle Größen neu (braucht das vorinstallierte Chromium)
+```
+
+Das Skript schreibt: Launcher-Icons je Dichte (`mipmap-*/ic_launcher*.png`, adaptiv: Vordergrund und
+Themen-Icon `ic_launcher_monochrome.png`, Hintergrundfarbe in `values/ic_launcher_background.xml`), Splash
+(`drawable*/splash.png`), PWA-Icons (`public/pwa-*.png`, `maskable-512x512.png`), Favicon und Apple-Touch-Icon,
+dazu die Vorschau `docs/icon/vorschau.png`. Da `android/` betroffen ist, `android/native-version.txt` erhöhen.
+Das Themen-Icon wirkt ab Android 13 (Einstellungen → Hintergrund und Stil → „Themen-Symbole“).
+

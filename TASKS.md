@@ -199,3 +199,14 @@ Hinweis „Neue App-Version“), APK zusätzlich auf Cloudflare Pages (`wep-pank
 `CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ACCOUNT_ID`), Profil zeigt Commit/Stand/letzte Prüfung.
 Tests: Entscheidung Live/Nativ, Rückfall, native-version-Regel. Anleitung: docs/ANDROID.md „Updates“.
 **Noch offen:** Gerätetest (Live-Update, Installer, Rückfall), Cloudflare-Token anlegen.
+
+### B3-1 · Icon, Kleinigkeiten, Status, Duplizieren 🔄 (PR offen) – Branch beta3/paket1
+Ergebnis: App-Icon „Klemmbrett mit Blatt“ (`resources/icon.svg`, `npm run icons` erzeugt Android adaptiv/rund/
+monochrom in allen Dichten, PWA 192/512 + maskable, Favicon, Apple-Touch-Icon, Splash; Vorschau
+`docs/icon/vorschau.png`); Fehler „Rasengräser“ (`gefundeneArt`); „schlecht“ = 1,00 € auch ohne Höchstwert;
+Status je WEP (`Wep.status`: in Arbeit / fertig / exportiert, Filter und Marke in der Liste, Menü „⋯“, Abgleich über
+die WEP-Datei); „⋯“ → „Duplizieren“ (`dupliziereWep`). Tests: `format`, `preisvorschlag`, `model/__tests__/status`,
+`tools/icons/icons.test.ts`; e2e um Status, Filter, Duplizieren erweitert. Screenshots: `docs/paket1/`
+(`npm run paket1:screenshots`). `native-version` auf 2 (Icons liegen unter `android/`).
+**Noch offen:** Gerätetest (Icon im Launcher, Themen-Icon, Splash), Android-Test-Workflow am PR.
+

@@ -11,8 +11,11 @@
 import { useState, useEffect, useCallback, useRef, useId, type ChangeEvent } from 'react'
 import {
   Check,
+  CircleCheck,
+  RotateCcw,
   ChevronLeft,
   ChevronRight,
+  CopyPlus,
   Ellipsis,
   Fence,
   FileSpreadsheet,
@@ -26,15 +29,15 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react'
-import type { Wep, Position, BeseitigungsPosition, Formalien } from '@/model'
-import { loescheWep, ladeWep, speichereWep } from './db'
+import { dupliziereWep, naechsteVorgangsNr, wepStatus, type Wep, type Position, type BeseitigungsPosition, type Formalien, type WepStatus } from '@/model'
+import { alleWeps, loescheWep, ladeWep, speichereWep } from './db'
 import { SkizzeTab } from './SkizzeTab'
 import { PositionenAbschnitt } from './Positionen'
 import { PositionHinzufuegen } from './PositionHinzufuegen'
 import { PositionBearbeiten } from './PositionBearbeiten'
 import { BeseitigungFormular, beseitigungSumme } from './BeseitigungFormular'
 import type { Abschnitt } from './katalogDaten'
-import { ICON, Kopf, Laedt, LeerZustand, Meldung, Rueckfrage, SlEintrag, euroFormat } from './ui'
+import { ICON, Kopf, Laedt, LeerZustand, Meldung, Rueckfrage, SlEintrag, StatusMarke, euroFormat } from './ui'
 import { skizzeAlsPng } from '@/skizze/skizzePng'
 import { skizzeDatenZuFormen, type Kasten } from '@/export/skizzeFormen'
 import { svgZuPngBrowser } from '@/export/svgRaster'
@@ -65,6 +68,8 @@ type Maske =
 interface Props {
   wepId: string
   onZurueck: () => void
+  /** Öffnet ein anderes WEP (z. B. die Kopie nach „Duplizieren“). */
+  onOeffnen?: (wepId: string) => void
 }
 
 const BEREICHE: { id: Bereich; titel: string; kurz: string; icon: LucideIcon }[] = [
@@ -95,7 +100,7 @@ function wepTitel(wep: Wep): string {
 // Hauptkomponente
 // ---------------------------------------------------------------------------
 
-export function WepDetail({ wepId, onZurueck }: Props) {
+export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
   const [wep, setWep] = useState<Wep | null>(null)
   const [tab, setTab] = useState<Tab>('formalien')
   const [maske, setMaske] = useState<Maske | null>(null)
@@ -147,6 +152,16 @@ export function WepDetail({ wepId, onZurueck }: Props) {
   }
 
   const titel = wepTitel(wep)
+
+  async function setzeStatus(status: WepStatus) {
+    await speichere({ ...wep!, status })
+  }
+
+  async function duplizieren() {
+    const kopie = dupliziereWep(wep!, naechsteVorgangsNr(await alleWeps()))
+    await speichereWep(kopie)
+    onOeffnen?.(kopie.id)
+  }
 
   async function loeschen() {
     await loescheWep(wepId)
@@ -215,8 +230,11 @@ export function WepDetail({ wepId, onZurueck }: Props) {
               {wep.formalien.kleingartenanlage.trim() && `${wep.formalien.kleingartenanlage.trim()} · `}
               <span className="nowrap">{wep.id}</span>
             </span>
+            <span className="sl-status">
+              <StatusMarke status={wepStatus(wep)} />
+            </span>
           </div>
-          <WepMenue onLoeschen={() => setLoeschFrage(true)} />
+          <WepMenue status={wepStatus(wep)} onStatus={(st) => void setzeStatus(st)} onDuplizieren={() => void duplizieren()} onLoeschen={() => setLoeschFrage(true)} />
         </div>
         <nav className="sl-nav">
           {BEREICHE.map((b) => {
@@ -267,7 +285,7 @@ export function WepDetail({ wepId, onZurueck }: Props) {
           <>
             <Kopf
               titel={titel}
-              unter={wep.formalien.kleingartenanlage.trim() || undefined}
+              unter={[wep.formalien.kleingartenanlage.trim(), wepStatus(wep)].filter(Boolean).join(' · ')}
               links={zurueckKnopf}
               rechts={
                 <>
@@ -279,7 +297,7 @@ export function WepDetail({ wepId, onZurueck }: Props) {
                   >
                     Export
                   </button>
-                  <WepMenue onLoeschen={() => setLoeschFrage(true)} />
+                  <WepMenue status={wepStatus(wep)} onStatus={(st) => void setzeStatus(st)} onDuplizieren={() => void duplizieren()} onLoeschen={() => setLoeschFrage(true)} />
                 </>
               }
             />
@@ -306,6 +324,7 @@ export function WepDetail({ wepId, onZurueck }: Props) {
             {tab === 'export' && (
               <ExportTab
                 wep={wep}
+                onSpeichern={speichere}
                 exportZustand={exportZustand}
                 setExportZustand={setExportZustand}
                 bauExcel={bauExcel}
@@ -350,7 +369,17 @@ export function WepDetail({ wepId, onZurueck }: Props) {
 // Menü „⋯“ und Rückfrage beim Löschen
 // ---------------------------------------------------------------------------
 
-function WepMenue({ onLoeschen }: { onLoeschen: () => void }) {
+function WepMenue({
+  status,
+  onStatus,
+  onDuplizieren,
+  onLoeschen,
+}: {
+  status: WepStatus
+  onStatus: (status: WepStatus) => void
+  onDuplizieren: () => void
+  onLoeschen: () => void
+}) {
   const [offen, setOffen] = useState(false)
   const id = useId()
 
@@ -378,12 +407,59 @@ function WepMenue({ onLoeschen }: { onLoeschen: () => void }) {
         <>
           <button type="button" className="menue-hintergrund" aria-hidden="true" tabIndex={-1} onClick={() => setOffen(false)} />
           <ul className="menue" role="menu" id={id}>
+            {status !== 'fertig' && (
+              <li role="none">
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="menue-eintrag"
+                  autoFocus
+                  onClick={() => {
+                    setOffen(false)
+                    onStatus('fertig')
+                  }}
+                >
+                  <CircleCheck {...ICON} />
+                  Als fertig markieren
+                </button>
+              </li>
+            )}
+            {status !== 'in Arbeit' && (
+              <li role="none">
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="menue-eintrag"
+                  autoFocus={status === 'fertig'}
+                  onClick={() => {
+                    setOffen(false)
+                    onStatus('in Arbeit')
+                  }}
+                >
+                  <RotateCcw {...ICON} />
+                  Zurück auf „In Arbeit“
+                </button>
+              </li>
+            )}
+            <li role="none">
+              <button
+                type="button"
+                role="menuitem"
+                className="menue-eintrag"
+                onClick={() => {
+                  setOffen(false)
+                  onDuplizieren()
+                }}
+              >
+                <CopyPlus {...ICON} />
+                Duplizieren
+              </button>
+            </li>
             <li role="none">
               <button
                 type="button"
                 role="menuitem"
                 className="menue-eintrag menue-gefahr"
-                autoFocus
                 onClick={() => {
                   setOffen(false)
                   onLoeschen()
@@ -560,12 +636,14 @@ function BeseitigungTab({
 
 function ExportTab({
   wep,
+  onSpeichern,
   exportZustand,
   setExportZustand,
   bauExcel,
   setBauExcel,
 }: {
   wep: Wep
+  onSpeichern: (wep: Wep) => Promise<void>
   exportZustand: ExportZustand
   setExportZustand: (z: ExportZustand) => void
   bauExcel: File | null
@@ -636,6 +714,9 @@ function ExportTab({
       } catch (e) {
         oneDrive = `OneDrive: ${e instanceof Error ? e.message : String(e)}`
       }
+
+      // Nach gelungenem Export gilt das WEP als „exportiert“ (im Menü „⋯“ zurücksetzbar)
+      await onSpeichern({ ...wep, status: 'exportiert' })
 
       setExportZustand({ typ: 'fertig', result, oneDrive })
     } catch (err) {

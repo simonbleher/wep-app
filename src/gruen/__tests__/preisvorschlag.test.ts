@@ -44,4 +44,13 @@ describe('berechnePreisvorschlag', () => {
   it('schlecht mit beliebigem Höchstwert → immer 1,00 €', () => {
     expect(berechnePreisvorschlag(pos({ hoechstwert: 999, zustand: 'schlecht' }))).toBe(1)
   })
+
+  it('schlecht ohne Höchstwert (eigene Position) → 1,00 €', () => {
+    expect(berechnePreisvorschlag(pos({ zustand: 'schlecht' }))).toBe(1)
+  })
+
+  it('ohne Höchstwert bleibt es bei 0, solange der Zustand nicht „schlecht“ ist', () => {
+    expect(berechnePreisvorschlag(pos({ zustand: 'sehr gut' }))).toBe(0)
+    expect(berechnePreisvorschlag(pos({ zustand: 'mittel' }))).toBe(0)
+  })
 })

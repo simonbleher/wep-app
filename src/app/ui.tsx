@@ -3,9 +3,15 @@
 // Strich-Icons aus lucide-react, Farben nur über die Tokens (styles.css).
 import { useEffect, useId, type ReactNode } from 'react'
 import { CircleUser, FileText, TriangleAlert, type LucideIcon } from 'lucide-react'
+import type { WepStatus } from '@/model'
 
 /** Einheitliche Icon-Größe und Strichstärke. */
 export const ICON = { size: 22, strokeWidth: 1.75, 'aria-hidden': true } as const
+
+/** Kleine Statusmarke eines WEP: in Arbeit · fertig · exportiert. */
+export function StatusMarke({ status }: { status: WepStatus }) {
+  return <span className={`status status-${status === 'in Arbeit' ? 'arbeit' : status}`}>{status === 'in Arbeit' ? 'In Arbeit' : status.charAt(0).toUpperCase() + status.slice(1)}</span>
+}
 
 export function euroFormat(wert: number): string {
   return wert.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
