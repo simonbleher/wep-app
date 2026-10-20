@@ -6,9 +6,9 @@ import { fileURLToPath, URL } from 'node:url'
 
 const version = (JSON.parse(readFileSync('./package.json', 'utf-8')) as { version: string }).version
 
-// Theme-Farbe der WEP-App (satter Grünton, hoher Kontrast für den Außeneinsatz)
-const THEME_COLOR = '#1b5e20'
-const BACKGROUND_COLOR = '#f4f6f4'
+// Theme-Farbe der WEP-App: weiß wie Kopfzeile und Hintergrund (Design Beta 2)
+const THEME_COLOR = '#ffffff'
+const BACKGROUND_COLOR = '#ffffff'
 
 // https://vite.dev/config/
 export default defineConfig({

@@ -17,7 +17,8 @@ async function rendere(aktiv: boolean): Promise<string> {
 describe('KI-Schalter im Skizzen-Tab', () => {
   it('aus: kein Chat, kein KI-Hinweis', async () => {
     const html = await rendere(false)
-    expect(html).toContain('Skizze Außenanlagen')
+    expect(html).toContain('>Skizze</h1>')
+    expect(html).toContain('Außenanlagen &amp; Aufwuchs')
     expect(html).not.toMatch(/chat|\bKI\b|Beschreibung im Chat|Diktat/i)
   })
 

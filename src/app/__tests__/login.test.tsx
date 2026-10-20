@@ -16,8 +16,8 @@ describe('Login-Bildschirm', () => {
     expect(html.indexOf('Mit Microsoft anmelden')).toBeLessThan(
       html.indexOf('Ohne Konto fortfahren'),
     )
-    expect(html).toMatch(/class="btn btn-primary"[^>]*>Mit Microsoft anmelden/)
-    expect(html).toMatch(/class="text-knopf login-ohne"[^>]*>Ohne Konto fortfahren/)
+    expect(html).toMatch(/class="knopf knopf-primaer knopf-breit"[^>]*>Mit Microsoft anmelden/)
+    expect(html).toMatch(/class="textknopf login-ohne"[^>]*>Ohne Konto fortfahren/)
   })
 
   it('kommt ohne Emojis aus', () => {

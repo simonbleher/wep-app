@@ -130,6 +130,15 @@ erfundene Daten), Design-Tokens `src/design/tokens.css`, Screenshots Handy/Table
 (`npm run entwurf:screenshots`). Die App selbst ist unverändert. **Wartet auf Simons Freigabe**, danach
 B2-4b · Umbau der App mit den Tokens.
 
+### B2-4b · Umbau der App, Teil A 👀 (#design) – Branch design/umbau-a
+Ergebnis: App im freigegebenen Entwurfs-Stil (nur Tokens, lucide-Icons, keine Emojis): Rahmen mit Kopfzeile,
+Handy-Leiste (Formalien, Außenanlagen, Aufwuchs, Beseitigung, Skizze), Export als Aktion oben rechts,
+Tablet ≥ 900 px mit Seitenleiste; WEP-Liste mit Statuszeile Abgleich (Löschen jetzt im Menü „⋯“ der
+WEP-Ansicht mit Rückfrage); Login und Profil inkl. Android-Test-Seite; Außenanlagen/Aufwuchs mit Positionsliste,
+Warnungen, eingeklappten Hinweisen, Summe; „Position hinzufügen“ mit Varianten direkt in den Suchtreffern.
+Playwright-Durchlauf erweitert, Screenshots `docs/umbau/` (`npm run umbau:screenshots`).
+Offen (Teil B): Formalien, Beseitigung, Export und Skizze im Detail, Dunkelmodus.
+
 ## KI-Assistent (Plan: docs/KI-ASSISTENT.md)
 
 > **Abgeschaltet seit 20.10.2026** (Beta 2, Schritt 1 – Branch app/ki-aus 👀): Schalter `KI_AKTIV`,

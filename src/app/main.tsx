@@ -4,7 +4,12 @@ import { createRoot } from 'react-dom/client'
 import { Capacitor, SystemBars, SystemBarsStyle } from '@capacitor/core'
 import { registerSW } from 'virtual:pwa-register'
 import App from './App'
+import '@/design/tokens.css'
 import './styles.css'
+
+// Vorerst immer helles Farbschema: Skizzen-Editor und Android-Systemleisten sind
+// noch nicht für den Dunkelmodus eingerichtet (siehe docs/ENTSCHEIDUNGEN.md).
+document.documentElement.dataset.thema = 'hell'
 
 if (Capacitor.isNativePlatform()) {
   // Android-App: Die Dateien liegen im APK, kein Service Worker nötig (und kein

@@ -1,86 +1,48 @@
-// WepDetail – vollständige Erfassungsmaske für ein Wertermittlungsprotokoll.
+// WepDetail – Erfassung eines Wertermittlungsprotokolls.
 //
-// Abschnitte (Tabs): Formalien | Außenanlagen | Aufwuchs | Beseitigung | Export
+// Abschnitte: Formalien | Außenanlagen | Aufwuchs | Beseitigung | Skizze.
+// Handy: Kopfzeile (Zurück, Titel, Export, Menü „⋯“) und untere Leiste mit den
+// fünf Abschnitten. Tablet (≥ 900 px): Seitenleiste mit Abschnitten, Summen und Export.
+// Export ist eine Aktion, kein Abschnitt. Löschen liegt im Menü „⋯“ mit Rückfrage.
 // Jede Änderung wird sofort in IndexedDB gespeichert.
-// Mobile-optimiert: große Touch-Ziele, hoher Kontrast (CLAUDE.md).
 
+import { useState, useEffect, useCallback, useRef, useId, type ChangeEvent } from 'react'
 import {
-  useState,
-  useEffect,
-  useCallback,
-  useRef,
-  useId,
-  type ChangeEvent,
-} from 'react'
-import type {
-  Wep,
-  Position,
-  BeseitigungsPosition,
-  Formalien,
-  Hinweis,
-} from '@/model'
-import { ZUSTANDSSTUFEN } from '@/model'
-// Katalog-Typen aus @/katalog (kompatibel mit sucheKatalog / istInvasiv)
-import type {
-  Position as KatalogPosition,
-  Variante as KatalogVariante,
-  InvasiveListe,
-} from '@/katalog'
-import { sucheKatalog } from '@/katalog'
-import { ladeWep, speichereWep } from './db'
+  Check,
+  ChevronLeft,
+  Ellipsis,
+  Fence,
+  FileSpreadsheet,
+  FileText,
+  PencilRuler,
+  Plus,
+  Shovel,
+  Sprout,
+  Trash2,
+  TriangleAlert,
+  type LucideIcon,
+} from 'lucide-react'
+import type { Wep, Position, BeseitigungsPosition, Formalien } from '@/model'
+import { loescheWep, ladeWep, speichereWep } from './db'
 import { SkizzeTab } from './SkizzeTab'
+import { PositionenAbschnitt } from './Positionen'
+import { PositionHinzufuegen } from './PositionHinzufuegen'
+import type { Abschnitt } from './katalogDaten'
+import { ICON, Kopf, SlEintrag, euroFormat } from './ui'
 import { skizzeAlsPng } from '@/skizze/skizzePng'
 import { skizzeDatenZuFormen, type Kasten } from '@/export/skizzeFormen'
 import { svgZuPngBrowser } from '@/export/svgRaster'
 import { exportWep, type ExportResult } from '@/export'
 import { exportNachOneDrive } from '@/sync'
-import { berechnePreisvorschlag } from '@/gruen/preisvorschlag'
-import { berechneRegelhinweise } from '@/gruen/regelhinweise'
 import { berechneAbschnittSumme } from '@/gruen/summen'
-import { merkeZuletztVerwendet, ladeZuletztVerwendet } from '@/gruen/zuletzt'
-import {
-  gefundeneArt,
-  kurzeBezeichnung,
-  leseZahl,
-  leseZahlOder,
-  variantenMerkmale,
-  zahlDe,
-  zahlFuerEingabe,
-} from '@/gruen/format'
-
-// Statische Daten (wird einmalig beim Modulladen gelesen)
-import katalogRaw from '../../data/katalog.json'
-import invasiveRaw from '../../data/invasive.json'
-import type { Katalog } from '@/katalog'
-
-const KATALOG_POSITIONEN = (katalogRaw as unknown as Katalog).positionen
-const INVASIVE_ARTEN = (invasiveRaw as unknown as InvasiveListe).arten
+import { leseZahl, leseZahlOder, zahlDe, zahlFuerEingabe } from '@/gruen/format'
 
 // ---------------------------------------------------------------------------
 // Typen
 // ---------------------------------------------------------------------------
 
-type Tab = 'formalien' | 'aussenanlagen' | 'aufwuchs' | 'beseitigung' | 'skizze' | 'export'
-
-type Abschnitt = 'aussenanlagen' | 'aufwuchs'
-
-/** Zustand des „Position hinzufügen"-Dialogs für Außenanlagen/Aufwuchs. */
-type HinzufuegenDialog =
-  | { schritt: 'suche'; abschnitt: Abschnitt }
-  | {
-      schritt: 'variante'
-      abschnitt: Abschnitt
-      katalogPos: KatalogPosition
-      /** Über die Suche gefundene Art, z. B. „Liguster“ bei der Hecke */
-      art?: string
-    }
-  | {
-      schritt: 'formular'
-      abschnitt: Abschnitt
-      katalogPos?: KatalogPosition
-      variante?: KatalogVariante
-      art?: string
-    }
+type Bereich = 'formalien' | 'aussenanlagen' | 'aufwuchs' | 'beseitigung' | 'skizze'
+type Tab = Bereich | 'export'
 
 type ExportZustand =
   | { typ: 'idle' }
@@ -88,29 +50,41 @@ type ExportZustand =
   | { typ: 'fertig'; result: ExportResult; oneDrive?: string }
   | { typ: 'fehler'; meldung: string }
 
-// ---------------------------------------------------------------------------
-// Props
-// ---------------------------------------------------------------------------
-
 interface Props {
   wepId: string
   onZurueck: () => void
 }
 
+const BEREICHE: { id: Bereich; titel: string; kurz: string; icon: LucideIcon }[] = [
+  { id: 'formalien', titel: 'Formalien', kurz: 'Formalien', icon: FileText },
+  { id: 'aussenanlagen', titel: 'Außenanlagen', kurz: 'Außen', icon: Fence },
+  { id: 'aufwuchs', titel: 'Aufwuchs', kurz: 'Aufwuchs', icon: Sprout },
+  { id: 'beseitigung', titel: 'Beseitigung', kurz: 'Beseitigung', icon: Shovel },
+  { id: 'skizze', titel: 'Skizze', kurz: 'Skizze', icon: PencilRuler },
+]
+
 // ---------------------------------------------------------------------------
 // Hilfsfunktionen
 // ---------------------------------------------------------------------------
-
-function neuePositionId(): string {
-  return `pos-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
-}
 
 function neueBeseitigungsId(): string {
   return `bes-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
 }
 
-function euroFormat(wert: number): string {
-  return wert.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
+function beseitigungSumme(positionen: BeseitigungsPosition[]): number {
+  return positionen.reduce((s, p) => s + p.menge * p.einzelpreis * p.faktor, 0)
+}
+
+function bereichSumme(wep: Wep, b: Bereich): number | undefined {
+  if (b === 'aussenanlagen') return berechneAbschnittSumme(wep.gruen.aussenanlagen)
+  if (b === 'aufwuchs') return berechneAbschnittSumme(wep.gruen.aufwuchs)
+  if (b === 'beseitigung') return beseitigungSumme(wep.gruen.beseitigungAA)
+  return undefined
+}
+
+/** Titel für Kopf und Seitenleiste: die Parzelle, sonst die Vorgangs-Nr. */
+function wepTitel(wep: Wep): string {
+  return wep.formalien.parzelle.trim() || `WEP ${wep.id}`
 }
 
 // ---------------------------------------------------------------------------
@@ -119,8 +93,9 @@ function euroFormat(wert: number): string {
 
 export function WepDetail({ wepId, onZurueck }: Props) {
   const [wep, setWep] = useState<Wep | null>(null)
-  const [aktuellerTab, setAktuellerTab] = useState<Tab>('formalien')
-  const [dialog, setDialog] = useState<HinzufuegenDialog | null>(null)
+  const [tab, setTab] = useState<Tab>('formalien')
+  const [hinzufuegen, setHinzufuegen] = useState<Abschnitt | null>(null)
+  const [loeschFrage, setLoeschFrage] = useState(false)
   const [exportZustand, setExportZustand] = useState<ExportZustand>({ typ: 'idle' })
   const bauExcelRef = useRef<File | null>(null)
 
@@ -137,775 +112,314 @@ export function WepDetail({ wepId, onZurueck }: Props) {
     await speichereWep(neu)
   }, [])
 
+  const wechsle = useCallback((t: Tab) => {
+    setTab(t)
+    setHinzufuegen(null)
+    window.scrollTo(0, 0)
+  }, [])
+
+  const zurueckKnopf = (
+    <button type="button" className="zurueck" onClick={onZurueck}>
+      <ChevronLeft {...ICON} />
+      Protokolle
+    </button>
+  )
+
   if (!wep) {
     return (
-      <main className="seite">
-        <header className="kopf">
-          <button type="button" className="btn btn-gross" onClick={onZurueck}>
-            ← zurück
-          </button>
-        </header>
-        <p className="hinweis">Lade …</p>
-      </main>
+      <div className="rahmen">
+        <main className="inhalt">
+          <Kopf titel={`WEP ${wepId}`} links={zurueckKnopf} />
+          <div className="seitenkopf nur-tablet">{zurueckKnopf}</div>
+          <p className="leertext">Lade …</p>
+        </main>
+      </div>
     )
   }
 
-  // ---------------------------------------------------------------------------
-  // Tab-Inhalt
-  // ---------------------------------------------------------------------------
+  const titel = wepTitel(wep)
 
-  return (
-    <main className="seite">
-      <header className="kopf">
-        <button type="button" className="btn btn-gross" onClick={onZurueck}>
-          ← zurück
-        </button>
-        <h1>WEP {wep.id}</h1>
-      </header>
-
-      {/* Tab-Navigation */}
-      <TabLeiste aktiv={aktuellerTab} onChange={setAktuellerTab} />
-
-      {/* Tab-Inhalte */}
-      {aktuellerTab === 'formalien' && (
-        <FormalienTab wep={wep} onSpeichern={speichere} />
-      )}
-      {aktuellerTab === 'aussenanlagen' && (
-        <PositionenTab
-          wep={wep}
-          abschnitt="aussenanlagen"
-          dialog={dialog}
-          setDialog={setDialog}
-          onSpeichern={speichere}
-        />
-      )}
-      {aktuellerTab === 'aufwuchs' && (
-        <PositionenTab
-          wep={wep}
-          abschnitt="aufwuchs"
-          dialog={dialog}
-          setDialog={setDialog}
-          onSpeichern={speichere}
-        />
-      )}
-      {aktuellerTab === 'beseitigung' && (
-        <BeseitigungTab wep={wep} onSpeichern={speichere} />
-      )}
-      {aktuellerTab === 'skizze' && <SkizzeTab wep={wep} onSpeichern={speichere} />}
-      {aktuellerTab === 'export' && (
-        <ExportTab
-          wep={wep}
-          exportZustand={exportZustand}
-          setExportZustand={setExportZustand}
-          bauExcelRef={bauExcelRef}
-        />
-      )}
-    </main>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Tab-Leiste
-// ---------------------------------------------------------------------------
-
-const TAB_LABELS: Record<Tab, string> = {
-  formalien: 'Formalien',
-  aussenanlagen: 'Außenanlagen',
-  aufwuchs: 'Aufwuchs',
-  beseitigung: 'Beseitigung',
-  skizze: 'Skizze',
-  export: 'Export',
-}
-
-function TabLeiste({
-  aktiv,
-  onChange,
-}: {
-  aktiv: Tab
-  onChange: (t: Tab) => void
-}) {
-  return (
-    <nav className="tab-leiste" aria-label="Abschnitte">
-      {(Object.keys(TAB_LABELS) as Tab[]).map((t) => (
-        <button
-          key={t}
-          type="button"
-          className={`tab-btn${t === aktiv ? ' tab-btn-aktiv' : ''}`}
-          onClick={() => onChange(t)}
-          aria-current={t === aktiv ? 'page' : undefined}
-        >
-          {TAB_LABELS[t]}
-        </button>
-      ))}
-    </nav>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Formalien-Tab
-// ---------------------------------------------------------------------------
-
-function FormalienTab({
-  wep,
-  onSpeichern,
-}: {
-  wep: Wep
-  onSpeichern: (wep: Wep) => Promise<void>
-}) {
-  function setFeld(key: keyof Formalien, wert: string | number) {
-    const neu: Wep = {
-      ...wep,
-      formalien: { ...wep.formalien, [key]: wert },
-    }
-    void onSpeichern(neu)
+  async function loeschen() {
+    await loescheWep(wepId)
+    setLoeschFrage(false)
+    onZurueck()
   }
 
-  const f = wep.formalien
-
-  return (
-    <section className="formular">
-      <h2 className="abschnitt-titel">Formalien</h2>
-
-      <Eingabe
-        label="Kleingartenanlage"
-        wert={f.kleingartenanlage}
-        onChange={(v) => setFeld('kleingartenanlage', v)}
-      />
-      <Eingabe
-        label="Parzelle"
-        wert={f.parzelle}
-        onChange={(v) => setFeld('parzelle', v)}
-      />
-      <Eingabe
-        label="Weg (optional)"
-        wert={f.weg ?? ''}
-        onChange={(v) => setFeld('weg', v)}
-      />
-      <Eingabe
-        label="Unterpächter"
-        wert={f.unterpaechter}
-        onChange={(v) => setFeld('unterpaechter', v)}
-      />
-      <ZahlEingabe
-        label="Parzellenfläche (m²)"
-        wert={f.parzellenflaecheM2 || undefined}
-        onChange={(v) => setFeld('parzellenflaecheM2', v ?? 0)}
-      />
-      <Eingabe
-        label="Wertermittlung am (Datum)"
-        typ="date"
-        wert={f.wertermittlungAm}
-        onChange={(v) => setFeld('wertermittlungAm', v)}
-      />
-      <Eingabe
-        label="Wertermittler Außenanlagen & Aufwuchs"
-        wert={f.wertermittlerAussenAufwuchs}
-        onChange={(v) => setFeld('wertermittlerAussenAufwuchs', v)}
-      />
-      <Eingabe
-        label="Auftraggeber"
-        wert={f.auftraggeber}
-        onChange={(v) => setFeld('auftraggeber', v)}
-      />
-      <Eingabe
-        label="Anwesend für den Verein"
-        wert={f.anwesendVerein}
-        onChange={(v) => setFeld('anwesendVerein', v)}
-      />
-      <Eingabe
-        label="Anwesend für den Unterpächter"
-        wert={f.anwesendUnterpaechter}
-        onChange={(v) => setFeld('anwesendUnterpaechter', v)}
-      />
-      <Eingabe
-        label="Anwesend für den Auftraggeber"
-        wert={f.anwesendAuftraggeber}
-        onChange={(v) => setFeld('anwesendAuftraggeber', v)}
-      />
-      <Eingabe
-        label="Vorgangs-Nr."
-        wert={f.vorgangsNr}
-        onChange={(v) => setFeld('vorgangsNr', v)}
-      />
-    </section>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Positionen-Tab (Außenanlagen / Aufwuchs)
-// ---------------------------------------------------------------------------
-
-function PositionenTab({
-  wep,
-  abschnitt,
-  dialog,
-  setDialog,
-  onSpeichern,
-}: {
-  wep: Wep
-  abschnitt: Abschnitt
-  dialog: HinzufuegenDialog | null
-  setDialog: (d: HinzufuegenDialog | null) => void
-  onSpeichern: (wep: Wep) => Promise<void>
-}) {
-  const positionen =
-    abschnitt === 'aussenanlagen' ? wep.gruen.aussenanlagen : wep.gruen.aufwuchs
-
-  const titel =
-    abschnitt === 'aussenanlagen' ? 'Außenanlagen' : 'Aufwuchs'
-
-  const summe = berechneAbschnittSumme(positionen)
-
-  function loeschePosition(posId: string) {
-    const neu = positionen.filter((p) => p.id !== posId)
-    const neuWep: Wep = {
-      ...wep,
-      gruen: { ...wep.gruen, [abschnitt]: neu },
-    }
-    void onSpeichern(neuWep)
-  }
-
-  function fuegePositionHinzu(pos: Position) {
-    const neu = [...positionen, pos]
-    const neuWep: Wep = {
-      ...wep,
-      gruen: { ...wep.gruen, [abschnitt]: neu },
-    }
-    void onSpeichern(neuWep)
-    setDialog(null)
-  }
-
-  function aktuellerDialog() {
-    return dialog?.abschnitt === abschnitt ? dialog : null
+  function fuegePositionHinzu(abschnitt: Abschnitt, pos: Position) {
+    const liste = abschnitt === 'aussenanlagen' ? wep!.gruen.aussenanlagen : wep!.gruen.aufwuchs
+    void speichere({ ...wep!, gruen: { ...wep!.gruen, [abschnitt]: [...liste, pos] } })
+    setHinzufuegen(null)
+    window.scrollTo(0, document.body.scrollHeight)
   }
 
   return (
-    <section className="formular">
-      <h2 className="abschnitt-titel">{titel}</h2>
-
-      {/* Beschreibungsfeld */}
-      <Eingabe
-        label="Beschreibung (optional)"
-        mehrzeilig
-        wert={
-          abschnitt === 'aussenanlagen'
-            ? wep.gruen.beschreibungAussen
-            : wep.gruen.beschreibungAufwuchs
-        }
-        onChange={(v) => {
-          const feld =
-            abschnitt === 'aussenanlagen'
-              ? 'beschreibungAussen'
-              : 'beschreibungAufwuchs'
-          void onSpeichern({ ...wep, gruen: { ...wep.gruen, [feld]: v } })
-        }}
-      />
-
-      {/* Positionsliste */}
-      {positionen.length === 0 ? (
-        <p className="hinweis">Noch keine Positionen. Position hinzufügen ↓</p>
-      ) : (
-        <ul className="pos-liste">
-          {positionen.map((pos) => (
-            <PositionsKarte
-              key={pos.id}
-              pos={pos}
-              wep={wep}
-              onLoeschen={() => loeschePosition(pos.id)}
-            />
-          ))}
-        </ul>
-      )}
-
-      {/* Live-Summe */}
-      <div className="summen-zeile">
-        <span>Summe {titel}:</span>
-        <span className="summen-wert">{euroFormat(summe)}</span>
-      </div>
-
-      {/* Dialog: Position hinzufügen */}
-      {aktuellerDialog() === null ? (
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={() => setDialog({ schritt: 'suche', abschnitt })}
-        >
-          ➕ Position hinzufügen
-        </button>
-      ) : (
-        <PositionHinzufuegenPanel
-          dialog={aktuellerDialog()!}
-          setDialog={setDialog}
-          abschnitt={abschnitt}
-          wep={wep}
-          onHinzufuegen={fuegePositionHinzu}
-        />
-      )}
-    </section>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Positions-Karte (Anzeige einer vorhandenen Position)
-// ---------------------------------------------------------------------------
-
-function PositionsKarte({
-  pos,
-  wep,
-  onLoeschen,
-}: {
-  pos: Position
-  wep: Wep
-  onLoeschen: () => void
-}) {
-  const hinweise = berechneRegelhinweise(pos, wep, KATALOG_POSITIONEN, INVASIVE_ARTEN)
-
-  return (
-    <li className="pos-karte">
-      <div className="pos-karte-kopf">
-        <div className="pos-karte-info">
-          <span className="pos-anzahl">
-            {zahlDe(pos.anzahl)} {pos.einheit}
-          </span>
-          <span className="pos-bezeichnung">{pos.bezeichnung}</span>
-          {pos.zustand && (
-            <span className="pos-zustand">
-              Zustand: {pos.zustand}
+    <div className={hinzufuegen ? 'rahmen' : 'rahmen mit-unten'}>
+      <aside className="seitenleiste" aria-label="Abschnitte">
+        {zurueckKnopf}
+        <div className="sl-wep">
+          <div className="sl-wep-text">
+            <span className="sl-wep-titel">{titel}</span>
+            <span className="neben">
+              {wep.formalien.kleingartenanlage.trim() && `${wep.formalien.kleingartenanlage.trim()} · `}
+              <span className="nowrap">{wep.id}</span>
             </span>
-          )}
-          <span className="pos-preis">
-            {euroFormat(pos.einzelpreis)} / {pos.einheit}
-            {pos.preisManuell ? ' (manuell)' : ' (Vorschlag)'}
-          </span>
-          <span className="pos-gesamt">
-            = {euroFormat(pos.anzahl * pos.einzelpreis)}
-          </span>
+          </div>
+          <WepMenue onLoeschen={() => setLoeschFrage(true)} />
         </div>
-        <button
-          type="button"
-          className="btn btn-gefahr"
-          aria-label={`Position ${pos.bezeichnung} löschen`}
-          onClick={onLoeschen}
-        >
-          🗑️
-        </button>
-      </div>
-
-      <HinweisListe hinweise={hinweise} />
-    </li>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Panel: Position hinzufügen (Suche → Variante → Formular)
-// ---------------------------------------------------------------------------
-
-function PositionHinzufuegenPanel({
-  dialog,
-  setDialog,
-  abschnitt,
-  wep,
-  onHinzufuegen,
-}: {
-  dialog: HinzufuegenDialog
-  setDialog: (d: HinzufuegenDialog | null) => void
-  abschnitt: Abschnitt
-  wep: Wep
-  onHinzufuegen: (pos: Position) => void
-}) {
-  const [suchbegriff, setSuchbegriff] = useState('')
-  const [zuletzt] = useState<string[]>(() => ladeZuletztVerwendet())
-
-  // Suchtreffer (Katalog gefiltert nach Abschnitt)
-  const relevantePositionen = KATALOG_POSITIONEN.filter((p) =>
-    abschnitt === 'aussenanlagen'
-      ? p.abschnitt === 'II. Außenanlagen'
-      : p.abschnitt === 'III. Aufwuchs',
-  )
-
-  const treffer = sucheKatalog(relevantePositionen, suchbegriff, {
-    zuletztVerwendet: suchbegriff ? [] : zuletzt,
-    limit: 10,
-  })
-
-  if (dialog.schritt === 'suche') {
-    return (
-      <div className="panel">
-        <div className="panel-kopf">
-          <h3 className="panel-titel">Position suchen</h3>
-          <button
-            type="button"
-            className="btn"
-            onClick={() => setDialog(null)}
-          >
-            ✕ Abbrechen
-          </button>
-        </div>
-
-        <input
-          type="search"
-          className="eingabe"
-          placeholder="Bezeichnung, Pflanze …"
-          value={suchbegriff}
-          onChange={(e) => setSuchbegriff(e.target.value)}
-          autoFocus
-        />
-
-        <ul className="suche-liste">
-          {treffer.map((t) => (
-            <li key={t.position.id + (t.variante ? JSON.stringify(t.variante) : '')}>
-              <button
-                type="button"
-                className="suche-eintrag"
-                onClick={() => {
-                  merkeZuletztVerwendet(t.position.id)
-                  const art = gefundeneArt(t.position, suchbegriff)
-                  if (t.variante) {
-                    // Suchtreffer nennt schon die Variante (z. B. „Apfel Halbstamm“)
-                    setDialog({
-                      schritt: 'formular',
-                      abschnitt,
-                      katalogPos: t.position,
-                      variante: t.variante,
-                      art,
-                    })
-                  } else if (t.position.varianten && t.position.varianten.length > 0) {
-                    setDialog({ schritt: 'variante', abschnitt, katalogPos: t.position, art })
-                  } else {
-                    setDialog({ schritt: 'formular', abschnitt, katalogPos: t.position, art })
-                  }
-                }}
-              >
-                <span className="suche-bezeichnung">
-                  {t.variante
-                    ? kurzeBezeichnung(t.position, t.variante, gefundeneArt(t.position, suchbegriff))
-                    : t.position.bezeichnung}
-                </span>
-                <span className="suche-meta">
-                  {t.position.kategorie}
-                  {(t.variante?.hoechstwert ?? t.position.hoechstwert) !== undefined
-                    ? ` · bis ${euroFormat((t.variante?.hoechstwert ?? t.position.hoechstwert) as number)}`
-                    : ''}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-
-        <button
-          type="button"
-          className="btn"
-          onClick={() =>
-            setDialog({ schritt: 'formular', abschnitt })
-          }
-        >
-          ✏️ Eigene Position (Freitext)
-        </button>
-      </div>
-    )
-  }
-
-  if (dialog.schritt === 'variante') {
-    const { katalogPos, art } = dialog
-    return (
-      <div className="panel">
-        <div className="panel-kopf">
-          <h3 className="panel-titel">
-            {art ? `${art} – ${katalogPos.bezeichnung}` : katalogPos.bezeichnung}
-          </h3>
-          <button
-            type="button"
-            className="btn"
-            onClick={() => setDialog({ schritt: 'suche', abschnitt })}
-          >
-            ← zurück
-          </button>
-        </div>
-
-        <p className="hinweis-klein">Variante wählen:</p>
-        <ul className="suche-liste">
-          {(katalogPos.varianten ?? []).map((v, i) => {
-            const merkmale = variantenMerkmale(v)
+        <nav className="sl-nav">
+          {BEREICHE.map((b) => {
+            const summe = bereichSumme(wep, b.id)
             return (
-              <li key={i}>
-                <button
-                  type="button"
-                  className="suche-eintrag"
-                  onClick={() =>
-                    setDialog({
-                      schritt: 'formular',
-                      abschnitt,
-                      katalogPos,
-                      variante: v,
-                      art,
-                    })
-                  }
-                >
-                  <span className="suche-bezeichnung">{merkmale || '–'}</span>
-                  <span className="suche-meta">bis {euroFormat(v.hoechstwert)}</span>
-                </button>
-              </li>
+              <SlEintrag
+                key={b.id}
+                icon={b.icon}
+                text={b.titel}
+                wert={summe === undefined ? undefined : euroFormat(summe)}
+                aktiv={tab === b.id}
+                onClick={() => wechsle(b.id)}
+              />
             )
           })}
-        </ul>
-      </div>
-    )
-  }
+        </nav>
+        <nav className="sl-nav sl-trenner">
+          <SlEintrag icon={FileSpreadsheet} text="Export als Excel" aktiv={tab === 'export'} onClick={() => wechsle('export')} />
+        </nav>
+      </aside>
 
-  // Schritt: Formular
-  return (
-    <PositionFormular
-      abschnitt={abschnitt}
-      katalogPos={dialog.katalogPos}
-      variante={dialog.variante}
-      art={dialog.art}
-      wep={wep}
-      onZurueck={() => setDialog({ schritt: 'suche', abschnitt })}
-      onAbbrechen={() => setDialog(null)}
-      onHinzufuegen={onHinzufuegen}
-    />
+      <main className={hinzufuegen ? 'inhalt inhalt-breit' : 'inhalt'}>
+        {hinzufuegen ? (
+          <PositionHinzufuegen
+            abschnitt={hinzufuegen}
+            wep={wep}
+            onAbbrechen={() => setHinzufuegen(null)}
+            onHinzufuegen={(pos) => fuegePositionHinzu(hinzufuegen, pos)}
+          />
+        ) : (
+          <>
+            <Kopf
+              titel={titel}
+              unter={wep.formalien.kleingartenanlage.trim() || undefined}
+              links={zurueckKnopf}
+              rechts={
+                <>
+                  <button
+                    type="button"
+                    className="textknopf"
+                    aria-current={tab === 'export' ? 'page' : undefined}
+                    onClick={() => wechsle('export')}
+                  >
+                    Export
+                  </button>
+                  <WepMenue onLoeschen={() => setLoeschFrage(true)} />
+                </>
+              }
+            />
+
+            {tab === 'formalien' && <FormalienTab wep={wep} onSpeichern={speichere} />}
+            {(tab === 'aussenanlagen' || tab === 'aufwuchs') && (
+              <PositionenAbschnitt
+                key={tab}
+                wep={wep}
+                abschnitt={tab}
+                onSpeichern={speichere}
+                onHinzufuegen={() => {
+                  setHinzufuegen(tab)
+                  window.scrollTo(0, 0)
+                }}
+              />
+            )}
+            {tab === 'beseitigung' && <BeseitigungTab wep={wep} onSpeichern={speichere} />}
+            {tab === 'skizze' && <SkizzeTab wep={wep} onSpeichern={speichere} />}
+            {tab === 'export' && (
+              <ExportTab
+                wep={wep}
+                exportZustand={exportZustand}
+                setExportZustand={setExportZustand}
+                bauExcelRef={bauExcelRef}
+              />
+            )}
+          </>
+        )}
+      </main>
+
+      {!hinzufuegen && (
+        <nav className="unten nur-handy" aria-label="Abschnitte">
+          {BEREICHE.map((b) => (
+            <button
+              key={b.id}
+              type="button"
+              className="unten-knopf"
+              aria-label={b.titel}
+              aria-current={tab === b.id ? 'page' : undefined}
+              onClick={() => wechsle(b.id)}
+            >
+              <b.icon {...ICON} />
+              <span>{b.kurz}</span>
+            </button>
+          ))}
+        </nav>
+      )}
+
+      {loeschFrage && (
+        <LoeschFrage wepId={wep.id} titel={titel} onAbbrechen={() => setLoeschFrage(false)} onLoeschen={() => void loeschen()} />
+      )}
+    </div>
   )
 }
 
 // ---------------------------------------------------------------------------
-// Positions-Formular (Anzahl, Einheit, Zustand, Preis)
+// Menü „⋯“ und Rückfrage beim Löschen
 // ---------------------------------------------------------------------------
 
-function PositionFormular({
-  abschnitt: _abschnitt,
-  katalogPos,
-  variante,
-  art,
-  wep,
-  onZurueck,
-  onAbbrechen,
-  onHinzufuegen,
-}: {
-  abschnitt: Abschnitt
-  katalogPos?: KatalogPosition
-  variante?: KatalogVariante
-  art?: string
-  wep: Wep
-  onZurueck: () => void
-  onAbbrechen: () => void
-  onHinzufuegen: (pos: Position) => void
-}) {
-  const hoechstwert = variante?.hoechstwert ?? katalogPos?.hoechstwert
+function WepMenue({ onLoeschen }: { onLoeschen: () => void }) {
+  const [offen, setOffen] = useState(false)
   const id = useId()
 
-  const [bezeichnung, setBezeichnung] = useState(
-    katalogPos ? kurzeBezeichnung(katalogPos, variante, art) : '',
-  )
-  const [anzahl, setAnzahl] = useState('1')
-  const [einheit, setEinheit] = useState<string>(katalogPos?.einheit ?? 'Stück')
-  const [zustand, setZustand] = useState<Position['zustand']>('gut')
-  const [preisManuell, setPreisManuell] = useState(false)
-  const [preisEingabe, setPreisEingabe] = useState('')
-
-  // Vorgeschlagener Preis berechnen
-  const vorschlauPos: Position = {
-    id: 'tmp',
-    bezeichnung,
-    anzahl: leseZahlOder(anzahl, 0),
-    einheit,
-    zustand,
-    hoechstwert,
-    einzelpreis: 0,
-    preisManuell: false,
-    hinweise: [],
-  }
-  const preisVorschlag = berechnePreisvorschlag(vorschlauPos)
-
-  // Regelhinweise für Vorschau
-  const vorschauHinweise = berechneRegelhinweise(
-    { ...vorschlauPos, einzelpreis: preisManuell ? leseZahlOder(preisEingabe, 0) : preisVorschlag },
-    wep,
-    KATALOG_POSITIONEN,
-    INVASIVE_ARTEN,
-  )
-
-  function bestaetigen() {
-    const einzelpreis = preisManuell ? leseZahlOder(preisEingabe, 0) : preisVorschlag
-    const pos: Position = {
-      id: neuePositionId(),
-      katalogId: katalogPos?.id,
-      bezeichnung: bezeichnung.trim(),
-      anzahl: leseZahlOder(anzahl, 0),
-      einheit,
-      zustand,
-      hoechstwert,
-      einzelpreis,
-      preisManuell,
-      hinweise: vorschauHinweise,
-    }
-    onHinzufuegen(pos)
-  }
+  useEffect(() => {
+    if (!offen) return
+    const taste = (e: KeyboardEvent) => e.key === 'Escape' && setOffen(false)
+    window.addEventListener('keydown', taste)
+    return () => window.removeEventListener('keydown', taste)
+  }, [offen])
 
   return (
-    <div className="panel">
-      <div className="panel-kopf">
-        <h3 className="panel-titel">
-          {katalogPos ? kurzeBezeichnung(katalogPos, variante, art) : 'Eigene Position'}
-        </h3>
-        {katalogPos ? (
-          <button type="button" className="btn" onClick={onZurueck}>
-            ← zurück
+    <div className="menue-anker">
+      <button
+        type="button"
+        className="symbolknopf"
+        aria-label="Weitere Aktionen"
+        aria-haspopup="menu"
+        aria-expanded={offen}
+        aria-controls={offen ? id : undefined}
+        onClick={() => setOffen(!offen)}
+      >
+        <Ellipsis {...ICON} />
+      </button>
+      {offen && (
+        <>
+          <button type="button" className="menue-hintergrund" aria-hidden="true" tabIndex={-1} onClick={() => setOffen(false)} />
+          <ul className="menue" role="menu" id={id}>
+            <li role="none">
+              <button
+                type="button"
+                role="menuitem"
+                className="menue-eintrag menue-gefahr"
+                autoFocus
+                onClick={() => {
+                  setOffen(false)
+                  onLoeschen()
+                }}
+              >
+                <Trash2 {...ICON} />
+                WEP löschen …
+              </button>
+            </li>
+          </ul>
+        </>
+      )}
+    </div>
+  )
+}
+
+function LoeschFrage({
+  wepId,
+  titel,
+  onAbbrechen,
+  onLoeschen,
+}: {
+  wepId: string
+  titel: string
+  onAbbrechen: () => void
+  onLoeschen: () => void
+}) {
+  const id = useId()
+  return (
+    <div className="dialog-hintergrund">
+      <div className="dialog" role="alertdialog" aria-modal="true" aria-labelledby={`${id}-t`} aria-describedby={`${id}-d`}>
+        <h2 className="h2" id={`${id}-t`}>
+          WEP {wepId} löschen?
+        </h2>
+        <p id={`${id}-d`}>
+          {titel !== `WEP ${wepId}` ? `„${titel}“ wird` : 'Das Protokoll wird'} auf diesem Gerät gelöscht. Das lässt
+          sich nicht rückgängig machen. Eine Kopie in OneDrive bleibt erhalten.
+        </p>
+        <div className="dialog-knoepfe">
+          <button type="button" className="knopf" autoFocus onClick={onAbbrechen}>
+            Abbrechen
           </button>
-        ) : (
-          <button type="button" className="btn" onClick={onAbbrechen}>
-            ✕ Abbrechen
+          <button type="button" className="knopf knopf-gefahr" onClick={onLoeschen}>
+            Löschen
           </button>
-        )}
-      </div>
-
-      <div className="eingabe-gruppe">
-        <label className="eingabe-label" htmlFor={`${id}-bez`}>
-          Bezeichnung (steht so in der Excel)
-        </label>
-        <input
-          id={`${id}-bez`}
-          type="text"
-          className="eingabe"
-          value={bezeichnung}
-          onChange={(e) => setBezeichnung(e.target.value)}
-          placeholder="z. B. Kirschbaum, alt"
-        />
-      </div>
-
-      <div className="eingabe-gruppe">
-        <label className="eingabe-label" htmlFor={`${id}-anz`}>
-          Anzahl / Menge
-        </label>
-        <input
-          id={`${id}-anz`}
-          type="text"
-          inputMode="decimal"
-          className="eingabe"
-          value={anzahl}
-          onChange={(e) => setAnzahl(e.target.value)}
-        />
-      </div>
-
-      <div className="eingabe-gruppe">
-        <label className="eingabe-label" htmlFor={`${id}-einh`}>
-          Einheit
-        </label>
-        <select
-          id={`${id}-einh`}
-          className="eingabe"
-          value={einheit}
-          onChange={(e) => setEinheit(e.target.value)}
-        >
-          {['Stück', 'm', 'm²', 'm³', 'lfdm', 'Pauschale'].map((u) => (
-            <option key={u} value={u}>
-              {u}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="eingabe-gruppe">
-        <label className="eingabe-label" htmlFor={`${id}-zust`}>
-          Zustand
-        </label>
-        <select
-          id={`${id}-zust`}
-          className="eingabe"
-          value={zustand ?? ''}
-          onChange={(e) => setZustand(e.target.value as Position['zustand'])}
-        >
-          {(Object.keys(ZUSTANDSSTUFEN) as NonNullable<Position['zustand']>[]).map((z) => (
-            <option key={z} value={z}>
-              {z}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="eingabe-gruppe">
-        <label className="eingabe-label" htmlFor={`${id}-preis`}>
-          Einzelpreis
-        </label>
-        {preisManuell ? (
-          <div className="preis-zeile">
-            <input
-              id={`${id}-preis`}
-              type="text"
-              inputMode="decimal"
-              className="eingabe"
-              value={preisEingabe}
-              onChange={(e) => setPreisEingabe(e.target.value)}
-              placeholder="0,00"
-            />
-            <button
-              type="button"
-              className="btn"
-              onClick={() => {
-                setPreisManuell(false)
-                setPreisEingabe('')
-              }}
-            >
-              Vorschlag ({euroFormat(preisVorschlag)})
-            </button>
-          </div>
-        ) : (
-          <div className="preis-zeile">
-            <span className="preis-anzeige">{euroFormat(preisVorschlag)}</span>
-            {hoechstwert !== undefined && (
-              <span className="preis-basis">
-                (Höchstwert {euroFormat(hoechstwert)} × Faktor{' '}
-                {zahlDe(ZUSTANDSSTUFEN[zustand ?? 'gut'].faktor)})
-              </span>
-            )}
-            <button
-              type="button"
-              className="btn"
-              onClick={() => {
-                setPreisManuell(true)
-                setPreisEingabe(zahlFuerEingabe(preisVorschlag))
-              }}
-            >
-              ✏️ Überschreiben
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Vorschau-Regelhinweise */}
-      <HinweisListe hinweise={vorschauHinweise} />
-
-      <div className="panel-fuss">
-        <button
-          type="button"
-          className="btn btn-primary"
-          disabled={
-            !bezeichnung.trim() ||
-            !(leseZahl(anzahl) > 0) ||
-            (preisManuell && !Number.isFinite(leseZahl(preisEingabe)))
-          }
-          onClick={bestaetigen}
-        >
-          ✓ Hinzufügen
-        </button>
-        <button type="button" className="btn" onClick={onAbbrechen}>
-          Abbrechen
-        </button>
+        </div>
       </div>
     </div>
   )
 }
 
 // ---------------------------------------------------------------------------
-// Beseitigung-Tab
+// Formalien
 // ---------------------------------------------------------------------------
 
-function BeseitigungTab({
-  wep,
-  onSpeichern,
-}: {
-  wep: Wep
-  onSpeichern: (wep: Wep) => Promise<void>
-}) {
+function FormalienTab({ wep, onSpeichern }: { wep: Wep; onSpeichern: (wep: Wep) => Promise<void> }) {
+  function setFeld(key: keyof Formalien, wert: string | number) {
+    void onSpeichern({ ...wep, formalien: { ...wep.formalien, [key]: wert } })
+  }
+
+  const f = wep.formalien
+
+  return (
+    <>
+      <header className="seitenkopf">
+        <h1 className="h1">Formalien</h1>
+      </header>
+      <section className="formular">
+        <Eingabe label="Kleingartenanlage" wert={f.kleingartenanlage} onChange={(v) => setFeld('kleingartenanlage', v)} />
+        <div className="feld-reihe">
+          <Eingabe label="Parzelle" wert={f.parzelle} onChange={(v) => setFeld('parzelle', v)} />
+          <Eingabe label="Weg (optional)" wert={f.weg ?? ''} onChange={(v) => setFeld('weg', v)} />
+        </div>
+        <Eingabe label="Unterpächter" wert={f.unterpaechter} onChange={(v) => setFeld('unterpaechter', v)} />
+        <div className="feld-reihe">
+          <ZahlEingabe
+            label="Parzellenfläche (m²)"
+            wert={f.parzellenflaecheM2 || undefined}
+            onChange={(v) => setFeld('parzellenflaecheM2', v ?? 0)}
+          />
+          <Eingabe
+            label="Wertermittlung am"
+            typ="date"
+            wert={f.wertermittlungAm}
+            onChange={(v) => setFeld('wertermittlungAm', v)}
+          />
+        </div>
+        <Eingabe
+          label="Wertermittler Außenanlagen & Aufwuchs"
+          wert={f.wertermittlerAussenAufwuchs}
+          onChange={(v) => setFeld('wertermittlerAussenAufwuchs', v)}
+        />
+        <Eingabe label="Auftraggeber" wert={f.auftraggeber} onChange={(v) => setFeld('auftraggeber', v)} />
+        <Eingabe label="Anwesend für den Verein" wert={f.anwesendVerein} onChange={(v) => setFeld('anwesendVerein', v)} />
+        <Eingabe
+          label="Anwesend für den Unterpächter"
+          wert={f.anwesendUnterpaechter}
+          onChange={(v) => setFeld('anwesendUnterpaechter', v)}
+        />
+        <Eingabe
+          label="Anwesend für den Auftraggeber"
+          wert={f.anwesendAuftraggeber}
+          onChange={(v) => setFeld('anwesendAuftraggeber', v)}
+        />
+        <Eingabe label="Vorgangs-Nr." wert={f.vorgangsNr} onChange={(v) => setFeld('vorgangsNr', v)} />
+      </section>
+    </>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Beseitigung
+// ---------------------------------------------------------------------------
+
+function BeseitigungTab({ wep, onSpeichern }: { wep: Wep; onSpeichern: (wep: Wep) => Promise<void> }) {
   const [offen, setOffen] = useState(false)
   const [gegenstand, setGegenstand] = useState('')
   const [menge, setMenge] = useState('1')
@@ -928,11 +442,7 @@ function BeseitigungTab({
       faktor: faktorZahl,
       begruendung: faktorZahl > 1 ? begruendung : undefined,
     }
-    const neu: Wep = {
-      ...wep,
-      gruen: { ...wep.gruen, beseitigungAA: [...positionen, pos] },
-    }
-    void onSpeichern(neu)
+    void onSpeichern({ ...wep, gruen: { ...wep.gruen, beseitigungAA: [...positionen, pos] } })
     setOffen(false)
     setGegenstand('')
     setMenge('1')
@@ -942,77 +452,69 @@ function BeseitigungTab({
   }
 
   function loeschen(posId: string) {
-    const neu: Wep = {
-      ...wep,
-      gruen: { ...wep.gruen, beseitigungAA: positionen.filter((p) => p.id !== posId) },
-    }
-    void onSpeichern(neu)
+    void onSpeichern({ ...wep, gruen: { ...wep.gruen, beseitigungAA: positionen.filter((p) => p.id !== posId) } })
   }
 
   return (
-    <section className="formular">
-      <h2 className="abschnitt-titel">Beseitigungskosten (Abschnitt 2)</h2>
-      <p className="hinweis-klein">
-        Hier werden Kosten für Beseitigungen eingetragen (z. B. invasive Arten,
-        regelwidrige Anlagen). Die Richtlinie sieht für Fällen/Roden ein saisonales
-        Verbot (1. März – 30. September) vor.
+    <>
+      <header className="seitenkopf">
+        <div>
+          <h1 className="h1">Beseitigung</h1>
+          <p className="neben">Beseitigungskosten (Abschnitt 2)</p>
+        </div>
+        {!offen && (
+          <button type="button" className="knopf knopf-primaer" onClick={() => setOffen(true)}>
+            <Plus {...ICON} />
+            Hinzufügen
+          </button>
+        )}
+      </header>
+      <p className="neben block">
+        Kosten für Beseitigungen (z. B. invasive Arten, regelwidrige Anlagen). Die Richtlinie sieht für
+        Fällen/Roden ein saisonales Verbot (1. März – 30. September) vor.
       </p>
 
-      {positionen.length === 0 ? (
-        <p className="hinweis">Noch keine Beseitigungspositionen.</p>
-      ) : (
-        <ul className="pos-liste">
-          {positionen.map((pos) => (
-            <li key={pos.id} className="pos-karte">
-              <div className="pos-karte-kopf">
-                <div className="pos-karte-info">
-                  <span className="pos-bezeichnung">{pos.gegenstand}</span>
-                  <span className="pos-anzahl">
-                    {zahlDe(pos.menge)} {pos.einheit}
-                  </span>
-                  <span className="pos-preis">
-                    {euroFormat(pos.einzelpreis)} · Faktor {zahlDe(pos.faktor)}
-                  </span>
-                  <span className="pos-gesamt">
-                    = {euroFormat(pos.menge * pos.einzelpreis * pos.faktor)}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  className="btn btn-gefahr"
-                  aria-label={`${pos.gegenstand} löschen`}
-                  onClick={() => loeschen(pos.id)}
-                >
-                  🗑️
-                </button>
-              </div>
-              {pos.begruendung && (
-                <p className="pos-begruendung">Begründung: {pos.begruendung}</p>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
+      <ul className="liste">
+        {positionen.length === 0 && <li className="leertext">Noch keine Beseitigungspositionen.</li>}
+        {positionen.map((pos) => (
+          <li key={pos.id} className="zeile">
+            <span className="zeile-text">
+              <span className="zeile-titel">{pos.gegenstand}</span>
+              <span className="neben">
+                {zahlDe(pos.menge)}&nbsp;{pos.einheit} · je {euroFormat(pos.einzelpreis)} · Faktor {zahlDe(pos.faktor)}
+              </span>
+              {pos.begruendung && <span className="neben">Begründung: {pos.begruendung}</span>}
+            </span>
+            <span className="zahl c-summe">{euroFormat(pos.menge * pos.einzelpreis * pos.faktor)}</span>
+            <button
+              type="button"
+              className="symbolknopf"
+              aria-label={`${pos.gegenstand} löschen`}
+              onClick={() => loeschen(pos.id)}
+            >
+              <Trash2 {...ICON} />
+            </button>
+          </li>
+        ))}
+      </ul>
+      <div className="summe">
+        <span>Summe Beseitigung</span>
+        <span className="zahl">{euroFormat(beseitigungSumme(positionen))}</span>
+      </div>
 
-      {!offen ? (
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={() => setOffen(true)}
-        >
-          ➕ Beseitigungsposition hinzufügen
-        </button>
-      ) : (
-        <div className="panel">
-          <div className="panel-kopf">
-            <h3 className="panel-titel">Beseitigungsposition</h3>
-            <button type="button" className="btn" onClick={() => setOffen(false)}>
-              ✕ Abbrechen
+      {offen && (
+        <section className="formular" aria-labelledby={`${id}-titel`}>
+          <div className="beschreibung-kopf">
+            <h2 className="h2" id={`${id}-titel`}>
+              Beseitigungsposition
+            </h2>
+            <button type="button" className="textknopf" onClick={() => setOffen(false)}>
+              Abbrechen
             </button>
           </div>
 
-          <div className="eingabe-gruppe">
-            <label className="eingabe-label" htmlFor={`${id}-geg`}>
+          <div className="feld">
+            <label className="label" htmlFor={`${id}-geg`}>
               Gegenstand / Beschreibung
             </label>
             <input
@@ -1025,68 +527,67 @@ function BeseitigungTab({
             />
           </div>
 
-          <div className="eingabe-gruppe">
-            <label className="eingabe-label" htmlFor={`${id}-menge`}>
-              Menge
-            </label>
-            <input
-              id={`${id}-menge`}
-              type="text"
-              inputMode="decimal"
-              className="eingabe"
-              value={menge}
-              onChange={(e) => setMenge(e.target.value)}
-            />
+          <div className="feld-reihe">
+            <div className="feld">
+              <label className="label" htmlFor={`${id}-menge`}>
+                Menge
+              </label>
+              <input
+                id={`${id}-menge`}
+                type="text"
+                inputMode="decimal"
+                className="eingabe"
+                value={menge}
+                onChange={(e) => setMenge(e.target.value)}
+              />
+            </div>
+            <div className="feld">
+              <label className="label" htmlFor={`${id}-einh`}>
+                Einheit
+              </label>
+              <select id={`${id}-einh`} className="eingabe" value={einheit} onChange={(e) => setEinheit(e.target.value)}>
+                {['Stück', 'm', 'm²', 'Pauschale'].map((u) => (
+                  <option key={u} value={u}>
+                    {u}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
-          <div className="eingabe-gruppe">
-            <label className="eingabe-label" htmlFor={`${id}-einh`}>
-              Einheit
-            </label>
-            <select
-              id={`${id}-einh`}
-              className="eingabe"
-              value={einheit}
-              onChange={(e) => setEinheit(e.target.value)}
-            >
-              {['Stück', 'm', 'm²', 'Pauschale'].map((u) => (
-                <option key={u} value={u}>{u}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="eingabe-gruppe">
-            <label className="eingabe-label" htmlFor={`${id}-preis`}>
-              Einzelpreis (€)
-            </label>
-            <input
-              id={`${id}-preis`}
-              type="text"
-              inputMode="decimal"
-              className="eingabe"
-              value={einzelpreis}
-              onChange={(e) => setEinzelpreis(e.target.value)}
-              placeholder="0,00"
-            />
-          </div>
-
-          <div className="eingabe-gruppe">
-            <label className="eingabe-label" htmlFor={`${id}-faktor`}>
-              Faktor (Standard 1)
-            </label>
-            <input
-              id={`${id}-faktor`}
-              type="text"
-              inputMode="decimal"
-              className="eingabe"
-              value={faktor}
-              onChange={(e) => setFaktor(e.target.value)}
-            />
+          <div className="feld-reihe">
+            <div className="feld">
+              <label className="label" htmlFor={`${id}-preis`}>
+                Einzelpreis (€)
+              </label>
+              <input
+                id={`${id}-preis`}
+                type="text"
+                inputMode="decimal"
+                className="eingabe"
+                value={einzelpreis}
+                onChange={(e) => setEinzelpreis(e.target.value)}
+                placeholder="0,00"
+              />
+            </div>
+            <div className="feld">
+              <label className="label" htmlFor={`${id}-faktor`}>
+                Faktor (Standard 1)
+              </label>
+              <input
+                id={`${id}-faktor`}
+                type="text"
+                inputMode="decimal"
+                className="eingabe"
+                value={faktor}
+                onChange={(e) => setFaktor(e.target.value)}
+              />
+            </div>
           </div>
 
           {faktorZahl > 1 && (
-            <div className="eingabe-gruppe">
-              <label className="eingabe-label" htmlFor={`${id}-begr`}>
+            <div className="feld">
+              <label className="label" htmlFor={`${id}-begr`}>
                 Begründung (Faktor &gt; 1)
               </label>
               <input
@@ -1099,24 +600,17 @@ function BeseitigungTab({
             </div>
           )}
 
-          <div className="panel-fuss">
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={!gegenstand.trim()}
-              onClick={fuegeHinzu}
-            >
-              ✓ Hinzufügen
-            </button>
-          </div>
-        </div>
+          <button type="button" className="knopf knopf-primaer knopf-breit" disabled={!gegenstand.trim()} onClick={fuegeHinzu}>
+            Hinzufügen
+          </button>
+        </section>
       )}
-    </section>
+    </>
   )
 }
 
 // ---------------------------------------------------------------------------
-// Export-Tab
+// Export (Aktion oben rechts bzw. in der Seitenleiste)
 // ---------------------------------------------------------------------------
 
 function ExportTab({
@@ -1166,8 +660,7 @@ function ExportTab({
           : undefined
       const skizzePng =
         hatSkizze && skizze
-          ? async (o: { transparent: boolean }) =>
-              (await skizzeAlsPng(skizze, undefined, undefined, o)).arrayBuffer()
+          ? async (o: { transparent: boolean }) => (await skizzeAlsPng(skizze, undefined, undefined, o)).arrayBuffer()
           : undefined
 
       const result = await exportWep(wep, sourceBuffer, { skizzeFormen, skizzePng, skizzeAlsBild })
@@ -1203,104 +696,107 @@ function ExportTab({
   }
 
   return (
-    <section className="formular">
-      <h2 className="abschnitt-titel">Export als Excel-Datei</h2>
+    <>
+      <header className="seitenkopf">
+        <h1 className="h1">Export als Excel</h1>
+      </header>
+      <section className="formular">
+        <p className="neben">
+          Die App schreibt die Grün-Daten in die WEP-Vorlage. Bau-Blätter werden nicht verändert. Falls der
+          Bau-Wertermittler seine Excel-Datei bereits ausgefüllt hat, diese hier hochladen – andernfalls wird die
+          leere Vorlage verwendet.
+        </p>
 
-      <p className="hinweis">
-        Die App schreibt die Grün-Daten in die WEP-Vorlage. Bau-Blätter werden
-        nicht verändert. Falls der Bau-Wertermittler seine Excel-Datei bereits
-        ausgefüllt hat, diese hier hochladen – andernfalls wird die leere
-        Vorlage verwendet.
-      </p>
-
-      <div className="eingabe-gruppe">
-        <label className="eingabe-label" htmlFor="bau-excel">
-          Bau-Excel (optional, bereits ausgefüllte Vorlage)
-        </label>
-        <input
-          id="bau-excel"
-          type="file"
-          className="eingabe"
-          accept=".xlsx"
-          onChange={onBauExcelChange}
-        />
-      </div>
-
-      {wep.skizze?.elemente.length ? (
-        <label className="hinweis-klein">
-          <input
-            type="checkbox"
-            checked={skizzeAlsBild}
-            onChange={(e) => setSkizzeAlsBild(e.target.checked)}
-          />{' '}
-          Skizze als Bild statt als bearbeitbare Formen einfügen
-        </label>
-      ) : null}
-
-      <button
-        type="button"
-        className="btn btn-primary"
-        disabled={exportZustand.typ === 'laedt'}
-        onClick={() => void exportieren()}
-      >
-        {exportZustand.typ === 'laedt' ? '⏳ Exportiere …' : '⬇️ Excel exportieren'}
-      </button>
-
-      {exportZustand.typ === 'fehler' && (
-        <p className="hinweis hinweis-warnung">Fehler: {exportZustand.meldung}</p>
-      )}
-
-      {exportZustand.typ === 'fertig' && (
-        <div className="export-ergebnis">
-          <p className="hinweis hinweis-ok">
-            ✅ Export erfolgreich: {exportZustand.result.filename}
-          </p>
-          {exportZustand.oneDrive && <p className="hinweis-klein">{exportZustand.oneDrive}</p>}
-          {exportZustand.result.skizzeEingefuegt && (
-            <p className="hinweis-klein">
-              🖍️ Skizze ins Blatt „Skizze Außenanlage-Aufwuchs“ eingefügt
-              {exportZustand.result.skizzeFormen ? ' (bearbeitbare Excel-Formen).' : ' (als Bild).'}
-            </p>
-          )}
-
-          {exportZustand.result.konflikte.length > 0 && (
-            <div>
-              <p className="hinweis-klein hinweis-warnung-titel">
-                ⚠️ Folgende Formalien-Felder waren in der Bau-Excel bereits
-                gefüllt und wurden nicht überschrieben:
-              </p>
-              <ul className="konflikte-liste">
-                {exportZustand.result.konflikte.map((k) => (
-                  <li key={k.feld} className="konflikt-eintrag">
-                    <strong>{k.feld}</strong> (Zelle {k.zelle}):
-                    Bau-Excel: „{k.bauExcelWert}" · App: „{k.appWert}"
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {exportZustand.result.aufwuchsUeberlauf && (
-            <p className="hinweis hinweis-warnung">
-              ⚠️ Aufwuchs-Positionen laufen auf Anlage III a (Aufwuchs II)
-              über (mehr als 28 Positionen in Aufwuchs I).
-            </p>
-          )}
-
-          {exportZustand.result.aufwuchsAbgeschnitten && (
-            <p className="hinweis hinweis-warnung">
-              ⚠️ Es gibt mehr als 64 Aufwuchs-Positionen. Überschüssige Positionen
-              wurden nicht exportiert – Positionen zusammenfassen.
-            </p>
-          )}
+        <div className="feld">
+          <label className="label" htmlFor="bau-excel">
+            Bau-Excel (optional, bereits ausgefüllte Vorlage)
+          </label>
+          <input id="bau-excel" type="file" className="eingabe" accept=".xlsx" onChange={onBauExcelChange} />
         </div>
-      )}
-    </section>
+
+        {wep.skizze?.elemente.length ? (
+          <label className="ankreuzen">
+            <input type="checkbox" checked={skizzeAlsBild} onChange={(e) => setSkizzeAlsBild(e.target.checked)} />
+            <span>Skizze als Bild statt als bearbeitbare Formen einfügen</span>
+          </label>
+        ) : null}
+
+        <button
+          type="button"
+          className="knopf knopf-primaer knopf-breit"
+          disabled={exportZustand.typ === 'laedt'}
+          onClick={() => void exportieren()}
+        >
+          <FileSpreadsheet {...ICON} />
+          {exportZustand.typ === 'laedt' ? 'Exportiere …' : 'Excel exportieren'}
+        </button>
+
+        {exportZustand.typ === 'fehler' && (
+          <p className="warnung" role="alert">
+            <TriangleAlert {...ICON} size={20} />
+            <span>Fehler: {exportZustand.meldung}</span>
+          </p>
+        )}
+
+        {exportZustand.typ === 'fertig' && (
+          <div className="block">
+            <p className="ok zeile">
+              <Check {...ICON} />
+              <span>Export erfolgreich: {exportZustand.result.filename}</span>
+            </p>
+            {exportZustand.oneDrive && <p className="neben">{exportZustand.oneDrive}</p>}
+            {exportZustand.result.skizzeEingefuegt && (
+              <p className="neben">
+                Skizze ins Blatt „Skizze Außenanlage-Aufwuchs“ eingefügt
+                {exportZustand.result.skizzeFormen ? ' (bearbeitbare Excel-Formen).' : ' (als Bild).'}
+              </p>
+            )}
+
+            {exportZustand.result.konflikte.length > 0 && (
+              <div className="warnung" role="note">
+                <TriangleAlert {...ICON} size={20} />
+                <div>
+                  <p>
+                    Folgende Formalien-Felder waren in der Bau-Excel bereits gefüllt und wurden nicht überschrieben:
+                  </p>
+                  <ul>
+                    {exportZustand.result.konflikte.map((k) => (
+                      <li key={k.feld}>
+                        <strong>{k.feld}</strong> (Zelle {k.zelle}): Bau-Excel: „{k.bauExcelWert}“ · App: „{k.appWert}“
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {exportZustand.result.aufwuchsUeberlauf && (
+              <p className="warnung" role="note">
+                <TriangleAlert {...ICON} size={20} />
+                <span>
+                  Aufwuchs-Positionen laufen auf Anlage III a (Aufwuchs II) über (mehr als 28 Positionen in Aufwuchs I).
+                </span>
+              </p>
+            )}
+
+            {exportZustand.result.aufwuchsAbgeschnitten && (
+              <p className="warnung" role="note">
+                <TriangleAlert {...ICON} size={20} />
+                <span>
+                  Es gibt mehr als 64 Aufwuchs-Positionen. Überschüssige Positionen wurden nicht exportiert –
+                  Positionen zusammenfassen.
+                </span>
+              </p>
+            )}
+          </div>
+        )}
+      </section>
+    </>
   )
 }
 
 // ---------------------------------------------------------------------------
-// Wiederverwendbare UI-Bausteine
+// Wiederverwendbare Eingaben
 // ---------------------------------------------------------------------------
 
 function Eingabe({
@@ -1308,37 +804,19 @@ function Eingabe({
   wert,
   onChange,
   typ = 'text',
-  mehrzeilig = false,
 }: {
   label: string
   wert: string
   onChange: (v: string) => void
   typ?: string
-  mehrzeilig?: boolean
 }) {
   const id = useId()
   return (
-    <div className="eingabe-gruppe">
-      <label className="eingabe-label" htmlFor={id}>
+    <div className="feld">
+      <label className="label" htmlFor={id}>
         {label}
       </label>
-      {mehrzeilig ? (
-        <textarea
-          id={id}
-          className="eingabe"
-          rows={3}
-          value={wert}
-          onChange={(e) => onChange(e.target.value)}
-        />
-      ) : (
-        <input
-          id={id}
-          type={typ}
-          className="eingabe"
-          value={wert}
-          onChange={(e) => onChange(e.target.value)}
-        />
-      )}
+      <input id={id} type={typ} className="eingabe" value={wert} onChange={(e) => onChange(e.target.value)} />
     </div>
   )
 }
@@ -1359,8 +837,8 @@ function ZahlEingabe({
   const id = useId()
   const [text, setText] = useState(wert === undefined ? '' : zahlFuerEingabe(wert))
   return (
-    <div className="eingabe-gruppe">
-      <label className="eingabe-label" htmlFor={id}>
+    <div className="feld">
+      <label className="label" htmlFor={id}>
         {label}
       </label>
       <input
@@ -1377,42 +855,5 @@ function ZahlEingabe({
         }}
       />
     </div>
-  )
-}
-
-/**
- * Regelhinweise: Warnungen immer sichtbar, reine Info-Texte (Richtlinien-
- * Erläuterungen) eingeklappt, damit die Positionsliste übersichtlich bleibt.
- */
-function HinweisListe({ hinweise }: { hinweise: Hinweis[] }) {
-  const warnungen = hinweise.filter((h) => h.schwere === 'warnung')
-  const infos = hinweise.filter((h) => h.schwere !== 'warnung')
-  return (
-    <>
-      {warnungen.map((h, i) => (
-        <HinweisAnzeige key={`w${i}`} hinweis={h} />
-      ))}
-      {infos.length > 0 && (
-        <details className="hinweis-details">
-          <summary className="hinweis-klein">
-            ℹ️ {infos.length === 1 ? '1 Hinweis' : `${infos.length} Hinweise`} zur Richtlinie
-          </summary>
-          {infos.map((h, i) => (
-            <HinweisAnzeige key={`i${i}`} hinweis={h} />
-          ))}
-        </details>
-      )}
-    </>
-  )
-}
-
-function HinweisAnzeige({ hinweis }: { hinweis: Hinweis }) {
-  const klasse =
-    hinweis.schwere === 'warnung' ? 'hinweis hinweis-warnung' : 'hinweis hinweis-info'
-  const icon = hinweis.schwere === 'warnung' ? '⚠️' : 'ℹ️'
-  return (
-    <p className={klasse}>
-      {icon} {hinweis.text}
-    </p>
   )
 }
