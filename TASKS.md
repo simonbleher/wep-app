@@ -1,6 +1,6 @@
 # Aufgaben
 
-Status: ⬜ offen · 🔄 in Arbeit · 👀 PR offen · ✅ erledigt
+Status: ⬜ offen · 🔄 in Arbeit · ✅ PR offen · ✅ erledigt
 
 Jede Aufgabe wird in ihrem Slack-Channel als **eigener Thread** gestartet.
 Der fertige Prompt steht jeweils darunter.
@@ -31,7 +31,7 @@ Stand: Branch katalog/bewrl-katalog – katalog.json (52 Positionen inkl. S. 18 
 > tippfehlertolerant, findet auch Arten-Namen (Apfel → Obstgehölz), sortiert ohne
 > Suchbegriff nach relevanz und "zuletzt verwendet". Mit Unit-Tests. PR.
 
-### K3 · Kleinigkeit Suche 👀 (#katalog)
+### K3 · Kleinigkeit Suche ✅ (#katalog)
 > „Insektenhotel“ findet das Ökologische Objekt nicht: Varianten-Feld `typ` in die
 > Suche aufnehmen (src/katalog/suche.ts) und testen. PR.
 
@@ -42,20 +42,20 @@ Stand: Branch katalog/bewrl-katalog – katalog.json (52 Positionen inkl. S. 18 
 > Freien → große Bedienelemente, hoher Kontrast. Lege src/model/ mit den Typen aus
 > der Architektur an. Startseite: Liste der WEPs + „Neues WEP“. PR.
 
-### A2 · Erfassung Formalien + Aufwuchs + Außenanlagen 👀 (#app-gruen) – nach A1, K2
+### A2 · Erfassung Formalien + Aufwuchs + Außenanlagen ✅ (#app-gruen) – nach A1, K2
 > Baue die Erfassungsmasken: Formalien, Außenanlagen, Aufwuchs. Position hinzufügen
 > über Schnellsuche (src/katalog), dann Anzahl, Einheit, Zustand, Preis
 > (Vorschlag = Höchstwert × Zustand, überschreibbar), eigene Pflanze per Freitext.
 > Regel-Warnungen anzeigen, nicht blockieren. Live-Summe. PR.
 
-### A3 · Verbesserungen Erfassung 👀 (#app-gruen) – nach A2 (von der Leitung selbst umgesetzt)
+### A3 · Verbesserungen Erfassung ✅ (#app-gruen) – nach A2 (von der Leitung selbst umgesetzt)
 > Kürzere Bezeichnungen mit gefundener Art („Liguster-Hecke (Laub, einfache Art)“,
 > „Apfel, Halbstamm, 5–30 J.“), Bezeichnung immer editierbar; Variante aus dem
 > Suchtreffer übernehmen (Variantenschritt überspringen); Richtlinien-Infos in der
 > Positionsliste einklappbar, Warnungen bleiben sichtbar; deutsche Zahlen (Komma
 > bei Eingabe und Anzeige, Faktor 0,75); alle Labels mit ihren Feldern verknüpft. PR.
 
-### E1 · Excel-Export: Bau-Excel + App → fertiges WEP 👀 (#export) – PR #7
+### E1 · Excel-Export: Bau-Excel + App → fertiges WEP ✅ (#export) – PR #7
 > Lies CLAUDE.md und docs/ARCHITEKTUR.md (Abschnitte „Beta-Umfang“ und Zellen-Mapping).
 > Schreibe src/export/: Eingabe ist ein Wep-Objekt aus der App plus **optional eine
 > Bau-Excel** (die WEP-Vorlage, in der der Bau-Wertermittler seine Blätter schon
@@ -70,13 +70,13 @@ Stand: Branch katalog/bewrl-katalog – katalog.json (52 Positionen inkl. S. 18 
 > exportieren, mit LibreOffice neu berechnen, Summen prüfen, und prüfen, dass
 > Bau-Blätter byte-gleich bleiben. PR.
 
-### E2 · Skizze als Bild in die Excel 👀 (#export) – von der Leitung umgesetzt
+### E2 · Skizze als Bild in die Excel ✅ (#export) – von der Leitung umgesetzt
 > `exportWep(wep, excel, { skizzePng })` fügt das PNG ins Blatt „Skizze
 > Außenanlage-Aufwuchs“ ein (Bereich B7:G48, Seitenverhältnis bleibt, zentriert).
 > Erneuter Export ersetzt die alte App-Skizze. Bau-Blätter unverändert. Die App
 > übergibt das PNG (skizzeAlsPng) im Export-Tab, sobald S2 gemerged ist.
 
-### E3 · Grün-Skizze als native Excel-Formen 👀 (#export) – Branch export/skizze-formen
+### E3 · Grün-Skizze als native Excel-Formen ✅ (#export) – Branch export/skizze-formen
 > `exportWep(wep, excel, { skizzeFormen })` schreibt die Skizze als bearbeitbare Formen
 > (`xdr:sp`/`cxnSp`/`pic` mit SVG + PNG-Fallback) an das vorhandene Drawing von „Skizze
 > Außenanlage-Aufwuchs“; Bau-Kopie und Vorlagen-Textfelder bleiben byte-gleich, erneuter
@@ -86,17 +86,17 @@ Stand: Branch katalog/bewrl-katalog – katalog.json (52 Positionen inkl. S. 18 
 > Offen: Sichtprüfung in echtem Excel (nur LibreOffice getestet), Editor mit den neuen
 > Elementtypen (Hecke, Baum …) – bis dahin erzeugt nur die KI-Strecke Lageplan-Elemente.
 
-### S1 · Einfaches Skizzen-Tool 👀 (#skizze) – PR #9, nach A1
+### S1 · Einfaches Skizzen-Tool ✅ (#skizze) – PR #9, nach A1
 > Einfache Zeichenfläche für die Parzellenskizze: Rechteck, Linie, Kreis (Baum),
 > Text, Maßangabe, Rückgängig. Speichern als JSON, Export als PNG für die Vorlage.
 > Touch-tauglich. Vorläufige Lösung, wird später ersetzt – also schlank halten. PR.
 
-### S2 · Skizze in die Erfassung einbauen 👀 (#skizze) – von der Leitung umgesetzt (Agent-PR #15 lag auf veraltetem Stand)
+### S2 · Skizze in die Erfassung einbauen ✅ (#skizze) – von der Leitung umgesetzt (Agent-PR #15 lag auf veraltetem Stand)
 > Tab „Skizze“ zwischen Beseitigung und Export mit dem SkizzeEditor, Speichern
 > entprellt in `wep.skizze` (beim Verlassen sofort), Excel-Export fügt die Skizze
 > automatisch ins Blatt „Skizze Außenanlage-Aufwuchs“ ein (E2).
 
-### Y1 · Sync über Simons privates OneDrive 👀 (#sync) – PR #8, Anleitung in docs/SYNC.md
+### Y1 · Sync über Simons privates OneDrive ✅ (#sync) – PR #8, Anleitung in docs/SYNC.md
 > Lies CLAUDE.md und docs/ARCHITEKTUR.md (Abschnitt „Beta-Umfang“). Implementiere in
 > src/sync/ die Synchronisation der WEPs zwischen Simons Geräten über sein privates
 > OneDrive: Microsoft Graph, Anmeldung mit MSAL.js (Authorization Code + PKCE, privates
@@ -111,26 +111,26 @@ Stand: Branch katalog/bewrl-katalog – katalog.json (52 Positionen inkl. S. 18 
 
 ## Beta 2 (Plan: docs/PLAN-BETA2.md)
 
-### B2-2 · Konto, Login, Profil, Ordnerstruktur 👀 (#app-gruen) – Branch app/konto-profil
+### B2-2 · Konto, Login, Profil, Ordnerstruktur ✅ (#app-gruen) – Branch app/konto-profil
 Ergebnis: Konto-Modul `src/konto/` (Web/MSAL, Schnittstelle für die spätere Android-Umsetzung),
 Login-Bildschirm mit „Ohne Konto fortfahren“, Profil-Bildschirm, Ordner `daten/` · `Exporte/` ·
 `LIESMICH.txt` im OneDrive (Migration beim ersten Abgleich), Excel-Export zusätzlich nach `Exporte/`
 (Warteschlange offline), Profil-Abgleich über `daten/profil.json`. Playwright-Durchlauf: `npm run e2e`.
 Details: docs/SYNC.md, docs/ENTSCHEIDUNGEN.md. Offen: Schritt 4 (Design).
 
-### B2-3 · Android-Test-APK 👀 (#app-gruen) – Branch android/test-apk
+### B2-3 · Android-Test-APK ✅ (#app-gruen) – Branch android/test-apk
 Ergebnis: Capacitor-Hülle (`android/`, App-ID `de.wep.app`), Android-Anmeldung `src/konto/android.ts`
 (System-Browser + PKCE, Token nativ), Hintergrund-Upload (WorkManager, Warteschlange, eigenes
 Kotlin-Plugin), Test-Seite im Profil, Workflow „Android Test-APK“. **Nur Machbarkeitstest**, noch nicht
 auf einem Gerät erprobt. Anleitung und Grenzen: docs/ANDROID.md. Offen: Schritt 4 (Design), 5 (fertige APK).
 
-### B2-4a · Design-Entwürfe 👀 (#design) – Branch design/entwurf
+### B2-4a · Design-Entwürfe ✅ (#design) – Branch design/entwurf
 Ergebnis: eigenständige Vorschau `entwurf.html` (WEP-Liste, Erfassung Aufwuchs, Position hinzufügen;
 erfundene Daten), Design-Tokens `src/design/tokens.css`, Screenshots Handy/Tablet in `docs/entwurf/`
 (`npm run entwurf:screenshots`). Die App selbst ist unverändert. **Wartet auf Simons Freigabe**, danach
 B2-4b · Umbau der App mit den Tokens.
 
-### B2-4b · Umbau der App, Teil A 👀 (#design) – Branch design/umbau-a
+### B2-4b · Umbau der App, Teil A ✅ (#design) – Branch design/umbau-a
 Ergebnis: App im freigegebenen Entwurfs-Stil (nur Tokens, lucide-Icons, keine Emojis): Rahmen mit Kopfzeile,
 Handy-Leiste (Formalien, Außenanlagen, Aufwuchs, Beseitigung, Skizze), Export als Aktion oben rechts,
 Tablet ≥ 900 px mit Seitenleiste; WEP-Liste mit Statuszeile Abgleich (Löschen jetzt im Menü „⋯“ der
@@ -139,7 +139,7 @@ Warnungen, eingeklappten Hinweisen, Summe; „Position hinzufügen“ mit Varian
 Playwright-Durchlauf erweitert, Screenshots `docs/umbau/` (`npm run umbau:screenshots`).
 Offen (Teil B): Formalien, Beseitigung, Export und Skizze im Detail, Dunkelmodus.
 
-### B2-4c · Umbau der App, Teil B 👀 (#design) – Branch design/umbau-b
+### B2-4c · Umbau der App, Teil B ✅ (#design) – Branch design/umbau-b
 Ergebnis: Formalien (gruppiert), Beseitigung (Liste + Formular), Export (bei gewählter Bau-Excel, Ergebnis,
 Hinweise) und Skizze (lucide-Werkzeugleiste, Dialoge Text/Baumart/Maß, Berührflächen ≥ 48 px, Zeichenfläche
 unverändert) im Entwurfs-Stil; gemeinsame Bausteine `Dialog`, `Rueckfrage`, `LeerZustand`, `Meldung` in
@@ -150,7 +150,7 @@ Aufgeräumt: `entwurf.html`, zweiter Vite-Einstieg, Service-Worker-Ausnahme, `sr
 `tools/entwurf/` entfernt (`docs/entwurf/` bleibt als Referenz). Tests (`umbauB.test.tsx`), Playwright-Durchlauf
 und Screenshots (`docs/umbau/`) erweitert. Offen: Dunkelmodus.
 
-### B2-5 · Fertige APK 👀 (#app-gruen) – Branch android/release
+### B2-5 · Fertige APK ✅ (#app-gruen) – Branch android/release
 Ergebnis: Workflows „Android-Schlüssel erzeugen“ (einmalig, manuell) und „Android Release“ (Push auf
 `main` + manuell; signierte APK als GitHub Release „WEP <Version> (<Code>)“; ohne Secrets Abbruch mit
 Meldung), `version.json` im Web-Build, Update-Hinweis in der Android-App (`src/android/update.ts`,
@@ -160,10 +160,10 @@ Drücken auf die Version); Update-Hinweis vergleicht Commit + Bauzeit, Release-W
 
 ## KI-Assistent (Plan: docs/KI-ASSISTENT.md)
 
-> **Abgeschaltet seit 20.10.2026** (Beta 2, Schritt 1 – Branch app/ki-aus 👀): Schalter `KI_AKTIV`,
+> **Abgeschaltet seit 20.10.2026** (Beta 2, Schritt 1 – Branch app/ki-aus ✅): Schalter `KI_AKTIV`,
 > Code bleibt. Einschalten: docs/KI-ASSISTENT.md.
 
-### K-A0 · KI-Testlauf 👀 (#00-leitung) – Branch ki/testlauf
+### K-A0 · KI-Testlauf ✅ (#00-leitung) – Branch ki/testlauf
 Ergebnis: `tools/ki-test/` (`npm run ki-test`), Prompt `tools/ki-test/prompt-aufnahme.md`,
 3 erfundene Testfälle, Bericht `tools/ki-test/ergebnis.md`. Fotos handschriftlicher Listen
 ergänzt Simon in `tools/ki-test/faelle/<name>/eingabe.jpg`.
@@ -178,12 +178,12 @@ ergänzt Simon in `tools/ki-test/faelle/<name>/eingabe.jpg`.
 - ~~OneDrive des BV~~ → Beta: privates OneDrive von Simon (BV-OneDrive später)
 - Blätter „Anl IV Schuppen“ / „Anl IV Dach“ (versteckt, viele #REF!): noch gebraucht?
 
-### K-B0 · Skizzen-Testlauf 👀 (#00-leitung) – Branch ki/skizze-test
+### K-B0 · Skizzen-Testlauf ✅ (#00-leitung) – Branch ki/skizze-test
 Ergebnis: `npm run ki-test-skizze`, Übersicht `tools/ki-test/ergebnis-skizze.html`, Fall 1 mit
 `soll.json` (Entwurf, offene Fragen im PR). Assistent A: Eingabe nur Text/.docx (Fall 04).
 Export-Sofortfix: PNG transparent, wenn das Blatt schon Formen hat. Weiterführung: E3.
 
-### K-B1 · Skizzen-Chat 👀 (#00-leitung) – Branch ki/skizze-chat
+### K-B1 · Skizzen-Chat ✅ (#00-leitung) – Branch ki/skizze-chat
 Ergebnis: `functions/api/ki/skizze-chat.ts` (+ `functions/_lib/`), Szene-Modell und Operationen in
 `src/skizze/` (`szene.ts`, `operationen.ts`, `chatWerkzeuge.ts`, `chatAblauf.ts`), Chat-Leiste
 `SkizzeChat.tsx` im Skizze-Tab, neue Symbole (Editor, PNG, Excel-Formen), Replay `npm run ki-test-chat`
