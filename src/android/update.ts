@@ -26,6 +26,8 @@ export interface VersionInfo {
   nativeVersion?: number
   /** Live-Update-Paket (zip des Web-Builds, nur wenn der Commit bekannt ist). */
   bundleUrl?: string
+  /** SHA-256 (hex, klein) des Pakets; das Update-Plugin verlangt sie. */
+  bundleSha256?: string
   releaseUrl: string
 }
 
@@ -86,7 +88,7 @@ export function entscheideUpdate(
   // Ein Web-Teil läuft nur auf genau dem nativen Teil, für den er gebaut wurde.
   if (nativNeu === undefined) return { art: 'keins', grund: 'Paket ohne nativeVersion' }
   if (nativNeu !== opt.nativInstalliert) return { art: 'keins', grund: 'Paket passt nicht zur installierten App' }
-  if (!neueste.bundleUrl || !neueste.commit) return { art: 'keins', grund: 'kein Paket' }
+  if (!neueste.bundleUrl || !neueste.commit || !neueste.bundleSha256) return { art: 'keins', grund: 'kein Paket' }
   if (opt.fehlgeschlagen?.includes(neueste.commit)) return { art: 'keins', grund: 'Rückfall nach Fehlstart' }
   if (opt.bereitCommit === neueste.commit) return { art: 'keins', grund: 'schon geladen, wartet auf Neustart' }
   return { art: 'live', grund: 'neuer Commit, passender nativer Teil' }
@@ -109,6 +111,8 @@ export function alsVersion(d: unknown): VersionInfo | null {
     gebautAm: text(v.gebautAm),
     nativeVersion: zahl(v.nativeVersion),
     bundleUrl: typeof v.bundleUrl === 'string' && v.bundleUrl.startsWith('https://') ? v.bundleUrl : undefined,
+    bundleSha256:
+      typeof v.bundleSha256 === 'string' && /^[0-9a-f]{64}$/.test(v.bundleSha256) ? v.bundleSha256 : undefined,
     releaseUrl: typeof v.releaseUrl === 'string' && v.releaseUrl.startsWith('https://') ? v.releaseUrl : '',
   }
 }

@@ -8,12 +8,13 @@ const neu = {
   gebautAm: '2026-10-20T13:00:00Z',
   nativeVersion: 1,
   bundleUrl: 'https://wep-pankow.pages.dev/updates/b.zip',
+  bundleSha256: 'ab'.repeat(32),
 }
 
 function bauDeps(o: { gehostet?: object; bundles?: { id: string; version: string; status: string }[]; unmetered?: boolean; nurWlan?: boolean; online?: boolean; gemerkt?: Partial<GemerkterStand> } = {}) {
   let gemerkt: GemerkterStand = { fehlgeschlagen: [], ...o.gemerkt }
   const updater = {
-    download: vi.fn(async ({ version }: { url: string; version: string }) => ({ id: `id-${version}`, version })),
+    download: vi.fn(async ({ version }: { url: string; version: string; checksum: string }) => ({ id: `id-${version}`, version })),
     next: vi.fn(async () => undefined),
     list: vi.fn(async () => ({ bundles: o.bundles ?? [] })),
   }
@@ -36,7 +37,7 @@ describe('pruefeAufUpdate (Live-Update)', () => {
     const t = bauDeps()
     const s = await pruefeAufUpdate(t.deps)
     expect(s.art).toBe('live-bereit')
-    expect(t.updater.download).toHaveBeenCalledWith({ url: neu.bundleUrl, version: 'b' })
+    expect(t.updater.download).toHaveBeenCalledWith({ url: neu.bundleUrl, version: 'b', checksum: neu.bundleSha256 })
     expect(t.updater.next).toHaveBeenCalledWith({ id: 'id-b' })
     expect(t.gemerkt().bereitCommit).toBe('b')
   })
