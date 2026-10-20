@@ -339,7 +339,8 @@ describe('Graph-Client', () => {
   it('Verschieben: Konflikt 409 heißt „vorhanden“, ein fehlender Zielordner wird angelegt', async () => {
     const aufrufe: string[] = []
     const holen = (async (url: string, init?: RequestInit) => {
-      aufrufe.push(`${init?.method ?? 'GET'} ${url.replace(/^.*approot/, '')}`)
+      aufrufe.push(`${init?.method ?? 'GET'} ${url.replace(/^.*\/me\/drive/, '')}`)
+      if (url.endsWith('approot?$select=id')) return new Response('{"id":"ROOT"}')
       if (url.includes('?$select=id')) return new Response('', { status: 404 })
       if (init?.method === 'POST') return new Response('{"id":"NEU"}')
       return new Response('', { status: 409 })
@@ -348,9 +349,10 @@ describe('Graph-Client', () => {
     const wurzel = erstelleGraphClient(async () => 'T', holen)
     expect(await wurzel.verschiebe('a.json', 'daten')).toBe('vorhanden')
     expect(aufrufe).toEqual([
-      'GET :/daten?$select=id',
-      'POST /children',
-      'PATCH :/a.json:',
+      'GET /special/approot:/daten?$select=id',
+      'GET /special/approot?$select=id',
+      'POST /items/ROOT/children',
+      'PATCH /special/approot:/a.json:',
     ])
   })
 
