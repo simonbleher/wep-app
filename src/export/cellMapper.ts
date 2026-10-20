@@ -215,5 +215,14 @@ export function formalienWertAlsString(
   if (def.typ === 'datum' && typeof roherWert === 'string') {
     return formatDatumDe(roherWert)
   }
+  // Eine Fläche von 0 heißt „noch nicht eingetragen“ (neues WEP), nicht „0 m²“
+  if (def.typ === 'number' && !(Number(roherWert) > 0)) return ''
   return String(roherWert)
+}
+
+/** Umkehrung von `isoDateToExcelSerial`: Seriennummer (1900-System) → "YYYY-MM-DD"; null bei Unsinn. */
+export function excelSerialToIso(serial: number): string | null {
+  if (!Number.isFinite(serial) || serial < 1 || serial > 2958465) return null
+  const d = new Date(Date.UTC(1899, 11, 30) + Math.floor(serial) * 86400000)
+  return d.toISOString().slice(0, 10)
 }

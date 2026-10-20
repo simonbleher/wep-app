@@ -59,6 +59,8 @@ Apps/WEP-App/
   daten/papierkorb/   gelöschte WEPs (<Vorgangs-Nr>.json mit Löschzeitpunkt, 30 Tage)
   daten/fotos/<Vorgangs-Nr>/            Fotos (<Foto-Id>.jpg) aktiver WEPs
   daten/papierkorb/fotos/<Vorgangs-Nr>/ Fotos gelöschter WEPs (ziehen mit dem WEP um)
+  daten/bau/<Vorgangs-Nr>.xlsx          Bau-Excel eines aktiven WEP (eine Datei je WEP)
+  daten/papierkorb/bau/<Vorgangs-Nr>.xlsx  Bau-Excel eines gelöschten WEP (zieht mit um)
   Exporte/        fertige Excel-Dateien (<Vorgangs-Nr>_WEP.xlsx)
   LIESMICH.txt    „Ordner der WEP-App – bitte nichts von Hand ändern; fertige
                   Excel-Dateien liegen in Exporte/.“
@@ -101,6 +103,21 @@ Apps/WEP-App/
   - **Export:** Beim Excel-Export entsteht zusätzlich `Exporte/<Nr>_Fotos/` mit Namen `<Positionsnr> <Bezeichnung>[ n].jpg`
     (`00 Gesamtansicht 1.jpg`); Reste eines früheren Exports im Ordner werden entfernt. Offline wartet es in der Export-Warteschlange
     (Ordner-Marke `<Nr>_Fotos/`). Ohne Konto: ZIP-Download.
+- **Bau-Excel (Beta 3, Paket 5):** Der Verweis `Wep.bauExcel` (Name, Größe, `version` = SHA-256-Kennung des Inhalts, `abgeglichen`)
+  steht im WEP und folgt dessen Konflikt-/Papierkorb-Regeln; die Datei liegt lokal in IndexedDB (Stores `bauExcel`, `bauExcelDaten`, DB-Version 6)
+  und in OneDrive unter `daten/bau/<Nr>.xlsx`. Der Abgleich (`src/sync/bauExcel.ts`) läuft nach Fotos und hat dieselben Regeln:
+  - **Hochladen** nur, wenn die lokale Datei die Kennung hat, die das WEP meint (nie eine veraltete Fassung), kein Konflikt offen ist und
+    „Upload nur über WLAN“ erlaubt (sonst bleibt sie offen und zählt in der Upload-Anzeige). **Austauschen** überschreibt die Datei in
+    OneDrive (immer genau eine je WEP). Der Hintergrunddienst der Android-App kennt die Bau-Excel nicht; sie geht beim Abgleich in der App hoch.
+  - **Nachladen:** Andere Geräte laden sie beim Öffnen des WEP und beim Export nach. Ihre Kennung muss zum Verweis passen; liegt in OneDrive noch
+    die alte Fassung (anderes Gerät hat noch nicht hochgeladen), wird nichts übernommen („veraltet“), der Export bricht mit Hinweis ab statt still
+    die leere Vorlage zu nehmen.
+  - **Papierkorb:** Das WEP im Papierkorb nimmt die Datei per Graph-Move nach `daten/papierkorb/bau/` mit, Wiederherstellen holt sie zurück;
+    eine noch nicht hochgeladene geht direkt in den Papierkorb-Ordner, nie nach `daten/bau/`. Endgültig löschen / 30 Tage leert beide Ordner
+    (Merkliste `wep-bau-aufraeumen`, localStorage). Umnummerieren und Wiederherstellen unter neuer Nummer kopieren die lokale Datei.
+  - **Entfernen** (mit Rückfrage): Verweis weg, lokale Datei weg, eine Löschmarke bleibt, bis die WEP-Datei ohne Verweis in OneDrive liegt und kein
+    Konflikt offen ist. Bei offenem Zwei-Geräte-Konflikt bleibt die lokale Datei erhalten, solange eine der beiden Fassungen auf sie verweist;
+    nichts wird in OneDrive gelöscht, was nur „nicht mehr im WEP steht“. **Duplizieren** kopiert die Bau-Excel nicht.
 - **Eigene Positionen:** `daten/eigene-positionen.json` (`wep-eigene-positionen/1`) enthält die vom
   Wertermittler gemerkten Freitext-Positionen (Bezeichnung, Einheit, Preis, Abschnitt). Der Abgleich
   führt beide Fassungen **je Eintrag** zusammen: Die neuere Änderung (`geaendertAm`) gewinnt, bei
@@ -197,7 +214,7 @@ gebaut, damit der Login-Bildschirm erscheint; angemeldet wird dabei nie.
   OneDrive aufgeräumt ist), `wiederhergestellt` (Datei muss aus dem Papierkorb zurückgeholt
   werden), `konflikt` (offener Konflikt samt anderer Fassung) und `aufraeumen`
   (entschiedene Konflikt-Kopien).
-- Der lokale Papierkorb ist der IndexedDB-Store `papierkorb` (Datenbank-Version 4). Version 5 ergänzt die Stores `fotos` (Verwaltung + Vorschau) und `fotoDaten` (die Bilddateien).
+- Der lokale Papierkorb ist der IndexedDB-Store `papierkorb` (Datenbank-Version 4). Version 5 ergänzt die Stores `fotos` (Verwaltung + Vorschau) und `fotoDaten` (die Bilddateien), Version 6 `bauExcel` (Verwaltung) und `bauExcelDaten` (die Excel-Dateien).
   Gespeichert wird in einem gelöschten WEP nichts mehr (z. B. eine verzögerte Speicherung):
   `speichereWep` ignoriert Einträge im Papierkorb.
 
@@ -224,6 +241,8 @@ gebaut, damit der Login-Bildschirm erscheint; angemeldet wird dabei nie.
 | `src/sync/ordner.ts` | Ordnerstruktur (auch `daten/papierkorb/`), `LIESMICH.txt`, Verschieben alter Dateien |
 | `src/sync/fotos.ts` | Foto-Abgleich: hochladen, Papierkorb-Umzug, Aufräumen, Löschmarken |
 | `src/fotos/` | Verkleinern (EXIF, Größe), Ablage, Benennung für den Export, Nachladen |
+| `src/sync/bauExcel.ts` | Bau-Excel-Abgleich: hochladen, Papierkorb-Umzug, Aufräumen, Löschmarke |
+| `src/bauexcel/` | Bau-Excel wählen/austauschen/entfernen/nachladen, Formalien-Abgleich (`abgleich.ts`), Kennung |
 | `src/sync/profil.ts` | Abgleich von `daten/profil.json` |
 | `src/sync/exporte.ts` | Upload der Excel-Exporte und Warteschlange |
 | `src/sync/speicher.ts` | Anbindung an IndexedDB (`src/app/db.ts`, Stores `weps`, `syncMeta`, `papierkorb`, `exporte`) |

@@ -135,6 +135,11 @@ Verweise auf „Formalien“) bleiben unangetastet.
 
 ### Skizze Außenanlage-Aufwuchs
 - Zeichenfläche ca. A5:H49, wird als Bild eingefügt.
+- A1 (Überschrift): Die Vorlage hat dort „Skizze – Baulichkeiten“; der Export schreibt „Skizze – Außenanlagen und Aufwuchs“.
+
+### Bau-Excel am WEP (Beta 3, Paket 5)
+- Die App liest aus der Bau-Excel alle ausgefüllten Formalien-Zellen E3–E17 und befüllt das WEP (Dialog bei Abweichungen); die Datei bleibt am WEP
+  (`Wep.bauExcel`) und ist Grundlage des Exports.
 
 ## Regeln aus der BewRL (Auswahl für Warnungen)
 

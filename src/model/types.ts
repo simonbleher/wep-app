@@ -34,6 +34,24 @@ export interface Wep {
    * `daten/fotos/<Vorgangs-Nr>/<id>.jpg`, siehe src/fotos).
    */
   fotos?: Foto[]
+  /**
+   * Die Bau-Excel dieses WEP (nur die Angaben; die Datei liegt in IndexedDB bzw. in OneDrive unter
+   * `daten/bau/<Vorgangs-Nr>.xlsx`, siehe src/bauexcel). Der Export nimmt sie automatisch.
+   */
+  bauExcel?: BauExcel
+}
+
+/** Angaben zur Bau-Excel am WEP. */
+export interface BauExcel {
+  /** Dateiname, wie ihn der Nutzer gewählt hat (nur zur Anzeige). */
+  name: string
+  /** Größe in Bytes. */
+  groesse: number
+  /** Kennung des Inhalts (Hash), erkennt auf anderen Geräten, ob die lokale Datei die aktuelle ist. */
+  version: string
+  hinzugefuegtAm: string
+  /** Die Formalien wurden mit dieser Fassung abgeglichen (übernommen oder bewusst behalten). */
+  abgeglichen?: boolean
 }
 
 /** Angaben zu einem Foto am WEP. */
@@ -62,12 +80,13 @@ export function wepStatus(wep: Pick<Wep, 'status'>): WepStatus {
 
 /**
  * Komplette Kopie eines WEP (Formalien, Positionen, Beschreibungen, Beseitigung, Skizze)
- * unter einer neuen Vorgangs-Nr.; Status „in Arbeit“. Fotos werden nicht kopiert
- * (docs/ENTSCHEIDUNGEN.md, Beta 3 Paket 4).
+ * unter einer neuen Vorgangs-Nr.; Status „in Arbeit“. Fotos und Bau-Excel werden nicht kopiert
+ * (docs/ENTSCHEIDUNGEN.md, Beta 3 Paket 4 und 5).
  */
 export function dupliziereWep(wep: Wep, neueId: string): Wep {
   const kopie = JSON.parse(JSON.stringify(wep)) as Wep
   delete kopie.fotos
+  delete kopie.bauExcel
   return { ...kopie, id: neueId, formalien: { ...kopie.formalien, vorgangsNr: neueId }, status: 'in Arbeit' }
 }
 

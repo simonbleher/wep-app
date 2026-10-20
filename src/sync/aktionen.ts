@@ -1,11 +1,11 @@
 // Aktionen der Oberfläche rund um Papierkorb und Konflikte: die Regeln aus papierkorb.ts,
 // angebunden an den IndexedDB-Speicher dieses Geräts. Wirkt zuerst lokal (funktioniert
 // offline und ohne Konto); der nächste Abgleich überträgt es nach OneDrive.
-import { entferneFotosLokal, kopiereFotosLokal } from '@/app/db'
+import { entferneBauExcelLokal, entferneFotosLokal, kopiereBauExcelLokal, kopiereFotosLokal } from '@/app/db'
 import type { Wep } from '@/model'
 import { geraeteKennung } from './geraet'
 import * as regeln from './papierkorb'
-import { fotoAufraeumListe, syncSpeicher } from './speicher'
+import { bauAufraeumListe, fotoAufraeumListe, syncSpeicher } from './speicher'
 import type { KonfliktInfo, PapierkorbEintrag, SyncMeta } from './types'
 
 export type { KonfliktWahl, WiederhergestelltErgebnis } from './papierkorb'
@@ -23,15 +23,24 @@ export function loescheWep(id: string): Promise<boolean> {
 export async function stelleWiederHer(id: string) {
   const res = await regeln.stelleWiederHer(syncSpeicher, id, kontext())
   // Neue Nummer (die alte war vergeben): Die Fotos des Originals bleiben im Papierkorb, die Kopie bekommt eigene
-  if (res?.neueNummer) await kopiereFotosLokal(id, res.id)
+  if (res?.neueNummer) {
+    await kopiereFotosLokal(id, res.id)
+    await kopiereBauExcelLokal(id, res.id)
+  }
   return res
 }
 
-/** Fotos eines endgültig gelöschten WEP: lokal sofort weg, in OneDrive beim nächsten Abgleich. */
+/**
+ * Fotos und Bau-Excel eines endgültig gelöschten WEP: lokal sofort weg, in OneDrive beim nächsten Abgleich.
+ */
 export async function vergesseFotos(ids: string[]): Promise<void> {
   if (!ids.length) return
-  for (const id of ids) await entferneFotosLokal(id)
+  for (const id of ids) {
+    await entferneFotosLokal(id)
+    await entferneBauExcelLokal(id)
+  }
   fotoAufraeumListe.speichere([...new Set([...fotoAufraeumListe.lade(), ...ids])])
+  bauAufraeumListe.speichere([...new Set([...bauAufraeumListe.lade(), ...ids])])
 }
 
 export async function loescheEndgueltig(id: string): Promise<boolean> {

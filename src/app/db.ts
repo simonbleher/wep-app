@@ -12,15 +12,18 @@ import type { LokaleAenderung, PapierkorbEintrag, SyncMeta } from '@/sync/types'
 import type { ExportEintrag } from '@/sync/exporte'
 import { metaMit, papierkorbMeta } from '@/sync/papierkorb'
 import type { FotoDatei, FotoRecord } from '@/fotos/types'
+import type { BauExcelRecord } from '@/bauexcel/types'
 
 const DB_NAME = 'wep-db'
-const DB_VERSION = 5
+const DB_VERSION = 6
 const STORE = 'weps'
 const META = 'syncMeta'
 const EXPORTE = 'exporte'
 const PAPIERKORB = 'papierkorb'
 const FOTOS = 'fotos'
 const FOTO_DATEN = 'fotoDaten'
+const BAU_EXCEL = 'bauExcel'
+const BAU_EXCEL_DATEN = 'bauExcelDaten'
 
 interface WepDB extends DBSchema {
   weps: {
@@ -47,6 +50,14 @@ interface WepDB extends DBSchema {
   fotoDaten: {
     key: string
     value: FotoDatei
+  }
+  bauExcel: {
+    key: string
+    value: BauExcelRecord
+  }
+  bauExcelDaten: {
+    key: string
+    value: { wepId: string; blob: Blob }
   }
 }
 
@@ -100,6 +111,13 @@ function datenbank(): Promise<IDBPDatabase<WepDB>> {
         }
         if (!db.objectStoreNames.contains(FOTO_DATEN)) {
           db.createObjectStore(FOTO_DATEN, { keyPath: 'key' })
+        }
+        // Version 6: Bau-Excel je WEP (Verwaltungseintrag, getrennt davon die Datei)
+        if (!db.objectStoreNames.contains(BAU_EXCEL)) {
+          db.createObjectStore(BAU_EXCEL, { keyPath: 'wepId' })
+        }
+        if (!db.objectStoreNames.contains(BAU_EXCEL_DATEN)) {
+          db.createObjectStore(BAU_EXCEL_DATEN, { keyPath: 'wepId' })
         }
         if (alteVersion >= 2 && alteVersion < 4) {
           const jetzt = new Date().toISOString()
@@ -322,4 +340,65 @@ export async function markiereFotoGeloescht(wepId: string, fotoId: string, zeit:
   }
   await tx.done
   await haken?.nachFotoEntfernen?.(wepId, fotoId).catch((e) => console.warn('Foto-Warteschlange:', e))
+}
+
+// --- Bau-Excel ----------------------------------------------------------------
+
+/** Alle Verwaltungseinträge der Bau-Excel (ohne die Dateien). */
+export async function alleBauExcelRecords(): Promise<BauExcelRecord[]> {
+  const db = await datenbank()
+  return db.getAll(BAU_EXCEL)
+}
+
+/** Die Bau-Excel-Datei auf diesem Gerät (undefined = nicht vorhanden). */
+export async function ladeBauExcelDatei(wepId: string): Promise<Blob | undefined> {
+  const db = await datenbank()
+  return (await db.get(BAU_EXCEL_DATEN, wepId))?.blob
+}
+
+/** Legt Eintrag und (falls gegeben) Datei an bzw. ersetzt sie in einer Transaktion. */
+export async function speichereBauExcel(record: BauExcelRecord, blob?: Blob): Promise<void> {
+  const db = await datenbank()
+  const tx = db.transaction([BAU_EXCEL, BAU_EXCEL_DATEN], 'readwrite')
+  await tx.objectStore(BAU_EXCEL).put(record)
+  if (blob) await tx.objectStore(BAU_EXCEL_DATEN).put({ wepId: record.wepId, blob })
+  else if (!record.hatDatei) await tx.objectStore(BAU_EXCEL_DATEN).delete(record.wepId)
+  await tx.done
+}
+
+/** Ändert nur den Eintrag (z. B. „hochgeladen“). */
+export async function setzeBauExcelRecord(record: BauExcelRecord): Promise<void> {
+  const db = await datenbank()
+  await db.put(BAU_EXCEL, record)
+}
+
+/** Entfernt Eintrag und Datei von diesem Gerät. */
+export async function entferneBauExcelLokal(wepId: string): Promise<void> {
+  const db = await datenbank()
+  const tx = db.transaction([BAU_EXCEL, BAU_EXCEL_DATEN], 'readwrite')
+  await tx.objectStore(BAU_EXCEL).delete(wepId)
+  await tx.objectStore(BAU_EXCEL_DATEN).delete(wepId)
+  await tx.done
+}
+
+/** Kopiert die Bau-Excel unter eine andere Nummer (Umnummerieren). Idempotent. */
+export async function kopiereBauExcelLokal(vonId: string, nachId: string): Promise<void> {
+  const db = await datenbank()
+  const r = await db.get(BAU_EXCEL, vonId)
+  if (!r || (await db.get(BAU_EXCEL, nachId))) return
+  const datei = await db.get(BAU_EXCEL_DATEN, vonId)
+  // In OneDrive liegt sie unter der alten Nummer: unter der neuen muss sie neu hochgeladen werden
+  await speichereBauExcel({ ...r, wepId: nachId, hochgeladen: false, geloescht: undefined }, datei?.blob)
+}
+
+/** Der Nutzer hat die Bau-Excel entfernt, die schon in OneDrive liegt: Marke, bis OneDrive aufgeräumt ist. */
+export async function markiereBauExcelGeloescht(wepId: string, zeit: string): Promise<void> {
+  const db = await datenbank()
+  const tx = db.transaction([BAU_EXCEL, BAU_EXCEL_DATEN], 'readwrite')
+  const alt = await tx.objectStore(BAU_EXCEL).get(wepId)
+  if (alt) {
+    await tx.objectStore(BAU_EXCEL).put({ ...alt, geloescht: zeit, hatDatei: false })
+    await tx.objectStore(BAU_EXCEL_DATEN).delete(wepId)
+  }
+  await tx.done
 }

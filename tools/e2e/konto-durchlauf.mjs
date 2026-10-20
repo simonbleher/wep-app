@@ -10,12 +10,16 @@
 // „Eigene“ in der Suche, im Profil ändern und löschen. Fotos: aufnehmen/aus der Galerie (selbst erzeugte
 // Testbilder mit EXIF-Ausrichtung und GPS), Verkleinern, Standortdaten weg, Text, Löschen mit Rückfrage,
 // Fotos zur Position, Export als ZIP, Papierkorb nimmt die Fotos mit, Duplizieren ohne Fotos, endgültig löschen.
+// Bau-Excel (Paket 5): Test-Bau-Excel aus der Vorlage mit erfundenen Werten am WEP merken, Formalien vorbefüllen, je Feld
+// wählen, austauschen, entfernen, Export nimmt die gemerkte Datei (Überschrift im Skizzen-Blatt), „Neues WEP aus Bau-Excel“.
 //
 // Start: npm run e2e  (baut mit einer Platzhalter-Client-ID nach dist-e2e/, damit der
 // Login-Bildschirm erscheint; es wird nie wirklich bei Microsoft angemeldet).
 // Chromium kommt aus PLAYWRIGHT_BROWSERS_PATH (vorinstalliert), nicht „playwright install“.
-import { spawn } from 'node:child_process'
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { execFileSync, spawn } from 'node:child_process'
+import { existsSync, mkdtempSync, readdirSync, readFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import JSZip from 'jszip'
 import { chromium } from 'playwright'
 import { EXIF_GPS, EXIF_KAMERA, testFoto } from '../fotos/testbild.mjs'
@@ -95,7 +99,7 @@ try {
   await seite.getByRole('button', { name: 'Protokolle' }).click()
 
   // 5. WEP anlegen: Name und Anlage aus dem Profil sind vorbelegt
-  await seite.getByRole('button', { name: /Neues WEP/ }).click()
+  await seite.getByRole('button', { name: 'Neues WEP', exact: true }).click()
   await seite.getByLabel(/Kleingartenanlage/).first().waitFor()
   pruefe((await seite.getByLabel(/Kleingartenanlage/).first().inputValue()) === 'KGA Musterwiese', 'Anlage aus dem Profil vorbelegt')
   pruefe((await seite.locator('input[value="Erika Musterfrau"]').count()) > 0, 'Wertermittler aus dem Profil vorbelegt')
@@ -238,16 +242,89 @@ try {
   await seite.getByLabel('Parzelle', { exact: true }).fill('Parzelle 42')
   await seite.getByLabel('Parzellenfläche (m²)').fill('350')
 
-  // 10d. Export: Bau-Excel wählen und entfernen, Export mit Ergebnis
+  // 10d. Bau-Excel (Paket 5): am WEP merken, Formalien vorbefüllen, je Feld wählen, austauschen, entfernen, Export
+  // Test-Bau-Excel aus der Vorlage mit erfundenen Werten (Anlage „KGA Testgarten“, Fläche 380 …)
+  const bauOrdner = mkdtempSync(join(tmpdir(), 'wep-bau-'))
+  const bauDatei = join(bauOrdner, 'WEP Bau Testgarten.xlsx')
+  const bauDateiNeu = join(bauOrdner, 'WEP Bau neu.xlsx')
+  execFileSync('npx', ['vite-node', 'tools/paket5/erzeuge-test-bau-excel.ts', '--', bauDatei], { stdio: 'ignore' })
+  execFileSync('npx', ['vite-node', 'tools/paket5/erzeuge-test-bau-excel.ts', '--', bauDateiNeu, 'abweichend'], { stdio: 'ignore' })
+  const bauEingabe = seite.getByTestId('bau-excel-eingabe')
+  pruefe(await seite.getByRole('button', { name: 'Bau-Excel auswählen' }).isVisible(), 'Bau-Excel: Formalien bieten „Bau-Excel auswählen“')
+  await bauEingabe.setInputFiles(bauDatei)
+  await seite.getByRole('heading', { name: 'Formalien abgleichen' }).waitFor()
+  const abgleichDialog = seite.getByRole('dialog')
+  pruefe((await abgleichDialog.getByRole('radio').count()) >= 4, 'Bau-Excel: abweichende Felder werden einzeln zur Wahl gestellt')
+  pruefe(await abgleichDialog.getByText('Bau-Excel sagt').first().isVisible(), 'Bau-Excel: „Bau-Excel sagt … / Im WEP steht …“')
+  pruefe(await abgleichDialog.getByText('KGA Testgarten').isVisible() && (await abgleichDialog.getByText('KGA Musterwiese').isVisible()), 'Bau-Excel: Anlage Bau-Excel gegen WEP')
+  pruefe(
+    (await abgleichDialog.getByRole('radio', { checked: true }).count()) === (await abgleichDialog.getByRole('radio').count()) / 2,
+    'Bau-Excel: Vorauswahl überall der Wert im WEP (nichts wird still überschrieben)',
+  )
+  await seite.screenshot({ path: 'dist-e2e/bau-abgleich.png' })
+  // Nur die Fläche aus der Bau-Excel nehmen
+  await abgleichDialog.locator('fieldset', { hasText: 'Parzellenfläche' }).getByRole('radio').first().check()
+  await abgleichDialog.getByRole('button', { name: 'Übernehmen' }).click()
+  await seite.getByText(/1 Feld aus der Bau-Excel übernommen/).waitFor()
+  pruefe((await seite.getByLabel('Parzellenfläche (m²)').inputValue()) === '380', 'Bau-Excel: gewählte Fläche übernommen (350 → 380)')
+  pruefe((await seite.getByLabel(/Kleingartenanlage/).first().inputValue()) === 'KGA Musterwiese', 'Bau-Excel: nicht gewähltes Feld bleibt im WEP')
+  pruefe((await seite.getByLabel(/^Weg/).inputValue()) === 'Rosenweg', 'Bau-Excel: leeres Feld „Weg“ wurde aus der Bau-Excel ergänzt')
+  pruefe(await seite.getByText(/WEP Bau Testgarten\.xlsx/).first().isVisible(), 'Bau-Excel: Name und Stand am WEP sichtbar')
+  // Neustart: die Bau-Excel bleibt am WEP
+  await seite.reload()
+  await seite.getByRole('button', { name: /KGA Musterwiese/ }).click()
+  await seite.getByRole('heading', { name: 'Formalien' }).first().waitFor()
+  // Austauschen mit Rückfrage; die neue Fassung wird erneut abgeglichen
+  pruefe(await seite.getByText(/WEP Bau Testgarten\.xlsx/).first().isVisible(), 'Bau-Excel: nach dem Neustart noch am WEP')
+  await seite.getByRole('button', { name: 'Austauschen' }).click()
+  pruefe(await seite.getByRole('alertdialog').getByText(/wird durch die neue Datei ersetzt/).isVisible(), 'Bau-Excel: Austauschen fragt zurück')
+  await seite.getByRole('alertdialog').getByRole('button', { name: 'Abbrechen' }).click()
+  await seite.getByRole('button', { name: 'Austauschen' }).click()
+  const wahlEvent = seite.waitForEvent('filechooser')
+  await seite.getByRole('alertdialog').getByRole('button', { name: 'Datei wählen' }).click()
+  await (await wahlEvent).setFiles(bauDateiNeu)
+  await seite.getByRole('heading', { name: 'Formalien abgleichen' }).waitFor()
+  pruefe(await seite.getByRole('dialog').getByText('Max Beispielmann').isVisible(), 'Bau-Excel: ausgetauschte Datei wird erneut abgeglichen')
+  await seite.getByRole('dialog').getByRole('button', { name: 'Später' }).click()
+  pruefe(await seite.getByText(/Angaben für die Formalien, die noch nicht abgeglichen sind/).isVisible(), 'Bau-Excel: „Später“ lässt einen Hinweis stehen')
+  await seite.getByRole('button', { name: 'Formalien abgleichen' }).click()
+  await seite.getByRole('dialog').getByRole('button', { name: 'Alle im WEP lassen' }).click()
+  await seite.getByRole('dialog').getByRole('button', { name: 'Übernehmen' }).click()
+  await seite.getByText(/Formalien im WEP bleiben unverändert/).waitFor()
+  pruefe((await seite.getByLabel('Parzelle', { exact: true }).inputValue()) === 'Parzelle 42', 'Bau-Excel: „Alle im WEP lassen“ ändert nichts')
+
+  // Export nimmt die gemerkte Bau-Excel – ohne dass sie noch einmal gewählt wird
   await seite.getByRole('button', { name: 'Export', exact: true }).click()
   await seite.getByRole('heading', { name: 'Export als Excel' }).waitFor()
-  await seite.locator('#bau-excel').setInputFiles('public/WEP_Vorlage.xlsx')
-  pruefe(await seite.getByText('WEP_Vorlage.xlsx').isVisible(), 'Export: gewählte Bau-Excel wird angezeigt')
-  await seite.getByRole('button', { name: 'Bau-Excel entfernen' }).click()
-  pruefe(await seite.getByRole('button', { name: /Bau-Excel auswählen/ }).isVisible(), 'Export: Bau-Excel wieder entfernbar')
+  pruefe(await seite.getByText(/WEP Bau neu\.xlsx/).first().isVisible(), 'Export: zeigt die am WEP gemerkte Bau-Excel')
+  const exportDownload = seite.waitForEvent('download')
   await seite.getByRole('button', { name: 'Excel exportieren' }).click()
   await seite.getByText(/Export erfolgreich/).waitFor({ timeout: 30000 })
-  pruefe(await seite.getByText(/Export erfolgreich/).isVisible(), 'Export: Ergebnis wird angezeigt')
+  const exportPfad = await (await exportDownload).path()
+  const exportZip = await JSZip.loadAsync(readFileSync(exportPfad))
+  const exportBlatt = await exportZip.file('xl/worksheets/sheet1.xml').async('string')
+  const exportGeteilt = await exportZip.file('xl/sharedStrings.xml').async('string')
+  pruefe(exportGeteilt.includes('Bert Bauer'), 'Export: Angaben des Bau-Wertermittlers aus der gemerkten Bau-Excel sind enthalten')
+  pruefe(exportBlatt.includes('Parzelle 42') && !exportBlatt.includes('Parzelle 17'), 'Export: nach dem Abgleich gelten die Werte aus dem WEP')
+  pruefe((await seite.getByText(/Folgende Formalien-Felder waren in der Bau-Excel bereits gefüllt/).count()) === 0, 'Export: keine Konflikt-Meldung nach dem Abgleich')
+  const skizzeBlatt = await exportZip.file('xl/worksheets/sheet19.xml').async('string')
+  pruefe(skizzeBlatt.includes('Skizze – Außenanlagen und Aufwuchs') && !/Skizze – Baulichkeiten/.test(skizzeBlatt), 'Export: Überschrift im Skizzen-Blatt Außenanlage-Aufwuchs korrigiert')
+  pruefe((await exportZip.file('xl/worksheets/sheet18.xml').async('string')).length > 0, 'Export: Blatt „Skizze Bau“ vorhanden')
+  pruefe(exportGeteilt.includes('Skizze – Baulichkeiten'), 'Export: „Skizze Bau“ behält seine Überschrift')
+
+  // Entfernen mit Rückfrage; danach nimmt der Export die leere Vorlage
+  await seite.getByRole('button', { name: 'Entfernen' }).click()
+  await seite.getByRole('alertdialog').getByRole('button', { name: 'Abbrechen' }).click()
+  pruefe(await seite.getByText(/WEP Bau neu\.xlsx/).first().isVisible(), 'Bau-Excel: „Abbrechen“ entfernt nichts')
+  await seite.getByRole('button', { name: 'Entfernen' }).click()
+  await seite.getByRole('alertdialog').getByRole('button', { name: 'Entfernen' }).click()
+  await seite.getByRole('button', { name: /Bau-Excel auswählen/ }).waitFor()
+  pruefe(await seite.getByRole('button', { name: /Bau-Excel auswählen/ }).isVisible(), 'Bau-Excel: entfernt, „Bau-Excel auswählen“ wieder da')
+  const leerDownload = seite.waitForEvent('download')
+  await seite.getByRole('button', { name: 'Excel exportieren' }).click()
+  await seite.getByText(/Export erfolgreich/).waitFor({ timeout: 30000 })
+  const leerZip = await JSZip.loadAsync(readFileSync(await (await leerDownload).path()))
+  pruefe(!(await leerZip.file('xl/sharedStrings.xml').async('string')).includes('Bert Bauer'), 'Export ohne Bau-Excel: leere Vorlage')
   pruefe(await seite.getByText('KGA Musterwiese · exportiert').isVisible(), 'Status: nach dem Export automatisch „exportiert“')
 
   // 10e. Skizze: Werkzeugleiste mit Icons (≥ 48 px), Dialoge im neuen Stil
@@ -523,6 +600,8 @@ try {
   await seite.getByLabel('Vorgangs-Nr.').waitFor()
   await nav.getByRole('button', { name: 'Fotos' }).click()
   await seite.getByText('3 Fotos', { exact: true }).waitFor()
+  // Die Vorschaubilder kommen asynchron aus IndexedDB, nach dem Text „3 Fotos“ (auf main schon so: Wettlauf)
+  await seite.waitForFunction(() => document.querySelectorAll('.foto-kachel img').length === 3, undefined, { timeout: 10000 }).catch(() => undefined)
   pruefe((await seite.locator('.foto-kachel img').count()) === 3, 'Wiederherstellen: alle Fotos mit Vorschau wieder da')
 
   // Duplizieren kopiert die Fotos nicht
@@ -579,7 +658,7 @@ try {
   await seite.getByRole('button', { name: 'Protokolle' }).filter({ visible: true }).first().click()
   await seite.getByRole('heading', { name: 'Protokolle' }).waitFor()
 
-  // 11g. Zustand der Datenbank (Version 5)
+  // 11g. Zustand der Datenbank (Version 6)
   const verspaetet = await seite.evaluate(async () => {
     const db = await new Promise((ok, fehler) => {
       const a = indexedDB.open('wep-db')
@@ -593,9 +672,9 @@ try {
       })
     return { weps: (await lies('weps')).length, korb: (await lies('papierkorb')).length, version: db.version }
   })
-  pruefe(verspaetet.weps === 1 && verspaetet.korb === 0 && verspaetet.version === 5, 'Datenbank Version 5: 1 WEP, Papierkorb leer')
+  pruefe(verspaetet.weps === 1 && verspaetet.korb === 0 && verspaetet.version === 6, 'Datenbank Version 6: 1 WEP, Papierkorb leer')
 
-  // 11h. Umstieg der Datenbank (Version 3 → 5): die Beta-Marke „gelöscht“ bekommt einen Löschzeitpunkt, Fotos-Stores entstehen
+  // 11h. Umstieg der Datenbank (Version 3 → 6): die Beta-Marke „gelöscht“ bekommt einen Löschzeitpunkt, Stores für Fotos und Bau-Excel entstehen
   const alt = await kontext.browser().newContext({ serviceWorkers: 'block' })
   const altSeite = await alt.newPage()
   // Eine Seite ohne App-Code (keine offene Datenbankverbindung): nur der gleiche Ursprung
@@ -628,7 +707,7 @@ try {
         }
       }),
   )
-  // „Ohne Konto“ vorgeben und die App starten: Die Datenbank wird auf Version 5 umgestellt
+  // „Ohne Konto“ vorgeben und die App starten: Die Datenbank wird auf Version 6 umgestellt
   await altSeite.evaluate(() => localStorage.setItem('wep-start-wahl', 'ohne-konto'))
   await altSeite.goto(URL)
   await altSeite.getByRole('heading', { name: 'Protokolle' }).waitFor()
@@ -646,12 +725,40 @@ try {
   const m9 = migriert.meta.find((m) => m.id === '2026-009')
   const m10 = migriert.meta.find((m) => m.id === '2026-010')
   pruefe(
-    migriert.version === 5 && migriert.stores.includes('papierkorb') && migriert.stores.includes('fotos') && migriert.stores.includes('fotoDaten'),
-    'Umstieg: Datenbank hat Version 5 mit Papierkorb und Fotos',
+    migriert.version === 6 &&
+      ['papierkorb', 'fotos', 'fotoDaten', 'bauExcel', 'bauExcelDaten'].every((n) => migriert.stores.includes(n)),
+    'Umstieg: Datenbank hat Version 6 mit Papierkorb, Fotos und Bau-Excel',
   )
   pruefe(m9?.geloescht === true && typeof m9.geloeschtAm === 'string', 'Umstieg: alte „gelöscht“-Marke bekommt einen Löschzeitpunkt')
   pruefe(m10?.geloeschtAm === undefined, 'Umstieg: andere Einträge bleiben unverändert')
   await alt.close()
+
+  // 11i. Neues WEP aus Bau-Excel: Datei prüfen, WEP anlegen, Formalien vorbefüllen
+  const neuEingabe = seite.getByTestId('neu-bau-excel-eingabe')
+  const keinExcel = join(bauOrdner, 'kein-excel.xlsx')
+  const { writeFileSync } = await import('node:fs')
+  writeFileSync(keinExcel, 'das ist kein Excel')
+  await neuEingabe.setInputFiles(keinExcel)
+  await seite.getByText(/nicht als Excel-Datei/).waitFor()
+  pruefe(await anzahlEintraege(seite.getByRole('list', { name: 'Protokolle' }), 1), 'Neues WEP aus Bau-Excel: unbrauchbare Datei legt kein WEP an')
+  await neuEingabe.setInputFiles(bauDatei)
+  await seite.getByRole('heading', { name: 'Formalien' }).first().waitFor()
+  pruefe((await seite.getByLabel('Parzelle', { exact: true }).inputValue()) === 'Parzelle 42', 'Neues WEP aus Bau-Excel: Parzelle aus der Datei')
+  pruefe((await seite.getByLabel(/^Weg/).inputValue()) === 'Rosenweg', 'Neues WEP aus Bau-Excel: Weg aus der Datei')
+  pruefe(await seite.getByText(/WEP Bau Testgarten\.xlsx/).first().isVisible(), 'Neues WEP aus Bau-Excel: Datei bleibt am WEP')
+  pruefe(await seite.getByText(/Angaben für die Formalien, die noch nicht abgeglichen sind/).isVisible(), 'Neues WEP aus Bau-Excel: Abweichung zum Profil wird zum Abgleich angeboten')
+
+  // Papierkorb nimmt die Bau-Excel mit; endgültig löschen entfernt sie von diesem Gerät
+  pruefe((await idbLies('bauExcel')).length === 1 && (await idbLies('bauExcel'))[0].hatDatei === true, 'Bau-Excel: Datei liegt lokal (IndexedDB)')
+  await seite.getByRole('button', { name: 'Weitere Aktionen' }).click()
+  await seite.getByRole('menuitem', { name: /In den Papierkorb/ }).click()
+  await seite.getByRole('alertdialog').getByRole('button', { name: 'In den Papierkorb' }).click()
+  await seite.getByRole('heading', { name: 'Protokolle' }).waitFor()
+  pruefe((await idbLies('bauExcel')).length === 1, 'Papierkorb: die Bau-Excel bleibt erhalten (30 Tage)')
+  await seite.getByRole('list', { name: 'Papierkorb' }).getByRole('button', { name: /Papierkorb/ }).click()
+  await seite.getByRole('list', { name: 'Papierkorb' }).getByRole('button', { name: 'Endgültig löschen' }).click()
+  await seite.getByRole('alertdialog').getByRole('button', { name: 'Endgültig löschen' }).click()
+  pruefe((await idbLies('bauExcel')).length === 0, 'Endgültig löschen: die Bau-Excel ist von diesem Gerät weg')
 
   // 12. Keine Skriptfehler
   pruefe(fehler.length === 0, `keine Skriptfehler im Browser ${fehler.join('; ')}`)
