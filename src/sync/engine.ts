@@ -94,6 +94,11 @@ export interface SyncOptionen {
   geraet: string
   /** Für Tests überschreibbar. */
   jetzt?: () => string
+  /**
+   * Wird vor dem Umnummerieren eines WEP aufgerufen (Fotos unter die neue Nummer kopieren).
+   * Muss idempotent sein; ein Fehler bricht das Umnummerieren ab.
+   */
+  vorUmnummerieren?: (von: string, nach: string) => Promise<void>
 }
 
 function neuerKonflikt(alt: KonfliktInfo | undefined, neu: Omit<KonfliktInfo, 'kopien'>, kopie?: string): KonfliktInfo {
@@ -110,6 +115,7 @@ export async function synchronisiere(opt: SyncOptionen): Promise<SyncErgebnis> {
     geloescht: [],
     wiederhergestellt: [],
     bereinigt: [],
+    umnummeriert: [],
   }
   const { client, papierkorb, lokal: speicher } = opt
 
@@ -522,10 +528,12 @@ export async function synchronisiere(opt: SyncOptionen): Promise<SyncErgebnis> {
     const nr = naechsteVorgangsNr(bekannt, Number.isFinite(jahr) ? jahr : undefined)
     const neu: Wep = { ...w, id: nr, formalien: { ...w.formalien, vorgangsNr: nr } }
     const zeit = jetzt()
+    await opt.vorUmnummerieren?.(id, nr)
     await speicher.schreibe({ id, wep: null, meta: null })
     await speicher.schreibe({ id: nr, wep: neu, meta: metaMit(undefined, nr, zeit) })
     lokal.set(nr, neu)
     await hochladen(neu, metaMit(undefined, nr, zeit))
+    ergebnis.umnummeriert.push({ von: id, nach: nr })
     ergebnis.konflikte.push({
       wepId: id,
       text: `Die Nummer ${id} gehört in OneDrive noch einem gelöschten WEP. Das neue WEP heißt jetzt ${nr}.`,

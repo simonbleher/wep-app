@@ -1,8 +1,8 @@
 // WepDetail – Erfassung eines Wertermittlungsprotokolls.
 //
-// Abschnitte: Formalien | Außenanlagen | Aufwuchs | Beseitigung | Skizze.
+// Abschnitte: Formalien | Außenanlagen | Aufwuchs | Beseitigung | Fotos | Skizze.
 // Handy: Kopfzeile (Zurück, Titel, Export, Menü „⋯“) und untere Leiste mit den
-// fünf Abschnitten. Tablet (≥ 900 px): Seitenleiste mit Abschnitten, Summen und Export.
+// sechs Abschnitten. Tablet (≥ 900 px): Seitenleiste mit Abschnitten, Summen und Export.
 // Export ist eine Aktion, kein Abschnitt. Löschen liegt im Menü „⋯“ mit Rückfrage.
 // Positionen (Außenanlagen, Aufwuchs, Beseitigung) werden per Antippen geändert; Formular
 // und „Löschen“ (mit Rückfrage) sind eigene Bildschirme, ohne untere Leiste.
@@ -10,6 +10,7 @@
 
 import { useState, useEffect, useCallback, useRef, useId, type ChangeEvent } from 'react'
 import {
+  Camera,
   Check,
   CircleCheck,
   RotateCcw,
@@ -35,6 +36,10 @@ import type { KonfliktInfo } from '@/sync/types'
 import { KonfliktHinweis } from './KonfliktHinweis'
 import { ladeWep, speichereWep } from './db'
 import { SkizzeTab } from './SkizzeTab'
+import { FotoGruppe, FotosTab, useFotoNachladen, useFotoRecords } from './Fotos'
+import { fotoOrdnerName, sammleExportFotos, zipDateien } from '@/fotos/exportOrdner'
+import { dbAblage } from '@/fotos/ablage'
+import { loeseFotosVonPosition, type WepAendern } from '@/fotos'
 import { PositionenAbschnitt } from './Positionen'
 import { PositionHinzufuegen } from './PositionHinzufuegen'
 import { PositionBearbeiten } from './PositionBearbeiten'
@@ -45,7 +50,7 @@ import { skizzeAlsPng } from '@/skizze/skizzePng'
 import { skizzeDatenZuFormen, type Kasten } from '@/export/skizzeFormen'
 import { svgZuPngBrowser } from '@/export/svgRaster'
 import { exportWep, type ExportResult } from '@/export'
-import { exportNachOneDrive } from '@/sync'
+import { exportFotosNachOneDrive, exportNachOneDrive, ladeFotoAusOneDrive } from '@/sync'
 import { berechneAbschnittSumme } from '@/gruen/summen'
 import { leseZahl, zahlDe, zahlFuerEingabe } from '@/gruen/format'
 
@@ -53,13 +58,13 @@ import { leseZahl, zahlDe, zahlFuerEingabe } from '@/gruen/format'
 // Typen
 // ---------------------------------------------------------------------------
 
-type Bereich = 'formalien' | 'aussenanlagen' | 'aufwuchs' | 'beseitigung' | 'skizze'
+type Bereich = 'formalien' | 'aussenanlagen' | 'aufwuchs' | 'beseitigung' | 'fotos' | 'skizze'
 type Tab = Bereich | 'export'
 
 type ExportZustand =
   | { typ: 'idle' }
   | { typ: 'laedt' }
-  | { typ: 'fertig'; result: ExportResult; oneDrive?: string }
+  | { typ: 'fertig'; result: ExportResult; oneDrive?: string; fotos?: string }
   | { typ: 'fehler'; meldung: string }
 
 /** Bildschirm statt Abschnitt: Position hinzufügen/ändern, Beseitigung hinzufügen/ändern. */
@@ -80,6 +85,7 @@ const BEREICHE: { id: Bereich; titel: string; kurz: string; icon: LucideIcon }[]
   { id: 'aussenanlagen', titel: 'Außenanlagen', kurz: 'Außen', icon: Fence },
   { id: 'aufwuchs', titel: 'Aufwuchs', kurz: 'Aufwuchs', icon: Sprout },
   { id: 'beseitigung', titel: 'Beseitigung', kurz: 'Beseitigung', icon: Shovel },
+  { id: 'fotos', titel: 'Fotos', kurz: 'Fotos', icon: Camera },
   { id: 'skizze', titel: 'Skizze', kurz: 'Skizze', icon: PencilRuler },
 ]
 
@@ -111,20 +117,36 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
   const [exportZustand, setExportZustand] = useState<ExportZustand>({ typ: 'idle' })
   const [bauExcel, setBauExcel] = useState<File | null>(null)
   const [konflikt, setKonflikt] = useState<KonfliktInfo | undefined>()
+  // Immer der neueste Stand: Fotos werden asynchron (nach dem Verkleinern) eingetragen
+  const wepRef = useRef<Wep | null>(null)
+  const fotoRecords = useFotoRecords(wepId)
+  const fotoNachladen = useFotoNachladen(wep, fotoRecords)
 
   // WEP aus IndexedDB laden
   useEffect(() => {
     void ladeWep(wepId).then((geladen) => {
-      if (geladen) setWep(geladen)
+      if (geladen) {
+        wepRef.current = geladen
+        setWep(geladen)
+      }
     })
     void ladeKonflikt(wepId).then(setKonflikt)
   }, [wepId])
 
   // Speichert und aktualisiert den Zustand gleichzeitig
   const speichere = useCallback(async (neu: Wep): Promise<void> => {
+    wepRef.current = neu
     setWep(neu)
     await speichereWep(neu)
   }, [])
+
+  // Änderung auf Basis des neuesten Stands (für Fotos, die erst nach dem Verkleinern eingetragen werden)
+  const aendere = useCallback<WepAendern>(
+    async (fn) => {
+      if (wepRef.current) await speichere(fn(wepRef.current))
+    },
+    [speichere],
+  )
 
   const wechsle = useCallback((t: Tab) => {
     setTab(t)
@@ -197,9 +219,14 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
   }
 
   function loeschePosition(abschnitt: Abschnitt, posId: string) {
-    setzePositionen(
-      abschnitt,
-      positionen(abschnitt).filter((p) => p.id !== posId),
+    const name = positionen(abschnitt).find((p) => p.id === posId)?.bezeichnung ?? ''
+    // Fotos der Position bleiben erhalten (hängen danach am WEP allgemein)
+    void speichere(
+      loeseFotosVonPosition(
+        { ...wep!, gruen: { ...wep!.gruen, [abschnitt]: positionen(abschnitt).filter((p) => p.id !== posId) } },
+        posId,
+        name,
+      ),
     )
     setMaske(null)
   }
@@ -212,7 +239,14 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
   }
 
   function loescheBeseitigung(posId: string) {
-    void speichere({ ...wep!, gruen: { ...wep!.gruen, beseitigungAA: wep!.gruen.beseitigungAA.filter((p) => p.id !== posId) } })
+    const name = wep!.gruen.beseitigungAA.find((p) => p.id === posId)?.gegenstand ?? ''
+    void speichere(
+      loeseFotosVonPosition(
+        { ...wep!, gruen: { ...wep!.gruen, beseitigungAA: wep!.gruen.beseitigungAA.filter((p) => p.id !== posId) } },
+        posId,
+        name,
+      ),
+    )
     setMaske(null)
   }
 
@@ -277,6 +311,15 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
             onAbbrechen={() => setMaske(null)}
             onSpeichern={(pos) => aenderePosition(maske.abschnitt, pos)}
             onLoeschen={() => loeschePosition(maske.abschnitt, bearbeitePos.id)}
+            fotos={
+              <FotoGruppe
+                wep={wep}
+                positionId={bearbeitePos.id}
+                aendere={aendere}
+                records={fotoRecords}
+                titel="Fotos zu dieser Position"
+              />
+            }
           />
         ) : maskeSichtbar && maske?.art === 'beseitigung' ? (
           <BeseitigungFormular
@@ -285,6 +328,17 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
             onAbbrechen={() => setMaske(null)}
             onFertig={speichereBeseitigung}
             onLoeschen={bearbeiteBes ? () => loescheBeseitigung(bearbeiteBes.id) : undefined}
+            fotos={
+              bearbeiteBes && (
+                <FotoGruppe
+                  wep={wep}
+                  positionId={bearbeiteBes.id}
+                  aendere={aendere}
+                  records={fotoRecords}
+                  titel="Fotos zu dieser Position"
+                />
+              )
+            }
           />
         ) : (
           <>
@@ -338,6 +392,7 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
                 onBearbeiten={(id) => oeffneMaske({ art: 'beseitigung', id })}
               />
             )}
+            {tab === 'fotos' && <FotosTab wep={wep} aendere={aendere} records={fotoRecords} nachladen={fotoNachladen} />}
             {tab === 'skizze' && <SkizzeTab wep={wep} onSpeichern={speichere} />}
             {tab === 'export' && (
               <ExportTab
@@ -653,6 +708,30 @@ function BeseitigungTab({
 // Export (Aktion oben rechts bzw. in der Seitenleiste)
 // ---------------------------------------------------------------------------
 
+/**
+ * Fotos zum Export: In OneDrive als Ordner Exporte/<Nr>_Fotos (sprechende Dateinamen, Nummer =
+ * Positionsnummer), ohne Konto als ZIP zum Herunterladen. Nicht in der Excel-Datei.
+ */
+async function exportiereFotos(wep: Wep): Promise<string> {
+  const ordner = fotoOrdnerName(wep.id)
+  const { dateien, fehlen } = await sammleExportFotos(wep, dbAblage, ladeFotoAusOneDrive)
+  const fehlt = fehlen.length ? ` ${fehlen.length} Foto${fehlen.length === 1 ? ' fehlt' : 's fehlen'} (noch nicht auf diesem Gerät).` : ''
+  if (!dateien.length) return `Keine Fotos exportiert.${fehlt}`
+  const od = await exportFotosNachOneDrive(ordner, dateien)
+  if (od === 'ohne-konto') {
+    const zip = await zipDateien(dateien)
+    const url = URL.createObjectURL(zip)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${ordner}.zip`
+    a.click()
+    URL.revokeObjectURL(url)
+    return `${dateien.length} Foto${dateien.length === 1 ? '' : 's'} als ZIP heruntergeladen (${ordner}.zip).${fehlt}`
+  }
+  if (od.status === 'hochgeladen') return `${dateien.length} Foto${dateien.length === 1 ? '' : 's'} in OneDrive abgelegt (Ordner Exporte/${ordner}).${fehlt}`
+  return `Fotos: ${od.wartend} Datei${od.wartend === 1 ? '' : 'en'} warten auf Netz und gehen beim nächsten Abgleich nach OneDrive (Exporte/${ordner}).${fehlt}`
+}
+
 function ExportTab({
   wep,
   onSpeichern,
@@ -734,10 +813,20 @@ function ExportTab({
         oneDrive = `OneDrive: ${e instanceof Error ? e.message : String(e)}`
       }
 
+      // Fotos: Ordner Exporte/<Nr>_Fotos in OneDrive, ohne Konto ein ZIP zum Herunterladen
+      let fotos: string | undefined
+      if (wep.fotos?.length) {
+        try {
+          fotos = await exportiereFotos(wep)
+        } catch (e) {
+          fotos = `Fotos: ${e instanceof Error ? e.message : String(e)}`
+        }
+      }
+
       // Nach gelungenem Export gilt das WEP als „exportiert“ (im Menü „⋯“ zurücksetzbar)
       await onSpeichern({ ...wep, status: 'exportiert' })
 
-      setExportZustand({ typ: 'fertig', result, oneDrive })
+      setExportZustand({ typ: 'fertig', result, oneDrive, fotos })
     } catch (err) {
       setExportZustand({
         typ: 'fehler',
@@ -838,6 +927,7 @@ function ExportTab({
             <span>Export erfolgreich: {ergebnis.result.filename}</span>
           </p>
           {ergebnis.oneDrive && <p className="neben">{ergebnis.oneDrive}</p>}
+          {ergebnis.fotos && <p className="neben">{ergebnis.fotos}</p>}
           {ergebnis.result.skizzeEingefuegt && (
             <p className="neben">
               Skizze ins Blatt „Skizze Außenanlage-Aufwuchs“ eingefügt

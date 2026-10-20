@@ -44,6 +44,22 @@ export interface UploadErgebnis {
   zeit: string
 }
 
+/** Ein Foto in der Upload-Warteschlange des Hintergrunddienstes. */
+export interface FotoWarteschlangenEintrag {
+  wepId: string
+  fotoId: string
+  eingereihtAm: string
+  groesse: number
+}
+
+/** Ergebnis eines erfolgreichen Foto-Uploads im Hintergrund. */
+export interface FotoUploadErgebnis {
+  wepId: string
+  fotoId: string
+  /** Zeitpunkt des Uploads (ISO). */
+  zeit: string
+}
+
 export interface ProtokollEintrag {
   zeit: string
   art: 'lauf' | 'upload' | 'fehler' | 'info'
@@ -75,6 +91,21 @@ export interface WepNativePlugin {
    */
   markiereGeloescht(a: { name: string; geloeschtAm: string }): Promise<void>
   liste(): Promise<{ eintraege: WarteschlangenEintrag[] }>
+  /**
+   * Reiht ein Foto (JPEG als Base64) für den Upload nach daten/fotos/<wepId>/<fotoId>.jpg ein.
+   * Ist das WEP für Foto-Uploads gesperrt (`sperreFotos`), wird es ignoriert.
+   */
+  reiheFotoEin(a: { wepId: string; fotoId: string; base64: string }): Promise<void>
+  entferneFoto(a: { wepId: string; fotoId: string }): Promise<void>
+  /**
+   * Sperrt (gesperrt: true) bzw. gibt frei (false) Foto-Uploads eines WEP. Gesperrt, wenn das WEP im
+   * Papierkorb liegt: Einträge werden entfernt und nie hochgeladen; ein gerade laufender Upload wird
+   * sofort nach daten/papierkorb/fotos/ verschoben.
+   */
+  sperreFotos(a: { wepId: string; gesperrt: boolean }): Promise<void>
+  listeFotos(): Promise<{ eintraege: FotoWarteschlangenEintrag[] }>
+  /** Liefert die Foto-Upload-Ergebnisse seit dem letzten Aufruf. */
+  holeFotoErgebnisse(): Promise<{ ergebnisse: FotoUploadErgebnis[] }>
   /** Liefert die Upload-Ergebnisse seit dem letzten Aufruf und leert die Ergebnisdatei. */
   holeErgebnisse(): Promise<{ ergebnisse: UploadErgebnis[] }>
   holeProtokoll(): Promise<{ eintraege: ProtokollEintrag[] }>

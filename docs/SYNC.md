@@ -57,6 +57,8 @@ Apps/WEP-App/
   daten/          WEP-Dateien (<Vorgangs-Nr>.json), Konflikt-Kopien, profil.json,
                   eigene-positionen.json
   daten/papierkorb/   gelöschte WEPs (<Vorgangs-Nr>.json mit Löschzeitpunkt, 30 Tage)
+  daten/fotos/<Vorgangs-Nr>/            Fotos (<Foto-Id>.jpg) aktiver WEPs
+  daten/papierkorb/fotos/<Vorgangs-Nr>/ Fotos gelöschter WEPs (ziehen mit dem WEP um)
   Exporte/        fertige Excel-Dateien (<Vorgangs-Nr>_WEP.xlsx)
   LIESMICH.txt    „Ordner der WEP-App – bitte nichts von Hand ändern; fertige
                   Excel-Dateien liegen in Exporte/.“
@@ -74,6 +76,31 @@ Apps/WEP-App/
   `exporte`) und geht beim nächsten Abgleich hoch. Ein neuer Export mit demselben
   Namen ersetzt die ältere Fassung. Ohne Konto passiert nichts. (Einfacher
   Graph-Upload, geeignet bis ca. 4 MB je Datei.)
+- **Fotos (Beta 3, Paket 4):** Die Angaben zu den Fotos (`Wep.fotos`: Id, Position, Text, Maße) stehen im WEP selbst und
+  werden mit ihm abgeglichen (Konflikte wie gehabt). Die Bilddateien (JPEG, ≤ 2000 px, meist 300–500 KB) liegen lokal in IndexedDB
+  und in OneDrive unter `daten/fotos/<Nr>/<Foto-Id>.jpg`. Der Foto-Abgleich (`src/sync/fotos.ts`) läuft nach dem WEP-Abgleich und
+  richtet sich nach dessen Ergebnis; er arbeitet mit den Listen der Ordner, nicht mit Merkern, und ist idempotent:
+  - **Hochladen** nur, wenn das Foto in OneDrive fehlt und die Datei hier liegt, und nur im WLAN, wenn „Upload nur über WLAN“ gilt
+    (Android: unbegrenztes Netz; Browser: soweit `navigator.connection.type` es verrät). Sonst bleibt es offen und zählt in
+    der Upload-Anzeige („n Änderungen warten“, Fotos-Ansicht). Die WEP-Datei geht unabhängig davon hoch.
+  - **Nachladen:** Andere Geräte laden die Fotos eines WEP beim Öffnen nach (nicht alle Fotos aller WEPs); im Mobilfunk bei
+    „nur WLAN“ erst nach „Jetzt laden“. Vorschaubilder entstehen lokal.
+  - **Papierkorb mit Fotos:** Wird ein WEP gelöscht, verschiebt der Abgleich seine Fotos per Graph-Move nach
+    `daten/papierkorb/fotos/<Nr>/` (auch Dateien, die ein Hintergrund-Upload noch nach `daten/fotos/` gelegt hat). Noch nicht
+    hochgeladene Fotos eines gelöschten WEP gehen direkt in den Papierkorb-Ordner, **nie** nach `daten/fotos/`. Wiederherstellen
+    holt sie zurück (auf jedem Gerät, das zuerst abgleicht). Wurde das WEP anderswo nach dem Löschen geändert (Konflikt) und
+    bleibt es deshalb erhalten, liegen seine Fotos wieder in `daten/fotos/`.
+  - **Endgültig löschen / 30 Tage:** Beide Fotoordner werden geleert, lokale Dateien entfernt. Die Nummer merkt sich eine
+    Liste (`wep-fotos-aufraeumen`, localStorage), damit auch ein Abbruch nach dem WEP-Abgleich nichts liegen lässt; ist das WEP
+    inzwischen wieder da, wird nichts gelöscht.
+  - **Einzelnes Foto löschen** (mit Rückfrage): Verweis weg, Datei lokal weg, eine Löschmarke bleibt, bis die WEP-Datei ohne das Foto
+    in OneDrive ist und kein Konflikt offen ist; erst dann wird die Datei in OneDrive entfernt. Nichts wird aus OneDrive gelöscht,
+    nur weil es im WEP nicht mehr steht.
+  - **Umnummerieren** (Nummer gehörte einem gelöschten WEP): die lokalen Fotos werden unter die neue Nummer kopiert, das gelöschte
+    WEP behält seine Fotos. Wiederherstellen unter neuer Nummer kopiert ebenso. **Duplizieren** kopiert keine Fotos.
+  - **Export:** Beim Excel-Export entsteht zusätzlich `Exporte/<Nr>_Fotos/` mit Namen `<Positionsnr> <Bezeichnung>[ n].jpg`
+    (`00 Gesamtansicht 1.jpg`); Reste eines früheren Exports im Ordner werden entfernt. Offline wartet es in der Export-Warteschlange
+    (Ordner-Marke `<Nr>_Fotos/`). Ohne Konto: ZIP-Download.
 - **Eigene Positionen:** `daten/eigene-positionen.json` (`wep-eigene-positionen/1`) enthält die vom
   Wertermittler gemerkten Freitext-Positionen (Bezeichnung, Einheit, Preis, Abschnitt). Der Abgleich
   führt beide Fassungen **je Eintrag** zusammen: Die neuere Änderung (`geaendertAm`) gewinnt, bei
@@ -170,7 +197,7 @@ gebaut, damit der Login-Bildschirm erscheint; angemeldet wird dabei nie.
   OneDrive aufgeräumt ist), `wiederhergestellt` (Datei muss aus dem Papierkorb zurückgeholt
   werden), `konflikt` (offener Konflikt samt anderer Fassung) und `aufraeumen`
   (entschiedene Konflikt-Kopien).
-- Der lokale Papierkorb ist der IndexedDB-Store `papierkorb` (Datenbank-Version 4).
+- Der lokale Papierkorb ist der IndexedDB-Store `papierkorb` (Datenbank-Version 4). Version 5 ergänzt die Stores `fotos` (Verwaltung + Vorschau) und `fotoDaten` (die Bilddateien).
   Gespeichert wird in einem gelöschten WEP nichts mehr (z. B. eine verzögerte Speicherung):
   `speichereWep` ignoriert Einträge im Papierkorb.
 
@@ -195,6 +222,8 @@ gebaut, damit der Login-Bildschirm erscheint; angemeldet wird dabei nie.
 | `src/sync/aktionen.ts` | Diese Regeln für die Oberfläche (an IndexedDB angebunden) |
 | `src/sync/graph.ts` | Microsoft-Graph-Zugriff auf einen Ordner im App-Ordner (`/me/drive/special/approot`) |
 | `src/sync/ordner.ts` | Ordnerstruktur (auch `daten/papierkorb/`), `LIESMICH.txt`, Verschieben alter Dateien |
+| `src/sync/fotos.ts` | Foto-Abgleich: hochladen, Papierkorb-Umzug, Aufräumen, Löschmarken |
+| `src/fotos/` | Verkleinern (EXIF, Größe), Ablage, Benennung für den Export, Nachladen |
 | `src/sync/profil.ts` | Abgleich von `daten/profil.json` |
 | `src/sync/exporte.ts` | Upload der Excel-Exporte und Warteschlange |
 | `src/sync/speicher.ts` | Anbindung an IndexedDB (`src/app/db.ts`, Stores `weps`, `syncMeta`, `papierkorb`, `exporte`) |

@@ -51,6 +51,12 @@ export class FakeDrive {
         if (!d || typeof d.inhalt !== 'string') throw new Error(`404 ${voll(name)}`)
         return d.inhalt
       },
+      ladeBlob: async (name) => {
+        this.aufrufe.push(`ladeBlob ${voll(name)}`)
+        const d = this.dateien.get(voll(name))
+        if (!d) throw new Error(`404 ${voll(name)}`)
+        return typeof d.inhalt === 'string' ? new Blob([d.inhalt]) : d.inhalt
+      },
       schreibe: async (name, inhalt) => {
         this.aufrufe.push(`schreibe ${voll(name)}`)
         const d = this.neu(inhalt)

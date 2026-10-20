@@ -130,6 +130,77 @@ class WepNativePlugin : Plugin() {
         }
     }
 
+    /** Reiht ein Foto (JPEG als Base64) für den Upload nach daten/fotos/ ein; gesperrte WEPs werden ignoriert. */
+    @PluginMethod
+    fun reiheFotoEin(call: PluginCall) {
+        try {
+            val wepId = call.getString("wepId") ?: return call.reject("wepId fehlt")
+            val fotoId = call.getString("fotoId") ?: return call.reject("fotoId fehlt")
+            val base64 = call.getString("base64") ?: return call.reject("base64 fehlt")
+            val bytes = android.util.Base64.decode(base64, android.util.Base64.DEFAULT)
+            if (FotoWarteschlange.reiheEin(ctx, wepId, fotoId, bytes)) {
+                UploadWorker.plane(ctx, ersetzen = false)
+            } else {
+                Protokoll.eintrag(ctx, "info", "Foto $wepId/$fotoId: WEP gelöscht – nicht eingereiht")
+            }
+            call.resolve()
+        } catch (e: Exception) {
+            fehler(call, e)
+        }
+    }
+
+    @PluginMethod
+    fun entferneFoto(call: PluginCall) {
+        try {
+            FotoWarteschlange.entferne(
+                ctx,
+                call.getString("wepId") ?: return call.reject("wepId fehlt"),
+                call.getString("fotoId") ?: return call.reject("fotoId fehlt"),
+            )
+            call.resolve()
+        } catch (e: Exception) {
+            fehler(call, e)
+        }
+    }
+
+    /** Foto-Uploads eines WEP sperren (Papierkorb) bzw. freigeben (das WEP lebt wieder). */
+    @PluginMethod
+    fun sperreFotos(call: PluginCall) {
+        try {
+            val wepId = call.getString("wepId") ?: return call.reject("wepId fehlt")
+            val gesperrt = call.getBoolean("gesperrt", true) ?: true
+            FotoWarteschlange.sperre(ctx, wepId, gesperrt)
+            call.resolve()
+        } catch (e: Exception) {
+            fehler(call, e)
+        }
+    }
+
+    @PluginMethod
+    fun listeFotos(call: PluginCall) {
+        try {
+            val arr = JSArray()
+            FotoWarteschlange.liste(ctx).forEach {
+                arr.put(
+                    JSObject().put("wepId", it.wepId).put("fotoId", it.fotoId)
+                        .put("eingereihtAm", it.eingereihtAm).put("groesse", it.datei.length()),
+                )
+            }
+            call.resolve(JSObject().put("eintraege", arr))
+        } catch (e: Exception) {
+            fehler(call, e)
+        }
+    }
+
+    @PluginMethod
+    fun holeFotoErgebnisse(call: PluginCall) {
+        try {
+            call.resolve(JSObject().put("ergebnisse", FotoWarteschlange.holeErgebnisse(ctx)))
+        } catch (e: Exception) {
+            fehler(call, e)
+        }
+    }
+
     @PluginMethod
     fun liste(call: PluginCall) {
         try {

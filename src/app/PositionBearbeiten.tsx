@@ -1,5 +1,6 @@
 // „Position ändern“ für Außenanlagen und Aufwuchs: das Formular der vorhandenen Position,
 // unten „Löschen“ (mit Rückfrage). Eigener Bildschirm wie „Position hinzufügen“.
+import type { ReactNode } from 'react'
 import type { Position, Wep } from '@/model'
 import { ABSCHNITT_TITEL, type Abschnitt } from './katalogDaten'
 import { PositionFormular, auswahlFuerPosition } from './PositionFormular'
@@ -12,6 +13,7 @@ export function PositionBearbeiten({
   onAbbrechen,
   onSpeichern,
   onLoeschen,
+  fotos,
 }: {
   abschnitt: Abschnitt
   pos: Position
@@ -19,6 +21,7 @@ export function PositionBearbeiten({
   onAbbrechen: () => void
   onSpeichern: (pos: Position) => void
   onLoeschen: () => void
+  fotos?: ReactNode
 }) {
   const titel = ABSCHNITT_TITEL[abschnitt]
   return (
@@ -50,6 +53,7 @@ export function PositionBearbeiten({
             bearbeiten={pos}
             onFertig={onSpeichern}
             onLoeschen={onLoeschen}
+            fotos={fotos}
           />
         </section>
       </div>

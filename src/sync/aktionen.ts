@@ -1,10 +1,11 @@
 // Aktionen der Oberfläche rund um Papierkorb und Konflikte: die Regeln aus papierkorb.ts,
 // angebunden an den IndexedDB-Speicher dieses Geräts. Wirkt zuerst lokal (funktioniert
 // offline und ohne Konto); der nächste Abgleich überträgt es nach OneDrive.
+import { entferneFotosLokal, kopiereFotosLokal } from '@/app/db'
 import type { Wep } from '@/model'
 import { geraeteKennung } from './geraet'
 import * as regeln from './papierkorb'
-import { syncSpeicher } from './speicher'
+import { fotoAufraeumListe, syncSpeicher } from './speicher'
 import type { KonfliktInfo, PapierkorbEintrag, SyncMeta } from './types'
 
 export type { KonfliktWahl, WiederhergestelltErgebnis } from './papierkorb'
@@ -19,17 +20,31 @@ export function loescheWep(id: string): Promise<boolean> {
   return regeln.loescheWep(syncSpeicher, id, kontext())
 }
 
-export function stelleWiederHer(id: string) {
-  return regeln.stelleWiederHer(syncSpeicher, id, kontext())
+export async function stelleWiederHer(id: string) {
+  const res = await regeln.stelleWiederHer(syncSpeicher, id, kontext())
+  // Neue Nummer (die alte war vergeben): Die Fotos des Originals bleiben im Papierkorb, die Kopie bekommt eigene
+  if (res?.neueNummer) await kopiereFotosLokal(id, res.id)
+  return res
 }
 
-export function loescheEndgueltig(id: string): Promise<boolean> {
-  return regeln.loescheEndgueltig(syncSpeicher, id, kontext().jetzt)
+/** Fotos eines endgültig gelöschten WEP: lokal sofort weg, in OneDrive beim nächsten Abgleich. */
+export async function vergesseFotos(ids: string[]): Promise<void> {
+  if (!ids.length) return
+  for (const id of ids) await entferneFotosLokal(id)
+  fotoAufraeumListe.speichere([...new Set([...fotoAufraeumListe.lade(), ...ids])])
+}
+
+export async function loescheEndgueltig(id: string): Promise<boolean> {
+  const ok = await regeln.loescheEndgueltig(syncSpeicher, id, kontext().jetzt)
+  if (ok) await vergesseFotos([id])
+  return ok
 }
 
 /** Entfernt, was länger als 30 Tage im Papierkorb liegt. Liefert die betroffenen Nummern. */
-export function raeumePapierkorbAuf(): Promise<string[]> {
-  return regeln.raeumePapierkorbAuf(syncSpeicher, kontext().jetzt)
+export async function raeumePapierkorbAuf(): Promise<string[]> {
+  const ids = await regeln.raeumePapierkorbAuf(syncSpeicher, kontext().jetzt)
+  await vergesseFotos(ids)
+  return ids
 }
 
 export function loeseKonflikt(id: string, wahl: regeln.KonfliktWahl): Promise<{ wep?: Wep } | undefined> {

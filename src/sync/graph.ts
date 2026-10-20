@@ -167,6 +167,11 @@ export function erstelleGraphClient(
       return antwort.text()
     },
 
+    async ladeBlob(name) {
+      const antwort = await anfrage(`${dateiUrl(name)}/content`)
+      return antwort.blob()
+    },
+
     async schreibe(name, inhalt, typ = 'application/json') {
       const antwort = await anfrage(`${dateiUrl(name)}/content`, {
         method: 'PUT',

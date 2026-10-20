@@ -7,6 +7,7 @@ export type {
   BeseitigungsPosition,
   SkizzeDaten,
   WepStatus,
+  Foto,
 } from './types'
 export { ZUSTANDSSTUFEN, neuerWep, WEP_STATUS, wepStatus, dupliziereWep, naechsteVorgangsNr } from './types'
 
