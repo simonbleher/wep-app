@@ -124,6 +124,12 @@ Ergebnis: Capacitor-Hülle (`android/`, App-ID `de.wep.app`), Android-Anmeldung 
 Kotlin-Plugin), Test-Seite im Profil, Workflow „Android Test-APK“. **Nur Machbarkeitstest**, noch nicht
 auf einem Gerät erprobt. Anleitung und Grenzen: docs/ANDROID.md. Offen: Schritt 4 (Design), 5 (fertige APK).
 
+### B2-4a · Design-Entwürfe 👀 (#design) – Branch design/entwurf
+Ergebnis: eigenständige Vorschau `entwurf.html` (WEP-Liste, Erfassung Aufwuchs, Position hinzufügen;
+erfundene Daten), Design-Tokens `src/design/tokens.css`, Screenshots Handy/Tablet in `docs/entwurf/`
+(`npm run entwurf:screenshots`). Die App selbst ist unverändert. **Wartet auf Simons Freigabe**, danach
+B2-4b · Umbau der App mit den Tokens.
+
 ## KI-Assistent (Plan: docs/KI-ASSISTENT.md)
 
 > **Abgeschaltet seit 20.10.2026** (Beta 2, Schritt 1 – Branch app/ki-aus 👀): Schalter `KI_AKTIV`,
