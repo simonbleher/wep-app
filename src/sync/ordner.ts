@@ -1,6 +1,7 @@
 // Ordnerstruktur im OneDrive-App-Ordner (Apps/WEP-App):
 //
-//   daten/        WEP-Dateien (<Vorgangs-Nr>.json), Konflikt-Kopien, profil.json
+//   daten/        WEP-Dateien (<Vorgangs-Nr>.json), Konflikt-Kopien, profil.json,
+//                 eigene-positionen.json
 //   daten/papierkorb/   gelöschte WEPs (30 Tage), mit Löschzeitpunkt
 //   Exporte/      fertige Excel-Dateien (<Vorgangs-Nr>_WEP.xlsx)
 //   LIESMICH.txt  Hinweis „bitte nichts von Hand ändern“
@@ -13,6 +14,7 @@ export const DATEN_ORDNER = 'daten'
 export const EXPORTE_ORDNER = 'Exporte'
 export const PAPIERKORB_ORDNER = 'daten/papierkorb'
 export const PROFIL_DATEI = 'profil.json'
+export const EIGENE_DATEI = 'eigene-positionen.json'
 export const LIESMICH_DATEI = 'LIESMICH.txt'
 
 export const LIESMICH_TEXT =
@@ -21,7 +23,7 @@ export const LIESMICH_TEXT =
 
 /** WEP- oder Konflikt-Datei aus einer früheren Version (liegt direkt im App-Ordner). */
 export function istAltdatei(name: string): boolean {
-  return name.endsWith('.json') && name !== PROFIL_DATEI
+  return name.endsWith('.json') && name !== PROFIL_DATEI && name !== EIGENE_DATEI
 }
 
 export interface OrdnerErgebnis {

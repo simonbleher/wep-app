@@ -5,7 +5,7 @@ import { useId, useState } from 'react'
 import { Trash2 } from 'lucide-react'
 import type { Position, Wep } from '@/model'
 import { ZUSTANDSSTUFEN } from '@/model'
-import type { Position as KatalogPosition, Variante as KatalogVariante } from '@/katalog'
+import type { EigenePosition, Position as KatalogPosition, Variante as KatalogVariante } from '@/katalog'
 import { berechnePreisvorschlag } from '@/gruen/preisvorschlag'
 import { berechneRegelhinweise } from '@/gruen/regelhinweise'
 import { kurzeBezeichnung, leseZahl, leseZahlOder, variantenMerkmale, zahlDe, zahlFuerEingabe } from '@/gruen/format'
@@ -23,6 +23,16 @@ export interface Auswahl {
   variante?: KatalogVariante
   /** Über die Suche gefundene Art, z. B. „Liguster“ bei der Hecke */
   art?: string
+  /** Gemerkte eigene Position (Freitext mit Bezeichnung, Einheit und Preis vorbelegt) */
+  eigene?: EigenePosition
+}
+
+/** Was „als eigene Position merken“ speichern soll (der Abschnitt kommt von der Suche). */
+export interface MerkeDaten {
+  bezeichnung: string
+  einheit: string
+  /** Nur, wenn ein eigener Preis eingetragen ist */
+  einzelpreis?: number
 }
 
 function neuePositionId(): string {
@@ -45,27 +55,36 @@ export function PositionFormular({
   wep: Wep
   /** Vorhandene Position ändern statt neu anlegen */
   bearbeiten?: Position
-  onFertig: (pos: Position) => void
+  onFertig: (pos: Position, merken?: MerkeDaten) => void
   /** Nur beim Ändern: Position nach der Rückfrage löschen */
   onLoeschen?: () => void
 }) {
-  const { position: katalogPos, variante, art } = auswahl
+  const { position: katalogPos, variante, art, eigene } = auswahl
   const hoechstwert = bearbeiten ? bearbeiten.hoechstwert : (variante?.hoechstwert ?? katalogPos?.hoechstwert)
   const id = useId()
 
   const [bezeichnung, setBezeichnung] = useState(
-    bearbeiten?.bezeichnung ?? (katalogPos ? kurzeBezeichnung(katalogPos, variante, art) : ''),
+    bearbeiten?.bezeichnung ?? (katalogPos ? kurzeBezeichnung(katalogPos, variante, art) : (eigene?.bezeichnung ?? '')),
   )
   const [anzahl, setAnzahl] = useState(bearbeiten ? zahlFuerEingabe(bearbeiten.anzahl) : '1')
-  const [einheit, setEinheit] = useState<string>(bearbeiten?.einheit ?? katalogPos?.einheit ?? 'Stück')
+  const [einheit, setEinheit] = useState<string>(bearbeiten?.einheit ?? katalogPos?.einheit ?? eigene?.einheit ?? 'Stück')
   const [zustand, setZustand] = useState<Zustand | undefined>(bearbeiten ? bearbeiten.zustand : 'gut')
   // Eine Position, deren Preis vom Vorschlag abweicht, bleibt beim Ändern ein eigener Preis
   const [preisManuell, setPreisManuell] = useState(
-    bearbeiten ? bearbeiten.preisManuell || Math.abs(berechnePreisvorschlag(bearbeiten) - bearbeiten.einzelpreis) >= 0.005 : false,
+    bearbeiten
+      ? bearbeiten.preisManuell || Math.abs(berechnePreisvorschlag(bearbeiten) - bearbeiten.einzelpreis) >= 0.005
+      : eigene?.einzelpreis !== undefined,
   )
   const [preisEingabe, setPreisEingabe] = useState(
-    bearbeiten && preisManuell ? zahlFuerEingabe(bearbeiten.einzelpreis) : '',
+    bearbeiten && preisManuell
+      ? zahlFuerEingabe(bearbeiten.einzelpreis)
+      : eigene?.einzelpreis !== undefined
+        ? zahlFuerEingabe(eigene.einzelpreis)
+        : '',
   )
+  // Freitext neu anlegen: optional als eigene Position merken (Standard an)
+  const merkenMoeglich = !katalogPos && !bearbeiten && !eigene
+  const [merken, setMerken] = useState(true)
   const [frage, setFrage] = useState(false)
 
   // Vorgeschlagener Preis: Höchstwert × Zustandsstufe
@@ -105,19 +124,24 @@ export function PositionFormular({
     (preisManuell && !Number.isFinite(leseZahl(preisEingabe)))
 
   function bestaetigen() {
-    onFertig({
-      ...bearbeiten,
-      id: bearbeiten?.id ?? neuePositionId(),
-      katalogId: bearbeiten ? bearbeiten.katalogId : katalogPos?.id,
-      bezeichnung: bezeichnung.trim(),
-      anzahl: leseZahlOder(anzahl, 0),
-      einheit,
-      zustand,
-      hoechstwert,
-      einzelpreis,
-      preisManuell,
-      hinweise: vorschauHinweise,
-    })
+    onFertig(
+      {
+        ...bearbeiten,
+        id: bearbeiten?.id ?? neuePositionId(),
+        katalogId: bearbeiten ? bearbeiten.katalogId : katalogPos?.id,
+        bezeichnung: bezeichnung.trim(),
+        anzahl: leseZahlOder(anzahl, 0),
+        einheit,
+        zustand,
+        hoechstwert,
+        einzelpreis,
+        preisManuell,
+        hinweise: vorschauHinweise,
+      },
+      merkenMoeglich && merken
+        ? { bezeichnung: bezeichnung.trim(), einheit, einzelpreis: preisManuell ? einzelpreis : undefined }
+        : undefined,
+    )
   }
 
   return (
@@ -128,7 +152,7 @@ export function PositionFormular({
           {variante ? ` · ${variantenMerkmale(variante)}` : ''} · BewRL S. {katalogPos.seite}
         </p>
       ) : (
-        <p className="neben quelle">Eigene Position (Freitext)</p>
+        <p className="neben quelle">{eigene ? 'Eigene Position (gemerkt)' : 'Eigene Position (Freitext)'}</p>
       )}
 
       <div className="feld">
@@ -140,7 +164,7 @@ export function PositionFormular({
           className="eingabe"
           value={bezeichnung}
           placeholder="z. B. Kirschbaum, alt"
-          autoFocus={!katalogPos && !bearbeiten}
+          autoFocus={!katalogPos && !bearbeiten && !eigene}
           onChange={(e) => setBezeichnung(e.target.value)}
         />
       </div>
@@ -246,6 +270,23 @@ export function PositionFormular({
           )}
         </div>
       </div>
+
+      {merkenMoeglich && (
+        <div>
+          <label className="schalter-zeile" htmlFor={`${id}-merken`}>
+            <span>Als eigene Position merken</span>
+            <input
+              id={`${id}-merken`}
+              type="checkbox"
+              role="switch"
+              className="schalter"
+              checked={merken}
+              onChange={(e) => setMerken(e.target.checked)}
+            />
+          </label>
+          <p className="neben">Erscheint künftig in der Suche und wird mit deinen anderen Geräten abgeglichen.</p>
+        </div>
+      )}
 
       <WarnListe hinweise={vorschauHinweise} />
 

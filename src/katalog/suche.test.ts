@@ -3,6 +3,7 @@ import katalogData from '../../data/katalog.json';
 import invasiveData from '../../data/invasive.json';
 import { sucheKatalog, istInvasiv } from './suche.js';
 import type { InvasiveArt, Katalog } from './types.js';
+import { alsKatalogPosition, type EigenerAbschnitt } from './eigene.js';
 
 // Echte Projektdaten laden (siehe data/README.md). Die JSON-Imports werden auf
 // die Katalog-Typen gecastet, da der Einheiten-Enum im JSON als string vorliegt.
@@ -179,5 +180,44 @@ describe('istInvasiv', () => {
 
   it('"Japanischer Ahorn" ist nicht invasiv und liefert null', () => {
     expect(istInvasiv(invasive, 'Japanischer Ahorn')).toBeNull();
+  });
+});
+
+describe('sucheKatalog – eigene Positionen', () => {
+  const eigene = (bezeichnung: string, abschnitt: EigenerAbschnitt = 'aufwuchs') =>
+    alsKatalogPosition({
+      id: bezeichnung.toLowerCase(),
+      abschnitt,
+      bezeichnung,
+      einheit: 'Stück',
+      geaendertAm: '2026-10-20T08:00:00.000Z',
+    });
+  const aufwuchs = positionen.filter((p) => p.abschnitt === 'III. Aufwuchs');
+
+  it('steht bei gleicher Güte vor dem Katalogtreffer', () => {
+    // „Rasen“ ist auch eine Katalogposition; die eigene mit demselben Namen gewinnt den Gleichstand.
+    const treffer = sucheKatalog([...aufwuchs, eigene('Rasen')], 'Rasen');
+    expect(treffer[0].position.eigen).toBe(true);
+    expect(treffer[0].score).toBe(treffer[1].score);
+    expect(treffer[1].position.id).toBe('aw-rasen');
+  });
+
+  it('verdrängt keinen besseren Katalogtreffer', () => {
+    // Exakter Katalog-Treffer „Rasen“ schlägt die eigene „Rasenkante“ (nur Präfix-Treffer).
+    const treffer = sucheKatalog([...aufwuchs, eigene('Rasenkante')], 'Rasen');
+    expect(treffer[0].position.id).toBe('aw-rasen');
+    expect(treffer.find((t) => t.position.eigen)).toBeDefined();
+  });
+
+  it('findet eine eigene Position über ihre Bezeichnung (tippfehlertolerant)', () => {
+    const treffer = sucheKatalog([...aufwuchs, eigene('Zaubernuss')], 'Zaubernus');
+    expect(treffer[0].position.eigen).toBe(true);
+    expect(treffer[0].position.bezeichnung).toBe('Zaubernuss');
+  });
+
+  it('ohne Suchbegriff: nach „zuletzt verwendet“ die eigenen, dann der Katalog', () => {
+    const treffer = sucheKatalog([...aufwuchs, eigene('Zaubernuss')], '', { zuletztVerwendet: ['aw-rasen'] });
+    expect(treffer[0].position.id).toBe('aw-rasen');
+    expect(treffer[1].position.eigen).toBe(true);
   });
 });

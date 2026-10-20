@@ -6,7 +6,8 @@
 // und Dialoge → Status (exportiert nach Export, fertig, zurücksetzen, Filter in der Liste) →
 // WEP duplizieren → WEPs über das Menü „⋯“ mit Rückfrage in den Papierkorb legen → Papierkorb:
 // Wiederherstellen, „Endgültig löschen“ mit Rückfrage, Frist von 30 Tagen, Umstieg der
-// Datenbank von Version 3 (Beta-Marke „gelöscht“).
+// Datenbank von Version 3 (Beta-Marke „gelöscht“). Eigene Positionen: Freitext merken (Standard an),
+// „Eigene“ in der Suche, im Profil ändern und löschen.
 //
 // Start: npm run e2e  (baut mit einer Platzhalter-Client-ID nach dist-e2e/, damit der
 // Login-Bildschirm erscheint; es wird nie wirklich bei Microsoft angemeldet).
@@ -169,6 +170,32 @@ try {
   await seite.getByRole('alertdialog').getByRole('button', { name: 'Löschen' }).click()
   await seite.getByText('2 Positionen').waitFor()
   pruefe(await seite.getByText('2 Positionen').isVisible(), 'Position nach Rückfrage gelöscht')
+
+  // 9d. Eigene Position: Freitext wurde gemerkt (Standard an), „Eigene“ in der Suche, Schalter aus merkt nicht
+  await seite.getByRole('button', { name: 'Hinzufügen', exact: true }).click()
+  await seite.getByLabel('Katalog durchsuchen').fill('zaubernus')
+  pruefe(await seite.getByRole('button', { name: /Zaubernuss.*Eigene/ }).isVisible(), 'Suche zeigt die gemerkte Position mit Kennzeichnung „Eigene“')
+  await seite.getByRole('button', { name: /Zaubernuss.*Eigene/ }).click()
+  pruefe((await seite.getByLabel(/^Bezeichnung/).inputValue()) === 'Zaubernuss', 'Eigene Position: Bezeichnung vorbelegt')
+  pruefe((await seite.getByLabel('Einzelpreis').inputValue()) === '40', 'Eigene Position: gemerkter Preis vorbelegt')
+  pruefe((await seite.getByRole('switch', { name: 'Als eigene Position merken' }).count()) === 0, 'Gemerkte Position: kein zweites Merken')
+  await seite.getByRole('button', { name: 'Suche', exact: true }).click()
+  await seite.getByLabel('Katalog durchsuchen').fill('')
+  await seite.getByRole('button', { name: 'Eigene Position (Freitext)' }).click()
+  pruefe(await seite.getByRole('switch', { name: 'Als eigene Position merken' }).isChecked(), 'Freitext: „Als eigene Position merken“ ist standardmäßig an')
+  await seite.getByLabel(/^Bezeichnung/).fill('Einmalpflanze')
+  await seite.getByRole('switch', { name: 'Als eigene Position merken' }).uncheck()
+  await seite.getByRole('button', { name: 'Hinzufügen', exact: true }).click()
+  await seite.getByText('3 Positionen').waitFor()
+  await seite.getByRole('row', { name: /Einmalpflanze/ }).click()
+  await seite.getByRole('button', { name: 'Löschen' }).click()
+  await seite.getByRole('alertdialog').getByRole('button', { name: 'Löschen' }).click()
+  await seite.getByText('2 Positionen').waitFor()
+  await seite.getByRole('button', { name: 'Hinzufügen', exact: true }).click()
+  await seite.getByLabel('Katalog durchsuchen').fill('einmalpflanze')
+  pruefe((await seite.getByRole('button', { name: /Einmalpflanze/ }).count()) === 0, 'Ohne „merken“ taucht die Freitext-Position nicht in der Suche auf')
+  await seite.getByRole('button', { name: 'Abbrechen' }).filter({ visible: true }).first().click()
+  pruefe(await seite.getByText('2 Positionen').isVisible(), 'Abbrechen ändert nichts')
 
   // 10. Gespeichert: nach Neuladen noch da
   await seite.reload()
@@ -347,6 +374,30 @@ try {
   await seite.getByRole('heading', { name: 'Protokolle' }).waitFor()
   pruefe(await anzahlEintraege(liste, 1), 'wiederhergestelltes WEP steht wieder in der Liste')
   pruefe(await seite.getByText('leer', { exact: true }).isVisible(), 'Papierkorb ist danach leer (eins endgültig gelöscht, eins wiederhergestellt)')
+
+  // 11f2. Profil: eigene Positionen ändern und löschen
+  await seite.getByRole('button', { name: 'Profil und Einstellungen' }).click()
+  await seite.getByRole('heading', { name: 'Eigene Positionen' }).waitFor()
+  pruefe(await seite.getByText(/Aufwuchs · Stück · 40,00/).isVisible(), 'Profil listet die gemerkte Position mit Abschnitt, Einheit und Preis')
+  pruefe((await seite.getByText('Einmalpflanze').count()) === 0, 'Profil: nicht gemerkte Position fehlt')
+  await seite.getByRole('button', { name: 'Zaubernuss ändern' }).click()
+  await seite.getByRole('dialog', { name: 'Eigene Position ändern' }).waitFor()
+  await seite.getByRole('dialog').getByLabel('Bezeichnung').fill('Zaubernuss, jung')
+  await seite.getByRole('dialog').getByLabel(/^Einzelpreis/).fill('48,50')
+  await seite.getByRole('dialog').getByRole('button', { name: 'Speichern' }).click()
+  pruefe(await seite.getByText(/Zaubernuss, jung/).isVisible() && (await seite.getByText(/48,50/).count()) > 0, 'Profil: geänderte Position mit neuem Preis')
+  await seite.reload()
+  await seite.getByRole('heading', { name: 'Protokolle' }).waitFor()
+  await seite.getByRole('button', { name: 'Profil und Einstellungen' }).click()
+  pruefe(await seite.getByRole('button', { name: 'Zaubernuss, jung ändern' }).isVisible(), 'Eigene Positionen bleiben nach Neuladen erhalten')
+  await seite.getByRole('button', { name: 'Zaubernuss, jung löschen' }).click()
+  await seite.getByRole('alertdialog').getByRole('button', { name: 'Abbrechen' }).click()
+  pruefe(await seite.getByRole('button', { name: 'Zaubernuss, jung ändern' }).isVisible(), 'Löschen: „Abbrechen“ löscht nicht')
+  await seite.getByRole('button', { name: 'Zaubernuss, jung löschen' }).click()
+  await seite.getByRole('alertdialog').getByRole('button', { name: 'Löschen' }).click()
+  pruefe(await seite.getByText(/Noch keine/).isVisible(), 'Profil: gelöschte eigene Position ist weg')
+  await seite.getByRole('button', { name: 'Protokolle' }).filter({ visible: true }).first().click()
+  await seite.getByRole('heading', { name: 'Protokolle' }).waitFor()
 
   // 11g. Zustand der Datenbank (Version 4)
   const verspaetet = await seite.evaluate(async () => {

@@ -1,8 +1,10 @@
 // Öffentliche Schnittstelle des Sync-Moduls für die App.
 // Die Anmeldung kommt aus src/konto; hier wird nur noch das Token benutzt.
 import { aktuellesKonto, kontoVerfuegbar, zugriffstoken } from '@/konto'
+import { lokaleEigene } from '@/katalog'
 import { lokalesProfil } from '@/profil'
 import { synchronisiere, wartetAufUpload } from './engine'
+import { synchronisiereEigenePositionen } from './eigenePositionen'
 import { exportHochladen, leereExportWarteschlange, type ExportStatus } from './exporte'
 import { erstelleGraphClient } from './graph'
 import { geraeteKennung } from './geraet'
@@ -45,7 +47,8 @@ export async function wartendeAenderungen(): Promise<number> {
     weps.filter((w) => wartetAufUpload(meta.get(w.id))).length +
     korb.filter((e) => !meta.get(e.id)?.papierkorbETag).length +
     metas.filter((m) => m.endgueltig).length +
-    exporte.length
+    exporte.length +
+    (lokaleEigene.lade().wartet ? 1 : 0)
   )
 }
 
@@ -59,6 +62,7 @@ export function lokalVeraendert(e: SyncErgebnis): boolean {
 export interface GesamtErgebnis extends SyncErgebnis {
   exporte: string[]
   profilGeaendert: boolean
+  eigenePositionenGeaendert: boolean
 }
 
 /** Führt einen vollständigen Abgleich mit OneDrive aus. */
@@ -99,7 +103,7 @@ async function abgleichen(): Promise<GesamtErgebnis> {
   // Abgelaufenes (30 Tage) zuerst, damit es nicht noch hochgeladen wird
   await raeumePapierkorbAuf(syncSpeicher, new Date().toISOString())
   const ergebnis = await synchronisiere({ client: daten, papierkorb, lokal: syncSpeicher, geraet })
-  const gesamt: GesamtErgebnis = { ...ergebnis, exporte: [], profilGeaendert: false }
+  const gesamt: GesamtErgebnis = { ...ergebnis, exporte: [], profilGeaendert: false, eigenePositionenGeaendert: false }
 
   const fehler = (wepId: string, e: unknown): SyncHinweis => ({
     wepId,
@@ -110,6 +114,12 @@ async function abgleichen(): Promise<GesamtErgebnis> {
     gesamt.profilGeaendert = p === 'geladen'
   } catch (e) {
     gesamt.fehler.push(fehler('Profil', e))
+  }
+  try {
+    const e = await synchronisiereEigenePositionen({ client: daten, geraet })
+    gesamt.eigenePositionenGeaendert = e === 'geladen' || e === 'beides'
+  } catch (e) {
+    gesamt.fehler.push(fehler('Eigene Positionen', e))
   }
   const q = await leereExportWarteschlange(exporte, exportSpeicher)
   gesamt.exporte = q.hochgeladen
@@ -162,4 +172,7 @@ export async function setzeAbgleichZurueck(): Promise<void> {
   }
   const stand = lokalesProfil.lade()
   lokalesProfil.speichere({ ...stand, letzterSyncAm: undefined, remoteETag: undefined })
+  // Eigene Positionen: beim nächsten Konto alles hochladen (Marken gelöschter Einträge inklusive)
+  const eigene = lokaleEigene.lade()
+  lokaleEigene.speichere({ ...eigene, wartet: eigene.eintraege.length > 0, letzterSyncAm: undefined, remoteETag: undefined })
 }
