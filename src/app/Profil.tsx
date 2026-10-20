@@ -13,6 +13,7 @@ import {
   type Profil as ProfilDaten,
   type Rolle,
 } from '@/profil'
+import { EigenePositionen } from './EigenePositionen'
 import { Fehlersuche } from './Fehlersuche'
 import { Synchronisierung } from './Synchronisierung'
 import { UpdateHinweis, UpdateStandZeilen } from './UpdateHinweis'
@@ -128,6 +129,8 @@ export function Profil({ konto, verfuegbar, onZurueck, onAnmelden, onAbmelden }:
               : 'Ohne Konto bleiben diese Angaben auf diesem Gerät.'}
           </p>
         </section>
+
+        <EigenePositionen id={`${id}-eigene`} konto={konto !== null} />
 
         <section className="abschnitt" aria-labelledby={`${id}-geraet`}>
           <h2 className="gruppenkopf" id={`${id}-geraet`}>

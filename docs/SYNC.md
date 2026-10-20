@@ -54,7 +54,8 @@ sein **privates OneDrive** ab. Die App sieht dabei **nur ihren eigenen Ordner**
 
 ```
 Apps/WEP-App/
-  daten/          WEP-Dateien (<Vorgangs-Nr>.json), Konflikt-Kopien, profil.json
+  daten/          WEP-Dateien (<Vorgangs-Nr>.json), Konflikt-Kopien, profil.json,
+                  eigene-positionen.json
   daten/papierkorb/   gelöschte WEPs (<Vorgangs-Nr>.json mit Löschzeitpunkt, 30 Tage)
   Exporte/        fertige Excel-Dateien (<Vorgangs-Nr>_WEP.xlsx)
   LIESMICH.txt    „Ordner der WEP-App – bitte nichts von Hand ändern; fertige
@@ -73,6 +74,13 @@ Apps/WEP-App/
   `exporte`) und geht beim nächsten Abgleich hoch. Ein neuer Export mit demselben
   Namen ersetzt die ältere Fassung. Ohne Konto passiert nichts. (Einfacher
   Graph-Upload, geeignet bis ca. 4 MB je Datei.)
+- **Eigene Positionen:** `daten/eigene-positionen.json` (`wep-eigene-positionen/1`) enthält die vom
+  Wertermittler gemerkten Freitext-Positionen (Bezeichnung, Einheit, Preis, Abschnitt). Der Abgleich
+  führt beide Fassungen **je Eintrag** zusammen: Die neuere Änderung (`geaendertAm`) gewinnt, bei
+  gleicher Zeit gewinnt „gelöscht“. Gelöschte Einträge bleiben als Marke (`geloescht`) in der Datei,
+  damit ein Gerät mit altem Stand sie nicht zurückbringt. Es gibt keine Konflikt-Kopien; überschreibt
+  ein anderes Gerät die Datei, heilt der nächste Abgleich (Vereinigung). Ohne Konto bleiben sie lokal
+  (`localStorage`), nach der Anmeldung werden sie hochgeladen.
 - **Profil:** `daten/profil.json` (`wep-profil/1`) enthält Name, Rolle und
   Standard-Kleingartenanlage. Es gibt kein Konflikt-Verfahren, die neuere Änderung
   gewinnt. Geräte-Einstellungen („Upload nur über WLAN“) bleiben lokal und stehen

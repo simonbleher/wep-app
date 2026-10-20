@@ -24,7 +24,7 @@
 // - Die „Offline-Warteschlange“ ergibt sich aus den Metadaten in IndexedDB:
 //   Jedes WEP mit lokalGeaendertAm > letzterSyncAm wartet auf den Upload.
 import { naechsteVorgangsNr, type Wep } from '@/model'
-import { PAPIERKORB_ORDNER, PROFIL_DATEI } from './ordner'
+import { EIGENE_DATEI, PAPIERKORB_ORDNER, PROFIL_DATEI } from './ordner'
 import { istAbgelaufen, metaMit } from './papierkorb'
 import type {
   GraphClient,
@@ -45,7 +45,7 @@ export function dateiName(wepId: string): string {
 
 /** Liefert die WEP-id zu einem Dateinamen oder null für fremde/Konflikt-/Profil-Dateien. */
 export function wepIdAusName(name: string): string | null {
-  if (!name.endsWith('.json') || name.includes(KONFLIKT_MARKE) || name === PROFIL_DATEI) {
+  if (!name.endsWith('.json') || name.includes(KONFLIKT_MARKE) || name === PROFIL_DATEI || name === EIGENE_DATEI) {
     return null
   }
   return name.slice(0, -'.json'.length)

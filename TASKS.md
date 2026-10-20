@@ -222,3 +222,12 @@ Tests: `src/sync/papierkorb.test.ts` (zwei Geräte über FakeDrive), `graph.test
 (`npm run paket2:screenshots`).
 **Noch offen:** Gerätetest (Löschen auf Handy und Tablet mit echtem OneDrive, Android-Hintergrund-Upload während des
 Löschens), alle Geräte auf diese Version bringen.
+
+### B3-3 · Eigene Positionen merken 🔄 (PR offen) – Branch beta3/paket3
+Ergebnis: Freitext-Position optional „als eigene Position merken“ (Standard an), Suche zeigt sie mit „Eigene“ vor gleich
+guten Katalogtreffern (nur im passenden Abschnitt), Verwaltung im Profil (Liste, ändern, löschen), Abgleich über
+`daten/eigene-positionen.json` (neuere Änderung je Eintrag gewinnt, gelöschte bleiben gelöscht). Code: `src/katalog/eigene*.ts`,
+`src/sync/eigenePositionen.ts`, `src/app/EigenePositionen.tsx`. Tests: `katalog/eigene.test.ts`, `katalog/suche.test.ts`,
+`sync/eigenePositionen.test.ts` (zwei Geräte über FakeDrive), `app/__tests__/paket3.test.tsx`; e2e erweitert.
+Screenshots: `docs/paket3/` (`npm run paket3:screenshots`). Kein `android/`-Eingriff, `native-version` unverändert.
+**Noch offen:** Gerätetest mit echtem OneDrive (zwei Geräte).

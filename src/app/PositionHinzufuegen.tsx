@@ -5,12 +5,12 @@
 import { useState } from 'react'
 import { ChevronLeft, Plus, Search, X } from 'lucide-react'
 import type { Position, Wep } from '@/model'
-import type { Position as KatalogPosition, Variante as KatalogVariante } from '@/katalog'
-import { sucheKatalog } from '@/katalog'
+import type { EigenePosition, Position as KatalogPosition, Variante as KatalogVariante } from '@/katalog'
+import { aktiveEigene, alsKatalogPosition, EIGEN_PRAEFIX, lokaleEigene, merkeEigenePosition, sucheKatalog } from '@/katalog'
 import { merkeZuletztVerwendet, ladeZuletztVerwendet } from '@/gruen/zuletzt'
 import { gefundeneArt, kurzeBezeichnung } from '@/gruen/format'
 import { ABSCHNITT_TITEL, KATALOG_POSITIONEN, type Abschnitt } from './katalogDaten'
-import { PositionFormular, type Auswahl } from './PositionFormular'
+import { PositionFormular, type Auswahl, type MerkeDaten } from './PositionFormular'
 import { ICON, Kopf, euroFormat } from './ui'
 
 /** Ein Suchtreffer mit allen Varianten, die direkt in der Liste stehen. */
@@ -21,14 +21,32 @@ interface TrefferGruppe {
   eintraege: Auswahl[]
 }
 
-const schluessel = (a: Auswahl) => `${a.position?.id ?? 'frei'}|${JSON.stringify(a.variante ?? '')}`
+const schluessel = (a: Auswahl) => `${a.position?.id ?? (a.eigene ? EIGEN_PRAEFIX + a.eigene.id : 'frei')}|${JSON.stringify(a.variante ?? '')}`
 
-export function gruppiere(positionen: KatalogPosition[], suchbegriff: string, zuletzt: string[]): TrefferGruppe[] {
-  const treffer = sucheKatalog(positionen, suchbegriff, {
+/**
+ * Sucht im Katalog und bei den eigenen Positionen des Abschnitts. Eigene Positionen stehen vor
+ * gleich guten Katalogtreffern und bekommen den Eintrag `eigene` statt einer Katalog-Position.
+ */
+export function gruppiere(
+  positionen: KatalogPosition[],
+  suchbegriff: string,
+  zuletzt: string[],
+  eigene: EigenePosition[] = [],
+): TrefferGruppe[] {
+  const eigeneNachId = new Map(eigene.map((e) => [EIGEN_PRAEFIX + e.id, e]))
+  const treffer = sucheKatalog([...eigene.map(alsKatalogPosition), ...positionen], suchbegriff, {
     zuletztVerwendet: suchbegriff ? [] : zuletzt,
     limit: 10,
   })
   return treffer.map((t, i) => {
+    const meine = eigeneNachId.get(t.position.id)
+    if (meine) {
+      return {
+        schluessel: `${t.position.id}-${i}`,
+        position: t.position,
+        eintraege: [{ eigene: meine }],
+      }
+    }
     const art = gefundeneArt(t.position, suchbegriff)
     // Nennt der Treffer schon eine Variante (z. B. „Apfel Halbstamm“), nur diese zeigen
     const varianten: (KatalogVariante | undefined)[] = t.variante
@@ -46,6 +64,7 @@ export function gruppiere(positionen: KatalogPosition[], suchbegriff: string, zu
 }
 
 function trefferText(a: Auswahl): string {
+  if (a.eigene) return a.eigene.bezeichnung
   if (!a.position) return ''
   return a.variante ? kurzeBezeichnung(a.position, a.variante, a.art) : a.position.bezeichnung
 }
@@ -66,16 +85,24 @@ export function PositionHinzufuegen({
   const [zuletzt] = useState<string[]>(() => ladeZuletztVerwendet())
   const [auswahl, setAuswahl] = useState<Auswahl | null>(null)
 
+  // Eigene Positionen nur im passenden Abschnitt
+  const [eigene] = useState<EigenePosition[]>(() => aktiveEigene(lokaleEigene.lade().eintraege, abschnitt))
   const relevante = KATALOG_POSITIONEN.filter((p) =>
     abschnitt === 'aussenanlagen' ? p.abschnitt === 'II. Außenanlagen' : p.abschnitt === 'III. Aufwuchs',
   )
-  const gruppen = gruppiere(relevante, suchbegriff, zuletzt)
+  const gruppen = gruppiere(relevante, suchbegriff, zuletzt, eigene)
   const anzahlTreffer = gruppen.reduce((n, g) => n + g.eintraege.length, 0)
 
   function waehle(a: Auswahl) {
     if (a.position) merkeZuletztVerwendet(a.position.id)
+    if (a.eigene) merkeZuletztVerwendet(EIGEN_PRAEFIX + a.eigene.id)
     setAuswahl(a)
     setSchritt('formular')
+  }
+
+  function fertig(pos: Position, merken?: MerkeDaten) {
+    if (merken) merkeEigenePosition({ ...merken, abschnitt })
+    onHinzufuegen(pos)
   }
 
   const titel = ABSCHNITT_TITEL[abschnitt]
@@ -138,7 +165,7 @@ export function PositionHinzufuegen({
 
           <p className="gruppenkopf">
             {suchbegriff
-              ? `${anzahlTreffer} Treffer im Katalog`
+              ? `${anzahlTreffer} Treffer${eigene.length ? '' : ' im Katalog'}`
               : zuletzt.length
                 ? 'Zuletzt verwendet und häufig'
                 : 'Häufig verwendet'}
@@ -155,6 +182,7 @@ export function PositionHinzufuegen({
               <ul className="liste">
                 {g.eintraege.map((e) => {
                   const hoechst = e.variante?.hoechstwert ?? e.position?.hoechstwert
+                  const gemerkterPreis = e.eigene?.einzelpreis
                   const aktiv = auswahl !== null && schluessel(auswahl) === schluessel(e)
                   return (
                     <li key={schluessel(e)}>
@@ -166,8 +194,14 @@ export function PositionHinzufuegen({
                       >
                         <span className="zeile-text">
                           <span className="zeile-titel">{trefferText(e)}</span>
-                          {g.eintraege.length === 1 && <span className="neben">{g.position.kategorie}</span>}
+                          {g.eintraege.length === 1 && (
+                            <span className="neben">
+                              {e.eigene ? `${e.eigene.einheit}` : g.position.kategorie}
+                            </span>
+                          )}
                         </span>
+                        {e.eigene && <span className="status">Eigene</span>}
+                        {gemerkterPreis !== undefined && <span className="zahl neben">{euroFormat(gemerkterPreis)}</span>}
                         {hoechst !== undefined && <span className="zahl neben">bis {euroFormat(hoechst)}</span>}
                       </button>
                     </li>
@@ -193,7 +227,7 @@ export function PositionHinzufuegen({
 
         <section className="split-formular" aria-label="Position">
           {auswahl ? (
-            <PositionFormular key={schluessel(auswahl)} auswahl={auswahl} wep={wep} onFertig={onHinzufuegen} />
+            <PositionFormular key={schluessel(auswahl)} auswahl={auswahl} wep={wep} onFertig={fertig} />
           ) : (
             <p className="formular-leer">
               Position aus dem Katalog wählen oder eine eigene Position (Freitext) anlegen.

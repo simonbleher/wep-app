@@ -51,6 +51,8 @@ export interface Position {
   synonyme?: string[];
   /** Häufigkeit im Kleingarten (1–5, 5 = sehr häufig) für die Sortierung. */
   relevanz: number;
+  /** Nur zur Laufzeit: eigene, vom Wertermittler gemerkte Position (siehe eigene.ts), nicht aus dem Katalog. */
+  eigen?: boolean;
 }
 
 /** Wurzelobjekt von data/katalog.json. */

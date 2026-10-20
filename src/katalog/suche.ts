@@ -176,8 +176,9 @@ function bewertePosition(position: Position, tokens: string[]): Treffer | null {
 /**
  * Sortierung der Trefferliste (Ranking):
  *   1. höherer score zuerst (höheres Feldgewicht und nähere/stärkere Treffer),
- *   2. bei Gleichstand höhere `relevanz` (Häufigkeit im Kleingarten),
- *   3. zuletzt alphabetisch nach `bezeichnung`.
+ *   2. bei Gleichstand eigene (gemerkte) Positionen vor Katalogpositionen,
+ *   3. dann höhere `relevanz` (Häufigkeit im Kleingarten),
+ *   4. zuletzt alphabetisch nach `bezeichnung`.
  * Dadurch landet z. B. „Liguster“ als Arten-Treffer zunächst gleichauf bei
  * Hecke (relevanz 5) und Ziergehölz (relevanz 4); die relevanz-Stufe (2.) ordnet
  * dann Hecke vor Ziergehölz – ohne Sonderfall für einzelne Namen.
@@ -185,6 +186,7 @@ function bewertePosition(position: Position, tokens: string[]): Treffer | null {
 function sortiere(a: Treffer, b: Treffer): number {
   return (
     b.score - a.score ||
+    Number(!!b.position.eigen) - Number(!!a.position.eigen) ||
     b.position.relevanz - a.position.relevanz ||
     a.position.bezeichnung.localeCompare(b.position.bezeichnung, 'de')
   );
@@ -192,7 +194,7 @@ function sortiere(a: Treffer, b: Treffer): number {
 
 /**
  * Liste ohne Suchbegriff: erst die zuletzt verwendeten Positionen in der
- * gegebenen Reihenfolge, dann der Rest nach relevanz absteigend, bei Gleichstand
+ * gegebenen Reihenfolge, dann die eigenen, dann der Rest nach relevanz absteigend, bei Gleichstand
  * alphabetisch nach bezeichnung.
  */
 function listeOhneBegriff(positionen: Position[], options: SucheOptions): Treffer[] {
@@ -214,6 +216,7 @@ function listeOhneBegriff(positionen: Position[], options: SucheOptions): Treffe
     .filter((p) => !zuletzt.includes(p.id))
     .sort(
       (a, b) =>
+        Number(!!b.eigen) - Number(!!a.eigen) ||
         b.relevanz - a.relevanz || a.bezeichnung.localeCompare(b.bezeichnung, 'de'),
     )
     .map<Treffer>((position) => ({
