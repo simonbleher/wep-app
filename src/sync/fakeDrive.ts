@@ -28,6 +28,13 @@ export class FakeDrive {
       .sort()
   }
 
+  /** Inhalt einer Datei als Text (Test-Abkürzung). */
+  text(pfad: string): string {
+    const d = this.dateien.get(pfad)
+    if (!d || typeof d.inhalt !== 'string') throw new Error(`keine Textdatei: ${pfad}`)
+    return d.inhalt
+  }
+
   client(ordner = ''): GraphClient {
     const voll = (name: string) => (ordner ? `${ordner}/${name}` : name)
     return {
@@ -49,6 +56,10 @@ export class FakeDrive {
         const d = this.neu(inhalt)
         this.dateien.set(voll(name), d)
         return { name, eTag: d.eTag, geaendertAm: d.geaendertAm }
+      },
+      loesche: async (name) => {
+        this.aufrufe.push(`loesche ${voll(name)}`)
+        this.dateien.delete(voll(name))
       },
       verschiebe: async (name, zielOrdner) => {
         this.aufrufe.push(`verschiebe ${voll(name)} -> ${zielOrdner}`)

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { FakeDrive } from './fakeDrive'
 import { neuerWep } from '@/model'
 import { synchronisiere, verpacke, wepIdAusName } from './engine'
-import type { LokalSpeicher } from './types'
+import { FakeLokal } from './testHilfen'
 import { LIESMICH_TEXT, richteOrdnerEin } from './ordner'
 
 describe('Ordner-Migration (richteOrdnerEin)', () => {
@@ -74,14 +74,14 @@ describe('Ordner-Migration (richteOrdnerEin)', () => {
     drive.lege('daten/profil.json', '{"format":"wep-profil/1"}')
     await richteOrdnerEin(drive.client())
 
-    const geladen: string[] = []
-    const lokal: LokalSpeicher = {
-      alleWeps: async () => [],
-      alleMeta: async () => [],
-      speichereAusSync: async (wep) => void geladen.push(wep.id),
-      setzeMeta: async () => {},
-    }
-    const e = await synchronisiere({ client: drive.client('daten'), lokal, geraet: 'test' })
+    const lokal = new FakeLokal()
+    const e = await synchronisiere({
+      client: drive.client('daten'),
+      papierkorb: drive.client('daten/papierkorb'),
+      lokal,
+      geraet: 'test',
+    })
+    const geladen = [...lokal.weps.keys()]
 
     expect(wepIdAusName('profil.json')).toBeNull()
     expect(geladen).toEqual(['2026-001'])
@@ -91,17 +91,18 @@ describe('Ordner-Migration (richteOrdnerEin)', () => {
 
   it('„ohne Konto“ angelegte WEPs gehen beim ersten Abgleich nach der Anmeldung nach daten/', async () => {
     const drive = new FakeDrive()
-    const weps = [neuerWep('2026-001'), neuerWep('2026-002')]
-    const lokal: LokalSpeicher = {
-      alleWeps: async () => weps,
-      // ohne Konto gespeichert: Änderungsmarke, aber nie abgeglichen
-      alleMeta: async () =>
-        weps.map((w) => ({ id: w.id, lokalGeaendertAm: '2026-10-19T10:00:00.000Z' })),
-      speichereAusSync: async () => {},
-      setzeMeta: async () => {},
+    // ohne Konto gespeichert: Änderungsmarke, aber nie abgeglichen
+    const lokal = new FakeLokal()
+    for (const w of [neuerWep('2026-001'), neuerWep('2026-002')]) {
+      await lokal.speichereWep(w, '2026-10-19T10:00:00.000Z')
     }
     await richteOrdnerEin(drive.client())
-    const e = await synchronisiere({ client: drive.client('daten'), lokal, geraet: 'test' })
+    const e = await synchronisiere({
+      client: drive.client('daten'),
+      papierkorb: drive.client('daten/papierkorb'),
+      lokal,
+      geraet: 'test',
+    })
 
     expect(e.hochgeladen.sort()).toEqual(['2026-001', '2026-002'])
     expect(drive.namen('daten')).toEqual(['2026-001.json', '2026-002.json'])

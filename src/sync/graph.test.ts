@@ -71,3 +71,47 @@ describe('Ordner anlegen im App-Ordner', () => {
     await expect(c.liste()).rejects.toBeInstanceOf(GraphFehler)
   })
 })
+
+describe('Papierkorb-Ordner und Löschen', () => {
+  it('Verschieben nach daten/papierkorb: legt erst daten/, dann papierkorb darin an', async () => {
+    const { holen, aufrufe } = mock([
+      ['GET', /approot:\/daten\/papierkorb\?\$select=id$/, 404, { error: { code: 'itemNotFound' } }],
+      ['GET', /approot:\/daten\?\$select=id$/, 200, { id: 'DATEN!1' }],
+      ['POST', /\/items\/DATEN!1\/children$/, 201, { id: 'KORB!1', name: 'papierkorb' }],
+      ['PATCH', /approot:\/daten\/2026-001\.json:$/, 200, ALT],
+    ])
+    const c = erstelleGraphClient(token, holen, 'daten')
+    expect(await c.verschiebe('2026-001.json', 'daten/papierkorb')).toBe('verschoben')
+    const post = aufrufe.find((a) => a.methode === 'POST')
+    expect(post?.url).toMatch(/\/items\/DATEN!1\/children$/)
+    expect(aufrufe.at(-1)).toMatchObject({ methode: 'PATCH' })
+  })
+
+  it('Zurückholen aus dem Papierkorb: Ordner existiert, Datei wird verschoben', async () => {
+    const { holen, aufrufe } = mock([
+      ['GET', /approot:\/daten\?\$select=id$/, 200, { id: 'DATEN!1' }],
+      ['PATCH', /approot:\/daten\/papierkorb\/2026-001\.json:$/, 200, ALT],
+    ])
+    const c = erstelleGraphClient(token, holen, 'daten/papierkorb')
+    expect(await c.verschiebe('2026-001.json', 'daten')).toBe('verschoben')
+    expect(aufrufe.map((a) => a.methode)).toEqual(['GET', 'PATCH'])
+  })
+
+  it('liste() eines noch fehlenden Papierkorb-Ordners ist leer', async () => {
+    const { holen } = mock([['GET', /papierkorb:\/children/, 404, { error: { code: 'itemNotFound' } }]])
+    expect(await erstelleGraphClient(token, holen, 'daten/papierkorb').liste()).toEqual([])
+  })
+
+  it('loesche(): DELETE auf die Datei, „schon weg“ (404) ist kein Fehler', async () => {
+    const { holen, aufrufe } = mock([
+      ['DELETE', /daten\/a\.json:$/, 204],
+      ['DELETE', /daten\/weg\.json:$/, 404, { error: { code: 'itemNotFound' } }],
+      ['DELETE', /daten\/gesperrt\.json:$/, 403, { error: { code: 'accessDenied' } }],
+    ])
+    const c = erstelleGraphClient(token, holen, 'daten')
+    await c.loesche('a.json')
+    await c.loesche('weg.json')
+    await expect(c.loesche('gesperrt.json')).rejects.toBeInstanceOf(GraphFehler)
+    expect(aufrufe).toHaveLength(3)
+  })
+})

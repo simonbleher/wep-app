@@ -11,13 +11,39 @@ sein **privates OneDrive** ab. Die App sieht dabei **nur ihren eigenen Ordner**
   und als „wartet auf Upload“ markiert.
 - Abgeglichen wird beim Öffnen der Startseite, wenn das Gerät wieder online geht,
   und über den Textknopf **„Abgleichen“** in der Statuszeile der Startseite.
-- **Konflikt** (dasselbe WEP auf zwei Geräten geändert): Die neuere Änderung
-  gewinnt. Die ältere Fassung bleibt als
-  `<Vorgangs-Nr>.konflikt-<Zeit>.json` im OneDrive-Ordner erhalten, und die App
-  zeigt einen Hinweis. Es geht also nichts verloren.
-- **Löschen** wird in der Beta nicht abgeglichen: Ein auf einem Gerät gelöschtes
-  WEP bleibt in OneDrive und auf den anderen Geräten, wird aber auf dem
-  löschenden Gerät nicht wieder geladen.
+- **Konflikt** (dasselbe WEP auf zwei Geräten geändert): Die neuere Änderung gilt vorerst.
+  Die andere Fassung liegt als `<Vorgangs-Nr>.konflikt-<Zeit>.json` in `daten/` **und** am
+  WEP selbst. Am WEP erscheint der Hinweis **„Auf zwei Geräten geändert“** (auch als Marke
+  „Konflikt“ in der Liste) mit den Knöpfen **„Diese Fassung behalten“** und **„Andere Fassung
+  übernehmen“**. Nach der Entscheidung wird die Konflikt-Kopie beim nächsten Abgleich aus
+  OneDrive entfernt; „Andere Fassung übernehmen“ speichert die andere Fassung als neue
+  Änderung, die dann auf allen Geräten gilt. Bis zur Entscheidung geht nichts verloren.
+- **Löschen gilt überall (Papierkorb):** Löschen verschiebt das WEP per Graph-Move von
+  `daten/<Nr>.json` nach `daten/papierkorb/<Nr>.json` und trägt den **Löschzeitpunkt**
+  (`geloeschtAm`, `geloeschtVon`) in die Datei ein. Andere Geräte legen das WEP beim nächsten
+  Abgleich in ihren lokalen Papierkorb. Ohne Konto bleibt der Papierkorb lokal; nach der
+  Anmeldung wird er mit hochgeladen. Offline gelöscht heißt: erst der nächste Abgleich meldet
+  es OneDrive. Alle Schritte sind idempotent (ein Abbruch zwischen Verschieben und Stempeln
+  wird beim nächsten Abgleich geheilt).
+- **Papierkorb-Ansicht** (Startseite → „Papierkorb“): **Wiederherstellen** (die Datei kommt
+  nach `daten/` zurück, das WEP ist auf allen Geräten wieder da) und **„Endgültig löschen“**
+  (mit Rückfrage; entfernt Datei, Papierkorb-Kopie und Konflikt-Kopien in OneDrive und auf
+  den anderen Geräten). Nach **30 Tagen** wird automatisch endgültig gelöscht (beim Öffnen der
+  App/Liste und bei jedem Abgleich, auch ohne Konto lokal). Ist die alte Nummer beim
+  Wiederherstellen inzwischen vergeben, entsteht ein neues WEP mit der nächsten Nummer; das
+  Original bleibt im Papierkorb. Neue WEPs bekommen nie eine Nummer, die im Papierkorb liegt.
+- **Änderung nach dem Löschzeitpunkt:** Wurde ein WEP auf einem anderen Gerät **nach** dem
+  Löschzeitpunkt noch geändert (oder hier gelöscht und dort danach geändert), wird nicht still
+  gelöscht: Das WEP bleibt erhalten, zeigt „Gelöscht und danach geändert“ mit **„WEP
+  behalten“** / **„Doch löschen“**. Eine Änderung **vor** dem Löschzeitpunkt (spät abgeglichen)
+  verhindert das Löschen nicht; im Papierkorb landet dann die jüngste Fassung.
+- **Umstieg von der Beta-Regel „Löschen wird nicht abgeglichen“:** Frühere Versionen
+  merkten sich nur „hier gelöscht“ (`geloescht`), die Datei blieb in OneDrive. Beim ersten
+  Start mit dieser Version bekommt diese Marke einen Löschzeitpunkt (Datenbank-Version 4);
+  der nächste Abgleich verschiebt die Datei nach `daten/papierkorb/` und legt das WEP in den
+  lokalen Papierkorb (30 Tage ab dem Umstieg). Andere Geräte folgen beim Abgleich. Ältere
+  App-Versionen kennen den Papierkorb nicht und würden ein gelöschtes WEP neu hochladen –
+  alle Geräte sollten auf diese Version aktualisiert werden.
 - Neue WEPs bekommen die nächste freie Nummer **auf dem jeweiligen Gerät**.
   Legst du auf zwei Geräten offline gleichzeitig ein neues WEP an, können beide
   dieselbe Nummer bekommen – dann greift die Konflikt-Regel und die ältere
@@ -29,6 +55,7 @@ sein **privates OneDrive** ab. Die App sieht dabei **nur ihren eigenen Ordner**
 ```
 Apps/WEP-App/
   daten/          WEP-Dateien (<Vorgangs-Nr>.json), Konflikt-Kopien, profil.json
+  daten/papierkorb/   gelöschte WEPs (<Vorgangs-Nr>.json mit Löschzeitpunkt, 30 Tage)
   Exporte/        fertige Excel-Dateien (<Vorgangs-Nr>_WEP.xlsx)
   LIESMICH.txt    „Ordner der WEP-App – bitte nichts von Hand ändern; fertige
                   Excel-Dateien liegen in Exporte/.“
@@ -126,6 +153,19 @@ bisher nur lokal.
 Für den Durchlauf im Browser (`npm run e2e`) wird mit einer Platzhalter-Client-ID
 gebaut, damit der Login-Bildschirm erscheint; angemeldet wird dabei nie.
 
+## Datenmodell (Papierkorb und Konflikte)
+
+- `SyncDatei` (`wep-sync/1`) hat zwei optionale Felder `geloeschtAm`/`geloeschtVon`, nur in
+  `daten/papierkorb/`. Das Format bleibt `wep-sync/1`.
+- `SyncMeta` (IndexedDB `syncMeta`) bekommt: `geloescht` + `geloeschtAm` (im Papierkorb),
+  `papierkorbETag` (Löschung ist in OneDrive angekommen), `endgueltig` (nur noch Marke, bis
+  OneDrive aufgeräumt ist), `wiederhergestellt` (Datei muss aus dem Papierkorb zurückgeholt
+  werden), `konflikt` (offener Konflikt samt anderer Fassung) und `aufraeumen`
+  (entschiedene Konflikt-Kopien).
+- Der lokale Papierkorb ist der IndexedDB-Store `papierkorb` (Datenbank-Version 4).
+  Gespeichert wird in einem gelöschten WEP nichts mehr (z. B. eine verzögerte Speicherung):
+  `speichereWep` ignoriert Einträge im Papierkorb.
+
 ## Datenschutz
 
 - Die WEPs enthalten Namen von Unterpächtern. Sie liegen nur lokal im Browser
@@ -142,12 +182,15 @@ gebaut, damit der Login-Bildschirm erscheint; angemeldet wird dabei nie.
 | `src/konto/web.ts` | Web-Umsetzung mit MSAL.js, Authority `consumers` |
 | `src/konto/android.ts` | Android-Umsetzung: System-Browser + PKCE, Token nativ (docs/ANDROID.md) |
 | `src/konto/startwahl.ts` | Gemerkte Wahl „mit Konto / ohne Konto“ und Start-Entscheidung |
-| `src/sync/engine.ts` | Abgleich-Logik für die WEPs (rein, getestet) |
+| `src/sync/engine.ts` | Abgleich-Logik für die WEPs inkl. Papierkorb und Konflikte (rein, getestet) |
+| `src/sync/papierkorb.ts` | Lokale Regeln: löschen, wiederherstellen, endgültig löschen, 30 Tage, Konflikt entscheiden |
+| `src/sync/aktionen.ts` | Diese Regeln für die Oberfläche (an IndexedDB angebunden) |
 | `src/sync/graph.ts` | Microsoft-Graph-Zugriff auf einen Ordner im App-Ordner (`/me/drive/special/approot`) |
-| `src/sync/ordner.ts` | Ordnerstruktur, `LIESMICH.txt`, Verschieben alter Dateien |
+| `src/sync/ordner.ts` | Ordnerstruktur (auch `daten/papierkorb/`), `LIESMICH.txt`, Verschieben alter Dateien |
 | `src/sync/profil.ts` | Abgleich von `daten/profil.json` |
 | `src/sync/exporte.ts` | Upload der Excel-Exporte und Warteschlange |
-| `src/sync/speicher.ts` | Anbindung an IndexedDB (`src/app/db.ts`, Stores `syncMeta`, `exporte`) |
+| `src/sync/speicher.ts` | Anbindung an IndexedDB (`src/app/db.ts`, Stores `weps`, `syncMeta`, `papierkorb`, `exporte`) |
+| `src/app/Papierkorb.tsx`, `KonfliktHinweis.tsx` | Papierkorb-Ansicht, Konflikt-Hinweis am WEP |
 | `src/profil/index.ts` | Profil und Geräte-Einstellungen (localStorage), Vorbelegung neuer WEPs |
 | `src/app/SyncLeiste.tsx` | Statuszeile und Abgleich auf der Startseite |
 

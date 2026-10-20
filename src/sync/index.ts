@@ -5,7 +5,9 @@ import { lokalesProfil } from '@/profil'
 import { synchronisiere, wartetAufUpload } from './engine'
 import { exportHochladen, leereExportWarteschlange, type ExportStatus } from './exporte'
 import { erstelleGraphClient } from './graph'
-import { DATEN_ORDNER, EXPORTE_ORDNER, richteOrdnerEin } from './ordner'
+import { geraeteKennung } from './geraet'
+import { DATEN_ORDNER, EXPORTE_ORDNER, PAPIERKORB_ORDNER, richteOrdnerEin } from './ordner'
+import { metaMit, raeumePapierkorbAuf } from './papierkorb'
 import { synchronisiereProfil } from './profil'
 import { exportSpeicher, syncSpeicher } from './speicher'
 import type { SyncErgebnis, SyncHinweis } from './types'
@@ -23,32 +25,35 @@ export function setzeSyncHaken(h: SyncHaken | undefined): void {
   syncHaken = h
 }
 
-const GERAET_KEY = 'wep-geraet'
+export { geraeteKennung }
+
 const ORDNER_KEY = 'wep-ordner-eingerichtet'
 
-/** Stabile, zufällige Kennung dieses Geräts (nur zur Info in den Sync-Dateien). */
-export function geraeteKennung(): string {
-  try {
-    let id = localStorage.getItem(GERAET_KEY)
-    if (!id) {
-      id = `${navigator.platform || 'Gerät'}-${Math.random().toString(36).slice(2, 8)}`
-      localStorage.setItem(GERAET_KEY, id)
-    }
-    return id
-  } catch {
-    return 'unbekanntes Gerät'
-  }
-}
-
-/** Anzahl der WEPs und Exporte, die noch auf den Upload warten. */
+/**
+ * Anzahl der Änderungen, die noch auf den Abgleich warten: WEPs und Exporte zum Hochladen,
+ * Löschungen (Papierkorb), die noch nicht in OneDrive sind, und endgültig Gelöschtes.
+ */
 export async function wartendeAenderungen(): Promise<number> {
-  const [weps, metas, exporte] = await Promise.all([
+  const [weps, korb, metas, exporte] = await Promise.all([
     syncSpeicher.alleWeps(),
+    syncSpeicher.alleImPapierkorb(),
     syncSpeicher.alleMeta(),
     exportSpeicher.alle(),
   ])
   const meta = new Map(metas.map((m) => [m.id, m]))
-  return weps.filter((w) => wartetAufUpload(meta.get(w.id))).length + exporte.length
+  return (
+    weps.filter((w) => wartetAufUpload(meta.get(w.id))).length +
+    korb.filter((e) => !meta.get(e.id)?.papierkorbETag).length +
+    metas.filter((m) => m.endgueltig).length +
+    exporte.length
+  )
+}
+
+/** Hat der Abgleich Daten auf diesem Gerät verändert (die Liste muss neu geladen werden)? */
+export function lokalVeraendert(e: SyncErgebnis): boolean {
+  return (
+    e.heruntergeladen.length + e.geloescht.length + e.wiederhergestellt.length + e.bereinigt.length + e.konflikte.length > 0
+  )
 }
 
 export interface GesamtErgebnis extends SyncErgebnis {
@@ -71,6 +76,7 @@ async function abgleichen(): Promise<GesamtErgebnis> {
   const geraet = geraeteKennung()
   const wurzel = erstelleGraphClient(zugriffstoken)
   const daten = erstelleGraphClient(zugriffstoken, undefined, DATEN_ORDNER)
+  const papierkorb = erstelleGraphClient(zugriffstoken, undefined, PAPIERKORB_ORDNER)
   const exporte = erstelleGraphClient(zugriffstoken, undefined, EXPORTE_ORDNER)
 
   // Ordnerstruktur zuerst: schlägt das fehl, gleichen wir lieber gar nicht ab, statt
@@ -90,7 +96,9 @@ async function abgleichen(): Promise<GesamtErgebnis> {
     }
   }
 
-  const ergebnis = await synchronisiere({ client: daten, lokal: syncSpeicher, geraet })
+  // Abgelaufenes (30 Tage) zuerst, damit es nicht noch hochgeladen wird
+  await raeumePapierkorbAuf(syncSpeicher, new Date().toISOString())
+  const ergebnis = await synchronisiere({ client: daten, papierkorb, lokal: syncSpeicher, geraet })
   const gesamt: GesamtErgebnis = { ...ergebnis, exporte: [], profilGeaendert: false }
 
   const fehler = (wepId: string, e: unknown): SyncHinweis => ({
@@ -138,7 +146,19 @@ export async function setzeAbgleichZurueck(): Promise<void> {
     /* nichts zu vergessen */
   }
   for (const m of await syncSpeicher.alleMeta()) {
-    await syncSpeicher.setzeMeta({ ...m, letzterSyncAm: undefined, remoteETag: undefined })
+    if (m.endgueltig) {
+      await syncSpeicher.schreibe({ id: m.id, meta: null }) // betraf nur das alte Konto
+      continue
+    }
+    await syncSpeicher.setzeMeta(
+      metaMit(m, m.id, m.lokalGeaendertAm, {
+        letzterSyncAm: undefined,
+        remoteETag: undefined,
+        papierkorbETag: undefined,
+        aufraeumen: undefined,
+        konflikt: m.konflikt && { ...m.konflikt, kopien: [] },
+      }),
+    )
   }
   const stand = lokalesProfil.lade()
   lokalesProfil.speichere({ ...stand, letzterSyncAm: undefined, remoteETag: undefined })

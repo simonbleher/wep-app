@@ -30,7 +30,10 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { dupliziereWep, naechsteVorgangsNr, wepStatus, type Wep, type Position, type BeseitigungsPosition, type Formalien, type WepStatus } from '@/model'
-import { alleWeps, loescheWep, ladeWep, speichereWep } from './db'
+import { PAPIERKORB_TAGE, belegteNummern, ladeKonflikt, loescheWep } from '@/sync/aktionen'
+import type { KonfliktInfo } from '@/sync/types'
+import { KonfliktHinweis } from './KonfliktHinweis'
+import { ladeWep, speichereWep } from './db'
 import { SkizzeTab } from './SkizzeTab'
 import { PositionenAbschnitt } from './Positionen'
 import { PositionHinzufuegen } from './PositionHinzufuegen'
@@ -107,12 +110,14 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
   const [loeschFrage, setLoeschFrage] = useState(false)
   const [exportZustand, setExportZustand] = useState<ExportZustand>({ typ: 'idle' })
   const [bauExcel, setBauExcel] = useState<File | null>(null)
+  const [konflikt, setKonflikt] = useState<KonfliktInfo | undefined>()
 
   // WEP aus IndexedDB laden
   useEffect(() => {
     void ladeWep(wepId).then((geladen) => {
       if (geladen) setWep(geladen)
     })
+    void ladeKonflikt(wepId).then(setKonflikt)
   }, [wepId])
 
   // Speichert und aktualisiert den Zustand gleichzeitig
@@ -158,7 +163,7 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
   }
 
   async function duplizieren() {
-    const kopie = dupliziereWep(wep!, naechsteVorgangsNr(await alleWeps()))
+    const kopie = dupliziereWep(wep!, naechsteVorgangsNr(await belegteNummern()))
     await speichereWep(kopie)
     onOeffnen?.(kopie.id)
   }
@@ -302,6 +307,19 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
               }
             />
 
+            {konflikt && (
+              <KonfliktHinweis
+                wepId={wep.id}
+                wep={wep}
+                konflikt={konflikt}
+                onGeloest={(neu) => {
+                  setKonflikt(undefined)
+                  if (neu) setWep(neu)
+                  else onZurueck() // „Doch löschen“: das WEP liegt jetzt im Papierkorb
+                }}
+              />
+            )}
+
             {tab === 'formalien' && <FormalienTab wep={wep} onSpeichern={speichere} />}
             {(tab === 'aussenanlagen' || tab === 'aufwuchs') && (
               <PositionenAbschnitt
@@ -355,8 +373,9 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
 
       {loeschFrage && (
         <Rueckfrage
-          titel={`WEP ${wep.id} löschen?`}
-          text={`${titel !== `WEP ${wep.id}` ? `„${titel}“ wird` : 'Das Protokoll wird'} auf diesem Gerät gelöscht. Das lässt sich nicht rückgängig machen. Eine Kopie in OneDrive bleibt erhalten.`}
+          titel={`WEP ${wep.id} in den Papierkorb?`}
+          text={`${titel !== `WEP ${wep.id}` ? `„${titel}“ wird` : 'Das Protokoll wird'} auf allen deinen Geräten entfernt. Du findest es ${PAPIERKORB_TAGE} Tage lang im Papierkorb und kannst es dort wiederherstellen.`}
+          bestaetigen="In den Papierkorb"
           onAbbrechen={() => setLoeschFrage(false)}
           onBestaetigen={() => void loeschen()}
         />
@@ -466,7 +485,7 @@ function WepMenue({
                 }}
               >
                 <Trash2 {...ICON} />
-                WEP löschen …
+                In den Papierkorb …
               </button>
             </li>
           </ul>

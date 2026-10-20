@@ -91,8 +91,12 @@ class WepNativePlugin : Plugin() {
             val inhalt = call.getString("inhalt") ?: return call.reject("inhalt fehlt")
             val geaendertAm = call.getString("geaendertAm") ?: return call.reject("geaendertAm fehlt")
             val eTag = call.getString("eTag")?.ifEmpty { null }
-            Warteschlange.reiheEin(ctx, name, inhalt, eTag, geaendertAm)
-            UploadWorker.plane(ctx, ersetzen = false)
+            val aufheben = call.getBoolean("sperreAufheben", false) ?: false
+            if (Warteschlange.reiheEin(ctx, name, inhalt, eTag, geaendertAm, aufheben)) {
+                UploadWorker.plane(ctx, ersetzen = false)
+            } else {
+                Protokoll.eintrag(ctx, "info", "$name: gelöscht – nicht eingereiht")
+            }
             call.resolve()
         } catch (e: Exception) {
             fehler(call, e)
@@ -103,6 +107,23 @@ class WepNativePlugin : Plugin() {
     fun entferne(call: PluginCall) {
         try {
             Warteschlange.entferne(ctx, call.getString("name") ?: return call.reject("name fehlt"))
+            call.resolve()
+        } catch (e: Exception) {
+            fehler(call, e)
+        }
+    }
+
+    /** Das WEP ist gelöscht: Eintrag entfernen und den Namen für Uploads sperren (Löschsperre). */
+    @PluginMethod
+    fun markiereGeloescht(call: PluginCall) {
+        try {
+            val name = call.getString("name") ?: return call.reject("name fehlt")
+            val geloeschtAm = call.getString("geloeschtAm") ?: return call.reject("geloeschtAm fehlt")
+            Warteschlange.markiereGeloescht(ctx, name, geloeschtAm)
+            Protokoll.eintrag(ctx, "info", "$name: gelöscht – aus der Warteschlange genommen und für Uploads gesperrt")
+            // Lief gerade ein Upload, verschiebt der Worker die Datei selbst in den Papierkorb;
+            // war einer vorgemerkt, wird der Nachlauf mit eingeplant.
+            if (Warteschlange.offeneLoeschungen(ctx).isNotEmpty()) UploadWorker.plane(ctx, ersetzen = false)
             call.resolve()
         } catch (e: Exception) {
             fehler(call, e)

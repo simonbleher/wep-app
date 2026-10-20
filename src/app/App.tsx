@@ -12,11 +12,12 @@ import {
 import { Capacitor } from '@capacitor/core'
 import { setzeAbgleichZurueck } from '@/sync'
 import { LoginBildschirm } from './LoginBildschirm'
+import { Papierkorb } from './Papierkorb'
 import { Profil } from './Profil'
 import { Startseite } from './Startseite'
 import { WepDetail } from './WepDetail'
 
-type Ansicht = { typ: 'start' } | { typ: 'detail'; wepId: string } | { typ: 'profil' }
+type Ansicht = { typ: 'start' } | { typ: 'detail'; wepId: string } | { typ: 'profil' } | { typ: 'papierkorb' }
 
 /** lade = Start wird gerade geklärt, login = Login-Bildschirm, bereit = App läuft. */
 type Phase = 'lade' | 'login' | 'bereit'
@@ -99,6 +100,15 @@ export default function App() {
           verfuegbar={kontoVerfuegbar()}
           onOeffnen={(wepId) => setAnsicht({ typ: 'detail', wepId })}
           onProfil={() => setAnsicht({ typ: 'profil' })}
+          onPapierkorb={() => setAnsicht({ typ: 'papierkorb' })}
+        />
+      ) : ansicht.typ === 'papierkorb' ? (
+        <Papierkorb
+          konto={konto}
+          verfuegbar={kontoVerfuegbar()}
+          onZurueck={() => setAnsicht({ typ: 'start' })}
+          onProfil={() => setAnsicht({ typ: 'profil' })}
+          onOeffnen={(wepId) => setAnsicht({ typ: 'detail', wepId })}
         />
       ) : ansicht.typ === 'profil' ? (
         <Profil

@@ -283,7 +283,16 @@ Uhrzeit des Uploads plausibel war.
   aber hier noch nicht gegen OneDrive bestätigt – bei unerwarteten 412/400 bitte das
   Protokoll schicken.
 - Debug-Build, Debug-Signatur, `versionName 1.0`; kein Update-Hinweis, kein Play Store.
-- Gelöschte WEPs werden (wie im Web) nicht abgeglichen; sie fliegen nur aus der Warteschlange.
+- Gelöschte WEPs (Papierkorb, docs/SYNC.md): Beim Löschen – auch wenn der Abgleich ein WEP von einem
+  anderen Gerät in den Papierkorb legt – wird der Eintrag aus der Warteschlange entfernt und der
+  Dateiname **gesperrt** (`geloescht.json`, `Warteschlange.markiereGeloescht`). Gesperrte Namen nimmt
+  `reiheEin` nicht an, und der Worker lädt sie nie hoch, auch bei geschlossener App. Wird während eines
+  laufenden Uploads gelöscht, merkt `erfolgreich` das; der Worker verschiebt die eben geschriebene Datei
+  sofort nach `daten/papierkorb/` (mit Löschzeitpunkt) und entfernt sie aus `daten/` (Nachlauf, wird
+  wiederholt). Die Sperre hebt die App auf, wenn der Name wieder einem lebenden WEP gehört (neue Speicherung
+  nach „Endgültig löschen“). Ein WEP, das gerade aus dem Papierkorb geholt wurde, lädt nicht der Worker,
+  sondern der nächste Abgleich in der App hoch (er holt erst die Papierkorb-Datei zurück). 404 beim Upload
+  (Datei in `daten/` weg) behandelt der Worker wie 412: liegen lassen, die App klärt es.
 - Der Abgleich in der geöffneten App ist unverändert und beachtet „Upload nur über WLAN“
   noch **nicht** – die Einstellung steuert nur den Hintergrunddienst.
 - Android kann Hintergrundarbeit verzögern (Doze, Akkusparmodus, „Apps im Standby“);

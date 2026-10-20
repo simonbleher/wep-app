@@ -1,10 +1,11 @@
 // Startseite: Liste aller WEPs, Statuszeile Abgleich und „Neues WEP“.
 // Gelöscht wird nicht hier, sondern in der WEP-Ansicht (Menü „⋯“, mit Rückfrage).
 import { useCallback, useEffect, useState } from 'react'
-import { ChevronRight, CircleUser, FileText, Plus } from 'lucide-react'
+import { ChevronRight, CircleUser, FileText, Plus, Trash2 } from 'lucide-react'
 import { WEP_STATUS, naechsteVorgangsNr, wepStatus, type Wep, type WepStatus } from '@/model'
 import type { Konto } from '@/konto'
 import { lokalesProfil, neuerWepMitProfil } from '@/profil'
+import { belegteNummern, ladePapierkorb, offeneKonflikte, raeumePapierkorbAuf } from '@/sync/aktionen'
 import { alleWeps, speichereWep } from './db'
 import { UpdateHinweis } from './UpdateHinweis'
 import { StatusZeile, useAbgleich } from './SyncLeiste'
@@ -18,6 +19,7 @@ interface Props {
   onProfil: () => void
   /** Öffnet die Detailansicht des WEP mit der angegebenen id. */
   onOeffnen: (wepId: string) => void
+  onPapierkorb: () => void
 }
 
 /** Titel eines WEP für die Liste: „Anlage · Parzelle“ (leer, wenn nichts eingetragen). */
@@ -32,24 +34,31 @@ function wepNeben(wep: Wep): string {
   return [wep.id, unterpaechter, datumDe(wertermittlungAm ?? '')].filter((t) => t && t.trim()).join(' · ')
 }
 
-export function Startseite({ konto, verfuegbar, onProfil, onOeffnen }: Props) {
+export function Startseite({ konto, verfuegbar, onProfil, onOeffnen, onPapierkorb }: Props) {
   const [weps, setWeps] = useState<Wep[]>([])
   const [geladen, setGeladen] = useState(false)
   const [filter, setFilter] = useState<WepStatus | 'alle'>('alle')
+  const [konflikte, setKonflikte] = useState<ReadonlySet<string>>(new Set())
+  const [imPapierkorb, setImPapierkorb] = useState(0)
 
   const neuLaden = useCallback(() => {
-    void alleWeps().then((liste) => {
+    // Was länger als 30 Tage im Papierkorb liegt, wird beim Öffnen der Liste endgültig gelöscht
+    void (async () => {
+      await raeumePapierkorbAuf()
+      const [liste, offene, korb] = await Promise.all([alleWeps(), offeneKonflikte(), ladePapierkorb()])
       // Neueste Vorgangs-Nr. zuerst
       setWeps([...liste].sort((a, b) => b.id.localeCompare(a.id, 'de', { numeric: true })))
+      setKonflikte(new Set(offene.keys()))
+      setImPapierkorb(korb.length)
       setGeladen(true)
-    })
+    })()
   }, [])
 
   useEffect(neuLaden, [neuLaden])
   const abgleich = useAbgleich(konto, neuLaden)
 
   async function neuesWep() {
-    const id = naechsteVorgangsNr(weps)
+    const id = naechsteVorgangsNr(await belegteNummern()) // auch Gelöschtes zählt: keine Nummer doppelt
     const wep = neuerWepMitProfil(id, lokalesProfil.lade().profil)
     await speichereWep(wep)
     setWeps((alt) => [wep, ...alt])
@@ -62,7 +71,7 @@ export function Startseite({ konto, verfuegbar, onProfil, onOeffnen }: Props) {
 
   return (
     <div className="rahmen">
-      <HauptSeitenleiste aktiv="protokolle" onProtokolle={() => undefined} onProfil={onProfil} fuss={verfuegbar ? status : undefined} />
+      <HauptSeitenleiste aktiv="protokolle" onProtokolle={() => undefined} onPapierkorb={onPapierkorb} onProfil={onProfil} fuss={verfuegbar ? status : undefined} />
 
       <main className="inhalt">
         <UpdateHinweis />
@@ -126,6 +135,7 @@ export function Startseite({ konto, verfuegbar, onProfil, onOeffnen }: Props) {
                       <span className={titel ? 'zeile-titel' : 'zeile-titel leer'}>{titel || 'ohne Bezeichnung'}</span>
                       <span className="neben">{wepNeben(wep)}</span>
                     </span>
+                    {konflikte.has(wep.id) && <span className="status status-konflikt">Konflikt</span>}
                     <StatusMarke status={wepStatus(wep)} />
                     <ChevronRight {...ICON} className="chevron" />
                   </button>
@@ -134,6 +144,21 @@ export function Startseite({ konto, verfuegbar, onProfil, onOeffnen }: Props) {
             })}
           </ul>
         )}
+
+        <ul className="liste papierkorb-zugang nur-handy" aria-label="Papierkorb">
+          <li>
+            <button type="button" className="zeile" onClick={onPapierkorb}>
+              <Trash2 {...ICON} />
+              <span className="zeile-text">
+                <span className="zeile-titel">Papierkorb</span>
+                <span className="neben">
+                  {imPapierkorb === 0 ? 'leer' : imPapierkorb === 1 ? '1 gelöschtes Protokoll' : `${imPapierkorb} gelöschte Protokolle`}
+                </span>
+              </span>
+              <ChevronRight {...ICON} className="chevron" />
+            </button>
+          </li>
+        </ul>
       </main>
     </div>
   )
