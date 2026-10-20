@@ -35,7 +35,10 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - uses: android-actions/setup-android@v3
+      # Das Android SDK ist auf ubuntu-latest vorinstalliert (ANDROID_HOME); fehlende
+      # Pakete lädt Gradle nach, sobald die Lizenzen angenommen sind.
+      - name: Android-Lizenzen annehmen
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
 
       - name: Hinweis zur Client-ID
         if: ${{ env.VITE_MS_CLIENT_ID == '' }}
