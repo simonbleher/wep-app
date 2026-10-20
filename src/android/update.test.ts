@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { istNeuer, type VersionInfo } from './update'
+import { alsApkInfo, alsVersion, apkFehlerText, entscheideUpdate, istNeuer, type VersionInfo } from './update'
 
 const v = (versionName: string, versionCode = 0, rest: Partial<VersionInfo> = {}): VersionInfo => ({
   versionName,
@@ -44,5 +44,62 @@ describe('istNeuer ohne Commit (früherer Vergleich)', () => {
   })
   it('unlesbare Zeit → früherer Vergleich', () => {
     expect(istNeuer(c('b', 'kaputt'), c('a', '2026-10-20T12:00:00Z'))).toBe(false)
+  })
+})
+
+describe('entscheideUpdate: Live-Update oder natives Update', () => {
+  const neuZeit = '2026-10-20T13:00:00Z'
+  const altZeit = '2026-10-20T12:00:00Z'
+  const installiert = v('0.1.0', 0, { commit: 'a', gebautAm: altZeit, nativeVersion: 1 })
+  const gehostet = (rest: Partial<VersionInfo> = {}) =>
+    v('0.1.0', 0, { commit: 'b', gebautAm: neuZeit, nativeVersion: 1, bundleUrl: 'https://x.pages.dev/updates/b.zip', ...rest })
+
+  it('neuer Commit, gleicher nativer Teil → Live-Update', () => {
+    expect(entscheideUpdate(installiert, gehostet(), { nativInstalliert: 1 }).art).toBe('live')
+  })
+  it('nativeVersion der gehosteten Fassung höher → natives Update (kein Live-Update)', () => {
+    expect(entscheideUpdate(installiert, gehostet({ nativeVersion: 2 }), { nativInstalliert: 1 }).art).toBe('nativ')
+  })
+  it('natives Update auch ohne neuen Commit-Vergleich (gleicher Commit, aber höherer nativer Teil)', () => {
+    const gleich = gehostet({ commit: 'a', gebautAm: altZeit, nativeVersion: 3 })
+    expect(entscheideUpdate(installiert, gleich, { nativInstalliert: 1 }).art).toBe('nativ')
+  })
+  it('gehostetes Paket für älteren nativen Teil als installiert → nichts anwenden', () => {
+    expect(entscheideUpdate(installiert, gehostet({ nativeVersion: 1 }), { nativInstalliert: 2 }).art).toBe('keins')
+  })
+  it('gleicher Commit → nichts zu tun', () => {
+    expect(entscheideUpdate(installiert, gehostet({ commit: 'a', gebautAm: altZeit }), { nativInstalliert: 1 }).art).toBe('keins')
+  })
+  it('Paket ohne nativeVersion (alter Build) oder ohne bundleUrl → kein Live-Update', () => {
+    expect(entscheideUpdate(installiert, gehostet({ nativeVersion: undefined }), { nativInstalliert: 1 }).art).toBe('keins')
+    expect(entscheideUpdate(installiert, gehostet({ bundleUrl: undefined }), { nativInstalliert: 1 }).art).toBe('keins')
+  })
+  it('Rückfall: zurückgerollter Commit wird nicht erneut geladen', () => {
+    const e = entscheideUpdate(installiert, gehostet(), { nativInstalliert: 1, fehlgeschlagen: ['b'] })
+    expect(e.art).toBe('keins')
+    // ein späterer Commit wird wieder versucht
+    const c = gehostet({ commit: 'c', bundleUrl: 'https://x.pages.dev/updates/c.zip' })
+    expect(entscheideUpdate(installiert, c, { nativInstalliert: 1, fehlgeschlagen: ['b'] }).art).toBe('live')
+  })
+  it('schon geladenes Paket wird nicht noch einmal geladen', () => {
+    expect(entscheideUpdate(installiert, gehostet(), { nativInstalliert: 1, bereitCommit: 'b' }).art).toBe('keins')
+  })
+})
+
+describe('alsVersion / alsApkInfo', () => {
+  it('liest nativeVersion und bundleUrl, verwirft unsichere Adressen', () => {
+    const i = alsVersion({ versionName: '0.1.0', nativeVersion: 2, bundleUrl: 'http://x/y.zip', commit: 'abc' })
+    expect(i?.nativeVersion).toBe(2)
+    expect(i?.bundleUrl).toBeUndefined()
+  })
+  it('apk.json: prüft Pflichtfelder und Hash', () => {
+    expect(alsApkInfo({ versionName: '0.1.0' })).toBeNull()
+    const a = alsApkInfo({ nativeVersion: 2, versionCode: 9, sha256: 'AB'.repeat(32), apkUrl: 'ftp://x' })
+    expect(a?.sha256).toBe('ab'.repeat(32))
+    expect(a?.apkUrl).toBe('https://wep-pankow-apk.pages.dev/wep.apk')
+  })
+  it('Fehlertexte: einmalige Erlaubnis wird erklärt', () => {
+    expect(apkFehlerText('ERLAUBNIS', '')).toContain('Apps installieren')
+    expect(apkFehlerText('PRUEFSUMME', '')).toContain('beschädigt')
   })
 })

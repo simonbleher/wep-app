@@ -43,15 +43,18 @@ Workflow **Android Release** läuft bei **jedem** Push auf `main` und manuell (*
 - baut `assembleRelease` und signiert mit den vier Secrets (ohne Verkleinern/Verschleiern –
   Capacitor und das eigene Plugin arbeiten mit Reflexion, der Gewinn wäre klein),
 - legt ein GitHub Release **„WEP <Version> (<Code>)“** an, APK als Anhang, dazu eine kurze
-  Änderungsliste aus den Commits seit dem vorigen Android-Release.
+  Änderungsliste aus den Commits seit dem vorigen Android-Release,
+- lädt (wenn die Cloudflare-Secrets gesetzt sind) die APK zusätzlich nach Cloudflare Pages
+  (`/wep.apk`, `/apk.json`), siehe „Updates“.
 
 Fehlen die Secrets, bricht der Lauf sofort mit der Meldung „Release-Schlüssel fehlt“ ab.
 Der Test-APK-Workflow bleibt für Branches unverändert bestehen.
 
 ## Installation (Release-APK)
 
-1. Auf GitHub → **Releases** → neuestes Release → `WEP-<Version>-<Code>.apk` herunterladen
-   (GitHub-Anmeldung nötig, das Repo ist privat; am Handy im Browser anmelden).
+1. Entweder `https://wep-pankow-apk.pages.dev/wep.apk` im Browser öffnen (ohne Anmeldung; setzt die
+   Cloudflare-Einrichtung unter „Updates“ voraus) oder auf GitHub → **Releases** → neuestes Release →
+   `WEP-<Version>-<Code>.apk` herunterladen (GitHub-Anmeldung nötig, das Repo ist privat).
 2. Datei öffnen. Android fragt einmalig, ob der Browser/Datei-Manager Apps aus unbekannten
    Quellen installieren darf → erlauben → installieren. Play Protect kann warnen
    („Unbekannter Entwickler“) → „Trotzdem installieren“.
@@ -69,25 +72,117 @@ lässt kein Drüberinstallieren zu. Deshalb:
 2. Test-App **deinstallieren** (Einstellungen → Apps → WEP → Deinstallieren).
 3. Release-APK installieren, anmelden; die WEPs kommen beim ersten Abgleich aus OneDrive zurück.
 
-## Updates
+## Updates (Selbst-Update, ab Beta 3 Paket 0)
 
-- Beim Start (online, höchstens einmal täglich) und über **Profil → Über die App → Nach
-  Update suchen** vergleicht die App ihre Version mit der der gehosteten Seite
-  (`https://wep-pankow.pages.dev/version.json`, entsteht bei jedem Web-Build aus
-  `package.json`, Commit und Bauzeit). Ist die dort veröffentlichte Fassung neuer, erscheint oben auf der
-  WEP-Liste und im Profil „Update verfügbar“ mit dem Knopf **Zur Release-Seite** (öffnet den
-  System-Browser). Im Browser/PWA wird nichts angezeigt.
-- Dort die neue APK laden und **über die alte installieren** (gleicher Schlüssel → Daten
-  bleiben).
-- **Vergleich über den Commit:** `version.json` enthält `commit` (Cloudflare:
-  `CF_PAGES_COMMIT_SHA`, GitHub: `GITHUB_SHA`) und `gebautAm`. „Update verfügbar“, wenn der
-  Commit der gehosteten Datei vom eingebauten abweicht **und** die gehostete später gebaut
-  wurde. Fehlt der Commit auf einer Seite, gilt der Vergleich über Versionsname und
-  versionCode. Eine Erhöhung von `package.json` ist also nicht nötig.
-- Da der Workflow „Android Release“ bei **jedem** Push auf `main` läuft, gibt es zu jedem
-  Commit eine APK. Cloudflare ist meist schneller als der APK-Bau (einige Minuten): Der
-  Hinweis kann kurz erscheinen, bevor das passende Release fertig ist – dann auf der
-  Release-Seite einen Moment warten und neu laden.
+Die App aktualisiert sich selbst, ohne Play Store. Es gibt zwei Wege:
+
+| Was ändert sich? | Weg | Was passiert |
+|------------------|-----|--------------|
+| nur der Web-Teil (fast immer) | **Live-Update** | still im Hintergrund, wirkt beim nächsten Start |
+| der native Teil (`android/`, Plugins) | **Neue APK** | Hinweis „Neue App-Version“, Tippen installiert |
+
+### Live-Update (Web-Teil)
+
+- Jeder Web-Build (Cloudflare, bei jedem Merge auf `main`) legt neben der Seite ein Paket
+  `https://wep-pankow.pages.dev/updates/<commit>.zip` ab (zip des `dist`-Ordners,
+  `tools/update-paket.mjs`) und schreibt in `version.json`: `commit`, `gebautAm`, `bundleUrl`,
+  `nativeVersion`, dazu `versionName`/`versionCode`. Ohne bekannten Commit (lokaler Build)
+  gibt es kein Paket.
+- Die App (`src/android/updateAblauf.ts`, `updateDienst.ts`) prüft **beim Start** (höchstens
+  alle 15 Minuten) und danach **etwa alle 3 Stunden** sowie beim Zurückkehren in die App. Ist
+  der Commit neu **und** `nativeVersion` gleich der der installierten App, lädt sie das Paket
+  (`@capgo/capacitor-updater`, manueller Modus) im Hintergrund und merkt es mit `next` für den
+  nächsten Start vor. Mit „Upload nur über WLAN“ (Profil) wird nur im WLAN geladen; sonst
+  steht im Profil „wird im WLAN geladen“.
+- **Rückfall:** Nach dem Start meldet die App `notifyAppReady` (sobald die Oberfläche steht). Kommt
+  die Meldung nicht binnen 15 Sekunden (Absturz beim Start), schaltet das Plugin selbst auf die
+  vorige Fassung zurück. Der fehlgeschlagene Commit steht dann auf einer Sperrliste und wird
+  nicht erneut geladen; ein späterer Commit wird wieder versucht.
+- Ein Paket für eine **andere** `nativeVersion` wird nie angewendet. Ist die gehostete
+  `nativeVersion` neuer, greift stattdessen der APK-Weg.
+- Es fließen keine Daten an Capgo: `updateUrl`, `statsUrl`, `channelUrl` sind leer, die
+  automatische Prüfung ist aus (`capacitor.config.ts`).
+- Im **Profil → Über die App** stehen: Commit und Bauzeit des laufenden Web-Teils, die Nummer
+  des App-Teils (`nativeVersion`), der Zeitpunkt und das Ergebnis der letzten Prüfung sowie
+  „Nach Update suchen“ (prüft sofort).
+- Die Anzeige im Browser/PWA ändert sich nicht: Dort aktualisiert der Service Worker.
+
+### `nativeVersion`
+
+- Datei `android/native-version.txt` (eine ganze Zahl). **Erhöhen**, sobald sich etwas am
+  nativen Teil ändert: Dateien unter `android/` (Kotlin, Manifest, Gradle …),
+  `capacitor.config.ts` oder Capacitor-/Capgo-Plugins in `package.json`.
+- Der Workflow **Prüfen** (nur Pull Requests) führt `node tools/pruefe-native-version.mjs
+  origin/<Basis>` aus und lässt den PR durchfallen, wenn das fehlt. Lokal: `git fetch origin
+  main && node tools/pruefe-native-version.mjs origin/main`.
+- Gradle schreibt die Zahl als `BuildConfig.WEP_NATIVE_VERSION` in die APK (das Plugin
+  `WepNative.nativeVersion()` liefert sie der App); Vite schreibt sie in `version.json`;
+  der Release-Workflow in `apk.json`.
+
+### Natives Update (neue APK)
+
+1. Hat `version.json` eine höhere `nativeVersion` als die installierte App, zeigt die App oben
+   auf der WEP-Liste und im Profil **„Neue App-Version – Jetzt installieren“**.
+2. Tippen: Die App holt `apk.json` (siehe unten). Ist die APK noch nicht fertig (Cloudflare ist
+   schneller als der APK-Bau), erscheint „wird noch gebaut – bitte in einigen Minuten noch
+   einmal versuchen“. Sonst lädt sie `wep.apk` mit Fortschrittsanzeige, prüft die SHA-256
+   aus `apk.json` und öffnet den Android-Installer (FileProvider).
+3. **Einmalige Erlaubnis:** Beim ersten Mal öffnet Android die Einstellung „Apps installieren“ /
+   „Unbekannte Apps installieren“ für WEP. Erlauben, zurück zur App, noch einmal auf „Jetzt
+   installieren“ tippen. Danach „Aktualisieren“ bestätigen. Die Daten bleiben erhalten
+   (gleicher Schlüssel, gleiche App-ID).
+4. Fehler (kein Netz, Prüfsumme falsch, Erlaubnis fehlt) erscheinen als Text unter dem Hinweis.
+
+### APK ohne GitHub-Login: Cloudflare-Projekt `wep-pankow-apk`
+
+Das Repo ist privat; die Release-APK ist nur mit GitHub-Anmeldung erreichbar. Deshalb lädt der
+Workflow **Android Release** die signierte APK zusätzlich in ein eigenes Cloudflare-Pages-Projekt:
+
+- `https://wep-pankow-apk.pages.dev/wep.apk` – immer die neueste APK (fester Link, auch zum
+  Weitergeben an andere Wertermittler),
+- `https://wep-pankow-apk.pages.dev/apk.json` – `versionName`, `versionCode`, `nativeVersion`,
+  `commit`, `sha256`, `apkUrl`, `gebautAm`.
+
+**Einrichtung (einmalig):**
+
+1. Cloudflare → oben rechts Profilsymbol → **My Profile** → **API Tokens** → **Create Token** →
+   **Create Custom Token**.
+2. Name z. B. `wep-apk-pages`. **Permissions:** *Account* → *Cloudflare Pages* → **Edit**.
+   Sonst nichts (kein Zonen-, DNS- oder Workers-Recht). Account Resources: dein Konto.
+   Optional: *TTL* setzen, dann in den Kalender, wann er abläuft.
+3. **Continue to summary** → **Create Token** → den Token **sofort kopieren** (wird nur einmal
+   angezeigt).
+4. Die **Account ID**: Cloudflare-Startseite → beim Konto das Menü „⋯“ → *Copy account ID*
+   (steht auch in der Adresszeile nach `dash.cloudflare.com/`).
+5. GitHub → Repo **Settings → Secrets and variables → Actions → New repository secret**:
+   - `CLOUDFLARE_API_TOKEN` = der Token
+   - `CLOUDFLARE_ACCOUNT_ID` = die Account ID
+6. Den Workflow **Android Release** neu starten (*Run workflow*). Er legt das Projekt beim ersten
+   Mal selbst an (`wrangler pages project create`) und lädt dann `wep.apk` und `apk.json` hoch.
+   Danach unter den oben genannten Adressen prüfen.
+
+Hinweise: Fehlen die Secrets, warnt der Lauf nur, das GitHub Release entsteht trotzdem. Schlägt
+nur der Cloudflare-Upload fehl, ebenfalls Warnung (Token-Rechte, Account ID prüfen). Ist der Name
+`wep-pankow-apk` bei Cloudflare schon vergeben, in `android-release.yml` (`APK_PROJEKT`) und in
+`src/android/update.ts` (`APK_BASIS_URL`) und `ApkInstaller.kt` (`APK_HOST`, dann auch `nativeVersion` erhöhen) gleichzeitig ändern. Cloudflare erlaubt Dateien bis
+25 MiB – die APK ist deutlich kleiner.
+
+### Erster Umstieg (einmalig, von Hand)
+
+Apps, die vor diesem Paket installiert wurden, kennen den neuen Weg noch nicht (ihr Hinweis öffnet
+weiter die Release-Seite). Die **erste** APK mit Selbst-Update (`nativeVersion` 1) per Hand
+installieren (Abschnitt „Installation“ oben, oder `wep.apk` aus Cloudflare); sie lässt sich über die
+alte installieren, die Daten bleiben. Ab dann geht alles aus der App.
+
+### Grenzen
+
+- Nicht auf einem echten Gerät erprobt, als diese Umsetzung entstand: Logik, Entscheidung und Rückfall
+  sind getestet (Vitest), der Gradle-Build läuft im Workflow „Android Test-APK“; Live-Update und
+  Installer müssen am Gerät ausprobiert werden (Checkliste im PR).
+- Der Rückfall deckt Abstürze **beim Start** ab (die Oberfläche kommt nicht hoch). Ein Fehler
+  tief in einer Ansicht wird dadurch nicht erkannt.
+- Auf manchen Geräten (Xiaomi, Huawei …) heißt die Erlaubnis „Unbekannte Apps installieren“.
+- Play Protect kann beim Installieren warnen („Unbekannter Entwickler“) → „Trotzdem installieren“.
 
 ## Fehlersuche
 

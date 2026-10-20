@@ -9,6 +9,7 @@ import {
   startZustand,
   type Konto,
 } from '@/konto'
+import { Capacitor } from '@capacitor/core'
 import { setzeAbgleichZurueck } from '@/sync'
 import { LoginBildschirm } from './LoginBildschirm'
 import { Profil } from './Profil'
@@ -25,6 +26,11 @@ export default function App() {
   const [phase, setPhase] = useState<Phase>('lade')
   const [konto, setKonto] = useState<Konto | null>(null)
   const [fehler, setFehler] = useState('')
+
+  // Android: Die Oberfläche steht → Start gilt als gelungen (sonst Rückfall des Live-Updates)
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) void import('@/android/updateDienst').then((m) => m.meldeStartErfolg())
+  }, [])
 
   useEffect(() => {
     let aktiv = true

@@ -2,6 +2,35 @@
 
 Stand: 20.10.2026, mit Simon abgestimmt. Cloud-Sitzungen, eine pro Paket, nacheinander.
 
+## Paket 0 – Selbst-Update der Android-App (ohne Play Store)
+
+Branch `beta3/selbst-update`. Ziel: Die APK aktualisiert sich selbst; Simon muss nicht mehr
+jedes Mal die Release-Seite öffnen.
+
+1. **Live-Update des Web-Teils** mit `@capgo/capacitor-updater` im manuellen Modus (keine
+   Capgo-Cloud, keine Statistik). Der Web-Build erzeugt zusätzlich `updates/<commit>.zip`;
+   `version.json` bekommt `bundleUrl` und `nativeVersion`. Die App prüft beim Start und etwa
+   alle 3 Stunden (respektiert „nur WLAN“), lädt im Hintergrund, merkt das Paket für den
+   nächsten Start vor; `notifyAppReady` nach gelungenem Start, sonst automatischer Rückfall
+   (der Commit wird dann nicht erneut geladen). Angewendet wird nur, wenn `nativeVersion` zur
+   installierten App passt.
+2. **`nativeVersion`:** Zahl in `android/native-version.txt`, nur erhöhen, wenn sich `android/`,
+   `capacitor.config.ts` oder Capacitor-/Capgo-Plugins ändern. Der Workflow „Prüfen“ lässt
+   Pull Requests sonst durchfallen (`tools/pruefe-native-version.mjs`).
+3. **Natives Update:** Ist `nativeVersion` der gehosteten Seite neuer → Hinweis „Neue
+   App-Version“ mit „Jetzt installieren“; die App lädt die APK selbst (Fortschritt, Prüfsumme)
+   und öffnet den Android-Installer (FileProvider, `REQUEST_INSTALL_PACKAGES`, Hinweis auf die
+   einmalige Erlaubnis „Apps installieren“).
+4. **APK ohne GitHub-Login:** Der Release-Workflow lädt die signierte APK zusätzlich in ein
+   eigenes Cloudflare-Pages-Projekt (`wep-pankow-apk`: `/wep.apk`, `/apk.json`); Secrets
+   `CLOUDFLARE_API_TOKEN` und `CLOUDFLARE_ACCOUNT_ID`, ohne sie nur eine Warnung.
+5. Der bisherige Hinweis „Zur Release-Seite“ entfällt. Im Browser/PWA bleibt alles wie bisher
+   (dort aktualisiert der Service Worker).
+
+Einmaliger Umstieg: Apps **vor** diesem Paket kennen weder Live-Update noch Selbst-Installation –
+die erste APK mit diesem Paket muss noch per Hand installiert werden (Release-Seite), danach
+nicht mehr. Anleitung: docs/ANDROID.md, Abschnitt „Selbst-Update“.
+
 ## Paket 1 – Icon, Kleinigkeiten, Status, Duplizieren
 
 1. **App-Icon:** Klemmbrett mit Blatt, schlicht im App-Stil (weiß auf gedecktem Grün

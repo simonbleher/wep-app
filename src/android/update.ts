@@ -1,17 +1,19 @@
-// Update-Hinweis der Android-App: vergleicht die eingebaute Version (version.json im APK)
-// mit der neuesten (version.json der gehosteten Seite, wird bei jedem Merge auf main neu
-// gebaut). Das Repo ist privat, deshalb gibt es keine anonyme Abfrage der GitHub-Releases.
+// Update-Logik der Android-App (rein, ohne Capacitor – Abläufe in updateAblauf.ts).
+//
+// Zwei Wege, beide ohne Play Store:
+// - Live-Update: Nur der Web-Teil ändert sich. Die gehostete version.json nennt das Paket
+//   (bundleUrl); die App lädt es und wendet es beim nächsten Start an.
+// - Natives Update: Ändert sich der native Teil (android/, Plugins), steigt nativeVersion
+//   (android/native-version.txt). Dann muss eine neue APK installiert werden.
 // Neuer ist die gehostete Fassung, wenn ihr Commit vom eingebauten abweicht UND sie später
 // gebaut wurde (gebautAm). Fehlt commit oder gebautAm auf einer Seite, gilt der frühere
 // Vergleich: höherer versionName, bei gleichem Namen höherer versionCode (wenn beide > 0).
-import { Capacitor } from '@capacitor/core'
-import { Browser } from '@capacitor/browser'
 
 /** Gehostete Seite (siehe docs/HOSTING.md); dort liegt die neueste version.json. */
 export const NEUESTE_VERSION_URL = 'https://wep-pankow.pages.dev/version.json'
-
-const LETZTE_PRUEFUNG_KEY = 'wep-update-letzte-pruefung'
-const TAG_MS = 24 * 60 * 60 * 1000
+/** Eigenes Pages-Projekt mit der signierten APK (fester Name /wep.apk, dazu apk.json). */
+export const APK_BASIS_URL = 'https://wep-pankow-apk.pages.dev'
+export const APK_JSON_URL = `${APK_BASIS_URL}/apk.json`
 
 export interface VersionInfo {
   versionName: string
@@ -20,13 +22,29 @@ export interface VersionInfo {
   commit?: string
   /** Bauzeitpunkt (ISO). */
   gebautAm?: string
+  /** Nummer des nativen Teils, zu dem dieser Web-Teil passt (fehlt in alten Builds). */
+  nativeVersion?: number
+  /** Live-Update-Paket (zip des Web-Builds, nur wenn der Commit bekannt ist). */
+  bundleUrl?: string
   releaseUrl: string
 }
 
-export interface UpdateStand {
-  verfuegbar: VersionInfo | null
-  /** Ergebnis der letzten Prüfung für die Anzeige im Profil. */
-  meldung: string
+/** apk.json des APK-Projekts. */
+export interface ApkInfo {
+  versionName: string
+  versionCode: number
+  nativeVersion: number
+  apkUrl: string
+  /** SHA-256 der APK (Hex), zur Prüfung nach dem Herunterladen. */
+  sha256?: string
+}
+
+export type UpdateArt = 'keins' | 'live' | 'nativ'
+
+export interface UpdateEntscheidung {
+  art: UpdateArt
+  /** Kurze Begründung (für Tests und Protokoll). */
+  grund: string
 }
 
 function teile(name: string): number[] {
@@ -49,82 +67,81 @@ export function istNeuer(neu: VersionInfo, alt: VersionInfo): boolean {
   return neu.versionCode > 0 && alt.versionCode > 0 && neu.versionCode > alt.versionCode
 }
 
-function alsVersion(d: unknown): VersionInfo | null {
+/**
+ * Entscheidet, was mit der gehosteten Fassung `neueste` zu tun ist.
+ * - `nativInstalliert`: nativeVersion der installierten App-Hülle.
+ * - `fehlgeschlagen`: Commits, deren Live-Update zurückgerollt wurde (nicht erneut versuchen).
+ * - `bereitCommit`: Commit des bereits geladenen, noch nicht angewendeten Pakets.
+ */
+export function entscheideUpdate(
+  installiert: VersionInfo,
+  neueste: VersionInfo,
+  opt: { nativInstalliert: number; fehlgeschlagen?: readonly string[]; bereitCommit?: string },
+): UpdateEntscheidung {
+  const nativNeu = neueste.nativeVersion
+  if (nativNeu !== undefined && nativNeu > opt.nativInstalliert) {
+    return { art: 'nativ', grund: `nativeVersion ${nativNeu} > ${opt.nativInstalliert}` }
+  }
+  if (!istNeuer(neueste, installiert)) return { art: 'keins', grund: 'aktuell' }
+  // Ein Web-Teil läuft nur auf genau dem nativen Teil, für den er gebaut wurde.
+  if (nativNeu === undefined) return { art: 'keins', grund: 'Paket ohne nativeVersion' }
+  if (nativNeu !== opt.nativInstalliert) return { art: 'keins', grund: 'Paket passt nicht zur installierten App' }
+  if (!neueste.bundleUrl || !neueste.commit) return { art: 'keins', grund: 'kein Paket' }
+  if (opt.fehlgeschlagen?.includes(neueste.commit)) return { art: 'keins', grund: 'Rückfall nach Fehlstart' }
+  if (opt.bereitCommit === neueste.commit) return { art: 'keins', grund: 'schon geladen, wartet auf Neustart' }
+  return { art: 'live', grund: 'neuer Commit, passender nativer Teil' }
+}
+
+/** Zahl ≥ 0 aus einem JSON-Wert. */
+function zahl(w: unknown): number | undefined {
+  return typeof w === 'number' && Number.isFinite(w) && w >= 0 ? w : undefined
+}
+
+export function alsVersion(d: unknown): VersionInfo | null {
   if (!d || typeof d !== 'object') return null
-  const v = d as Partial<VersionInfo>
+  const v = d as Record<string, unknown>
   if (typeof v.versionName !== 'string' || !v.versionName) return null
+  const text = (w: unknown) => (typeof w === 'string' && w ? w : undefined)
   return {
     versionName: v.versionName,
-    versionCode: typeof v.versionCode === 'number' ? v.versionCode : 0,
-    commit: typeof v.commit === 'string' && v.commit ? v.commit : undefined,
-    gebautAm: typeof v.gebautAm === 'string' && v.gebautAm ? v.gebautAm : undefined,
+    versionCode: zahl(v.versionCode) ?? 0,
+    commit: text(v.commit),
+    gebautAm: text(v.gebautAm),
+    nativeVersion: zahl(v.nativeVersion),
+    bundleUrl: typeof v.bundleUrl === 'string' && v.bundleUrl.startsWith('https://') ? v.bundleUrl : undefined,
     releaseUrl: typeof v.releaseUrl === 'string' && v.releaseUrl.startsWith('https://') ? v.releaseUrl : '',
   }
 }
 
-async function holeJson(url: string): Promise<VersionInfo | null> {
-  const antwort = await fetch(url, { cache: 'no-store' })
-  if (!antwort.ok) throw new Error(`HTTP ${antwort.status}`)
-  return alsVersion(await antwort.json())
-}
-
-/** Prüft einmal. Wirft nie; ohne Netz oder Fehler gibt es keinen Hinweis. */
-export async function pruefeAufUpdate(): Promise<UpdateStand> {
-  try {
-    const [installiert, neueste] = await Promise.all([holeJson('/version.json'), holeJson(NEUESTE_VERSION_URL)])
-    if (!installiert || !neueste) return { verfuegbar: null, meldung: 'Versionsangabe nicht lesbar.' }
-    if (istNeuer(neueste, installiert)) {
-      return { verfuegbar: neueste, meldung: 'Eine neuere Version ist verfügbar.' }
-    }
-    return { verfuegbar: null, meldung: 'Die App ist auf dem neuesten Stand.' }
-  } catch {
-    return { verfuegbar: null, meldung: 'Keine Verbindung – Prüfung nicht möglich.' }
+/** apk.json prüfen; die APK-Adresse muss https sein (sonst Standardadresse). */
+export function alsApkInfo(d: unknown): ApkInfo | null {
+  if (!d || typeof d !== 'object') return null
+  const v = d as Record<string, unknown>
+  const nativeVersion = zahl(v.nativeVersion)
+  if (nativeVersion === undefined) return null
+  return {
+    versionName: typeof v.versionName === 'string' ? v.versionName : '',
+    versionCode: zahl(v.versionCode) ?? 0,
+    nativeVersion,
+    apkUrl: typeof v.apkUrl === 'string' && v.apkUrl.startsWith('https://') ? v.apkUrl : `${APK_BASIS_URL}/wep.apk`,
+    sha256: typeof v.sha256 === 'string' && /^[0-9a-f]{64}$/i.test(v.sha256) ? v.sha256.toLowerCase() : undefined,
   }
 }
 
-function merkePruefung(): void {
-  try {
-    localStorage.setItem(LETZTE_PRUEFUNG_KEY, String(Date.now()))
-  } catch {
-    /* gesperrter Speicher: dann eben öfter prüfen */
+/** Verständliche Meldung für Fehler beim Laden/Installieren der APK. */
+export function apkFehlerText(code: string | undefined, text: string): string {
+  if (code === 'ERLAUBNIS') {
+    return (
+      'Android braucht einmalig die Erlaubnis „Apps installieren“ für WEP. Die Einstellung ist geöffnet – ' +
+      'erlauben, dann zurück zur App und noch einmal tippen.'
+    )
   }
+  if (code === 'PRUEFSUMME') return 'Die heruntergeladene Datei ist beschädigt. Bitte noch einmal versuchen.'
+  if (code === 'KEIN_NETZ') return 'Keine Verbindung – Download nicht möglich.'
+  return `Die Installation ist fehlgeschlagen: ${text || 'unbekannter Fehler'}`
 }
 
-function pruefungFaellig(): boolean {
-  try {
-    const t = Number(localStorage.getItem(LETZTE_PRUEFUNG_KEY))
-    return !(t > 0 && Date.now() - t < TAG_MS)
-  } catch {
-    return true
-  }
-}
-
-type Hoerer = (s: UpdateStand | null) => void
-let stand: UpdateStand | null = null
-const hoerer = new Set<Hoerer>()
-
-export function aktuellerUpdateStand(): UpdateStand | null {
-  return stand
-}
-
-export function beobachteUpdate(h: Hoerer): () => void {
-  hoerer.add(h)
-  return () => void hoerer.delete(h)
-}
-
-/** Prüfung mit Merken des Zeitpunkts. `erzwingen` = Knopf „Nach Update suchen“. */
-export async function pruefeUndMerke(erzwingen: boolean): Promise<UpdateStand | null> {
-  if (!Capacitor.isNativePlatform()) return null
-  if (!erzwingen && (!navigator.onLine || !pruefungFaellig())) return stand
-  const s = await pruefeAufUpdate()
-  // Ohne Verbindung nicht als „geprüft“ merken, sonst gäbe es einen Tag lang keinen Hinweis.
-  if (s.verfuegbar || s.meldung.startsWith('Die App')) merkePruefung()
-  stand = s
-  hoerer.forEach((h) => h(s))
-  return s
-}
-
-/** Öffnet die Release-Seite im System-Browser. */
-export async function oeffneReleaseSeite(info: VersionInfo): Promise<void> {
-  await Browser.open({ url: info.releaseUrl || 'https://github.com/simonbleher/wep-app/releases/latest' })
+/** Kurzform eines Commits für die Anzeige. */
+export function kurzCommit(commit: string | undefined): string {
+  return commit ? commit.slice(0, 7) : 'lokal'
 }
