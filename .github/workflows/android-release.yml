@@ -77,8 +77,25 @@ jobs:
 
       - name: Schlüssel bereitstellen
         run: |
-          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/wep-release.jks"
-          echo "ANDROID_KEYSTORE_FILE=$RUNNER_TEMP/wep-release.jks" >> "$GITHUB_ENV"
+          set -euo pipefail
+          ks="$RUNNER_TEMP/wep-release.jks"
+          # Leerzeichen, Zeilenumbrüche und Windows-Zeilenenden (\r) aus dem kopierten Secret entfernen
+          if ! printf '%s' "$ANDROID_KEYSTORE_BASE64" | tr -d ' \r\n\t' | base64 -d > "$ks" 2>/dev/null; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 ist kein gültiges Base64. Bitte das Secret neu anlegen und NUR die lange Zeile aus zugangsdaten.txt kopieren (ohne Überschrift)."
+            exit 1
+          fi
+          groesse=$(stat -c %s "$ks")
+          if [ "$groesse" -lt 1000 ]; then
+            echo "::error::Schlüsseldatei ist nur $groesse Bytes groß – ANDROID_KEYSTORE_BASE64 ist vermutlich nicht vollständig kopiert."
+            exit 1
+          fi
+          # Passwort und Alias früh prüfen, damit der Fehler verständlich ist
+          if ! keytool -list -keystore "$ks" -storetype PKCS12 -storepass:env ANDROID_KEYSTORE_PASSWORT -alias "$ANDROID_KEY_ALIAS" > /dev/null 2>&1; then
+            echo "::error::Schlüsseldatei ok, aber ANDROID_KEYSTORE_PASSWORT oder ANDROID_KEY_ALIAS passt nicht (Werte aus zugangsdaten.txt prüfen, ohne Leerzeichen)."
+            exit 1
+          fi
+          echo "Schlüssel bereitgestellt ($groesse Bytes)."
+          echo "ANDROID_KEYSTORE_FILE=$ks" >> "$GITHUB_ENV"
 
       - name: Release-APK bauen
         working-directory: android
