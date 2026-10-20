@@ -758,6 +758,7 @@ try {
   await seite.getByRole('list', { name: 'Papierkorb' }).getByRole('button', { name: /Papierkorb/ }).click()
   await seite.getByRole('list', { name: 'Papierkorb' }).getByRole('button', { name: 'Endgültig löschen' }).click()
   await seite.getByRole('alertdialog').getByRole('button', { name: 'Endgültig löschen' }).click()
+  for (let i = 0; i < 50 && (await idbLies('bauExcel')).length > 0; i++) await new Promise((r) => setTimeout(r, 100))
   pruefe((await idbLies('bauExcel')).length === 0, 'Endgültig löschen: die Bau-Excel ist von diesem Gerät weg')
 
   // 12. Keine Skriptfehler
