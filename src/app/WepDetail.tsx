@@ -71,7 +71,7 @@ type ExportZustand =
 type Maske =
   | { art: 'hinzufuegen'; abschnitt: Abschnitt }
   | { art: 'position'; abschnitt: Abschnitt; id: string }
-  | { art: 'beseitigung'; id?: string }
+  | { art: 'beseitigung'; id?: string; vorlage?: { gegenstand: string; einheit: string; menge: number } }
 
 interface Props {
   wepId: string
@@ -326,6 +326,7 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
           <BeseitigungFormular
             key={maske.id ?? 'neu'}
             bearbeiten={bearbeiteBes}
+            vorlage={maske.vorlage}
             onAbbrechen={() => setMaske(null)}
             onFertig={speichereBeseitigung}
             onLoeschen={bearbeiteBes ? () => loescheBeseitigung(bearbeiteBes.id) : undefined}
@@ -393,6 +394,10 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
                 onSpeichern={speichere}
                 onHinzufuegen={() => oeffneMaske({ art: 'hinzufuegen', abschnitt: tab })}
                 onBearbeiten={(id) => oeffneMaske({ art: 'position', abschnitt: tab, id })}
+                onBeseitigung={(vorlage) => {
+                  setTab('beseitigung')
+                  oeffneMaske({ art: 'beseitigung', vorlage })
+                }}
               />
             )}
             {tab === 'beseitigung' && (

@@ -10,11 +10,13 @@ import {
   ladeGeraeteEinstellungen,
   lokalesProfil,
   speichereGeraeteEinstellungen,
+  wendeKontrastAn,
   type Profil as ProfilDaten,
   type Rolle,
 } from '@/profil'
 import { EigenePositionen } from './EigenePositionen'
 import { Fehlersuche } from './Fehlersuche'
+import { Sicherung } from './Sicherung'
 import { Synchronisierung } from './Synchronisierung'
 import { UpdateHinweis, UpdateStandZeilen } from './UpdateHinweis'
 import { HauptSeitenleiste, ICON, Kopf } from './ui'
@@ -31,6 +33,7 @@ export function Profil({ konto, verfuegbar, onZurueck, onAnmelden, onAbmelden }:
   const id = useId()
   const [profil, setProfil] = useState<ProfilDaten>(() => lokalesProfil.lade().profil)
   const [nurWlan, setNurWlan] = useState(() => ladeGeraeteEinstellungen().nurWlan)
+  const [sonne, setSonne] = useState(() => ladeGeraeteEinstellungen().sonnenKontrast)
   const nativ = Capacitor.isNativePlatform()
   const [fehlersuche, setFehlersuche] = useState(false)
   const [updateMeldung, setUpdateMeldung] = useState('')
@@ -156,7 +159,27 @@ export function Profil({ konto, verfuegbar, onZurueck, onAnmelden, onAbmelden }:
             </label>
           </div>
           <p className="neben">Gilt für Fotos und den Hintergrund-Upload der Android-App. Im Browser wirkt sie für Fotos nur, wenn der Browser die Verbindungsart meldet.</p>
+          <div>
+            <label className="schalter-zeile" htmlFor={`${id}-sonne`}>
+              <span>Sonnen-Kontrast</span>
+              <input
+                id={`${id}-sonne`}
+                type="checkbox"
+                role="switch"
+                className="schalter"
+                checked={sonne}
+                onChange={(e) => {
+                  setSonne(e.target.checked)
+                  speichereGeraeteEinstellungen({ sonnenKontrast: e.target.checked })
+                  wendeKontrastAn(e.target.checked)
+                }}
+              />
+            </label>
+          </div>
+          <p className="neben">Kräftigere Linien und Texte und größere Schrift, damit alles im Freien bei Sonne lesbar bleibt. Gilt nur für dieses Gerät.</p>
         </section>
+
+        <Sicherung id={`${id}-sicherung`} appVersion={__APP_VERSION__} />
 
         <section className="abschnitt" aria-labelledby={`${id}-konto`}>
           <h2 className="gruppenkopf" id={`${id}-konto`}>

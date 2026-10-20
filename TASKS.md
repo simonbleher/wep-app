@@ -265,5 +265,16 @@ Außenanlagen und Aufwuchs“ (**Simon bestätigt Wortlaut noch**). Code: `src/b
 FakeDrive), `app/__tests__/paket5.test.tsx`; e2e erweitert (DB 6). Test-Bau-Excel aus der Vorlage mit erfundenen Werten: `src/bauexcel/testBauExcel.ts`.
 Screenshots: `docs/paket5/` (`npm run paket5:screenshots`). `native-version` bleibt 4 (kein Android-Eingriff).
 **Noch offen:** Gerätetest (Dateiauswahl auf Android mit OneDrive-App, zwei Geräte mit echtem OneDrive).
-- B3-6 · Liste und Alltag (Suche, Problempflanzen, Sicherung, Sonnen-Kontrast) ⏳ – Branch beta3/paket6
+### B3-6 · Liste und Alltag ✅ PR offen – Branch beta3/paket6
+Ergebnis: (1) Suche in der WEP-Liste (Vorgangs-Nr., Anlage, Parzelle, Weg, Unterpächter, Auftraggeber; jedes Wort, Umlaute egal) zusammen mit
+dem Status-Filter, Sortierung „Zuletzt geändert“ (Standard) / „Nummer“ (`src/app/wepListe.ts`). (2) Problempflanzen: `data/problempflanzen.json`
+(Quelle je Eintrag, `richtlinie` mit Seite oder `praxis`, noch unbestätigt), Warnung mit Knopf „Zur Beseitigung“ (Beseitigung vorbelegt), nur
+warnen; die 41 Arten der Unionsliste gegen die Anlage der Richtlinie geprüft (vollständig). (3) Sicherung als ZIP-Datei (`src/sicherung/`, Profil →
+„Sicherung“): alle WEPs, Papierkorb, eigene Positionen, Profil, optional Fotos und Bau-Excel; Einspielen mit Vorschau (neu / gleich / weicht ab / im
+Papierkorb), Standard „behalten“, Auswahl je Eintrag, „als neues WEP anlegen“. (4) Sonnen-Kontrast: Schalter im Profil (Geräte-Einstellung),
+Block `:root[data-kontrast='sonne']` in `src/design/tokens.css`. Tests: `app/__tests__/wepListe.test.ts`, `gruen/__tests__/problempflanzen.test.ts`,
+`sicherung/sicherung.test.ts`, `design/kontrast.test.ts`, `app/__tests__/paket6.test.tsx`; e2e erweitert. Screenshots: `docs/paket6/`
+(`npm run paket6:screenshots`, auch mit Sonnen-Kontrast). `native-version` bleibt 4 (kein Android-Eingriff).
+**Offen:** Simon bestätigt die Praxis-Einträge der Problempflanzen (Quelle BfN-Schwarze-Liste, nicht Teil der Richtlinie); Gerätetest der Sicherung auf Android
+(Datei speichern/wählen).
 - B3-7 · Skizze bedienen (Zoomen, Einrasten, Auswählen) ⏳ – Branch beta3/paket7

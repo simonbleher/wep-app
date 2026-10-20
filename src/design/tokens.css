@@ -95,3 +95,33 @@
   --farbe-warnung-hell: #2e1715;
   --farbe-fokus: #8ab4ff;
 }
+
+/* Sonnen-Kontrast (Beta 3, Paket 6): Geräte-Einstellung im Profil, setzt data-kontrast="sonne" am <html>.
+   Nur Tokens ändern sich: Texte und Ränder dunkler (Text mind. 12:1, Ränder mind. 7:1 auf Weiß),
+   Linien 2 px, Schrift und Berührflächen größer, Schrift kräftiger. Gilt für das helle Farbschema,
+   mit dem die App immer läuft; die Werte stehen bewusst hier, nicht im Dunkelmodus. */
+:root[data-kontrast='sonne'] {
+  --farbe-text: #000000;
+  --farbe-text-2: #1f1f1f; /* 16,5:1 auf Weiß */
+  --farbe-linie: #6e6e6b; /* Trennlinien deutlich sichtbar, 5,1:1 */
+  --farbe-rand: #2e2e2c; /* Ränder von Eingabefeldern, 13,6:1 */
+  --farbe-akzent: #174026; /* 11,7:1 auf Weiß */
+  --farbe-akzent-gedrueckt: #0e2a19;
+  --farbe-akzent-hell: #d6e6da;
+  --farbe-warnung: #8c1812; /* 9,3:1 auf Weiß */
+  --farbe-warnung-hell: #f6dcda;
+  --farbe-fokus: #0a3a94;
+
+  --schrift-mini: 14px;
+  --schrift-klein: 17px;
+  --schrift-basis: 19px;
+  --schrift-titel: 22px;
+  --schrift-gross: 30px;
+  --gewicht-normal: 500;
+  --gewicht-mittel: 600;
+  --gewicht-fett: 700;
+
+  --beruehr-min: 52px;
+  --zeile-min: 60px;
+  --linie: 2px;
+}

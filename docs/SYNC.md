@@ -130,6 +130,14 @@ Apps/WEP-App/
   gewinnt. Geräte-Einstellungen („Upload nur über WLAN“) bleiben lokal und stehen
   nie in dieser Datei.
 
+## Sicherung als Datei (Beta 3, Paket 6)
+
+Zusätzlich zum Abgleich: Profil → „Sicherung erstellen“ legt eine ZIP-Datei an (`WEP-Sicherung_<Datum>.zip`) mit allen WEPs, dem
+Papierkorb, den eigenen Positionen und dem Profil, auf Wunsch mit Fotos und Bau-Excel-Dateien. „Sicherung einspielen“ zeigt zuerst eine
+Vorschau (neu, gleich, weicht ab, im Papierkorb) und spielt nur ein, was gewählt ist; bei Abweichungen bleibt der Stand auf dem Gerät, bis
+„Aus der Sicherung übernehmen“ oder „Als neues WEP anlegen“ gewählt wird. Eingespielte WEPs gehen über den normalen Abgleich nach OneDrive.
+Code: `src/sicherung/`.
+
 ## Anmeldung, „ohne Konto“ und Profil in der App
 
 - Beim ersten Start und nach dem Abmelden erscheint ein Login-Bildschirm mit dem

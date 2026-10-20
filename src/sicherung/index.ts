@@ -1,0 +1,12 @@
+// Sicherung als Datei: erstellen, lesen, vergleichen, einspielen (Beta 3, Paket 6).
+export { erstelleSicherung, sicherungsDateiname } from './erstellen'
+export type { ErstellteSicherung, SicherungsOptionen, SicherungsZaehlung } from './erstellen'
+export { leseSicherung, SicherungsFehler } from './lesen'
+export type { GeleseneSicherung } from './lesen'
+export { erstelleVorschau, standardEntscheidungen, alle as allePunkte, WAHL_TEXT } from './vorschau'
+export type { Entscheidungen, Punkt, Vorschau, Wahl } from './vorschau'
+export { spieleEin } from './einspielen'
+export type { EinspielErgebnis } from './einspielen'
+export { SICHERUNG_FORMAT } from './types'
+export type { SicherungsDatei, SicherungsQuelle, SicherungsZiel } from './types'
+export { lokalerStand, lokalesZiel } from './lokal'

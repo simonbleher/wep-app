@@ -11,6 +11,8 @@ export type {
   SucheOptions,
 } from './types.js';
 export { sucheKatalog, istInvasiv } from './suche.js';
+export { findeProblempflanze } from './problempflanzen.js';
+export type { Problempflanze, ProblempflanzeQuelle, ProblempflanzenListe } from './problempflanzen.js';
 export type { EigenePosition, EigenerAbschnitt } from './eigene.js';
 export {
   EIGEN_PRAEFIX,
