@@ -1,0 +1,98 @@
+/* Design-Tokens der WEP-App (Entwurf Beta 2, Schritt 4).
+   Grundsatz: Schwarz/Grau/Weiß, eine ruhige Akzentfarbe (gedecktes Grün), Rot nur
+   für Warnungen. Alle Farben sind volle Flächen (keine Transparenz) und erreichen
+   auf ihrem Hintergrund mindestens WCAG AA, Text meist AAA – für Sonnenlicht.
+   Wird zuerst nur von der Vorschau entwurf.html genutzt; nach der Freigabe
+   übernimmt die App diese Datei. */
+
+:root {
+  color-scheme: light;
+
+  /* Farben */
+  --farbe-grund: #ffffff; /* Seitenhintergrund */
+  --farbe-flaeche: #f3f3f2; /* Seitenleiste, Eingabe-Hintergrund, gedrückt */
+  --farbe-text: #111111;
+  --farbe-text-2: #4d4d4d; /* Nebentext, 8,6:1 auf Weiß */
+  --farbe-linie: #e3e3e1; /* Trennlinien in Listen */
+  --farbe-rand: #8a8a87; /* Ränder von Eingabefeldern, 3,5:1 */
+  --farbe-akzent: #2e6640; /* gedecktes Grün, 6,9:1 auf Weiß */
+  --farbe-akzent-gedrueckt: #234f31;
+  --farbe-akzent-hell: #e7efe9; /* ausgewählt, aktiver Abschnitt */
+  --farbe-auf-akzent: #ffffff;
+  --farbe-warnung: #b3261e; /* nur für Warnungen, 6,5:1 */
+  --farbe-warnung-hell: #fbeeed;
+  --farbe-fokus: #1f5fd1;
+
+  /* Abstände (4er-Raster) */
+  --abstand-1: 4px;
+  --abstand-2: 8px;
+  --abstand-3: 12px;
+  --abstand-4: 16px;
+  --abstand-5: 24px;
+  --abstand-6: 32px;
+  --abstand-7: 48px;
+
+  /* Radien */
+  --radius-klein: 6px;
+  --radius: 10px;
+
+  /* Schrift: Systemschrift, nur fünf Größen */
+  --schrift-familie: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
+  --schrift-mini: 12px; /* nur Beschriftung der unteren Leiste */
+  --schrift-klein: 15px; /* Nebentext */
+  --schrift-basis: 17px; /* Fließtext, Eingaben (≥ 16 px: kein Zoom beim Tippen) */
+  --schrift-titel: 20px; /* Kopfzeile */
+  --schrift-gross: 28px; /* Seitentitel */
+  --gewicht-normal: 400;
+  --gewicht-mittel: 500;
+  --gewicht-fett: 600;
+  --zeilenhoehe: 1.4;
+
+  /* Bedienung */
+  --beruehr-min: 48px; /* Mindesthöhe aller Berührflächen */
+  --zeile-min: 56px; /* Listenzeile */
+  --linie: 1px;
+  --kopf-hoehe: 56px;
+  --leiste-hoehe: 64px; /* untere Abschnittsleiste (Handy) */
+  --seitenleiste-breite: 280px; /* Tablet ≥ 900 px */
+  --inhalt-max: 760px;
+}
+
+/* Dunkelmodus: nur Tokens tauschen. Folgt der Systemeinstellung,
+   data-thema="hell" / "dunkel" am <html> erzwingt eine Variante. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-thema='hell']) {
+    color-scheme: dark;
+    --farbe-grund: #111111;
+    --farbe-flaeche: #1e1e1e;
+    --farbe-text: #f2f2f2;
+    --farbe-text-2: #b5b5b5;
+    --farbe-linie: #2c2c2c;
+    --farbe-rand: #7a7a7a;
+    --farbe-akzent: #7fbf92;
+    --farbe-akzent-gedrueckt: #95cfa6;
+    --farbe-akzent-hell: #1d2e22;
+    --farbe-auf-akzent: #0b1f11;
+    --farbe-warnung: #ff8a80;
+    --farbe-warnung-hell: #2e1715;
+    --farbe-fokus: #8ab4ff;
+  }
+}
+
+:root[data-thema='dunkel'] {
+  color-scheme: dark;
+  --farbe-grund: #111111;
+  --farbe-flaeche: #1e1e1e;
+  --farbe-text: #f2f2f2;
+  --farbe-text-2: #b5b5b5;
+  --farbe-linie: #2c2c2c;
+  --farbe-rand: #7a7a7a;
+  --farbe-akzent: #7fbf92;
+  --farbe-akzent-gedrueckt: #95cfa6;
+  --farbe-akzent-hell: #1d2e22;
+  --farbe-auf-akzent: #0b1f11;
+  --farbe-warnung: #ff8a80;
+  --farbe-warnung-hell: #2e1715;
+  --farbe-fokus: #8ab4ff;
+}
