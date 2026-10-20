@@ -546,6 +546,26 @@ describe('Konflikte sichtbar machen', () => {
     expect(tablet.meta(ID)?.konflikt).toBeUndefined()
   })
 
+  it('Konflikt mit Fotos auf beiden Geräten: jede Entscheidung behält die Fotos beider Fassungen', async () => {
+    const foto = (id: string) => ({ id, aufgenommenAm: '2026-10-20T10:00:00Z', breite: 10, hoehe: 10, groesse: 100 })
+    for (const wahl of ['diese', 'andere'] as const) {
+      const { handy, tablet } = await zweiGeraete()
+      await tablet.bearbeite({ ...wep(ID, 'Tablet-Fassung'), fotos: [foto('t1')] })
+      await handy.bearbeite({ ...wep(ID, 'Handy-Fassung'), fotos: [foto('h1'), foto('h2')] })
+      await tablet.sync()
+      await handy.sync()
+      expect(handy.meta(ID)?.konflikt?.art).toBe('zwei-geraete')
+
+      const r = await handy.loeseKonflikt(ID, wahl)
+      const ids = (r?.wep?.fotos ?? []).map((f) => f.id).sort()
+      expect(ids).toEqual(['h1', 'h2', 't1'])
+      expect(r?.wep?.formalien.kleingartenanlage).toBe(wahl === 'diese' ? 'Handy-Fassung' : 'Tablet-Fassung')
+      await handy.sync()
+      await tablet.sync()
+      expect((tablet.lokal.weps.get(ID)?.fotos ?? []).map((f) => f.id).sort()).toEqual(['h1', 'h2', 't1'])
+    }
+  })
+
   it('„Andere Fassung übernehmen“: die andere Fassung gilt jetzt überall, Kopie wird aufgeräumt', async () => {
     const { drive, handy, tablet } = await konflikt()
     handy.lokal.ereignisse = []
