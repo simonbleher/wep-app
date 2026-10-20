@@ -5,6 +5,10 @@ name: Android Release
 # ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORT) – erzeugt mit „Android-Schlüssel erzeugen“,
 # siehe docs/ANDROID.md. Ohne sie bricht der Lauf mit einer Meldung ab.
 # Versionsname: package.json, versionCode: Lauf-Nummer.
+# Zusätzlich (optional): die signierte APK geht auf ein eigenes Cloudflare-Pages-Projekt
+# (feste URL /wep.apk + apk.json), damit die App sich selbst aktualisieren kann – ohne
+# GitHub-Anmeldung. Dafür die Secrets CLOUDFLARE_API_TOKEN und CLOUDFLARE_ACCOUNT_ID
+# (docs/ANDROID.md); ohne sie gibt es nur eine Warnung, das Release bleibt.
 on:
   push:
     branches: [main] # jeder Commit auf main bekommt eine APK (Update-Hinweis vergleicht Commits)
@@ -28,6 +32,9 @@ jobs:
       ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
       ANDROID_KEY_PASSWORT: ${{ secrets.ANDROID_KEY_PASSWORT }}
       WEP_VERSION_CODE: ${{ github.run_number }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      APK_PROJEKT: wep-pankow-apk # muss zu APK_BASIS_URL in src/android/update.ts passen
     steps:
       - name: Secrets prüfen
         run: |
@@ -133,3 +140,48 @@ jobs:
             --title "WEP ${{ steps.version.outputs.name }} (${{ steps.version.outputs.code }})" \
             --notes-file aenderungen.md \
             --latest
+
+      - name: Hinweis zu den Cloudflare-Secrets
+        if: ${{ env.CLOUDFLARE_API_TOKEN == '' || env.CLOUDFLARE_ACCOUNT_ID == '' }}
+        run: |
+          echo "::warning title=APK nicht auf Cloudflare::Secrets CLOUDFLARE_API_TOKEN und CLOUDFLARE_ACCOUNT_ID fehlen – die App kann sich nicht selbst aktualisieren (docs/ANDROID.md, Abschnitt „Selbst-Update“). Das GitHub Release ist trotzdem angelegt."
+
+      - name: APK auf Cloudflare Pages bereitstellen
+        id: cloudflare
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != '' }}
+        continue-on-error: true # das Release ist schon veröffentlicht; ein Fehler hier soll es nicht rückgängig machen
+        run: |
+          set -euo pipefail
+          apk="WEP-${{ steps.version.outputs.name }}-${{ steps.version.outputs.code }}.apk"
+          mkdir apk-site
+          cp "$apk" apk-site/wep.apk
+          sha=$(sha256sum apk-site/wep.apk | cut -d' ' -f1)
+          APK_SHA="$sha" APK_NAME="${{ steps.version.outputs.name }}" APK_CODE="${{ steps.version.outputs.code }}" \
+          APK_COMMIT="${{ github.sha }}" APK_PROJEKT_NAME="$APK_PROJEKT" node -e '
+            const fs = require("fs")
+            fs.writeFileSync("apk-site/apk.json", JSON.stringify({
+              versionName: process.env.APK_NAME,
+              versionCode: Number(process.env.APK_CODE),
+              nativeVersion: Number(fs.readFileSync("android/native-version.txt", "utf8").trim()),
+              commit: process.env.APK_COMMIT,
+              sha256: process.env.APK_SHA,
+              apkUrl: `https://${process.env.APK_PROJEKT_NAME}.pages.dev/wep.apk`,
+              gebautAm: new Date().toISOString(),
+            }, null, 2) + "\n")'
+          cat > apk-site/_headers <<'EOF'
+          /apk.json
+            Cache-Control: no-cache
+            Access-Control-Allow-Origin: *
+          /wep.apk
+            Cache-Control: no-cache
+            Content-Type: application/vnd.android.package-archive
+          EOF
+          cat apk-site/apk.json
+          # Projekt beim ersten Mal anlegen (schlägt fehl, wenn es schon existiert – dann egal)
+          npx --yes wrangler@4 pages project create "$APK_PROJEKT" --production-branch main || true
+          npx --yes wrangler@4 pages deploy apk-site --project-name "$APK_PROJEKT" --branch main --commit-dirty=true
+
+      - name: Hinweis bei Fehler auf Cloudflare
+        if: ${{ steps.cloudflare.outcome == 'failure' }}
+        run: |
+          echo "::warning title=APK-Upload auf Cloudflare fehlgeschlagen::Das GitHub Release ist angelegt, aber die Selbst-Update-Adresse wurde nicht aktualisiert. Token-Rechte (Cloudflare Pages: Edit) und Kontonummer prüfen (docs/ANDROID.md)."

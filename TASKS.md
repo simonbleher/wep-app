@@ -188,3 +188,14 @@ Ergebnis: `functions/api/ki/skizze-chat.ts` (+ `functions/_lib/`), Szene-Modell 
 `src/skizze/` (`szene.ts`, `operationen.ts`, `chatWerkzeuge.ts`, `chatAblauf.ts`), Chat-Leiste
 `SkizzeChat.tsx` im Skizze-Tab, neue Symbole (Editor, PNG, Excel-Formen), Replay `npm run ki-test-chat`
 → `tools/ki-test/ergebnis-chat.html`. Offen: Vergleich mit `claude-ergebnis.json` (Datei fehlt noch).
+
+## Beta 3 (Plan: docs/PLAN-BETA3.md)
+
+### B3-0 · Selbst-Update der Android-App 🔄 (PR offen) – Branch beta3/selbst-update
+Ergebnis: Live-Update des Web-Teils (`@capgo/capacitor-updater`, manuell, `updates/<commit>.zip`,
+`version.json` mit `bundleUrl`/`nativeVersion`, Rückfall per `notifyAppReady` + Sperrliste), `android/native-version.txt`
+mit Prüfung im Workflow „Prüfen“, natives Update (APK in der App laden, Android-Installer,
+Hinweis „Neue App-Version“), APK zusätzlich auf Cloudflare Pages (`wep-pankow-apk`, Secrets
+`CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ACCOUNT_ID`), Profil zeigt Commit/Stand/letzte Prüfung.
+Tests: Entscheidung Live/Nativ, Rückfall, native-version-Regel. Anleitung: docs/ANDROID.md „Updates“.
+**Noch offen:** Gerätetest (Live-Update, Installer, Rückfall), Cloudflare-Token anlegen.

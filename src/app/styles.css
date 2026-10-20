@@ -1541,6 +1541,14 @@ select.eingabe {
   border-top: 0;
 }
 
+/* Fehlermeldung unter dem Update-Hinweis */
+.update-fehler {
+  margin: 0;
+  padding: var(--abstand-2) var(--abstand-4);
+  color: var(--farbe-text-2);
+  font-size: var(--schrift-klein);
+}
+
 /* Update-Hinweis (Android-App): schlichte Zeile, keine Farbfläche */
 .update-hinweis {
   display: flex;

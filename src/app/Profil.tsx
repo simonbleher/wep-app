@@ -15,7 +15,7 @@ import {
 } from '@/profil'
 import { Fehlersuche } from './Fehlersuche'
 import { Synchronisierung } from './Synchronisierung'
-import { UpdateHinweis } from './UpdateHinweis'
+import { UpdateHinweis, UpdateStandZeilen } from './UpdateHinweis'
 import { HauptSeitenleiste, ICON, Kopf } from './ui'
 
 interface Props {
@@ -46,7 +46,7 @@ export function Profil({ konto, verfuegbar, onZurueck, onAnmelden, onAbmelden }:
   async function nachUpdateSuchen() {
     setSuche(true)
     setUpdateMeldung('')
-    const m = await import('@/android/update')
+    const m = await import('@/android/updateDienst')
     const s = await m.pruefeUndMerke(true)
     setUpdateMeldung(s?.meldung ?? '')
     setSuche(false)
@@ -201,6 +201,7 @@ export function Profil({ konto, verfuegbar, onZurueck, onAnmelden, onAbmelden }:
               <dt>Version</dt>
               <dd>{__APP_VERSION__}</dd>
             </div>
+            {nativ && <UpdateStandZeilen />}
             <div>
               <dt>Speicherort</dt>
               <dd>

@@ -42,6 +42,8 @@ export async function startAndroid(): Promise<void> {
   } catch (e) {
     console.warn('Android-Start:', e)
   }
+  // Update-Prüfung (Live-Update des Web-Teils, Hinweis auf neue App-Version)
+  void import('./updateDienst').then((m) => m.starteAutomatik())
   void App.addListener('appStateChange', ({ isActive }) => {
     if (isActive) void q.uebernimmErgebnisse().catch(() => undefined)
   })

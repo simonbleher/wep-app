@@ -15,3 +15,7 @@
 /version.json
   Cache-Control: no-cache
   Access-Control-Allow-Origin: *
+
+# Live-Update-Pakete der Android-App: je Commit unveränderlich (siehe docs/ANDROID.md)
+/updates/*
+  Cache-Control: public, max-age=31536000, immutable

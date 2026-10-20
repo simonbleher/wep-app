@@ -4,6 +4,9 @@ apply plugin: 'kotlin-android'
 android {
     namespace = "de.wep.app"
     compileSdk = rootProject.ext.compileSdkVersion
+    buildFeatures {
+        buildConfig = true
+    }
     defaultConfig {
         applicationId "de.wep.app"
         minSdkVersion rootProject.ext.minSdkVersion
@@ -11,6 +14,8 @@ android {
         // Release-Workflow: -PwepVersionCode=<Lauf-Nummer> -PwepVersionName=<package.json>
         versionCode Integer.parseInt((project.findProperty('wepVersionCode') ?: '1').toString())
         versionName (project.findProperty('wepVersionName') ?: '1.0').toString()
+        // Nummer des nativen Teils (android/native-version.txt); Web-Pakete passen nur zu genau dieser Nummer.
+        buildConfigField 'int', 'WEP_NATIVE_VERSION', file('../native-version.txt').text.trim()
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

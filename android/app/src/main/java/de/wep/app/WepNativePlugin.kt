@@ -176,4 +176,47 @@ class WepNativePlugin : Plugin() {
         val (typ, unmetered) = Netz.info(ctx)
         call.resolve(JSObject().put("typ", typ).put("unmetered", unmetered))
     }
+
+    /** Nummer des nativen Teils (android/native-version.txt, per Gradle in BuildConfig) und versionCode. */
+    @PluginMethod
+    fun nativeVersion(call: PluginCall) {
+        val code = try {
+            @Suppress("DEPRECATION")
+            ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionCode
+        } catch (e: Exception) {
+            0
+        }
+        call.resolve(JSObject().put("nativeVersion", BuildConfig.WEP_NATIVE_VERSION).put("versionCode", code))
+    }
+
+    /** APK laden (Ereignis `apkFortschritt` mit geladen/gesamt). */
+    @PluginMethod
+    fun ladeApk(call: PluginCall) {
+        try {
+            val url = call.getString("url") ?: return call.reject("url fehlt")
+            val groesse = ApkInstaller.lade(ctx, url, call.getString("sha256")) { geladen, gesamt ->
+                notifyListeners("apkFortschritt", JSObject().put("geladen", geladen).put("gesamt", gesamt))
+            }
+            Protokoll.eintrag(ctx, "info", "APK geladen ($groesse Bytes)")
+            call.resolve(JSObject().put("groesse", groesse))
+        } catch (e: ApkInstaller.ApkFehler) {
+            Protokoll.eintrag(ctx, "fehler", "APK laden: ${e.message}")
+            call.reject(e.message, e.code, e)
+        } catch (e: Exception) {
+            fehler(call, e)
+        }
+    }
+
+    /** Android-Installer für die geladene APK öffnen (ERLAUBNIS, wenn „Apps installieren“ fehlt). */
+    @PluginMethod
+    fun installiereApk(call: PluginCall) {
+        try {
+            ApkInstaller.installiere(ctx)
+            call.resolve()
+        } catch (e: ApkInstaller.ApkFehler) {
+            call.reject(e.message, e.code, e)
+        } catch (e: Exception) {
+            fehler(call, e)
+        }
+    }
 }

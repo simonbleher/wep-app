@@ -1,0 +1,36 @@
+name: Prüfen
+
+# Typechecks, Tests und die Regel für die Nummer des nativen Teils der Android-App:
+# Ändert ein Pull Request etwas unter android/ (oder Capacitor-Plugins), muss
+# android/native-version.txt erhöht werden – sonst bekommen installierte Apps keinen
+# Hinweis auf eine neue App-Version (docs/ANDROID.md, „Selbst-Update“).
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  pruefen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Vergleich mit dem Basis-Branch
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run typecheck:functions
+      - run: npm test
+
+      - name: native-version geprüft
+        if: ${{ github.event_name == 'pull_request' }}
+        run: node tools/pruefe-native-version.mjs "origin/${{ github.base_ref }}"

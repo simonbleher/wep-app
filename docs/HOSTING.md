@@ -17,3 +17,9 @@ private GitHub-Repos).
   dem Ändern der Variable muss einmal neu gebaut werden (Deployment „erneut ausführen“).
 - In der Microsoft-App-Registrierung muss `https://<projektname>.pages.dev/`
   (mit Schrägstrich) als Umleitungs-URI vom Typ *Single-Page-Webanwendung* stehen.
+
+## Live-Update-Pakete der Android-App
+
+`npm run build` legt bei bekanntem Commit (`CF_PAGES_COMMIT_SHA`) zusätzlich `dist/updates/<commit>.zip`
+ab und schreibt `bundleUrl`/`nativeVersion` in `version.json`; `public/_headers` setzt dafür einen
+langen Cache. Details: docs/ANDROID.md, Abschnitt „Updates“. Der Build-Befehl bleibt `npm run build`.

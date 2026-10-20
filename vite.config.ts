@@ -7,6 +7,15 @@ import { fileURLToPath, URL } from 'node:url'
 
 const version = (JSON.parse(readFileSync('./package.json', 'utf-8')) as { version: string }).version
 
+/** Gehostete Seite; von dort holt die Android-App version.json und das Update-Paket. */
+const HOST_URL = 'https://wep-pankow.pages.dev'
+
+/** Nummer des nativen Teils der Android-App (android/native-version.txt, siehe docs/ANDROID.md). */
+const nativeVersion = Number.parseInt(readFileSync('./android/native-version.txt', 'utf-8').trim(), 10)
+if (!Number.isInteger(nativeVersion) || nativeVersion < 1) {
+  throw new Error('android/native-version.txt muss eine ganze Zahl ab 1 enthalten.')
+}
+
 /** Release-Seite, auf die der Update-Hinweis der Android-App verweist. */
 const RELEASE_URL = 'https://github.com/simonbleher/wep-app/releases/latest'
 
@@ -14,6 +23,9 @@ const RELEASE_URL = 'https://github.com/simonbleher/wep-app/releases/latest'
  * Schreibt `version.json` in den Build: versionName aus package.json, versionCode aus
  * WEP_VERSION_CODE (Release-Workflow: Lauf-Nummer, sonst 0 = unbekannt), `commit`
  * (Cloudflare: CF_PAGES_COMMIT_SHA, GitHub Actions: GITHUB_SHA) und `gebautAm` (ISO-Zeit).
+ * `nativeVersion` (android/native-version.txt) sagt, zu welchem nativen Teil der Web-Teil passt;
+ * `bundleUrl` (nur wenn der Commit bekannt ist) zeigt auf das Live-Update-Paket, das
+ * tools/update-paket.mjs nach dem Build als updates/<commit>.zip erzeugt.
  * Die Android-App liest die eingebaute Datei als „installiert“ und die gehostete als „neueste“
  * und vergleicht über den Commit (siehe src/android/update.ts).
  */
@@ -31,7 +43,8 @@ function versionJson(): Plugin {
             {
               versionName: version,
               versionCode,
-              ...(commit ? { commit } : {}),
+              ...(commit ? { commit, bundleUrl: `${HOST_URL}/updates/${commit}.zip` } : {}),
+              nativeVersion,
               gebautAm: new Date().toISOString(),
               releaseUrl: RELEASE_URL,
             },

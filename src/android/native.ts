@@ -7,7 +7,7 @@
 // - Anmeldedaten verschlüsselt speichern (EncryptedSharedPreferences), damit auch der
 //   Hintergrunddienst sie lesen kann
 // - Upload-Warteschlange (Dateien im App-Speicher) und der WorkManager-Worker
-import { registerPlugin } from '@capacitor/core'
+import { registerPlugin, type PluginListenerHandle } from '@capacitor/core'
 
 /** Anmeldedaten, wie sie verschlüsselt auf dem Gerät liegen. */
 export interface Anmeldung {
@@ -73,6 +73,23 @@ export interface WepNativePlugin {
   planeUpload(a: { nurWlan: boolean }): Promise<void>
   jetztVersuchen(): Promise<void>
   netzTyp(): Promise<NetzInfo>
+
+  /** Nummer des nativen Teils (android/native-version.txt) und versionCode der installierten APK. */
+  nativeVersion(): Promise<{ nativeVersion: number; versionCode: number }>
+  /**
+   * Lädt die APK in den App-Cache (nur https, nur *.pages.dev) und prüft die SHA-256.
+   * Fortschritt über das Ereignis `apkFortschritt`. Fehlercodes: KEIN_NETZ, PRUEFSUMME.
+   */
+  ladeApk(a: { url: string; sha256?: string }): Promise<{ groesse: number }>
+  /**
+   * Öffnet den Android-Installer für die geladene APK. Fehlt die Erlaubnis „Apps installieren“,
+   * öffnet das Plugin die Einstellung und weist mit dem Code ERLAUBNIS ab.
+   */
+  installiereApk(): Promise<void>
+  addListener(
+    eventName: 'apkFortschritt',
+    fn: (f: { geladen: number; gesamt: number }) => void,
+  ): Promise<PluginListenerHandle>
 }
 
 export const WepNative = registerPlugin<WepNativePlugin>('WepNative')
