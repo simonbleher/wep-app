@@ -1,6 +1,11 @@
-# Plan Beta 3a
+# Plan Beta 3
 
 Stand: 20.10.2026, mit Simon abgestimmt. Cloud-Sitzungen, eine pro Paket, nacheinander.
+
+**Beta 3a (Pakete 0–3) abgeschlossen am 20.10.2026** – #39–#44. Ab jetzt kommen Updates
+über das Selbst-Update auf die Android-Geräte.
+
+# Beta 3a
 
 ## Paket 0 – Selbst-Update der Android-App (ohne Play Store)
 
@@ -74,6 +79,73 @@ nicht mehr. Anleitung: docs/ANDROID.md, Abschnitt „Selbst-Update“.
 - Abgleich über `daten/eigene-positionen.json` (alle Geräte gleich; neuere Änderung je
   Eintrag gewinnt).
 
-## Später (Beta 3b)
+# Beta 3b
 
-Fotos pro Position/WEP; Bau-Excel direkt aus OneDrive wählen und Formalien vorbefüllen.
+Mit Simon abgestimmt am 20.10.2026. Gleiche Arbeitsweise wie 3a. Für alle Pakete gilt:
+- Ändert sich `android/`, `capacitor.config.ts` oder ein Capacitor-Plugin → `android/native-version.txt`
+  erhöhen (der Workflow „Prüfen“ achtet darauf); sonst kommt das Paket als Live-Update.
+- Alles, was in OneDrive liegt, folgt den Regeln aus Paket 2 (Papierkorb, keine stillen Verluste).
+- Testdaten nur erfunden, Fotos nur selbst erzeugte Testbilder.
+
+## Paket 4 – Fotos
+
+1. **Aufnehmen:** Fotos an einer **Position** (z. B. Baum, Mangel) und am **WEP allgemein**
+   (Gesamtansicht). Kamera direkt in der App oder aus der Galerie, mehrere auf einmal. Kurzer
+   optionaler Text je Foto.
+2. **Klein halten:** Beim Speichern verkleinern (längste Seite ca. 2000 px, JPEG, Ziel ca.
+   300–500 KB), Ausrichtung (EXIF) korrigieren, Standortdaten entfernen. 5–50 Fotos je WEP
+   müssen flüssig gehen (Vorschaubilder, nicht alles auf einmal laden).
+3. **Speichern und Abgleich:** lokal in IndexedDB; in OneDrive unter `daten/fotos/<Vorgangs-Nr>/`.
+   Upload nur im WLAN (Einstellung „nur WLAN“), auch im Android-Hintergrunddienst; offene
+   Fotos zählen in der Upload-Anzeige. Andere Geräte laden Vorschaubilder/Fotos beim Öffnen
+   des WEP nach (nicht alle Fotos aller WEPs auf jedes Gerät).
+4. **Löschen:** Foto löschen mit Rückfrage; ein WEP im Papierkorb nimmt seine Fotos mit
+   (Wiederherstellen bringt sie zurück, endgültig löschen entfernt sie). Duplizieren kopiert
+   die Fotos nicht (Rückfrage? → Entscheidung in ENTSCHEIDUNGEN.md: Standard „ohne Fotos“).
+5. **Export:** Beim Excel-Export zusätzlich Ordner `Exporte/<Vorgangs-Nr>_Fotos/` mit
+   sprechenden Dateinamen (z. B. `03 Apfelbaum.jpg`, `00 Gesamtansicht 1.jpg`), Nummer =
+   Positionsnummer im WEP. Nicht in die Excel-Datei. Im Browser ohne Konto: Fotos als ZIP
+   neben der Excel herunterladen.
+
+## Paket 5 – Bau-Excel am WEP, Formalien vorbefüllen
+
+1. **Bau-Excel wählen** über die Dateiauswahl des Systems (auf Android erscheint dort auch
+   die OneDrive-App bzw. der Download-Ordner, wenn die Datei per E-Mail kam). Keine neuen
+   Microsoft-Rechte. Möglich beim Anlegen („Neues WEP aus Bau-Excel“) und später am WEP.
+2. **Am WEP merken:** Die Bau-Excel bleibt beim WEP (lokal + `daten/bau/<Vorgangs-Nr>.xlsx`),
+   der Export nimmt sie automatisch; austauschen und entfernen möglich. Papierkorb wie Fotos.
+3. **Formalien vorbefüllen:** Alles, was in der Bau-Excel ausgefüllt ist, in die Formalien
+   übernehmen (Zellen laut docs/ARCHITEKTUR.md). Schon ausgefüllte Felder im WEP nicht
+   still überschreiben: Liste „Bau-Excel sagt … / im WEP steht …“ mit Auswahl je Feld.
+   Neue Bau-Excel (ausgetauscht) → derselbe Abgleich.
+4. **Skizzen-Überschrift:** In der Export-Kopie die Überschrift des Blatts „Skizze
+   Außenanlage-Aufwuchs“ prüfen; steht dort „Baulichkeiten“, passend ersetzen (Wortlaut im PR
+   zeigen, Simon bestätigt). `docs/WEP_Vorlage.xlsx` bleibt unverändert.
+
+## Paket 6 – Liste und Alltag
+
+1. **Suche** in der WEP-Liste (Vorgangs-Nr., Anlage, Parzelle, Pächter, Ort), zusammen mit dem
+   Status-Filter aus Paket 1; Sortierung (zuletzt geändert / Nummer).
+2. **Problempflanzen:** Arten, die laut Richtlinie bzw. Berliner Praxis zu entfernen sind
+   oder Probleme machen (z. B. Japanischer Staudenknöterich) – Liste aus docs/Richtlinie.pdf
+   und der vorhandenen Invasiv-Liste prüfen/ergänzen; Hinweis mit Vorschlag „Beseitigung“
+   (nur warnen, nie sperren). Quelle je Eintrag in der Datenliste vermerken.
+3. **Sicherung als Datei:** Profil → „Sicherung erstellen“ (eine Datei mit allen WEPs,
+   Papierkorb, eigenen Positionen, Profil; Fotos und Bau-Excel optional) und „Sicherung
+   einspielen“ (Vorschau, was neu/geändert ist; nichts still überschreiben).
+4. **Sonnen-Kontrast:** Schalter im Profil (Geräte-Einstellung): kräftigere Linien und Texte,
+   größere Schrift; an den bestehenden Design-Tokens, Rest des Designs unverändert.
+
+## Paket 7 – Skizze bedienen
+
+1. **Zoomen/Verschieben** mit zwei Fingern (und Mausrad/Ziehen am PC), „Ganze Skizze“-Knopf.
+2. **Einrasten:** Kanten und Ecken an benachbarten Formen und am Grundstücksrand, gerade
+   Linien (0/90/45°); abschaltbar.
+3. **Leichter auswählen:** größere Greifflächen für kleine Formen, Auswahl kleiner Formen
+   unter großen (z. B. Pfosten auf Grundstück), Antippen wechselt bei Überlagerung durch.
+4. Export der Skizze (Excel-Formen) muss unverändert stimmen – bestehende Export-Tests grün.
+
+## Reihenfolge
+
+4 → 5 → 6 → 7, eine Sitzung je Paket. 6 und 7 berühren getrennte Bereiche und könnten
+notfalls parallel laufen.
