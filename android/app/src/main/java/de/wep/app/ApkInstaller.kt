@@ -24,10 +24,13 @@ object ApkInstaller {
 
     private fun datei(ctx: Context) = File(File(ctx.cacheDir, ORDNER).also { it.mkdirs() }, DATEI)
 
-    /** Nur https auf *.pages.dev (das eigene APK-Projekt), damit das Plugin kein offener Downloader ist. */
+    /** Feste Adresse des eigenen APK-Projekts (APK_PROJEKT in android-release.yml). */
+    private const val APK_HOST = "wep-pankow-apk.pages.dev"
+
+    /** Nur https auf das eigene APK-Projekt (auf *.pages.dev kann jeder Seiten anlegen). */
     fun urlErlaubt(url: String): Boolean {
         val u = try { URL(url) } catch (e: Exception) { return false }
-        return u.protocol == "https" && u.host.endsWith(".pages.dev")
+        return u.protocol == "https" && u.host == APK_HOST
     }
 
     /** Lädt die APK; `fortschritt(geladen, gesamt)` mit gesamt = -1, wenn unbekannt. Gibt die Größe zurück. */
