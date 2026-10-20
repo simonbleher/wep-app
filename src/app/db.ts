@@ -9,11 +9,13 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
 import type { Wep } from '@/model'
 import type { SyncMeta } from '@/sync/types'
+import type { ExportEintrag } from '@/sync/exporte'
 
 const DB_NAME = 'wep-db'
-const DB_VERSION = 2
+const DB_VERSION = 3
 const STORE = 'weps'
 const META = 'syncMeta'
+const EXPORTE = 'exporte'
 
 interface WepDB extends DBSchema {
   weps: {
@@ -23,6 +25,10 @@ interface WepDB extends DBSchema {
   syncMeta: {
     key: string
     value: SyncMeta
+  }
+  exporte: {
+    key: string
+    value: ExportEintrag
   }
 }
 
@@ -39,6 +45,10 @@ function datenbank(): Promise<IDBPDatabase<WepDB>> {
         // Version 2: Sync-Metadaten (OneDrive)
         if (!db.objectStoreNames.contains(META)) {
           db.createObjectStore(META, { keyPath: 'id' })
+        }
+        // Version 3: Excel-Exporte, die noch nach OneDrive hochgeladen werden müssen
+        if (!db.objectStoreNames.contains(EXPORTE)) {
+          db.createObjectStore(EXPORTE, { keyPath: 'name' })
         }
       },
     })
@@ -116,4 +126,21 @@ export async function speichereWepAusSync(wep: Wep, meta: SyncMeta): Promise<voi
   await tx.objectStore(STORE).put(wep)
   await tx.objectStore(META).put(meta)
   await tx.done
+}
+
+// --- Warteschlange für Excel-Exporte ----------------------------------------
+
+export async function legeExportAb(eintrag: ExportEintrag): Promise<void> {
+  const db = await datenbank()
+  await db.put(EXPORTE, eintrag)
+}
+
+export async function alleExporte(): Promise<ExportEintrag[]> {
+  const db = await datenbank()
+  return db.getAll(EXPORTE)
+}
+
+export async function entferneExport(name: string): Promise<void> {
+  const db = await datenbank()
+  await db.delete(EXPORTE, name)
 }

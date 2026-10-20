@@ -32,11 +32,22 @@ export interface RemoteDatei {
   geaendertAm: string
 }
 
-/** Zugriff auf den OneDrive-App-Ordner (in Tests durch einen Mock ersetzt). */
+/**
+ * Zugriff auf einen Ordner im OneDrive-App-Ordner (in Tests durch einen Mock ersetzt).
+ * Dateinamen sind relativ zum Ordner des Clients; der Wurzel-Client (Ordner '') sieht
+ * den App-Ordner selbst.
+ */
 export interface GraphClient {
+  /** Dateien (keine Unterordner) des Ordners; ein fehlender Ordner ergibt eine leere Liste. */
   liste(): Promise<RemoteDatei[]>
   lade(name: string): Promise<string>
-  schreibe(name: string, inhalt: string): Promise<RemoteDatei>
+  /** Legt die Datei an oder ersetzt sie; fehlende Ordner entstehen dabei. */
+  schreibe(name: string, inhalt: string | Blob, typ?: string): Promise<RemoteDatei>
+  /**
+   * Verschiebt eine Datei in einen Unterordner des App-Ordners (nur beim Wurzel-Client).
+   * Ist dort schon eine gleichnamige Datei, bleibt alles unverändert: 'vorhanden'.
+   */
+  verschiebe(name: string, zielOrdner: string): Promise<'verschoben' | 'vorhanden'>
 }
 
 /** Lokaler Speicher, den die Sync-Logik braucht (in der App: IndexedDB). */

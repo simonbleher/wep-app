@@ -1,7 +1,10 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import { readFileSync } from 'node:fs'
 import { fileURLToPath, URL } from 'node:url'
+
+const version = (JSON.parse(readFileSync('./package.json', 'utf-8')) as { version: string }).version
 
 // Theme-Farbe der WEP-App (satter Grünton, hoher Kontrast für den Außeneinsatz)
 const THEME_COLOR = '#1b5e20'
@@ -9,6 +12,7 @@ const BACKGROUND_COLOR = '#f4f6f4'
 
 // https://vite.dev/config/
 export default defineConfig({
+  define: { __APP_VERSION__: JSON.stringify(version) },
   plugins: [
     react(),
     VitePWA({

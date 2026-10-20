@@ -516,3 +516,77 @@ textarea.eingabe {
   align-items: center;
   list-style-position: inside;
 }
+
+/* Konto, Login, Profil (Beta 2, Schritt 2) – schlicht, ohne Emojis */
+.kopf-rechts {
+  margin-left: auto;
+}
+
+.btn-symbol {
+  padding: 0;
+}
+
+.status-zeile {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--farbe-text-schwach);
+}
+
+.text-knopf {
+  min-height: 48px;
+  padding: 0 12px;
+  border: 0;
+  background: none;
+  color: var(--farbe-text-schwach);
+  font: inherit;
+  font-size: 0.9rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.login {
+  min-height: 100dvh;
+  justify-content: space-between;
+}
+
+.login-mitte {
+  margin: auto 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--abstand);
+}
+
+.login-ohne {
+  align-self: center;
+}
+
+.zeile-schalter {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+}
+
+.zeile-schalter input {
+  width: 24px;
+  height: 24px;
+}
+
+.daten-liste {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 16px;
+  margin: 0;
+}
+
+.daten-liste dt {
+  color: var(--farbe-text-schwach);
+}
+
+.daten-liste dd {
+  margin: 0;
+}

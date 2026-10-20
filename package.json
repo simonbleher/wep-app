@@ -14,7 +14,8 @@
     "ki-test-skizze": "vite-node --config tools/ki-test/vite.config.ts tools/ki-test/run-skizze.ts --",
     "ki-test-chat": "vite-node --config tools/ki-test/vite.config.ts tools/ki-test/run-chat.ts --",
     "typecheck:functions": "tsc -p functions/tsconfig.json --noEmit",
-    "ki-test-skizze-export": "vite-node --config tools/ki-test/vite.config.ts tools/ki-test/export-skizze.ts --"
+    "ki-test-skizze-export": "vite-node --config tools/ki-test/vite.config.ts tools/ki-test/export-skizze.ts --",
+    "e2e": "VITE_MS_CLIENT_ID=00000000-0000-0000-0000-000000000000 vite build --outDir dist-e2e && node tools/e2e/konto-durchlauf.mjs"
   },
   "dependencies": {
     "@azure/msal-browser": "^4.30.0",
@@ -31,6 +32,7 @@
     "@vitejs/plugin-react": "^4.3.4",
     "@xmldom/xmldom": "^0.9.12",
     "mammoth": "^1.13.0",
+    "playwright": "^1.64.1",
     "typescript": "^5.7.3",
     "vite": "^6.0.11",
     "vite-plugin-pwa": "^0.21.1",

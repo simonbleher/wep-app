@@ -14,3 +14,4 @@ dev-dist/
 .dev.vars
 # Rohantworten des KI-Testlaufs
 /tools/ki-test/ausgaben/
+dist-e2e/
