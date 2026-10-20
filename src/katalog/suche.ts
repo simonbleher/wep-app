@@ -274,7 +274,7 @@ function invasivSchwelle(laenge: number): number {
  * NICHT auf einen anderen mehrwortigen Eintrag matchen (z. B. „Japanischer
  * Staudenknöterich“ nicht auf „Japanischer Hopfen“).
  */
-function ganzerNameQualitaet(query: string, ziel: string): number {
+export function ganzerNameQualitaet(query: string, ziel: string): number {
   if (!query || !ziel) return 0;
   if (query === ziel) return 1;
   if (ziel.startsWith(query) && query.length >= 3) return 0.9;

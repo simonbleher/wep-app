@@ -9,7 +9,7 @@ import type { EigenePosition, Position as KatalogPosition, Variante as KatalogVa
 import { berechnePreisvorschlag } from '@/gruen/preisvorschlag'
 import { berechneRegelhinweise } from '@/gruen/regelhinweise'
 import { kurzeBezeichnung, leseZahl, leseZahlOder, variantenMerkmale, zahlDe, zahlFuerEingabe } from '@/gruen/format'
-import { INVASIVE_ARTEN, KATALOG_POSITIONEN } from './katalogDaten'
+import { INVASIVE_ARTEN, KATALOG_POSITIONEN, PROBLEMPFLANZEN } from './katalogDaten'
 import { WarnListe } from './Positionen'
 import { ICON, Rueckfrage, euroFormat } from './ui'
 
@@ -113,6 +113,7 @@ export function PositionFormular({
     wep,
     KATALOG_POSITIONEN,
     INVASIVE_ARTEN,
+    PROBLEMPFLANZEN,
   )
   // Richtlinien-Erläuterungen stehen nur hier im Formular, nicht in der Positionsliste
   const richtlinie = [katalogPos?.regeln, ...vorschauHinweise.filter((h) => h.schwere === 'info').map((h) => h.text)].filter(

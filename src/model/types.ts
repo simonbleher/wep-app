@@ -112,6 +112,8 @@ export interface Hinweis {
   schwere: 'info' | 'warnung'
   text: string
   regel?: string
+  /** Vorschlag „Beseitigung“: die Oberfläche kann daraus eine Beseitigungsposition vorbelegen. */
+  beseitigung?: { gegenstand: string; einheit: string; menge: number }
 }
 
 /**

@@ -1,12 +1,13 @@
 // Startseite: Liste aller WEPs, Statuszeile Abgleich und „Neues WEP“.
 // Gelöscht wird nicht hier, sondern in der WEP-Ansicht (Menü „⋯“, mit Rückfrage).
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ChevronRight, CircleUser, FileSpreadsheet, FileText, Plus, Trash2 } from 'lucide-react'
+import { ChevronRight, CircleUser, FileSpreadsheet, FileText, Plus, Search, Trash2, X } from 'lucide-react'
 import { WEP_STATUS, naechsteVorgangsNr, wepStatus, type Wep, type WepStatus } from '@/model'
 import type { Konto } from '@/konto'
 import { lokalesProfil, neuerWepMitProfil } from '@/profil'
 import { belegteNummern, ladePapierkorb, offeneKonflikte, raeumePapierkorbAuf } from '@/sync/aktionen'
-import { alleWeps, speichereWep } from './db'
+import { alleSyncMeta, alleWeps, speichereWep } from './db'
+import { SORTIERUNGEN, waehleWeps, type Sortierung } from './wepListe'
 import { UpdateHinweis } from './UpdateHinweis'
 import { BAU_EXCEL_ACCEPT } from './BauExcel'
 import { legeWepAusBauExcelAn } from '@/bauexcel/neu'
@@ -40,6 +41,9 @@ export function Startseite({ konto, verfuegbar, onProfil, onOeffnen, onPapierkor
   const [weps, setWeps] = useState<Wep[]>([])
   const [geladen, setGeladen] = useState(false)
   const [filter, setFilter] = useState<WepStatus | 'alle'>('alle')
+  const [suchbegriff, setSuchbegriff] = useState('')
+  const [sortierung, setSortierung] = useState<Sortierung>('geaendert')
+  const [geaendertAm, setGeaendertAm] = useState<ReadonlyMap<string, string>>(new Map())
   const [konflikte, setKonflikte] = useState<ReadonlySet<string>>(new Set())
   const [imPapierkorb, setImPapierkorb] = useState(0)
   const [fehler, setFehler] = useState<string>()
@@ -49,9 +53,9 @@ export function Startseite({ konto, verfuegbar, onProfil, onOeffnen, onPapierkor
     // Was länger als 30 Tage im Papierkorb liegt, wird beim Öffnen der Liste endgültig gelöscht
     void (async () => {
       await raeumePapierkorbAuf()
-      const [liste, offene, korb] = await Promise.all([alleWeps(), offeneKonflikte(), ladePapierkorb()])
-      // Neueste Vorgangs-Nr. zuerst
-      setWeps([...liste].sort((a, b) => b.id.localeCompare(a.id, 'de', { numeric: true })))
+      const [liste, offene, korb, meta] = await Promise.all([alleWeps(), offeneKonflikte(), ladePapierkorb(), alleSyncMeta()])
+      setWeps(liste)
+      setGeaendertAm(new Map(meta.map((m) => [m.id, m.lokalGeaendertAm])))
       setKonflikte(new Set(offene.keys()))
       setImPapierkorb(korb.length)
       setGeladen(true)
@@ -82,7 +86,8 @@ export function Startseite({ konto, verfuegbar, onProfil, onOeffnen, onPapierkor
     }
   }
 
-  const sichtbar = filter === 'alle' ? weps : weps.filter((w) => wepStatus(w) === filter)
+  const sichtbar = waehleWeps(weps, { suchbegriff, status: filter, sortierung, geaendertAm })
+  const gefiltert = suchbegriff.trim() !== '' || filter !== 'alle'
 
   const status = <StatusZeile konto={konto} verfuegbar={verfuegbar} abgleich={abgleich} />
 
@@ -146,13 +151,45 @@ export function Startseite({ konto, verfuegbar, onProfil, onOeffnen, onPapierkor
         ))}
 
         {geladen && weps.length > 0 && (
-          <div className="segmente status-filter" role="group" aria-label="Nach Status filtern">
-            {(['alle', ...WEP_STATUS] as const).map((f) => (
-              <button key={f} type="button" className="segment" aria-pressed={f === filter} onClick={() => setFilter(f)}>
-                {f === 'alle' ? 'Alle' : f.charAt(0).toUpperCase() + f.slice(1)}
-              </button>
-            ))}
-          </div>
+          <>
+            <div className="suchfeld suchfeld-liste">
+              <Search {...ICON} className="suchfeld-icon" />
+              <input
+                type="search"
+                className="eingabe"
+                aria-label="Protokolle durchsuchen"
+                placeholder="Nummer, Anlage, Parzelle, Pächter"
+                value={suchbegriff}
+                onChange={(e) => setSuchbegriff(e.target.value)}
+                enterKeyHint="search"
+                autoComplete="off"
+              />
+              {suchbegriff && (
+                <button type="button" className="symbolknopf suchfeld-leeren" aria-label="Suche leeren" onClick={() => setSuchbegriff('')}>
+                  <X {...ICON} />
+                </button>
+              )}
+            </div>
+            <div className="segmente status-filter" role="group" aria-label="Nach Status filtern">
+              {(['alle', ...WEP_STATUS] as const).map((f) => (
+                <button key={f} type="button" className="segment" aria-pressed={f === filter} onClick={() => setFilter(f)}>
+                  {f === 'alle' ? 'Alle' : f.charAt(0).toUpperCase() + f.slice(1)}
+                </button>
+              ))}
+            </div>
+            <div className="listen-kopf">
+              <p className="neben" role="status" data-testid="listen-anzahl">
+                {gefiltert ? `${sichtbar.length} von ${weps.length} Protokollen` : weps.length === 1 ? '1 Protokoll' : `${weps.length} Protokolle`}
+              </p>
+              <div className="segmente segmente-2" role="group" aria-label="Sortierung">
+                {SORTIERUNGEN.map((s) => (
+                  <button key={s.wert} type="button" className="segment" aria-pressed={s.wert === sortierung} onClick={() => setSortierung(s.wert)}>
+                    {s.text}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </>
         )}
 
         {!geladen ? (
@@ -166,8 +203,8 @@ export function Startseite({ konto, verfuegbar, onProfil, onOeffnen, onPapierkor
         ) : sichtbar.length === 0 ? (
           <LeerZustand
             icon={FileText}
-            titel={`Kein Protokoll „${filter}“`}
-            text="Mit „Alle“ sind wieder alle Protokolle zu sehen."
+            titel={suchbegriff.trim() ? `Kein Protokoll zu „${suchbegriff.trim()}“` : `Kein Protokoll „${filter}“`}
+            text={suchbegriff.trim() ? 'Anderen Suchbegriff eingeben oder die Suche leeren.' : 'Mit „Alle“ sind wieder alle Protokolle zu sehen.'}
           />
         ) : (
           <ul className="liste" aria-label="Protokolle">

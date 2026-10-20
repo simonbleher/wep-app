@@ -19,12 +19,15 @@ export function beseitigungSumme(positionen: BeseitigungsPosition[]): number {
 
 export function BeseitigungFormular({
   bearbeiten,
+  vorlage,
   onAbbrechen,
   onFertig,
   onLoeschen,
   fotos,
 }: {
   bearbeiten?: BeseitigungsPosition
+  /** Vorbelegung beim Hinzufügen (z. B. aus dem Hinweis einer Problempflanze). */
+  vorlage?: { gegenstand: string; einheit: string; menge: number }
   onAbbrechen: () => void
   onFertig: (pos: BeseitigungsPosition) => void
   onLoeschen?: () => void
@@ -32,9 +35,9 @@ export function BeseitigungFormular({
   fotos?: ReactNode
 }) {
   const id = useId()
-  const [gegenstand, setGegenstand] = useState(bearbeiten?.gegenstand ?? '')
-  const [menge, setMenge] = useState(bearbeiten ? zahlFuerEingabe(bearbeiten.menge) : '1')
-  const [einheit, setEinheit] = useState(bearbeiten?.einheit ?? 'Stück')
+  const [gegenstand, setGegenstand] = useState(bearbeiten?.gegenstand ?? vorlage?.gegenstand ?? '')
+  const [menge, setMenge] = useState(bearbeiten ? zahlFuerEingabe(bearbeiten.menge) : vorlage ? zahlFuerEingabe(vorlage.menge) : '1')
+  const [einheit, setEinheit] = useState(bearbeiten?.einheit ?? vorlage?.einheit ?? 'Stück')
   const [einzelpreis, setEinzelpreis] = useState(bearbeiten ? zahlFuerEingabe(bearbeiten.einzelpreis) : '')
   const [faktor, setFaktor] = useState(bearbeiten ? zahlFuerEingabe(bearbeiten.faktor) : '1')
   const [begruendung, setBegruendung] = useState(bearbeiten?.begruendung ?? '')

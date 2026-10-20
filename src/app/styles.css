@@ -1809,3 +1809,73 @@ select.eingabe {
 .foto-blaettern .symbolknopf:disabled {
   visibility: hidden;
 }
+
+/* Warnung mit Knopf „Zur Beseitigung“ (Problempflanzen) */
+.warnung {
+  flex-wrap: wrap;
+}
+
+.warnung .textknopf {
+  flex-basis: 100%;
+  justify-content: flex-start;
+  color: var(--farbe-warnung);
+}
+
+/* Suche und Sortierung der WEP-Liste */
+.suchfeld-liste {
+  margin-top: 0;
+  margin-bottom: var(--abstand-3);
+}
+
+.listen-kopf {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--abstand-3);
+  margin-bottom: var(--abstand-2);
+}
+
+.listen-kopf .neben {
+  margin: 0;
+}
+
+.segmente-2 {
+  grid-template-columns: repeat(2, auto);
+  flex: none;
+}
+
+.segmente-2 .segment {
+  padding: 0 var(--abstand-3);
+}
+
+/* Sicherung: Vorschau beim Einspielen */
+.sicherung-vorschau {
+  display: flex;
+  flex-direction: column;
+  gap: var(--abstand-3);
+  margin-top: var(--abstand-3);
+}
+
+.sicherung-zeile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--abstand-2);
+  padding: var(--abstand-3) 0;
+  border-bottom: var(--linie) solid var(--farbe-linie);
+}
+
+.sicherung-zeile .neben {
+  margin: 0;
+}
+
+.sicherung-kopf {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--abstand-3);
+}
+
+/* Sonnen-Kontrast: größere Schrift darf die Statusmarke in der Seitenleiste nicht abschneiden */
+.sl-fuss .status {
+  white-space: normal;
+}

@@ -93,24 +93,42 @@ export function neuerWepMitProfil(id: string, profil: Profil): Wep {
 export interface GeraeteEinstellungen {
   /** Upload nur über WLAN. Wirkt in der Android-App (WEP-Dateien und Fotos); im Browser nur für Fotos, soweit der Browser die Verbindungsart meldet. */
   nurWlan: boolean
+  /** Sonnen-Kontrast: kräftigere Linien und Texte, größere Schrift (src/design/tokens.css). */
+  sonnenKontrast: boolean
 }
+
+const STANDARD_GERAET: GeraeteEinstellungen = { nurWlan: true, sonnenKontrast: false }
 
 const GERAET_KEY = 'wep-geraete-einstellungen'
 
 export function ladeGeraeteEinstellungen(): GeraeteEinstellungen {
   try {
     const roh = localStorage.getItem(GERAET_KEY)
-    if (roh) return { nurWlan: true, ...(JSON.parse(roh) as Partial<GeraeteEinstellungen>) }
+    if (roh) return { ...STANDARD_GERAET, ...(JSON.parse(roh) as Partial<GeraeteEinstellungen>) }
   } catch {
     /* Standard */
   }
-  return { nurWlan: true }
+  return { ...STANDARD_GERAET }
 }
 
-export function speichereGeraeteEinstellungen(e: GeraeteEinstellungen): void {
+/** Speichert die genannten Einstellungen; die übrigen bleiben, wie sie sind. */
+export function speichereGeraeteEinstellungen(teil: Partial<GeraeteEinstellungen>): void {
   try {
-    localStorage.setItem(GERAET_KEY, JSON.stringify(e))
+    localStorage.setItem(GERAET_KEY, JSON.stringify({ ...ladeGeraeteEinstellungen(), ...teil }))
   } catch {
     /* nur Komfort */
   }
+}
+
+/**
+ * Schaltet den Sonnen-Kontrast am Dokument ein oder aus (Attribut `data-kontrast="sonne"`, das
+ * src/design/tokens.css auswertet). Ohne Angabe gilt die gespeicherte Geräte-Einstellung.
+ */
+export function wendeKontrastAn(
+  an: boolean = ladeGeraeteEinstellungen().sonnenKontrast,
+  wurzel: { dataset: Record<string, string | undefined> } | undefined = typeof document === 'undefined' ? undefined : document.documentElement,
+): void {
+  if (!wurzel) return
+  if (an) wurzel.dataset.kontrast = 'sonne'
+  else delete wurzel.dataset.kontrast
 }

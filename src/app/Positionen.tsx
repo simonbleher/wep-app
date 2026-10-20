@@ -2,12 +2,12 @@
 // Handy zweizeilig, Tablet als Tabelle. Antippen einer Position öffnet das Formular zum
 // Ändern (dort auch „Löschen“); Richtlinien-Erläuterungen stehen nur im Formular.
 import { useId, useState } from 'react'
-import { ChevronRight, Plus, Sprout, Fence, TriangleAlert } from 'lucide-react'
+import { ChevronRight, Plus, Shovel, Sprout, Fence, TriangleAlert } from 'lucide-react'
 import type { Hinweis, Position, Wep } from '@/model'
 import { berechneRegelhinweise } from '@/gruen/regelhinweise'
 import { berechneAbschnittSumme } from '@/gruen/summen'
 import { zahlDe } from '@/gruen/format'
-import { ABSCHNITT_TITEL, INVASIVE_ARTEN, KATALOG_POSITIONEN, type Abschnitt } from './katalogDaten'
+import { ABSCHNITT_TITEL, INVASIVE_ARTEN, KATALOG_POSITIONEN, PROBLEMPFLANZEN, type Abschnitt } from './katalogDaten'
 import { ICON, LeerZustand, euroFormat } from './ui'
 
 export function PositionenAbschnitt({
@@ -16,12 +16,15 @@ export function PositionenAbschnitt({
   onSpeichern,
   onHinzufuegen,
   onBearbeiten,
+  onBeseitigung,
 }: {
   wep: Wep
   abschnitt: Abschnitt
   onSpeichern: (wep: Wep) => Promise<void>
   onHinzufuegen: () => void
   onBearbeiten: (posId: string) => void
+  /** Öffnet die Beseitigung, mit dem Vorschlag aus einem Hinweis vorbelegt. */
+  onBeseitigung?: (vorschlag: NonNullable<Hinweis['beseitigung']>) => void
 }) {
   const positionen = abschnitt === 'aussenanlagen' ? wep.gruen.aussenanlagen : wep.gruen.aufwuchs
   const titel = ABSCHNITT_TITEL[abschnitt]
@@ -67,7 +70,7 @@ export function PositionenAbschnitt({
           <span role="columnheader" className="zahl">Summe</span>
         </div>
         {positionen.map((pos) => (
-          <PositionZeile key={pos.id} pos={pos} wep={wep} onOeffnen={() => onBearbeiten(pos.id)} />
+          <PositionZeile key={pos.id} pos={pos} wep={wep} onOeffnen={() => onBearbeiten(pos.id)} onBeseitigung={onBeseitigung} />
         ))}
         <div className="summe" role="row">
           <span role="cell">Summe {titel}</span>
@@ -116,8 +119,18 @@ function Beschreibung({ wert, onChange }: { wert: string; onChange: (v: string) 
   )
 }
 
-function PositionZeile({ pos, wep, onOeffnen }: { pos: Position; wep: Wep; onOeffnen: () => void }) {
-  const hinweise = berechneRegelhinweise(pos, wep, KATALOG_POSITIONEN, INVASIVE_ARTEN)
+function PositionZeile({
+  pos,
+  wep,
+  onOeffnen,
+  onBeseitigung,
+}: {
+  pos: Position
+  wep: Wep
+  onOeffnen: () => void
+  onBeseitigung?: (vorschlag: NonNullable<Hinweis['beseitigung']>) => void
+}) {
+  const hinweise = berechneRegelhinweise(pos, wep, KATALOG_POSITIONEN, INVASIVE_ARTEN, PROBLEMPFLANZEN)
   const neben = [`${zahlDe(pos.anzahl)} ${pos.einheit}`, pos.zustand, `je ${euroFormat(pos.einzelpreis)}`]
     .filter(Boolean)
     .join(' · ')
@@ -141,7 +154,7 @@ function PositionZeile({ pos, wep, onOeffnen }: { pos: Position; wep: Wep; onOef
         </span>
         <span role="cell" className="zahl c-summe">{euroFormat(pos.anzahl * pos.einzelpreis)}</span>
       </button>
-      <WarnListe hinweise={hinweise} />
+      <WarnListe hinweise={hinweise} onBeseitigung={onBeseitigung} />
     </div>
   )
 }
@@ -150,16 +163,29 @@ function PositionZeile({ pos, wep, onOeffnen }: { pos: Position; wep: Wep; onOef
  * Warnungen einer Position (Regelverstöße). Reine Richtlinien-Erläuterungen
  * (Schwere „info“) stehen nicht in der Liste, sondern im Formular unter „Richtlinie“.
  */
-export function WarnListe({ hinweise }: { hinweise: Hinweis[] }) {
+export function WarnListe({
+  hinweise,
+  onBeseitigung,
+}: {
+  hinweise: Hinweis[]
+  /** Fehlt sie, gibt es keinen Knopf „Zur Beseitigung“ (z. B. im Formular, wo noch nichts gespeichert ist). */
+  onBeseitigung?: (vorschlag: NonNullable<Hinweis['beseitigung']>) => void
+}) {
   return (
     <>
       {hinweise
         .filter((h) => h.schwere === 'warnung')
         .map((h, i) => (
-          <p key={i} className="warnung" role="note">
+          <div key={i} className="warnung" role="note">
             <TriangleAlert {...ICON} size={20} />
             <span>{h.text}</span>
-          </p>
+            {h.beseitigung && onBeseitigung && (
+              <button type="button" className="textknopf" onClick={() => onBeseitigung(h.beseitigung!)}>
+                <Shovel {...ICON} size={18} />
+                Zur Beseitigung
+              </button>
+            )}
+          </div>
         ))}
     </>
   )
