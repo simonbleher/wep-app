@@ -1,5 +1,20 @@
 # KI-Assistent (Planung, noch nicht gebaut)
 
+## Abgeschaltet seit 20.10.2026, so einschalten
+
+Die KI-Funktionen sind vorerst **aus** (Beta 2, siehe docs/PLAN-BETA2.md, Schritt 1).
+Der Code bleibt vollständig im Repo. Einschalten braucht **beide** Seiten:
+
+1. **App (Build-Variable):** `VITE_KI_AKTIV=true` beim Build setzen (lokal in `.env.local`,
+   bei Cloudflare Pages unter „Variablen“). Der Schalter `KI_AKTIV` steht in
+   `src/funktionen.ts`; ohne die Variable ist er `false`.
+2. **Schnittstelle (Cloudflare-Variable):** `KI_AKTIV=true` zusätzlich zu `GEMINI_API_KEY`
+   (lokal in `.dev.vars`). Sonst antwortet `/api/ki/*` mit 404 „KI ist abgeschaltet“.
+
+Wenn aus: Skizzen-Chat und KI-Hinweise sind in der App ausgeblendet; Skizzen-Editor, neue
+Symbole und Export als Excel-Formen laufen unverändert. Test: `src/app/__tests__/kiSchalter.test.tsx`.
+Vor dem Wiedereinschalten rechtliche Prüfung (siehe „Datenschutz“).
+
 Ziel: Die beiden Claude-in-Excel-Skills von Simon in der App nachbauen –
 ohne Claude-API, mit **Google AI Studio (Gemini, kostenloser Tarif)**.
 

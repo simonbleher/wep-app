@@ -9,6 +9,7 @@ import type { Wep, SkizzeDaten } from '@/model'
 import { SkizzeEditor } from '@/skizze/SkizzeEditor'
 import { SkizzeChat } from '@/skizze/SkizzeChat'
 import { leereSkizze } from '@/skizze/types'
+import { KI_AKTIV } from '@/funktionen'
 import { entprelle } from './entprellen'
 
 const SPEICHER_VERZOEGERUNG_MS = 400
@@ -65,12 +66,12 @@ export function SkizzeTab({
     <section className="formular skizze-tab">
       <h2 className="abschnitt-titel">Skizze Außenanlagen &amp; Aufwuchs</h2>
       <p className="hinweis-klein">
-        Rechteck, Linie, Kreis, Text, Maßangabe und Symbole (Baum, Beet, Hecke …) – oder per Beschreibung im Chat darunter. Die Skizze wird beim
+        Rechteck, Linie, Kreis, Text, Maßangabe und Symbole (Baum, Beet, Hecke …){KI_AKTIV && ' – oder per Beschreibung im Chat darunter'}. Die Skizze wird beim
         Excel-Export ins Blatt „Skizze Außenanlage-Aufwuchs“ eingefügt.
         {anzahl > 0 && ` · ${anzahl} ${anzahl === 1 ? 'Element' : 'Elemente'} gespeichert`}
       </p>
       <SkizzeEditor wert={editorWert} onAenderung={beiEditorAenderung} />
-      <SkizzeChat holeSkizze={holeSkizze} onSkizze={beiChatAenderung} />
+      {KI_AKTIV && <SkizzeChat holeSkizze={holeSkizze} onSkizze={beiChatAenderung} />}
     </section>
   )
 }
