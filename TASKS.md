@@ -191,16 +191,18 @@ Ergebnis: `functions/api/ki/skizze-chat.ts` (+ `functions/_lib/`), Szene-Modell 
 
 ## Beta 3 (Plan: docs/PLAN-BETA3.md)
 
-### B3-0 · Selbst-Update der Android-App 🔄 (PR offen) – Branch beta3/selbst-update
+### B3-0 · Selbst-Update der Android-App ✅ #39, #41, #42 – Branch beta3/selbst-update
 Ergebnis: Live-Update des Web-Teils (`@capgo/capacitor-updater`, manuell, `updates/<commit>.zip`,
 `version.json` mit `bundleUrl`/`nativeVersion`, Rückfall per `notifyAppReady` + Sperrliste), `android/native-version.txt`
 mit Prüfung im Workflow „Prüfen“, natives Update (APK in der App laden, Android-Installer,
 Hinweis „Neue App-Version“), APK zusätzlich auf Cloudflare Pages (`wep-pankow-apk`, Secrets
 `CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ACCOUNT_ID`), Profil zeigt Commit/Stand/letzte Prüfung.
 Tests: Entscheidung Live/Nativ, Rückfall, native-version-Regel. Anleitung: docs/ANDROID.md „Updates“.
-**Noch offen:** Gerätetest (Live-Update, Installer, Rückfall), Cloudflare-Token anlegen.
+Nachträge: #41 (Update-Hinweis nach Installation sofort neu prüfen), #42 (Prüfsumme des Live-Update-Pakets,
+sonst „Failed to download“). Cloudflare-Token angelegt; Installer und Live-Update auf dem Handy erprobt.
+**Noch offen:** Rückfall bei Fehlstart nur in Tests geprüft.
 
-### B3-1 · Icon, Kleinigkeiten, Status, Duplizieren 🔄 (PR offen) – Branch beta3/paket1
+### B3-1 · Icon, Kleinigkeiten, Status, Duplizieren ✅ #40 – Branch beta3/paket1
 Ergebnis: App-Icon „Klemmbrett mit Blatt“ (`resources/icon.svg`, `npm run icons` erzeugt Android adaptiv/rund/
 monochrom in allen Dichten, PWA 192/512 + maskable, Favicon, Apple-Touch-Icon, Splash; Vorschau
 `docs/icon/vorschau.png`); Fehler „Rasengräser“ (`gefundeneArt`); „schlecht“ = 1,00 € auch ohne Höchstwert;
@@ -210,7 +212,7 @@ die WEP-Datei); „⋯“ → „Duplizieren“ (`dupliziereWep`). Tests: `forma
 (`npm run paket1:screenshots`). `native-version` auf 2 (Icons liegen unter `android/`).
 **Noch offen:** Gerätetest (Icon im Launcher, Themen-Icon, Splash), Android-Test-Workflow am PR.
 
-### B3-2 · Papierkorb, Konflikte sichtbar 🔄 (PR offen) – Branch beta3/paket2
+### B3-2 · Papierkorb, Konflikte sichtbar ✅ #43 – Branch beta3/paket2
 Ergebnis: Löschen verschiebt nach `daten/papierkorb/` (Löschzeitpunkt, idempotent), andere Geräte legen das WEP
 beim Abgleich in ihren Papierkorb, ohne Konto lokaler Papierkorb; Papierkorb-Ansicht (Wiederherstellen,
 „Endgültig löschen“ mit Rückfrage, automatisch nach 30 Tagen); Änderung nach dem Löschzeitpunkt → Konflikt statt
@@ -223,7 +225,7 @@ Tests: `src/sync/papierkorb.test.ts` (zwei Geräte über FakeDrive), `graph.test
 **Noch offen:** Gerätetest (Löschen auf Handy und Tablet mit echtem OneDrive, Android-Hintergrund-Upload während des
 Löschens), alle Geräte auf diese Version bringen.
 
-### B3-3 · Eigene Positionen merken 🔄 (PR offen) – Branch beta3/paket3
+### B3-3 · Eigene Positionen merken ✅ #44 – Branch beta3/paket3
 Ergebnis: Freitext-Position optional „als eigene Position merken“ (Standard an), Suche zeigt sie mit „Eigene“ vor gleich
 guten Katalogtreffern (nur im passenden Abschnitt), Verwaltung im Profil (Liste, ändern, löschen), Abgleich über
 `daten/eigene-positionen.json` (neuere Änderung je Eintrag gewinnt, gelöschte bleiben gelöscht). Code: `src/katalog/eigene*.ts`,
@@ -231,3 +233,9 @@ guten Katalogtreffern (nur im passenden Abschnitt), Verwaltung im Profil (Liste,
 `sync/eigenePositionen.test.ts` (zwei Geräte über FakeDrive), `app/__tests__/paket3.test.tsx`; e2e erweitert.
 Screenshots: `docs/paket3/` (`npm run paket3:screenshots`). Kein `android/`-Eingriff, `native-version` unverändert.
 **Noch offen:** Gerätetest mit echtem OneDrive (zwei Geräte).
+
+### Beta 3b (Plan: docs/PLAN-BETA3.md, Abschnitt „Beta 3b“)
+- B3-4 · Fotos ⏳ – Branch beta3/paket4
+- B3-5 · Bau-Excel am WEP, Formalien vorbefüllen ⏳ – Branch beta3/paket5
+- B3-6 · Liste und Alltag (Suche, Problempflanzen, Sicherung, Sonnen-Kontrast) ⏳ – Branch beta3/paket6
+- B3-7 · Skizze bedienen (Zoomen, Einrasten, Auswählen) ⏳ – Branch beta3/paket7
