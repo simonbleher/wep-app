@@ -172,21 +172,29 @@ export async function loeseKonflikt(
     return {}
   }
 
-  if (wahl === 'diese' || !konflikt.fassung) {
-    await spei.schreibe({ id, meta: metaMit(m, id, k.jetzt, { konflikt: undefined, aufraeumen: aufraeumen.length ? aufraeumen : undefined }) })
-    return { wep: aktuell }
-  }
+  const gewaehlt = wahl === 'diese' || !konflikt.fassung ? aktuell : konflikt.fassung
+  const andere = gewaehlt === aktuell ? konflikt.fassung : aktuell
+  // Fotos beider Fassungen behalten: sonst verschwänden die Fotos des anderen Geräts aus dem WEP
+  // (und noch nicht hochgeladene würden später lokal verworfen).
+  const ergebnisWep = mitFotosVon(gewaehlt, andere)
+  const geaendert = ergebnisWep !== aktuell
   await spei.schreibe({
     id,
-    wep: konflikt.fassung,
+    ...(geaendert ? { wep: ergebnisWep, ereignis: 'geaendert' as const } : {}),
     meta: metaMit(m, id, k.jetzt, {
       konflikt: undefined,
       aufraeumen: aufraeumen.length ? aufraeumen : undefined,
-      lokalGeaendertAm: k.jetzt, // wartet damit auf den Upload und gewinnt auf den anderen Geräten
+      // wartet damit auf den Upload und gewinnt auf den anderen Geräten
+      ...(geaendert ? { lokalGeaendertAm: k.jetzt } : {}),
     }),
-    ereignis: 'geaendert',
   })
-  return { wep: konflikt.fassung }
+  return { wep: ergebnisWep }
+}
+
+/** `wep` mit den Fotos aus `andere` ergänzt, die es nicht kennt (gleiches Objekt, wenn nichts fehlt). */
+export function mitFotosVon(wep: Wep, andere: Wep | undefined): Wep {
+  const fehlend = (andere?.fotos ?? []).filter((f) => !(wep.fotos ?? []).some((g) => g.id === f.id))
+  return fehlend.length ? { ...wep, fotos: [...(wep.fotos ?? []), ...fehlend] } : wep
 }
 
 /** Alle WEPs im Papierkorb, zuletzt gelöschte zuerst. */
