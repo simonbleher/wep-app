@@ -6,6 +6,7 @@ import type { Wep } from '@/model'
 import type { Konto } from '@/konto'
 import { lokalesProfil, neuerWepMitProfil } from '@/profil'
 import { alleWeps, speichereWep } from './db'
+import { UpdateHinweis } from './UpdateHinweis'
 import { StatusZeile, useAbgleich } from './SyncLeiste'
 import { HauptSeitenleiste, ICON, Laedt, LeerZustand, Meldung, datumDe } from './ui'
 
@@ -76,6 +77,7 @@ export function Startseite({ konto, verfuegbar, onProfil, onOeffnen }: Props) {
       <HauptSeitenleiste aktiv="protokolle" onProtokolle={() => undefined} onProfil={onProfil} fuss={verfuegbar ? status : undefined} />
 
       <main className="inhalt">
+        <UpdateHinweis />
         <header className="seitenkopf">
           <h1 className="h1">Protokolle</h1>
           <button type="button" className="symbolknopf nur-handy" aria-label="Profil und Einstellungen" onClick={onProfil}>

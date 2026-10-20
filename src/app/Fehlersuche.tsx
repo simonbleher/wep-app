@@ -1,5 +1,5 @@
-// Test-Seite für den Hintergrund-Upload (nur in der Android-App sichtbar, im Profil):
-// Warteschlange, letzte Worker-Läufe, aktueller Netztyp und „Jetzt versuchen“.
+// Ausführliches Upload-Protokoll zur Fehlersuche (nur in der Android-App, im Profil nach
+// langem Drücken auf die Version): Warteschlange, letzte Worker-Läufe, aktueller Netztyp.
 import { useCallback, useEffect, useState } from 'react'
 import {
   WepNative,
@@ -16,7 +16,7 @@ function zeit(iso: string): string {
     : d.toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
-export function AndroidTest() {
+export function Fehlersuche() {
   const [queue, setQueue] = useState<WarteschlangenEintrag[]>([])
   const [protokoll, setProtokoll] = useState<ProtokollEintrag[]>([])
   const [netz, setNetz] = useState<NetzInfo | null>(null)
@@ -50,9 +50,9 @@ export function AndroidTest() {
   }
 
   return (
-    <section className="abschnitt" aria-labelledby="android-test">
-      <h2 className="gruppenkopf" id="android-test">
-        Test: Hintergrund-Upload
+    <section className="abschnitt" aria-labelledby="fehlersuche">
+      <h2 className="gruppenkopf" id="fehlersuche">
+        Fehlersuche: Upload-Protokoll
       </h2>
       <dl className="werte">
         <div>

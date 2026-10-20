@@ -10,3 +10,8 @@
   Cache-Control: no-cache
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
+# Update-Hinweis der Android-App: Die WebView (Herkunft https://localhost) fragt die Datei
+# von der gehosteten Seite ab – dafür CORS, und nie zwischenspeichern.
+/version.json
+  Cache-Control: no-cache
+  Access-Control-Allow-Origin: *

@@ -28,6 +28,27 @@ export interface Warteschlange {
   bereinige(): Promise<number>
 }
 
+const LETZTER_UPLOAD_KEY = 'wep-letzter-upload'
+
+/** Zeitpunkt (ISO) des letzten erfolgreichen Hintergrund-Uploads, falls bekannt. */
+export function letzterUpload(): string | undefined {
+  try {
+    return localStorage.getItem(LETZTER_UPLOAD_KEY) ?? undefined
+  } catch {
+    return undefined
+  }
+}
+
+function merkeLetztenUpload(zeit: string | undefined): void {
+  if (!zeit) return
+  try {
+    const alt = localStorage.getItem(LETZTER_UPLOAD_KEY)
+    if (!alt || alt < zeit) localStorage.setItem(LETZTER_UPLOAD_KEY, zeit)
+  } catch {
+    /* Anzeige ist nur Komfort */
+  }
+}
+
 export function erstelleWarteschlange(
   native: NativeTeil,
   meta: MetaSpeicher,
@@ -58,6 +79,7 @@ export function erstelleWarteschlange(
     async uebernimmErgebnisse() {
       const { ergebnisse } = await native.holeErgebnisse()
       if (ergebnisse.length === 0) return 0
+      merkeLetztenUpload(ergebnisse.map((e) => e.zeit).sort().pop())
       const metas = new Map((await meta.alleMeta()).map((m) => [m.id, m]))
       // Älteste zuerst, damit der jüngste eTag gewinnt
       for (const e of [...ergebnisse].sort((a, b) => a.zeit.localeCompare(b.zeit))) {

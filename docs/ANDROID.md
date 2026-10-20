@@ -1,9 +1,100 @@
-# Android-Test-APK (Beta 2, Schritt 3)
+# Android-App (Beta 2, Schritte 3 und 5)
 
-**Ziel dieses Schritts ist ein Test der Machbarkeit, noch keine fertige App.** Die Test-APK
-soll zeigen, dass (1) die Anmeldung per System-Browser klappt und (2) WEPs, die offline
-erfasst wurden, im Hintergrund hochgeladen werden – bei geschlossener App, sobald WLAN da
-ist. Design, Signierung, Update-Hinweis und Release-Build kommen in Schritt 5.
+Zwei Wege zur APK:
+
+- **Release-APK** (Normalfall, Schritt 5): signiert, als GitHub Release; siehe
+  „Release-Schlüssel einrichten“, „Installation“ und „Updates“ direkt unten.
+- **Test-APK** (Schritt 3): Debug-Build für Branches, nur zum Ausprobieren; siehe
+  „Test-APK holen und installieren“ weiter unten.
+
+## Release-Schlüssel einrichten (einmalig)
+
+Jede APK muss signiert sein, und **jedes Update muss mit demselben Schlüssel signiert sein**,
+sonst lehnt Android es ab. Den Schlüssel erzeugt ein Workflow einmalig:
+
+1. GitHub → **Actions** → **Android-Schlüssel erzeugen** → *Run workflow*. (Nur einmal! Ein
+   zweiter Schlüssel passt nicht zu bereits installierten Apps.)
+2. Nach dem grünen Lauf unten bei **Artifacts** `wep-android-schluessel` herunterladen und
+   entpacken. Darin: `wep-release.jks` (der Schlüssel) und `zugangsdaten.txt` (Alias,
+   Passwörter und der Schlüssel als Base64-Text). Die Passwörter stehen **nicht** im Log.
+3. **Settings → Secrets and variables → Actions → New repository secret** – vier Secrets
+   (Name genau so, Wert aus `zugangsdaten.txt`, ohne Leerzeichen/Zeilenumbruch):
+   - `ANDROID_KEYSTORE_BASE64` – der lange Base64-Text (eine Zeile)
+   - `ANDROID_KEYSTORE_PASSWORT` – Wert von `ANDROID_KEYSTORE_PASSWORT=`
+   - `ANDROID_KEY_ALIAS` – `wep-release`
+   - `ANDROID_KEY_PASSWORT` – Wert von `ANDROID_KEY_PASSWORT=` (gleich dem Keystore-Passwort;
+     das Format PKCS12 kennt nur eines)
+4. **Sicherung:** `wep-release.jks` und `zugangsdaten.txt` an einem sicheren Ort ablegen
+   (Passwortmanager, nicht im Repo, nicht in OneDrive-Freigaben). GitHub Secrets kann man
+   nicht wieder auslesen – geht der Schlüssel verloren, müssen alle Nutzer die App
+   deinstallieren und neu installieren (die Daten liegen dann nur noch in OneDrive).
+5. **Artefakt löschen:** am Lauf unter *Artifacts* beim Eintrag `wep-android-schluessel` auf
+   den Papierkorb klicken (sonst löscht GitHub es nach 1 Tag von selbst). Lokale Kopie
+   ebenfalls nach der Sicherung entfernen, wo sie nicht hingehört (Downloads).
+
+Der Schlüssel ist RSA 4096, 30 Jahre gültig.
+
+## Release-APK: Bau und Veröffentlichung
+
+Workflow **Android Release** läuft bei jedem Push auf `main`, der `android/`, `src/`, `data/`,
+`public/`, `package.json` u. Ä. ändert, und manuell (*Run workflow*). Er
+
+- nimmt den **Versionsnamen aus `package.json`** (`version`) und als **versionCode die
+  Lauf-Nummer** des Workflows,
+- baut `assembleRelease` und signiert mit den vier Secrets (ohne Verkleinern/Verschleiern –
+  Capacitor und das eigene Plugin arbeiten mit Reflexion, der Gewinn wäre klein),
+- legt ein GitHub Release **„WEP <Version> (<Code>)“** an, APK als Anhang, dazu eine kurze
+  Änderungsliste aus den Commits seit dem vorigen Android-Release.
+
+Fehlen die Secrets, bricht der Lauf sofort mit der Meldung „Release-Schlüssel fehlt“ ab.
+Der Test-APK-Workflow bleibt für Branches unverändert bestehen.
+
+## Installation (Release-APK)
+
+1. Auf GitHub → **Releases** → neuestes Release → `WEP-<Version>-<Code>.apk` herunterladen
+   (GitHub-Anmeldung nötig, das Repo ist privat; am Handy im Browser anmelden).
+2. Datei öffnen. Android fragt einmalig, ob der Browser/Datei-Manager Apps aus unbekannten
+   Quellen installieren darf → erlauben → installieren. Play Protect kann warnen
+   („Unbekannter Entwickler“) → „Trotzdem installieren“.
+3. App öffnen, anmelden, fertig. Die Daten in der App bleiben bei späteren Updates erhalten.
+
+## Umstieg von der Test-APK
+
+Test- und Release-APK sind **unterschiedlich signiert** und haben dieselbe App-ID – Android
+lässt kein Drüberinstallieren zu. Deshalb:
+
+1. **Vorher abgleichen:** In der Test-App das Profil öffnen, Bereich „Synchronisierung“:
+   „Offene Uploads“ muss **keine** zeigen (sonst „Jetzt hochladen“ mit WLAN). Auf der
+   WEP-Liste einmal abgleichen lassen („Abgeglichen um …“). Nur was in OneDrive liegt, ist
+   sicher; **ohne Konto erfasste WEPs gehen beim Deinstallieren verloren.**
+2. Test-App **deinstallieren** (Einstellungen → Apps → WEP → Deinstallieren).
+3. Release-APK installieren, anmelden; die WEPs kommen beim ersten Abgleich aus OneDrive zurück.
+
+## Updates
+
+- Beim Start (online, höchstens einmal täglich) und über **Profil → Über die App → Nach
+  Update suchen** vergleicht die App ihre Version mit der der gehosteten Seite
+  (`https://wep-pankow.pages.dev/version.json`, entsteht bei jedem Web-Build aus
+  `package.json`). Ist die dort veröffentlichte Version neuer, erscheint oben auf der
+  WEP-Liste und im Profil „Update verfügbar“ mit dem Knopf **Zur Release-Seite** (öffnet den
+  System-Browser). Im Browser/PWA wird nichts angezeigt.
+- Dort die neue APK laden und **über die alte installieren** (gleicher Schlüssel → Daten
+  bleiben).
+- **Wichtig:** Der Hinweis erscheint, wenn der **Versionsname** in `package.json` erhöht
+  wurde (Beispiel 0.1.0 → 0.2.0). Der Cloudflare-Build kennt die Lauf-Nummer nicht; der
+  versionCode ist deshalb nur für Android relevant (Update-Reihenfolge), nicht für den
+  Hinweis. Für einen Hinweis also vor dem Merge die Version erhöhen.
+
+## Fehlersuche
+
+Im Profil zeigt der Bereich „Synchronisierung“ offene Uploads und den letzten erfolgreichen
+Upload; „Jetzt hochladen“ stößt den Hintergrunddienst an. Das ausführliche Upload-Protokoll
+(Netztyp, Läufe, Fehler) erscheint nach **langem Drücken auf die Version** unter „Über die
+App“.
+
+---
+
+# Test-APK (Beta 2, Schritt 3)
 
 ## Aufbau
 
@@ -37,8 +128,8 @@ ist. Design, Signierung, Update-Hinweis und Release-Build kommen in Schritt 5.
     `syncMeta`. Nach einem Abgleich in der App werden erledigte Einträge aus der Warteschlange
     entfernt.
   - Jeder Lauf schreibt Protokolleinträge.
-- **Test-Seite**: im Profil (nur in der Android-App) – Netztyp, Warteschlange, Protokoll der
-  letzten Läufe, Knopf „Jetzt versuchen“.
+- **Oberfläche**: Profil → „Synchronisierung“ (nur in der Android-App); das ausführliche
+  Protokoll (Netztyp, Läufe) nur nach langem Drücken auf die Version.
 
 ## Einmalig einrichten
 
@@ -65,14 +156,14 @@ ist. Design, Signierung, Update-Hinweis und Release-Build kommen in Schritt 5.
 1. **Login:** App öffnen → „Mit Microsoft anmelden“ → der System-Browser öffnet sich,
    anmelden und zustimmen → du landest wieder in der App, im Profil steht dein Konto.
 2. **Offline erfassen:** Flugmodus an (oder WLAN und Mobildaten aus). Ein WEP anlegen und
-   ein paar Positionen erfassen. Im Profil → „Test: Hintergrund-Upload“ steht die Datei in
-   der Warteschlange.
+   ein paar Positionen erfassen. Im Profil → „Synchronisierung“ steht ein offener Upload
+   (Einzelheiten: Version lang drücken → Protokoll).
 3. **App schließen:** App aus der Übersicht wegwischen (nicht nur in den Hintergrund).
 4. **WLAN an:** Flugmodus aus, WLAN verbinden, 1–15 Minuten warten (WorkManager startet nicht
    sekundengenau; der Energiesparmodus kann verzögern).
 5. **Prüfen:** In OneDrive unter `Apps/WEP-App/daten/` liegt `<Vorgangs-Nr>.json`. In der App
-   (Profil → Test) steht im Protokoll „… hochgeladen (eTag …)“ und die Warteschlange ist leer.
-   Zum Beschleunigen: **„Jetzt versuchen“** (beachtet die WLAN-Einstellung).
+   (Profil → Version lang drücken) steht im Protokoll „… hochgeladen (eTag …)“ und die Warteschlange ist leer.
+   Zum Beschleunigen: **„Jetzt hochladen“** (beachtet die WLAN-Einstellung).
 6. **Nur WLAN:** Mit Mobildaten statt WLAN darf nichts hochgeladen werden (Netz „Mobilfunk
    (getaktet)“, die Datei bleibt in der Warteschlange). Schalter „Upload nur über WLAN“ im
    Profil aus → der Upload läuft auch über Mobilfunk.

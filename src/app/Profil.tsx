@@ -1,6 +1,6 @@
 // Profil und Einstellungen: Name, Rolle, Standard-Anlage (werden über OneDrive
 // abgeglichen), Geräte-Einstellungen (nur lokal), Konto, App-Version, Speicherort.
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { ChevronLeft } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
 import type { Konto } from '@/konto'
@@ -13,7 +13,9 @@ import {
   type Profil as ProfilDaten,
   type Rolle,
 } from '@/profil'
-import { AndroidTest } from './AndroidTest'
+import { Fehlersuche } from './Fehlersuche'
+import { Synchronisierung } from './Synchronisierung'
+import { UpdateHinweis } from './UpdateHinweis'
 import { HauptSeitenleiste, ICON, Kopf } from './ui'
 
 interface Props {
@@ -28,6 +30,27 @@ export function Profil({ konto, verfuegbar, onZurueck, onAnmelden, onAbmelden }:
   const id = useId()
   const [profil, setProfil] = useState<ProfilDaten>(() => lokalesProfil.lade().profil)
   const [nurWlan, setNurWlan] = useState(() => ladeGeraeteEinstellungen().nurWlan)
+  const nativ = Capacitor.isNativePlatform()
+  const [fehlersuche, setFehlersuche] = useState(false)
+  const [updateMeldung, setUpdateMeldung] = useState('')
+  const [suche, setSuche] = useState(false)
+  const druckTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+
+  /** Langes Drücken auf die Version öffnet das ausführliche Upload-Protokoll. */
+  const druckStart = () => {
+    if (!nativ) return
+    druckTimer.current = setTimeout(() => setFehlersuche(true), 800)
+  }
+  const druckEnde = () => clearTimeout(druckTimer.current)
+
+  async function nachUpdateSuchen() {
+    setSuche(true)
+    setUpdateMeldung('')
+    const m = await import('@/android/update')
+    const s = await m.pruefeUndMerke(true)
+    setUpdateMeldung(s?.meldung ?? '')
+    setSuche(false)
+  }
 
   useEffect(() => {
     setProfil(lokalesProfil.lade().profil)
@@ -160,14 +183,21 @@ export function Profil({ konto, verfuegbar, onZurueck, onAnmelden, onAbmelden }:
           )}
         </section>
 
-        {Capacitor.isNativePlatform() && <AndroidTest />}
+        {nativ && <Synchronisierung id={`${id}-sync`} />}
+        {nativ && fehlersuche && <Fehlersuche />}
 
         <section className="abschnitt" aria-labelledby={`${id}-app`}>
           <h2 className="gruppenkopf" id={`${id}-app`}>
             Über die App
           </h2>
           <dl className="werte">
-            <div>
+            <div
+              onPointerDown={druckStart}
+              onPointerUp={druckEnde}
+              onPointerLeave={druckEnde}
+              onPointerCancel={druckEnde}
+              onContextMenu={(e) => nativ && e.preventDefault()}
+            >
               <dt>Version</dt>
               <dd>{__APP_VERSION__}</dd>
             </div>
@@ -179,6 +209,21 @@ export function Profil({ konto, verfuegbar, onZurueck, onAnmelden, onAbmelden }:
               </dd>
             </div>
           </dl>
+          {nativ && (
+            <>
+              <UpdateHinweis />
+              <div className="knopf-reihe">
+                <button type="button" className="knopf" disabled={suche} onClick={() => void nachUpdateSuchen()}>
+                  {suche ? 'Suche …' : 'Nach Update suchen'}
+                </button>
+              </div>
+              {updateMeldung && (
+                <p className="neben" role="status">
+                  {updateMeldung}
+                </p>
+              )}
+            </>
+          )}
         </section>
       </main>
     </div>

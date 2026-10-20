@@ -1540,3 +1540,15 @@ select.eingabe {
 .werte + .liste {
   border-top: 0;
 }
+
+/* Update-Hinweis (Android-App): schlichte Zeile, keine Farbfläche */
+.update-hinweis {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--abstand-3);
+  padding: var(--abstand-2) var(--abstand-4);
+  border-bottom: var(--linie) solid var(--farbe-linie);
+  color: var(--farbe-text-2);
+  font-size: var(--schrift-klein);
+}
