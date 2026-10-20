@@ -80,7 +80,9 @@ const deps: UpdateDeps = {
 }
 
 type Hoerer = (s: UpdateStand | null) => void
-let stand: UpdateStand | null = ladeGemerkt().letzterStand ?? null
+// Erst nach dem Abgleich mit der laufenden Fassung anzeigen (pruefeUndMerke), sonst stünde nach
+// einer Installation kurz der alte Hinweis „Neue App-Version“ da.
+let stand: UpdateStand | null = null
 const hoerer = new Set<Hoerer>()
 
 export function aktuellerUpdateStand(): UpdateStand | null {
@@ -92,17 +94,36 @@ export function beobachteUpdate(h: Hoerer): () => void {
   return () => void hoerer.delete(h)
 }
 
+/** Kennung der laufenden Fassung (Commit des Web-Teils + nativer Teil); undefined, wenn unbekannt. */
+async function laufendeFassung(): Promise<string | undefined> {
+  try {
+    const [v, n] = await Promise.all([installierteVersion(), nativeVersion()])
+    return `${v?.commit ?? '?'}|${n}`
+  } catch {
+    return undefined
+  }
+}
+
 /** Prüfung mit Merken des Standes. `erzwingen` = Knopf „Nach Update suchen“. */
 export async function pruefeUndMerke(erzwingen: boolean): Promise<UpdateStand | null> {
   if (!Capacitor.isNativePlatform()) return null
+  const fassung = await laufendeFassung()
   if (!erzwingen) {
     const g = ladeGemerkt()
-    if (g.letztePruefung && Date.now() - g.letztePruefung < START_ABSTAND_MS) return stand
+    // Gemerkter Stand gilt nur für dieselbe Fassung: nach Installation oder Live-Update sofort neu prüfen.
+    const gleicheFassung = fassung !== undefined && g.geprueftFuer === fassung
+    if (gleicheFassung && g.letztePruefung && Date.now() - g.letztePruefung < START_ABSTAND_MS) {
+      if (!stand && g.letzterStand) {
+        stand = g.letzterStand
+        hoerer.forEach((h) => h(stand))
+      }
+      return stand
+    }
   }
   const s = await pruefeAufUpdate(deps)
   // Nur echte Ergebnisse merken (Offline/Fehler ändern „letzter Stand“ nicht und zählen nicht als Prüfung).
   if (s.art !== 'offline' && s.art !== 'fehler') {
-    speichereGemerkt({ ...ladeGemerkt(), letzterStand: s, letztePruefung: Date.now() })
+    speichereGemerkt({ ...ladeGemerkt(), letzterStand: s, letztePruefung: Date.now(), geprueftFuer: fassung })
   }
   stand = s
   hoerer.forEach((h) => h(s))

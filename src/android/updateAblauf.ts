@@ -36,6 +36,8 @@ export interface GemerkterStand {
   letzterStand?: UpdateStand
   /** Zeitpunkt der letzten erfolgreichen Prüfung (ms). */
   letztePruefung?: number
+  /** Für welche App-Fassung (Commit + nativer Teil) die letzte Prüfung galt. */
+  geprueftFuer?: string
 }
 
 /** Der benutzte Ausschnitt von @capgo/capacitor-updater. */
