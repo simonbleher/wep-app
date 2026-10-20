@@ -31,7 +31,7 @@ describe('Positionsliste Aufwuchs', () => {
     pos({ id: 'b', bezeichnung: 'Zaubernuss', anzahl: 1, einzelpreis: 40, preisManuell: true }),
   ]
   const html = renderToStaticMarkup(
-    createElement(PositionenAbschnitt, { wep, abschnitt: 'aufwuchs', onSpeichern: async () => {}, onHinzufuegen: () => {} }),
+    createElement(PositionenAbschnitt, { wep, abschnitt: 'aufwuchs', onSpeichern: async () => {}, onHinzufuegen: () => {}, onBearbeiten: () => {} }),
   )
 
   it('zeigt Positionen, Warnung, „manuell“ und die Summe', () => {
@@ -43,7 +43,7 @@ describe('Positionsliste Aufwuchs', () => {
     expect(html).toMatch(/Summe Aufwuchs<\/span><span role="cell" class="zahl">85,60/)
   })
 
-  it('Löschen erscheint erst nach dem Antippen einer Position', () => {
+  it('Löschen steht nicht in der Liste, sondern im Formular der Position (umbauB.test.tsx)', () => {
     expect(html).not.toMatch(/löschen/i)
   })
 })

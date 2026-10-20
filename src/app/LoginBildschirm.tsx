@@ -1,6 +1,5 @@
 // Login-Bildschirm beim ersten Start und nach dem Abmelden.
-import { TriangleAlert } from 'lucide-react'
-import { ICON } from './ui'
+import { Meldung } from './ui'
 
 interface Props {
   onAnmelden: () => void
@@ -21,10 +20,9 @@ export function LoginBildschirm({ onAnmelden, onOhneKonto, fehler }: Props) {
           Mit Microsoft anmelden
         </button>
         {fehler && (
-          <p className="warnung" role="alert">
-            <TriangleAlert {...ICON} size={20} />
-            <span>{fehler}</span>
-          </p>
+          <Meldung alarm>
+            <p>{fehler}</p>
+          </Meldung>
         )}
       </div>
       <button type="button" className="textknopf login-ohne" onClick={onOhneKonto}>

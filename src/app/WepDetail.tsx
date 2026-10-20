@@ -4,12 +4,15 @@
 // Handy: Kopfzeile (Zurück, Titel, Export, Menü „⋯“) und untere Leiste mit den
 // fünf Abschnitten. Tablet (≥ 900 px): Seitenleiste mit Abschnitten, Summen und Export.
 // Export ist eine Aktion, kein Abschnitt. Löschen liegt im Menü „⋯“ mit Rückfrage.
+// Positionen (Außenanlagen, Aufwuchs, Beseitigung) werden per Antippen geändert; Formular
+// und „Löschen“ (mit Rückfrage) sind eigene Bildschirme, ohne untere Leiste.
 // Jede Änderung wird sofort in IndexedDB gespeichert.
 
 import { useState, useEffect, useCallback, useRef, useId, type ChangeEvent } from 'react'
 import {
   Check,
   ChevronLeft,
+  ChevronRight,
   Ellipsis,
   Fence,
   FileSpreadsheet,
@@ -19,7 +22,8 @@ import {
   Shovel,
   Sprout,
   Trash2,
-  TriangleAlert,
+  Upload,
+  X,
   type LucideIcon,
 } from 'lucide-react'
 import type { Wep, Position, BeseitigungsPosition, Formalien } from '@/model'
@@ -27,15 +31,17 @@ import { loescheWep, ladeWep, speichereWep } from './db'
 import { SkizzeTab } from './SkizzeTab'
 import { PositionenAbschnitt } from './Positionen'
 import { PositionHinzufuegen } from './PositionHinzufuegen'
+import { PositionBearbeiten } from './PositionBearbeiten'
+import { BeseitigungFormular, beseitigungSumme } from './BeseitigungFormular'
 import type { Abschnitt } from './katalogDaten'
-import { ICON, Kopf, SlEintrag, euroFormat } from './ui'
+import { ICON, Kopf, Laedt, LeerZustand, Meldung, Rueckfrage, SlEintrag, euroFormat } from './ui'
 import { skizzeAlsPng } from '@/skizze/skizzePng'
 import { skizzeDatenZuFormen, type Kasten } from '@/export/skizzeFormen'
 import { svgZuPngBrowser } from '@/export/svgRaster'
 import { exportWep, type ExportResult } from '@/export'
 import { exportNachOneDrive } from '@/sync'
 import { berechneAbschnittSumme } from '@/gruen/summen'
-import { leseZahl, leseZahlOder, zahlDe, zahlFuerEingabe } from '@/gruen/format'
+import { leseZahl, zahlDe, zahlFuerEingabe } from '@/gruen/format'
 
 // ---------------------------------------------------------------------------
 // Typen
@@ -49,6 +55,12 @@ type ExportZustand =
   | { typ: 'laedt' }
   | { typ: 'fertig'; result: ExportResult; oneDrive?: string }
   | { typ: 'fehler'; meldung: string }
+
+/** Bildschirm statt Abschnitt: Position hinzufügen/ändern, Beseitigung hinzufügen/ändern. */
+type Maske =
+  | { art: 'hinzufuegen'; abschnitt: Abschnitt }
+  | { art: 'position'; abschnitt: Abschnitt; id: string }
+  | { art: 'beseitigung'; id?: string }
 
 interface Props {
   wepId: string
@@ -66,14 +78,6 @@ const BEREICHE: { id: Bereich; titel: string; kurz: string; icon: LucideIcon }[]
 // ---------------------------------------------------------------------------
 // Hilfsfunktionen
 // ---------------------------------------------------------------------------
-
-function neueBeseitigungsId(): string {
-  return `bes-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
-}
-
-function beseitigungSumme(positionen: BeseitigungsPosition[]): number {
-  return positionen.reduce((s, p) => s + p.menge * p.einzelpreis * p.faktor, 0)
-}
 
 function bereichSumme(wep: Wep, b: Bereich): number | undefined {
   if (b === 'aussenanlagen') return berechneAbschnittSumme(wep.gruen.aussenanlagen)
@@ -94,10 +98,10 @@ function wepTitel(wep: Wep): string {
 export function WepDetail({ wepId, onZurueck }: Props) {
   const [wep, setWep] = useState<Wep | null>(null)
   const [tab, setTab] = useState<Tab>('formalien')
-  const [hinzufuegen, setHinzufuegen] = useState<Abschnitt | null>(null)
+  const [maske, setMaske] = useState<Maske | null>(null)
   const [loeschFrage, setLoeschFrage] = useState(false)
   const [exportZustand, setExportZustand] = useState<ExportZustand>({ typ: 'idle' })
-  const bauExcelRef = useRef<File | null>(null)
+  const [bauExcel, setBauExcel] = useState<File | null>(null)
 
   // WEP aus IndexedDB laden
   useEffect(() => {
@@ -114,7 +118,12 @@ export function WepDetail({ wepId, onZurueck }: Props) {
 
   const wechsle = useCallback((t: Tab) => {
     setTab(t)
-    setHinzufuegen(null)
+    setMaske(null)
+    window.scrollTo(0, 0)
+  }, [])
+
+  const oeffneMaske = useCallback((m: Maske) => {
+    setMaske(m)
     window.scrollTo(0, 0)
   }, [])
 
@@ -131,7 +140,7 @@ export function WepDetail({ wepId, onZurueck }: Props) {
         <main className="inhalt">
           <Kopf titel={`WEP ${wepId}`} links={zurueckKnopf} />
           <div className="seitenkopf nur-tablet">{zurueckKnopf}</div>
-          <p className="leertext">Lade …</p>
+          <Laedt />
         </main>
       </div>
     )
@@ -145,15 +154,58 @@ export function WepDetail({ wepId, onZurueck }: Props) {
     onZurueck()
   }
 
+  function positionen(abschnitt: Abschnitt): Position[] {
+    return abschnitt === 'aussenanlagen' ? wep!.gruen.aussenanlagen : wep!.gruen.aufwuchs
+  }
+
+  function setzePositionen(abschnitt: Abschnitt, liste: Position[]) {
+    void speichere({ ...wep!, gruen: { ...wep!.gruen, [abschnitt]: liste } })
+  }
+
   function fuegePositionHinzu(abschnitt: Abschnitt, pos: Position) {
-    const liste = abschnitt === 'aussenanlagen' ? wep!.gruen.aussenanlagen : wep!.gruen.aufwuchs
-    void speichere({ ...wep!, gruen: { ...wep!.gruen, [abschnitt]: [...liste, pos] } })
-    setHinzufuegen(null)
+    setzePositionen(abschnitt, [...positionen(abschnitt), pos])
+    setMaske(null)
     window.scrollTo(0, document.body.scrollHeight)
   }
 
+  function aenderePosition(abschnitt: Abschnitt, pos: Position) {
+    setzePositionen(
+      abschnitt,
+      positionen(abschnitt).map((p) => (p.id === pos.id ? pos : p)),
+    )
+    setMaske(null)
+  }
+
+  function loeschePosition(abschnitt: Abschnitt, posId: string) {
+    setzePositionen(
+      abschnitt,
+      positionen(abschnitt).filter((p) => p.id !== posId),
+    )
+    setMaske(null)
+  }
+
+  function speichereBeseitigung(pos: BeseitigungsPosition) {
+    const liste = wep!.gruen.beseitigungAA
+    const neu = liste.some((p) => p.id === pos.id) ? liste.map((p) => (p.id === pos.id ? pos : p)) : [...liste, pos]
+    void speichere({ ...wep!, gruen: { ...wep!.gruen, beseitigungAA: neu } })
+    setMaske(null)
+  }
+
+  function loescheBeseitigung(posId: string) {
+    void speichere({ ...wep!, gruen: { ...wep!.gruen, beseitigungAA: wep!.gruen.beseitigungAA.filter((p) => p.id !== posId) } })
+    setMaske(null)
+  }
+
+  // Die zu ändernde Position kann inzwischen fehlen (z. B. nach einem Abgleich) – dann zurück zur Liste
+  const bearbeitePos = maske?.art === 'position' ? positionen(maske.abschnitt).find((p) => p.id === maske.id) : undefined
+  const bearbeiteBes =
+    maske?.art === 'beseitigung' && maske.id ? wep.gruen.beseitigungAA.find((p) => p.id === maske.id) : undefined
+  const maskeSichtbar =
+    maske !== null &&
+    (maske.art === 'hinzufuegen' || (maske.art === 'position' && bearbeitePos) || (maske.art === 'beseitigung' && (!maske.id || bearbeiteBes)))
+
   return (
-    <div className={hinzufuegen ? 'rahmen' : 'rahmen mit-unten'}>
+    <div className={maskeSichtbar ? 'rahmen' : 'rahmen mit-unten'}>
       <aside className="seitenleiste" aria-label="Abschnitte">
         {zurueckKnopf}
         <div className="sl-wep">
@@ -186,13 +238,30 @@ export function WepDetail({ wepId, onZurueck }: Props) {
         </nav>
       </aside>
 
-      <main className={hinzufuegen ? 'inhalt inhalt-breit' : 'inhalt'}>
-        {hinzufuegen ? (
+      <main className={maskeSichtbar && maske?.art !== 'beseitigung' ? 'inhalt inhalt-breit' : 'inhalt'}>
+        {maskeSichtbar && maske?.art === 'hinzufuegen' ? (
           <PositionHinzufuegen
-            abschnitt={hinzufuegen}
+            abschnitt={maske.abschnitt}
             wep={wep}
-            onAbbrechen={() => setHinzufuegen(null)}
-            onHinzufuegen={(pos) => fuegePositionHinzu(hinzufuegen, pos)}
+            onAbbrechen={() => setMaske(null)}
+            onHinzufuegen={(pos) => fuegePositionHinzu(maske.abschnitt, pos)}
+          />
+        ) : maskeSichtbar && maske?.art === 'position' && bearbeitePos ? (
+          <PositionBearbeiten
+            abschnitt={maske.abschnitt}
+            pos={bearbeitePos}
+            wep={wep}
+            onAbbrechen={() => setMaske(null)}
+            onSpeichern={(pos) => aenderePosition(maske.abschnitt, pos)}
+            onLoeschen={() => loeschePosition(maske.abschnitt, bearbeitePos.id)}
+          />
+        ) : maskeSichtbar && maske?.art === 'beseitigung' ? (
+          <BeseitigungFormular
+            key={maske.id ?? 'neu'}
+            bearbeiten={bearbeiteBes}
+            onAbbrechen={() => setMaske(null)}
+            onFertig={speichereBeseitigung}
+            onLoeschen={bearbeiteBes ? () => loescheBeseitigung(bearbeiteBes.id) : undefined}
           />
         ) : (
           <>
@@ -222,27 +291,32 @@ export function WepDetail({ wepId, onZurueck }: Props) {
                 wep={wep}
                 abschnitt={tab}
                 onSpeichern={speichere}
-                onHinzufuegen={() => {
-                  setHinzufuegen(tab)
-                  window.scrollTo(0, 0)
-                }}
+                onHinzufuegen={() => oeffneMaske({ art: 'hinzufuegen', abschnitt: tab })}
+                onBearbeiten={(id) => oeffneMaske({ art: 'position', abschnitt: tab, id })}
               />
             )}
-            {tab === 'beseitigung' && <BeseitigungTab wep={wep} onSpeichern={speichere} />}
+            {tab === 'beseitigung' && (
+              <BeseitigungTab
+                wep={wep}
+                onHinzufuegen={() => oeffneMaske({ art: 'beseitigung' })}
+                onBearbeiten={(id) => oeffneMaske({ art: 'beseitigung', id })}
+              />
+            )}
             {tab === 'skizze' && <SkizzeTab wep={wep} onSpeichern={speichere} />}
             {tab === 'export' && (
               <ExportTab
                 wep={wep}
                 exportZustand={exportZustand}
                 setExportZustand={setExportZustand}
-                bauExcelRef={bauExcelRef}
+                bauExcel={bauExcel}
+                setBauExcel={setBauExcel}
               />
             )}
           </>
         )}
       </main>
 
-      {!hinzufuegen && (
+      {!maskeSichtbar && (
         <nav className="unten nur-handy" aria-label="Abschnitte">
           {BEREICHE.map((b) => (
             <button
@@ -261,7 +335,12 @@ export function WepDetail({ wepId, onZurueck }: Props) {
       )}
 
       {loeschFrage && (
-        <LoeschFrage wepId={wep.id} titel={titel} onAbbrechen={() => setLoeschFrage(false)} onLoeschen={() => void loeschen()} />
+        <Rueckfrage
+          titel={`WEP ${wep.id} löschen?`}
+          text={`${titel !== `WEP ${wep.id}` ? `„${titel}“ wird` : 'Das Protokoll wird'} auf diesem Gerät gelöscht. Das lässt sich nicht rückgängig machen. Eine Kopie in OneDrive bleibt erhalten.`}
+          onAbbrechen={() => setLoeschFrage(false)}
+          onBestaetigen={() => void loeschen()}
+        />
       )}
     </div>
   )
@@ -321,41 +400,6 @@ function WepMenue({ onLoeschen }: { onLoeschen: () => void }) {
   )
 }
 
-function LoeschFrage({
-  wepId,
-  titel,
-  onAbbrechen,
-  onLoeschen,
-}: {
-  wepId: string
-  titel: string
-  onAbbrechen: () => void
-  onLoeschen: () => void
-}) {
-  const id = useId()
-  return (
-    <div className="dialog-hintergrund">
-      <div className="dialog" role="alertdialog" aria-modal="true" aria-labelledby={`${id}-t`} aria-describedby={`${id}-d`}>
-        <h2 className="h2" id={`${id}-t`}>
-          WEP {wepId} löschen?
-        </h2>
-        <p id={`${id}-d`}>
-          {titel !== `WEP ${wepId}` ? `„${titel}“ wird` : 'Das Protokoll wird'} auf diesem Gerät gelöscht. Das lässt
-          sich nicht rückgängig machen. Eine Kopie in OneDrive bleibt erhalten.
-        </p>
-        <div className="dialog-knoepfe">
-          <button type="button" className="knopf" autoFocus onClick={onAbbrechen}>
-            Abbrechen
-          </button>
-          <button type="button" className="knopf knopf-gefahr" onClick={onLoeschen}>
-            Löschen
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ---------------------------------------------------------------------------
 // Formalien
 // ---------------------------------------------------------------------------
@@ -366,245 +410,146 @@ function FormalienTab({ wep, onSpeichern }: { wep: Wep; onSpeichern: (wep: Wep) 
   }
 
   const f = wep.formalien
+  const id = useId()
 
   return (
     <>
       <header className="seitenkopf">
         <h1 className="h1">Formalien</h1>
       </header>
-      <section className="formular">
-        <Eingabe label="Kleingartenanlage" wert={f.kleingartenanlage} onChange={(v) => setFeld('kleingartenanlage', v)} />
-        <div className="feld-reihe">
-          <Eingabe label="Parzelle" wert={f.parzelle} onChange={(v) => setFeld('parzelle', v)} />
-          <Eingabe label="Weg (optional)" wert={f.weg ?? ''} onChange={(v) => setFeld('weg', v)} />
-        </div>
-        <Eingabe label="Unterpächter" wert={f.unterpaechter} onChange={(v) => setFeld('unterpaechter', v)} />
-        <div className="feld-reihe">
+
+      <section className="abschnitt" aria-labelledby={`${id}-anlage`}>
+        <h2 className="gruppenkopf" id={`${id}-anlage`}>
+          Anlage und Parzelle
+        </h2>
+        <div className="formular">
+          <Eingabe label="Kleingartenanlage" wert={f.kleingartenanlage} onChange={(v) => setFeld('kleingartenanlage', v)} />
+          <div className="feld-reihe">
+            <Eingabe label="Parzelle" wert={f.parzelle} onChange={(v) => setFeld('parzelle', v)} />
+            <Eingabe label="Weg (optional)" wert={f.weg ?? ''} onChange={(v) => setFeld('weg', v)} />
+          </div>
           <ZahlEingabe
             label="Parzellenfläche (m²)"
             wert={f.parzellenflaecheM2 || undefined}
             onChange={(v) => setFeld('parzellenflaecheM2', v ?? 0)}
           />
+        </div>
+      </section>
+
+      <section className="abschnitt" aria-labelledby={`${id}-beteiligte`}>
+        <h2 className="gruppenkopf" id={`${id}-beteiligte`}>
+          Beteiligte
+        </h2>
+        <div className="formular">
+          <Eingabe label="Unterpächter" wert={f.unterpaechter} onChange={(v) => setFeld('unterpaechter', v)} />
+          <Eingabe label="Auftraggeber" wert={f.auftraggeber} onChange={(v) => setFeld('auftraggeber', v)} />
+          <Eingabe label="Anwesend für den Verein" wert={f.anwesendVerein} onChange={(v) => setFeld('anwesendVerein', v)} />
           <Eingabe
-            label="Wertermittlung am"
-            typ="date"
-            wert={f.wertermittlungAm}
-            onChange={(v) => setFeld('wertermittlungAm', v)}
+            label="Anwesend für den Unterpächter"
+            wert={f.anwesendUnterpaechter}
+            onChange={(v) => setFeld('anwesendUnterpaechter', v)}
+          />
+          <Eingabe
+            label="Anwesend für den Auftraggeber"
+            wert={f.anwesendAuftraggeber}
+            onChange={(v) => setFeld('anwesendAuftraggeber', v)}
           />
         </div>
-        <Eingabe
-          label="Wertermittler Außenanlagen & Aufwuchs"
-          wert={f.wertermittlerAussenAufwuchs}
-          onChange={(v) => setFeld('wertermittlerAussenAufwuchs', v)}
-        />
-        <Eingabe label="Auftraggeber" wert={f.auftraggeber} onChange={(v) => setFeld('auftraggeber', v)} />
-        <Eingabe label="Anwesend für den Verein" wert={f.anwesendVerein} onChange={(v) => setFeld('anwesendVerein', v)} />
-        <Eingabe
-          label="Anwesend für den Unterpächter"
-          wert={f.anwesendUnterpaechter}
-          onChange={(v) => setFeld('anwesendUnterpaechter', v)}
-        />
-        <Eingabe
-          label="Anwesend für den Auftraggeber"
-          wert={f.anwesendAuftraggeber}
-          onChange={(v) => setFeld('anwesendAuftraggeber', v)}
-        />
-        <Eingabe label="Vorgangs-Nr." wert={f.vorgangsNr} onChange={(v) => setFeld('vorgangsNr', v)} />
+      </section>
+
+      <section className="abschnitt" aria-labelledby={`${id}-wert`}>
+        <h2 className="gruppenkopf" id={`${id}-wert`}>
+          Wertermittlung
+        </h2>
+        <div className="formular">
+          <Eingabe
+            label="Wertermittler Außenanlagen & Aufwuchs"
+            wert={f.wertermittlerAussenAufwuchs}
+            onChange={(v) => setFeld('wertermittlerAussenAufwuchs', v)}
+          />
+          <div className="feld-reihe">
+            <Eingabe
+              label="Wertermittlung am"
+              typ="date"
+              wert={f.wertermittlungAm}
+              onChange={(v) => setFeld('wertermittlungAm', v)}
+            />
+            <Eingabe label="Vorgangs-Nr." wert={f.vorgangsNr} onChange={(v) => setFeld('vorgangsNr', v)} />
+          </div>
+        </div>
       </section>
     </>
   )
 }
 
 // ---------------------------------------------------------------------------
-// Beseitigung
+// Beseitigung (Liste; Formular: BeseitigungFormular.tsx)
 // ---------------------------------------------------------------------------
 
-function BeseitigungTab({ wep, onSpeichern }: { wep: Wep; onSpeichern: (wep: Wep) => Promise<void> }) {
-  const [offen, setOffen] = useState(false)
-  const [gegenstand, setGegenstand] = useState('')
-  const [menge, setMenge] = useState('1')
-  const [einheit, setEinheit] = useState('Stück')
-  const [einzelpreis, setEinzelpreis] = useState('')
-  const [faktor, setFaktor] = useState('1')
-  const [begruendung, setBegruendung] = useState('')
-  const id = useId()
-  const faktorZahl = leseZahlOder(faktor, 1)
-
+function BeseitigungTab({
+  wep,
+  onHinzufuegen,
+  onBearbeiten,
+}: {
+  wep: Wep
+  onHinzufuegen: () => void
+  onBearbeiten: (id: string) => void
+}) {
   const positionen = wep.gruen.beseitigungAA
-
-  function fuegeHinzu() {
-    const pos: BeseitigungsPosition = {
-      id: neueBeseitigungsId(),
-      gegenstand,
-      menge: leseZahlOder(menge, 0),
-      einheit,
-      einzelpreis: leseZahlOder(einzelpreis, 0),
-      faktor: faktorZahl,
-      begruendung: faktorZahl > 1 ? begruendung : undefined,
-    }
-    void onSpeichern({ ...wep, gruen: { ...wep.gruen, beseitigungAA: [...positionen, pos] } })
-    setOffen(false)
-    setGegenstand('')
-    setMenge('1')
-    setEinzelpreis('')
-    setFaktor('1')
-    setBegruendung('')
-  }
-
-  function loeschen(posId: string) {
-    void onSpeichern({ ...wep, gruen: { ...wep.gruen, beseitigungAA: positionen.filter((p) => p.id !== posId) } })
-  }
 
   return (
     <>
       <header className="seitenkopf">
         <div>
           <h1 className="h1">Beseitigung</h1>
-          <p className="neben">Beseitigungskosten (Abschnitt 2)</p>
+          <p className="neben">{positionen.length === 1 ? '1 Position' : `${positionen.length} Positionen`}</p>
         </div>
-        {!offen && (
-          <button type="button" className="knopf knopf-primaer" onClick={() => setOffen(true)}>
-            <Plus {...ICON} />
-            Hinzufügen
-          </button>
-        )}
+        <button type="button" className="knopf knopf-primaer" onClick={onHinzufuegen}>
+          <Plus {...ICON} />
+          Hinzufügen
+        </button>
       </header>
       <p className="neben block">
         Kosten für Beseitigungen (z. B. invasive Arten, regelwidrige Anlagen). Die Richtlinie sieht für
         Fällen/Roden ein saisonales Verbot (1. März – 30. September) vor.
       </p>
 
-      <ul className="liste">
-        {positionen.length === 0 && <li className="leertext">Noch keine Beseitigungspositionen.</li>}
-        {positionen.map((pos) => (
-          <li key={pos.id} className="zeile">
-            <span className="zeile-text">
-              <span className="zeile-titel">{pos.gegenstand}</span>
-              <span className="neben">
-                {zahlDe(pos.menge)}&nbsp;{pos.einheit} · je {euroFormat(pos.einzelpreis)} · Faktor {zahlDe(pos.faktor)}
-              </span>
-              {pos.begruendung && <span className="neben">Begründung: {pos.begruendung}</span>}
-            </span>
-            <span className="zahl c-summe">{euroFormat(pos.menge * pos.einzelpreis * pos.faktor)}</span>
-            <button
-              type="button"
-              className="symbolknopf"
-              aria-label={`${pos.gegenstand} löschen`}
-              onClick={() => loeschen(pos.id)}
-            >
-              <Trash2 {...ICON} />
-            </button>
-          </li>
-        ))}
-      </ul>
-      <div className="summe">
-        <span>Summe Beseitigung</span>
-        <span className="zahl">{euroFormat(beseitigungSumme(positionen))}</span>
-      </div>
-
-      {offen && (
-        <section className="formular" aria-labelledby={`${id}-titel`}>
-          <div className="beschreibung-kopf">
-            <h2 className="h2" id={`${id}-titel`}>
-              Beseitigungsposition
-            </h2>
-            <button type="button" className="textknopf" onClick={() => setOffen(false)}>
-              Abbrechen
-            </button>
+      {positionen.length === 0 ? (
+        <LeerZustand
+          icon={Shovel}
+          titel="Noch keine Positionen"
+          text="Hier stehen die Kosten für zu beseitigende Anlagen und Pflanzen, zum Beispiel invasive Arten."
+        />
+      ) : (
+        <>
+          <ul className="liste" aria-label="Beseitigungspositionen">
+            {positionen.map((pos) => (
+              <li key={pos.id}>
+                <button type="button" className="zeile" onClick={() => onBearbeiten(pos.id)}>
+                  <span className="zeile-text">
+                    <span className="zeile-titel">{pos.gegenstand}</span>
+                    <span className="neben">
+                      {zahlDe(pos.menge)}&nbsp;{pos.einheit} · je {euroFormat(pos.einzelpreis)} · Faktor {zahlDe(pos.faktor)}
+                    </span>
+                    {pos.begruendung && <span className="neben">Begründung: {pos.begruendung}</span>}
+                  </span>
+                  <span className="zahl c-summe">{euroFormat(pos.menge * pos.einzelpreis * pos.faktor)}</span>
+                  <ChevronRight {...ICON} className="chevron" />
+                </button>
+              </li>
+            ))}
+          </ul>
+          <div className="summe">
+            <span>Summe Beseitigung</span>
+            <span className="zahl">{euroFormat(beseitigungSumme(positionen))}</span>
           </div>
-
-          <div className="feld">
-            <label className="label" htmlFor={`${id}-geg`}>
-              Gegenstand / Beschreibung
-            </label>
-            <input
-              id={`${id}-geg`}
-              type="text"
-              className="eingabe"
-              value={gegenstand}
-              onChange={(e) => setGegenstand(e.target.value)}
-              placeholder="z. B. Japanischer Knöterich entfernen"
-            />
-          </div>
-
-          <div className="feld-reihe">
-            <div className="feld">
-              <label className="label" htmlFor={`${id}-menge`}>
-                Menge
-              </label>
-              <input
-                id={`${id}-menge`}
-                type="text"
-                inputMode="decimal"
-                className="eingabe"
-                value={menge}
-                onChange={(e) => setMenge(e.target.value)}
-              />
-            </div>
-            <div className="feld">
-              <label className="label" htmlFor={`${id}-einh`}>
-                Einheit
-              </label>
-              <select id={`${id}-einh`} className="eingabe" value={einheit} onChange={(e) => setEinheit(e.target.value)}>
-                {['Stück', 'm', 'm²', 'Pauschale'].map((u) => (
-                  <option key={u} value={u}>
-                    {u}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="feld-reihe">
-            <div className="feld">
-              <label className="label" htmlFor={`${id}-preis`}>
-                Einzelpreis (€)
-              </label>
-              <input
-                id={`${id}-preis`}
-                type="text"
-                inputMode="decimal"
-                className="eingabe"
-                value={einzelpreis}
-                onChange={(e) => setEinzelpreis(e.target.value)}
-                placeholder="0,00"
-              />
-            </div>
-            <div className="feld">
-              <label className="label" htmlFor={`${id}-faktor`}>
-                Faktor (Standard 1)
-              </label>
-              <input
-                id={`${id}-faktor`}
-                type="text"
-                inputMode="decimal"
-                className="eingabe"
-                value={faktor}
-                onChange={(e) => setFaktor(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {faktorZahl > 1 && (
-            <div className="feld">
-              <label className="label" htmlFor={`${id}-begr`}>
-                Begründung (Faktor &gt; 1)
-              </label>
-              <input
-                id={`${id}-begr`}
-                type="text"
-                className="eingabe"
-                value={begruendung}
-                onChange={(e) => setBegruendung(e.target.value)}
-              />
-            </div>
-          )}
-
-          <button type="button" className="knopf knopf-primaer knopf-breit" disabled={!gegenstand.trim()} onClick={fuegeHinzu}>
-            Hinzufügen
-          </button>
-        </section>
+        </>
       )}
+
+      <button type="button" className="zeile zeile-akzent" onClick={onHinzufuegen}>
+        <Plus {...ICON} />
+        <span className="zeile-titel">Position hinzufügen</span>
+      </button>
     </>
   )
 }
@@ -617,18 +562,24 @@ function ExportTab({
   wep,
   exportZustand,
   setExportZustand,
-  bauExcelRef,
+  bauExcel,
+  setBauExcel,
 }: {
   wep: Wep
   exportZustand: ExportZustand
   setExportZustand: (z: ExportZustand) => void
-  bauExcelRef: React.MutableRefObject<File | null>
+  bauExcel: File | null
+  setBauExcel: (datei: File | null) => void
 }) {
   // Standard: Skizze als bearbeitbare Excel-Formen; Fallback: Bild (PNG)
   const [skizzeAlsBild, setSkizzeAlsBild] = useState(false)
+  const dateiRef = useRef<HTMLInputElement>(null)
+  const id = useId()
 
   function onBauExcelChange(e: ChangeEvent<HTMLInputElement>) {
-    bauExcelRef.current = e.target.files?.[0] ?? null
+    setBauExcel(e.target.files?.[0] ?? null)
+    // gleiche Datei erneut wählbar machen
+    e.target.value = ''
   }
 
   async function exportieren() {
@@ -636,9 +587,9 @@ function ExportTab({
     try {
       let sourceBuffer: ArrayBuffer
 
-      if (bauExcelRef.current) {
+      if (bauExcel) {
         // Bau-Excel hochgeladen
-        sourceBuffer = await bauExcelRef.current.arrayBuffer()
+        sourceBuffer = await bauExcel.arrayBuffer()
       } else {
         // Leere Vorlage aus public/ laden
         const resp = await fetch('/WEP_Vorlage.xlsx')
@@ -695,102 +646,134 @@ function ExportTab({
     }
   }
 
+  const hatSkizze = Boolean(wep.skizze?.elemente.length)
+  const ergebnis = exportZustand.typ === 'fertig' ? exportZustand : null
+
   return (
     <>
       <header className="seitenkopf">
         <h1 className="h1">Export als Excel</h1>
       </header>
-      <section className="formular">
+
+      <p className="neben block">
+        Die App schreibt die Grün-Daten in die WEP-Vorlage. Bau-Blätter werden nicht verändert.
+      </p>
+
+      <section className="abschnitt" aria-labelledby={`${id}-bau`}>
+        <h2 className="gruppenkopf" id={`${id}-bau`}>
+          Bau-Excel
+        </h2>
         <p className="neben">
-          Die App schreibt die Grün-Daten in die WEP-Vorlage. Bau-Blätter werden nicht verändert. Falls der
-          Bau-Wertermittler seine Excel-Datei bereits ausgefüllt hat, diese hier hochladen – andernfalls wird die
+          Falls der Bau-Wertermittler seine Excel-Datei bereits ausgefüllt hat, diese hier wählen. Ohne Datei wird die
           leere Vorlage verwendet.
         </p>
-
-        <div className="feld">
-          <label className="label" htmlFor="bau-excel">
-            Bau-Excel (optional, bereits ausgefüllte Vorlage)
-          </label>
-          <input id="bau-excel" type="file" className="eingabe" accept=".xlsx" onChange={onBauExcelChange} />
-        </div>
-
-        {wep.skizze?.elemente.length ? (
-          <label className="ankreuzen">
-            <input type="checkbox" checked={skizzeAlsBild} onChange={(e) => setSkizzeAlsBild(e.target.checked)} />
-            <span>Skizze als Bild statt als bearbeitbare Formen einfügen</span>
-          </label>
-        ) : null}
-
-        <button
-          type="button"
-          className="knopf knopf-primaer knopf-breit"
-          disabled={exportZustand.typ === 'laedt'}
-          onClick={() => void exportieren()}
-        >
-          <FileSpreadsheet {...ICON} />
-          {exportZustand.typ === 'laedt' ? 'Exportiere …' : 'Excel exportieren'}
-        </button>
-
-        {exportZustand.typ === 'fehler' && (
-          <p className="warnung" role="alert">
-            <TriangleAlert {...ICON} size={20} />
-            <span>Fehler: {exportZustand.meldung}</span>
-          </p>
-        )}
-
-        {exportZustand.typ === 'fertig' && (
-          <div className="block">
-            <p className="ok zeile">
-              <Check {...ICON} />
-              <span>Export erfolgreich: {exportZustand.result.filename}</span>
-            </p>
-            {exportZustand.oneDrive && <p className="neben">{exportZustand.oneDrive}</p>}
-            {exportZustand.result.skizzeEingefuegt && (
-              <p className="neben">
-                Skizze ins Blatt „Skizze Außenanlage-Aufwuchs“ eingefügt
-                {exportZustand.result.skizzeFormen ? ' (bearbeitbare Excel-Formen).' : ' (als Bild).'}
-              </p>
-            )}
-
-            {exportZustand.result.konflikte.length > 0 && (
-              <div className="warnung" role="note">
-                <TriangleAlert {...ICON} size={20} />
-                <div>
-                  <p>
-                    Folgende Formalien-Felder waren in der Bau-Excel bereits gefüllt und wurden nicht überschrieben:
-                  </p>
-                  <ul>
-                    {exportZustand.result.konflikte.map((k) => (
-                      <li key={k.feld}>
-                        <strong>{k.feld}</strong> (Zelle {k.zelle}): Bau-Excel: „{k.bauExcelWert}“ · App: „{k.appWert}“
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            )}
-
-            {exportZustand.result.aufwuchsUeberlauf && (
-              <p className="warnung" role="note">
-                <TriangleAlert {...ICON} size={20} />
-                <span>
-                  Aufwuchs-Positionen laufen auf Anlage III a (Aufwuchs II) über (mehr als 28 Positionen in Aufwuchs I).
-                </span>
-              </p>
-            )}
-
-            {exportZustand.result.aufwuchsAbgeschnitten && (
-              <p className="warnung" role="note">
-                <TriangleAlert {...ICON} size={20} />
-                <span>
-                  Es gibt mehr als 64 Aufwuchs-Positionen. Überschüssige Positionen wurden nicht exportiert –
-                  Positionen zusammenfassen.
-                </span>
-              </p>
-            )}
+        <input
+          ref={dateiRef}
+          id="bau-excel"
+          type="file"
+          hidden
+          accept=".xlsx"
+          aria-label="Bau-Excel (optional, bereits ausgefüllte Vorlage)"
+          onChange={onBauExcelChange}
+        />
+        {bauExcel ? (
+          <div className="zeile datei">
+            <FileSpreadsheet {...ICON} />
+            <span className="zeile-text">
+              <span className="zeile-titel einzeilig">{bauExcel.name}</span>
+              <span className="neben">{Math.max(1, Math.round(bauExcel.size / 1024))} KB · wird mit den Grün-Daten befüllt</span>
+            </span>
+            <button type="button" className="symbolknopf" aria-label="Bau-Excel entfernen" onClick={() => setBauExcel(null)}>
+              <X {...ICON} />
+            </button>
           </div>
+        ) : (
+          <button type="button" className="knopf knopf-breit" onClick={() => dateiRef.current?.click()}>
+            <Upload {...ICON} />
+            Bau-Excel auswählen (optional)
+          </button>
         )}
       </section>
+
+      {hatSkizze && (
+        <section className="abschnitt" aria-labelledby={`${id}-skizze`}>
+          <h2 className="gruppenkopf" id={`${id}-skizze`}>
+            Skizze
+          </h2>
+          <label className="schalter-zeile">
+            <span>Als Bild statt als bearbeitbare Formen einfügen</span>
+            <input
+              type="checkbox"
+              className="schalter"
+              checked={skizzeAlsBild}
+              onChange={(e) => setSkizzeAlsBild(e.target.checked)}
+            />
+          </label>
+        </section>
+      )}
+
+      <button
+        type="button"
+        className="knopf knopf-primaer knopf-breit"
+        disabled={exportZustand.typ === 'laedt'}
+        onClick={() => void exportieren()}
+      >
+        <FileSpreadsheet {...ICON} />
+        {exportZustand.typ === 'laedt' ? 'Exportiere …' : 'Excel exportieren'}
+      </button>
+
+      {exportZustand.typ === 'fehler' && (
+        <div className="ergebnis">
+          <Meldung alarm>
+            <p>Der Export hat nicht geklappt: {exportZustand.meldung}</p>
+            <p>Die Daten im WEP sind unverändert. Bitte noch einmal versuchen.</p>
+          </Meldung>
+        </div>
+      )}
+
+      {ergebnis && (
+        <div className="ergebnis" aria-live="polite">
+          <p className="ok zeile">
+            <Check {...ICON} />
+            <span>Export erfolgreich: {ergebnis.result.filename}</span>
+          </p>
+          {ergebnis.oneDrive && <p className="neben">{ergebnis.oneDrive}</p>}
+          {ergebnis.result.skizzeEingefuegt && (
+            <p className="neben">
+              Skizze ins Blatt „Skizze Außenanlage-Aufwuchs“ eingefügt
+              {ergebnis.result.skizzeFormen ? ' (bearbeitbare Excel-Formen).' : ' (als Bild).'}
+            </p>
+          )}
+
+          {ergebnis.result.konflikte.length > 0 && (
+            <Meldung>
+              <p>Folgende Formalien-Felder waren in der Bau-Excel bereits gefüllt und wurden nicht überschrieben:</p>
+              <ul className="meldung-liste">
+                {ergebnis.result.konflikte.map((k) => (
+                  <li key={k.feld}>
+                    <strong>{k.feld}</strong> (Zelle {k.zelle}): Bau-Excel: „{k.bauExcelWert}“ · App: „{k.appWert}“
+                  </li>
+                ))}
+              </ul>
+            </Meldung>
+          )}
+
+          {ergebnis.result.aufwuchsUeberlauf && (
+            <Meldung>
+              <p>Aufwuchs-Positionen laufen auf Anlage III a (Aufwuchs II) über (mehr als 28 Positionen in Aufwuchs I).</p>
+            </Meldung>
+          )}
+
+          {ergebnis.result.aufwuchsAbgeschnitten && (
+            <Meldung>
+              <p>
+                Es gibt mehr als 64 Aufwuchs-Positionen. Überschüssige Positionen wurden nicht exportiert – Positionen
+                zusammenfassen.
+              </p>
+            </Meldung>
+          )}
+        </div>
+      )}
     </>
   )
 }

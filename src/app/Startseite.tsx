@@ -1,13 +1,13 @@
 // Startseite: Liste aller WEPs, Statuszeile Abgleich und „Neues WEP“.
 // Gelöscht wird nicht hier, sondern in der WEP-Ansicht (Menü „⋯“, mit Rückfrage).
 import { useCallback, useEffect, useState } from 'react'
-import { ChevronRight, CircleUser, Plus, TriangleAlert } from 'lucide-react'
+import { ChevronRight, CircleUser, FileText, Plus } from 'lucide-react'
 import type { Wep } from '@/model'
 import type { Konto } from '@/konto'
 import { lokalesProfil, neuerWepMitProfil } from '@/profil'
 import { alleWeps, speichereWep } from './db'
 import { StatusZeile, useAbgleich } from './SyncLeiste'
-import { HauptSeitenleiste, ICON, datumDe } from './ui'
+import { HauptSeitenleiste, ICON, Laedt, LeerZustand, Meldung, datumDe } from './ui'
 
 interface Props {
   /** Angemeldetes Konto oder null („ohne Konto“). */
@@ -96,16 +96,19 @@ export function Startseite({ konto, verfuegbar, onProfil, onOeffnen }: Props) {
         </div>
 
         {abgleich.hinweise.map((h) => (
-          <p key={h.wepId + h.text} className="warnung" role="note">
-            <TriangleAlert {...ICON} size={20} />
-            <span>{h.text}</span>
-          </p>
+          <Meldung key={h.wepId + h.text}>
+            <p>{h.text}</p>
+          </Meldung>
         ))}
 
         {!geladen ? (
-          <p className="leertext">Lade …</p>
+          <Laedt />
         ) : weps.length === 0 ? (
-          <p className="leertext">Noch kein Protokoll vorhanden. Mit „Neues WEP“ ein erstes Protokoll anlegen.</p>
+          <LeerZustand
+            icon={FileText}
+            titel="Noch kein Protokoll"
+            text="Mit „Neues WEP“ ein erstes Protokoll anlegen."
+          />
         ) : (
           <ul className="liste" aria-label="Protokolle">
             {weps.map((wep) => {

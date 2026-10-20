@@ -7,6 +7,8 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Check, Mic, Send, TriangleAlert } from 'lucide-react'
+import { ICON } from '@/app/ui'
 import type { SkizzeDaten } from './types'
 import { skizzeZuSzene, szeneZuSkizze } from './szene'
 import { fuehreChatAus, type ChatErgebnis, type ChatSchritt } from './chatAblauf'
@@ -114,35 +116,41 @@ export function SkizzeChat({ holeSkizze, onSkizze }: SkizzeChatProps) {
   }
 
   return (
-    <section aria-label="Skizze per Beschreibung bearbeiten" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
-      <h3 style={{ margin: 0, fontSize: 16 }}>Skizze per Beschreibung ändern</h3>
+    <section aria-label="Skizze per Beschreibung bearbeiten" className="chat">
+      <h2 className="h2">Skizze per Beschreibung ändern</h2>
 
       {eintraege.length === 0 && (
-        <p className="hinweis-klein" style={{ margin: 0 }}>
+        <p className="neben">
           Beschreiben Sie, was in die Skizze soll – z. B. „{BEISPIELE[0]}“, „{BEISPIELE[1]}“ oder „{BEISPIELE[2]}“. Bau-Elemente
           bleiben unverändert.
         </p>
       )}
 
-      <div role="log" aria-live="polite" style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 320, overflowY: 'auto' }}>
+      <div role="log" aria-live="polite" className="chat-verlauf">
         {eintraege.map((e) => (
-          <div key={e.id} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <div style={{ alignSelf: 'flex-end', background: '#e8f5e9', borderRadius: 8, padding: '6px 10px', maxWidth: '90%' }}>{e.frage}</div>
-            <div style={{ background: '#f4f6f4', border: '1px solid #ddd', borderRadius: 8, padding: '6px 10px' }}>
+          <div key={e.id} className="chat-eintrag">
+            <div className="chat-frage">{e.frage}</div>
+            <div className="chat-antwort">
               {!e.ergebnis && <em>Die KI arbeitet …</em>}
-              {e.ergebnis?.fehler && <span style={{ color: '#c62828' }}>{e.ergebnis.fehler}</span>}
+              {e.ergebnis?.fehler && <span className="chat-fehler">{e.ergebnis.fehler}</span>}
               {e.ergebnis && !e.ergebnis.fehler && (
                 <>
                   {e.ergebnis.schritte.length > 0 && (
-                    <ul style={{ margin: 0, paddingLeft: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <ul className="chat-schritte">
                       {e.ergebnis.schritte.map((s: ChatSchritt, i) => (
-                        <li key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'space-between' }}>
-                          <span style={{ color: s.ok ? undefined : '#c62828', textDecoration: e.zurueck.has(i) ? 'line-through' : undefined }}>
-                            {s.ok ? '✓' : '⚠'} {s.pruefung ? '(Prüfung) ' : ''}
-                            {s.text}
+                        <li key={i} className="chat-schritt">
+                          <span
+                            className={s.ok ? 'chat-text' : 'chat-text chat-fehler'}
+                            style={e.zurueck.has(i) ? { textDecoration: 'line-through' } : undefined}
+                          >
+                            {s.ok ? <Check {...ICON} size={18} /> : <TriangleAlert {...ICON} size={18} />}
+                            <span>
+                              {s.pruefung ? '(Prüfung) ' : ''}
+                              {s.text}
+                            </span>
                           </span>
                           {s.ok && s.vorher && !e.zurueck.has(i) && (
-                            <button type="button" onClick={() => rueckgaengig(e.id, i)} title="Diesen Schritt rückgängig machen" style={{ minHeight: 36, padding: '0 10px' }}>
+                            <button type="button" className="textknopf" onClick={() => rueckgaengig(e.id, i)} title="Diesen Schritt rückgängig machen">
                               Rückgängig
                             </button>
                           )}
@@ -152,11 +160,9 @@ export function SkizzeChat({ holeSkizze, onSkizze }: SkizzeChatProps) {
                   )}
                   {e.ergebnis.schritte.length === 0 && e.ergebnis.hinweise.length === 0 && <span>Nichts geändert.</span>}
                   {e.ergebnis.hinweise.map((h, i) => (
-                    <p key={i} style={{ margin: '4px 0 0' }}>
-                      {h}
-                    </p>
+                    <p key={i}>{h}</p>
                   ))}
-                  <small style={{ color: '#666', display: 'block', marginTop: 4 }}>
+                  <small className="neben">
                     {e.ergebnis.modelle[0]}
                     {e.ergebnis.pruefung ? ` · Prüfung: ${e.ergebnis.pruefung}` : ''}
                   </small>
@@ -169,14 +175,15 @@ export function SkizzeChat({ holeSkizze, onSkizze }: SkizzeChatProps) {
       </div>
 
       <form
+        className="chat-eingabe"
         onSubmit={(ev) => {
           ev.preventDefault()
           void senden()
         }}
-        style={{ display: 'flex', gap: 6, alignItems: 'stretch' }}
       >
         <textarea
           aria-label="Nachricht an den Skizzen-Assistenten"
+          className="eingabe"
           value={text}
           onChange={(ev) => setText(ev.target.value)}
           onKeyDown={(ev) => {
@@ -187,25 +194,22 @@ export function SkizzeChat({ holeSkizze, onSkizze }: SkizzeChatProps) {
           }}
           rows={2}
           placeholder="Was soll in die Skizze?"
-          style={{ flex: 1, fontSize: 16, padding: 8, borderRadius: 6, border: '1px solid #ccc' }}
         />
         {diktatMoeglich && (
           <button
             type="button"
+            className="werkzeug"
             onClick={diktatUmschalten}
             aria-pressed={diktat}
+            aria-label="Diktieren"
             title="Diktieren"
-            style={{ minWidth: 48, fontSize: 20, borderRadius: 6, background: diktat ? '#c62828' : '#f0f0f0', color: diktat ? '#fff' : undefined }}
           >
-            🎤
+            <Mic {...ICON} />
           </button>
         )}
-        <button
-          type="submit"
-          disabled={laeuft || !text.trim()}
-          style={{ minWidth: 72, fontSize: 16, borderRadius: 6, background: '#1b5e20', color: '#fff', border: 'none' }}
-        >
-          {laeuft ? '…' : 'Senden'}
+        <button type="submit" className="knopf knopf-primaer" disabled={laeuft || !text.trim()}>
+          <Send {...ICON} />
+          {laeuft ? 'Sendet …' : 'Senden'}
         </button>
       </form>
     </section>

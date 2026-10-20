@@ -1,4 +1,4 @@
-// Screenshots der umgebauten App (Beta 2, Schritt 4, Teil A) für docs/umbau/.
+// Screenshots der umgebauten App (Beta 2, Schritt 4, Teil A und B) für docs/umbau/.
 // Aufruf: npm run umbau:screenshots  (baut wie npm run e2e nach dist-e2e/, startet vite preview)
 // Testdaten sind erfunden (Erika Musterfrau …). Die Android-Test-Seite wird im Browser mit
 // einer nachgebauten Capacitor-Brücke gezeigt (nur für das Bild, nicht in der App).
@@ -36,7 +36,7 @@ const pos = (id, katalogId, bezeichnung, anzahl, einheit, zustand, hoechstwert, 
   hinweise: [],
 })
 
-function wep(id, anlage, parzelle, unterpaechter, datum, gruen = {}) {
+function wep(id, anlage, parzelle, unterpaechter, datum, gruen = {}, extra = {}) {
   return {
     id,
     formalien: {
@@ -55,7 +55,9 @@ function wep(id, anlage, parzelle, unterpaechter, datum, gruen = {}) {
       protokollerstellungAm: '',
       parzellenflaecheM2: 0,
       vorgangsNr: id,
+      ...(extra.formalien ?? {}),
     },
+    ...(extra.skizze ? { skizze: extra.skizze } : {}),
     gruen: {
       beschreibungAussen: '',
       beschreibungAufwuchs: '',
@@ -65,6 +67,23 @@ function wep(id, anlage, parzelle, unterpaechter, datum, gruen = {}) {
       ...gruen,
     },
   }
+}
+
+/** Beispiel-Skizze (Editor-Koordinaten 800 × 600). */
+const SKIZZE = {
+  breite: 800,
+  hoehe: 600,
+  raster: true,
+  rasterGroesse: 40,
+  elemente: [
+    { id: 'k1', typ: 'rechteck', x: 60, y: 60, breite: 300, hoehe: 200 },
+    { id: 'k2', typ: 'text', x: 150, y: 150, inhalt: 'Laube' },
+    { id: 'k3', typ: 'massangabe', x1: 60, y1: 290, x2: 360, y2: 290, beschriftung: '7,5 m' },
+    { id: 'k4', typ: 'symbol', art: 'baum', x: 440, y: 90, breite: 70, hoehe: 70, beschriftung: 'Apfel' },
+    { id: 'k5', typ: 'symbol', art: 'beet', x: 440, y: 220, breite: 150, hoehe: 60, beschriftung: '' },
+    { id: 'k6', typ: 'symbol', art: 'hecke', x: 60, y: 420, breite: 400, hoehe: 40, beschriftung: 'Liguster' },
+    { id: 'k7', typ: 'kreis', cx: 640, cy: 440, radius: 40, beschriftung: 'Kirsche' },
+  ],
 }
 
 const WEPS = [
@@ -86,7 +105,18 @@ const WEPS = [
     ],
     beseitigungAA: [
       { id: 'b1', gegenstand: 'Japanischer Knöterich entfernen', menge: 1, einheit: 'Pauschale', einzelpreis: 180, faktor: 1 },
+      { id: 'b2', gegenstand: 'Thuja-Hecke roden (Wurzelstöcke)', menge: 12, einheit: 'm', einzelpreis: 14, faktor: 1.5, begruendung: 'Wurzelstöcke, schwer zugänglich' },
     ],
+  }, {
+    skizze: SKIZZE,
+    formalien: {
+      weg: 'Weg C',
+      auftraggeber: 'BV Pankow (Muster)',
+      anwesendVerein: 'Hans Beispiel',
+      anwesendUnterpaechter: 'Erika Musterfrau',
+      protokollerstellungAm: '2026-10-15',
+      parzellenflaecheM2: 380,
+    },
   }),
   wep('2026-006', 'KGA Testgarten', 'Parzelle 17', 'Hans Beispiel', '2026-10-09'),
   wep('2026-005', 'KGA Musterau', 'Parzelle 3, Weg B', 'Paula Platzhalter', '2026-10-02'),
@@ -189,11 +219,21 @@ try {
       await bild('3-aufwuchs-unten')
       await seite.evaluate(() => window.scrollTo(0, 0))
     }
-    // Hinweise aufgeklappt, Position angetippt
-    await seite.getByRole('row', { name: /Rose, Beet/ }).click()
-    for (const s of await seite.locator('details.hinweise > summary').filter({ visible: true }).all()) await s.click()
-    await seite.getByRole('row', { name: /Rose, Beet/ }).scrollIntoViewIfNeeded()
-    await bild('3-aufwuchs-hinweise')
+    // Position angetippt → Formular zum Ändern (Richtlinie, „Löschen“ unten, Rückfrage)
+    await seite.getByRole('row', { name: /Rasen/ }).click()
+    await seite.getByLabel(/^Bezeichnung/).waitFor()
+    await bild('3-position-aendern')
+    await seite.getByText('Richtlinie', { exact: true }).click()
+    await seite.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
+    await bild('3-position-aendern-unten')
+    await seite.evaluate(() => window.scrollTo(0, 0))
+    await seite.getByRole('button', { name: 'Löschen' }).click()
+    await bild('3-position-loeschen-rueckfrage')
+    await seite.getByRole('alertdialog').getByRole('button', { name: 'Abbrechen' }).click()
+    await seite.getByRole('button', { name: 'Abbrechen' }).filter({ visible: true }).first().click()
+    // Warnung (Rasen über 100 m²) steht weiter in der Liste, Richtlinien-Text nicht
+    await seite.getByRole('row', { name: /Rasen/ }).scrollIntoViewIfNeeded()
+    await bild('3-aufwuchs-warnung')
 
     // Außenanlagen
     await abschnitt(groesse === 'handy' ? 'Außenanlagen' : 'Außenanlagen').click()
@@ -224,6 +264,68 @@ try {
     await seite.getByRole('heading', { name: 'Export als Excel' }).waitFor()
     await bild('6-export')
 
+    // --- Teil B ---------------------------------------------------------------
+    // Formalien (gruppiert)
+    await abschnitt('Formalien').click()
+    await seite.getByRole('heading', { name: 'Beteiligte' }).waitFor()
+    await bild('10-formalien')
+    if (groesse === 'handy') {
+      await seite.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
+      await bild('10-formalien-unten')
+      await seite.evaluate(() => window.scrollTo(0, 0))
+    }
+
+    // Beseitigung: Liste, Formular zum Ändern, Rückfrage
+    await abschnitt('Beseitigung').click()
+    await seite.getByRole('heading', { name: 'Beseitigung' }).waitFor()
+    await bild('11-beseitigung')
+    await seite.getByRole('button', { name: /Thuja-Hecke roden/ }).click()
+    await seite.getByLabel(/^Gegenstand/).waitFor()
+    await bild('11-beseitigung-formular')
+    await seite.getByRole('button', { name: 'Löschen' }).click()
+    await bild('11-beseitigung-loeschen-rueckfrage')
+    await seite.getByRole('alertdialog').getByRole('button', { name: 'Abbrechen' }).click()
+    await seite.getByRole('button', { name: 'Abbrechen' }).filter({ visible: true }).first().click()
+
+    // Export: Bau-Excel gewählt, Ergebnis
+    if (groesse === 'handy') await seite.getByRole('button', { name: 'Export', exact: true }).click()
+    else await seite.getByRole('button', { name: 'Export als Excel' }).click()
+    await seite.getByRole('heading', { name: 'Export als Excel' }).waitFor()
+    await seite.locator('#bau-excel').setInputFiles('public/WEP_Vorlage.xlsx')
+    await seite.getByRole('button', { name: 'Excel exportieren' }).click()
+    await seite.getByText(/Export erfolgreich/).waitFor({ timeout: 30000 })
+    await seite.getByText(/Export erfolgreich/).scrollIntoViewIfNeeded()
+    await bild('6-export-ergebnis')
+    await seite.evaluate(() => window.scrollTo(0, 0))
+
+    // Skizze: Werkzeugleiste mit Icons, Dialoge
+    await abschnitt('Skizze').click()
+    await seite.getByRole('toolbar', { name: 'Zeichenwerkzeuge' }).waitFor()
+    await bild('12-skizze')
+    await seite.getByRole('button', { name: 'Symbol', exact: true }).click()
+    await bild('12-skizze-symbol')
+    const flaeche = await seite.locator('.skizze-flaeche svg').boundingBox()
+    await seite.mouse.click(flaeche.x + flaeche.width * 0.78, flaeche.y + flaeche.height * 0.22)
+    await seite.getByRole('dialog', { name: 'Beschriftung' }).waitFor()
+    await bild('12-skizze-dialog-baumart')
+    await seite.getByRole('button', { name: 'Überspringen' }).click()
+    await seite.getByRole('button', { name: 'Text', exact: true }).click()
+    await seite.mouse.click(flaeche.x + flaeche.width * 0.6, flaeche.y + flaeche.height * 0.8)
+    await seite.getByRole('dialog', { name: 'Text einfügen' }).waitFor()
+    await seite.getByRole('textbox', { name: 'Text', exact: true }).fill('Kompost')
+    await bild('12-skizze-dialog-text')
+    await seite.getByRole('button', { name: 'Abbrechen' }).click()
+    await seite.getByRole('button', { name: 'Maßangabe', exact: true }).click()
+    const f2 = await seite.locator('.skizze-flaeche svg').boundingBox()
+    await seite.mouse.move(f2.x + f2.width * 0.1, f2.y + f2.height * 0.62)
+    await seite.mouse.down()
+    await seite.mouse.move(f2.x + f2.width * 0.5, f2.y + f2.height * 0.62, { steps: 4 })
+    await seite.mouse.up()
+    await seite.getByRole('dialog', { name: 'Maß eintragen' }).waitFor()
+    await seite.getByLabel('Maß (in m)').fill('5 m')
+    await bild('12-skizze-dialog-mass')
+    await seite.getByRole('button', { name: 'Abbrechen' }).click()
+
     // Menü „⋯“ und Rückfrage
     await seite.getByRole('button', { name: 'Weitere Aktionen' }).filter({ visible: true }).click()
     await bild('7a-menue')
@@ -236,6 +338,13 @@ try {
     await seite.getByRole('button', { name: 'Profil und Einstellungen' }).filter({ visible: true }).click()
     await seite.getByRole('heading', { name: 'Profil und Einstellungen' }).waitFor()
     await bild('8-profil')
+
+    // Leerer Abschnitt
+    await seite.getByRole('button', { name: 'Protokolle' }).filter({ visible: true }).first().click()
+    await seite.getByRole('button', { name: /Parzelle 17/ }).click()
+    await abschnitt('Aufwuchs').click()
+    await seite.getByText('Noch keine Positionen').first().waitFor()
+    await bild('13-leerzustand')
     await kontext.close()
 
     // Android-Test-Seite im Profil (nachgebaute Brücke)

@@ -3,9 +3,14 @@
  *
  * Touch-tauglich (Pointer Events), SVG-basierte Zeichenfläche, reines JSON-
  * Datenmodell. Die Komponente darf NICHT WepDetail oder Startseite verändern.
+ *
+ * Werkzeugleiste und Dialoge im Stil der App (Tokens, lucide-Icons, Berührflächen ≥ 48 px,
+ * Klassen in src/app/styles.css). Die Zeichenfläche selbst (SVG) ist davon unberührt.
  */
 
-import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useReducer, useRef, useState } from 'react'
+import { Circle, Grid3x3, MousePointer2, Redo2, Ruler, Slash, Square, Trash2, TreePine, Type, Undo2, type LucideIcon } from 'lucide-react'
+import { Dialog, ICON } from '@/app/ui'
 import type { SkizzeDaten, SkizzeElement, SkizzeWerkzeug, SymbolArt } from './types.js'
 import { SYMBOL_ARTEN, leereSkizze, neueId } from './types.js'
 import { primsZuSvg, symbolPrims } from './symbole.js'
@@ -122,15 +127,25 @@ function svgKoordinaten(
 // Werkzeug-Metadaten
 // ---------------------------------------------------------------------------
 
-const WERKZEUGE: { id: SkizzeWerkzeug; label: string; titel: string }[] = [
-  { id: 'auswahl', label: '↖', titel: 'Auswählen / Verschieben / Löschen' },
-  { id: 'rechteck', label: '▭', titel: 'Rechteck zeichnen' },
-  { id: 'linie', label: '╱', titel: 'Linie zeichnen' },
-  { id: 'kreis', label: '○', titel: 'Kreis / Baum zeichnen' },
-  { id: 'text', label: 'T', titel: 'Text einfügen' },
-  { id: 'massangabe', label: '↔', titel: 'Maßangabe zeichnen' },
-  { id: 'symbol', label: '🌳', titel: 'Symbol setzen (Baum, Beet, Hecke …)' },
+const WERKZEUGE: { id: SkizzeWerkzeug; name: string; titel: string; icon: LucideIcon }[] = [
+  { id: 'auswahl', name: 'Auswählen', titel: 'Auswählen / Verschieben / Löschen', icon: MousePointer2 },
+  { id: 'rechteck', name: 'Rechteck', titel: 'Rechteck zeichnen', icon: Square },
+  { id: 'linie', name: 'Linie', titel: 'Linie zeichnen', icon: Slash },
+  { id: 'kreis', name: 'Kreis', titel: 'Kreis / Baum zeichnen', icon: Circle },
+  { id: 'text', name: 'Text', titel: 'Text einfügen', icon: Type },
+  { id: 'massangabe', name: 'Maßangabe', titel: 'Maßangabe zeichnen', icon: Ruler },
+  { id: 'symbol', name: 'Symbol', titel: 'Symbol setzen (Baum, Beet, Hecke …)', icon: TreePine },
 ]
+
+/** Lesbare Namen der Elementarten für die Auswahlzeile. */
+const TYP_NAMEN: Record<SkizzeElement['typ'], string> = {
+  rechteck: 'Rechteck',
+  linie: 'Linie',
+  kreis: 'Kreis',
+  text: 'Text',
+  massangabe: 'Maßangabe',
+  symbol: 'Symbol',
+}
 
 /** Anzeigenamen der Symbole im Auswahlfeld. */
 const SYMBOL_NAMEN: Record<SymbolArt, string> = {
@@ -205,6 +220,7 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
   } | null>(null)
 
   const svgRef = useRef<SVGSVGElement>(null)
+  const editorId = useId()
   const ausgewaehltesEl = zustand.elemente.find((e) => e.id === zustand.ausgewaehlt)
 
   // Zeichnen-Status
@@ -231,6 +247,7 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      if (textDialog || massDialog || kreisLabelDialog) return // Dialog offen: Tasten gehören dem Dialog
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
         e.preventDefault()
         dispatch({ typ: 'undo' })
@@ -246,7 +263,7 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [zustand.ausgewaehlt, zustand.elemente])
+  }, [zustand.ausgewaehlt, zustand.elemente, textDialog, massDialog, kreisLabelDialog])
 
   // ---------------------------------------------------------------------------
   // Pointer-Ereignisse
@@ -637,66 +654,93 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
   // Render
   // ---------------------------------------------------------------------------
 
+  const auswahlName = ausgewaehltesEl
+    ? ausgewaehltesEl.typ === 'symbol'
+      ? SYMBOL_NAMEN[ausgewaehltesEl.art]
+      : TYP_NAMEN[ausgewaehltesEl.typ]
+    : ''
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', userSelect: 'none' }}>
+    <div className="skizze-editor">
       {/* Werkzeugleiste */}
-      <div
-        role="toolbar"
-        aria-label="Zeichenwerkzeuge"
-        style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}
-      >
+      <div role="toolbar" aria-label="Zeichenwerkzeuge" className="werkzeuge">
         {WERKZEUGE.map((w) => (
           <button
             key={w.id}
+            type="button"
+            className="werkzeug"
             title={w.titel}
+            aria-label={w.name}
             aria-pressed={aktivesWerkzeug === w.id}
             onClick={() => setAktivesWerkzeug(w.id)}
-            style={{
-              minWidth: 44,
-              minHeight: 44,
-              fontSize: 20,
-              fontWeight: aktivesWerkzeug === w.id ? 'bold' : 'normal',
-              background: aktivesWerkzeug === w.id ? '#1b5e20' : '#f0f0f0',
-              color: aktivesWerkzeug === w.id ? '#fff' : '#333',
-              border: '1px solid #ccc',
-              borderRadius: 6,
-              cursor: 'pointer',
-            }}
           >
-            {w.label}
+            <w.icon {...ICON} />
           </button>
         ))}
 
-        {/* Trennlinie */}
-        <div style={{ width: 1, height: 44, background: '#ccc', margin: '0 4px' }} />
+        <span className="werkzeuge-trenner" aria-hidden="true" />
 
-        {/* Undo */}
         <button
+          type="button"
+          className="werkzeug"
           title="Rückgängig (Strg+Z)"
+          aria-label="Rückgängig"
           disabled={!kannUndo(zustand.verlauf)}
           onClick={() => dispatch({ typ: 'undo' })}
-          style={{ minWidth: 44, minHeight: 44, fontSize: 20 }}
         >
-          ↩
+          <Undo2 {...ICON} />
         </button>
 
-        {/* Redo */}
         <button
+          type="button"
+          className="werkzeug"
           title="Wiederholen (Strg+Y)"
+          aria-label="Wiederholen"
           disabled={!kannRedo(zustand.verlauf)}
           onClick={() => dispatch({ typ: 'redo' })}
-          style={{ minWidth: 44, minHeight: 44, fontSize: 20 }}
         >
-          ↪
+          <Redo2 {...ICON} />
         </button>
 
-        {/* Symbol-Auswahl */}
-        {aktivesWerkzeug === 'symbol' && (
+        {zustand.ausgewaehlt && !ausgewaehltesEl?.fest && (
+          <button
+            type="button"
+            className="werkzeug werkzeug-gefahr"
+            title="Ausgewähltes Element löschen (Entf)"
+            aria-label="Ausgewähltes Element löschen"
+            onClick={() => zustand.ausgewaehlt && dispatch({ typ: 'element-loeschen', id: zustand.ausgewaehlt })}
+          >
+            <Trash2 {...ICON} />
+          </button>
+        )}
+
+        <button
+          type="button"
+          className="werkzeug werkzeug-schalter"
+          title="Raster ein-/ausblenden"
+          aria-label="Raster"
+          aria-pressed={rasterSichtbar}
+          onClick={() => {
+            const neu = !rasterSichtbar
+            setRasterSichtbar(neu)
+            onAenderung({ ...daten, elemente: zustand.elemente, raster: neu })
+          }}
+        >
+          <Grid3x3 {...ICON} />
+        </button>
+      </div>
+
+      {/* Symbol-Auswahl */}
+      {aktivesWerkzeug === 'symbol' && (
+        <div className="feld">
+          <label className="label" htmlFor={`${editorId}-symbol`}>
+            Symbol
+          </label>
           <select
-            aria-label="Symbol"
+            id={`${editorId}-symbol`}
+            className="eingabe"
             value={symbolArt}
             onChange={(e) => setSymbolArt(e.target.value as SymbolArt)}
-            style={{ minHeight: 44, fontSize: 16, borderRadius: 6 }}
           >
             {SYMBOL_ARTEN.map((a) => (
               <option key={a} value={a}>
@@ -704,86 +748,30 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
               </option>
             ))}
           </select>
-        )}
-
-        {/* Löschen */}
-        {zustand.ausgewaehlt && !ausgewaehltesEl?.fest && (
-          <button
-            title="Ausgewähltes Element löschen (Entf)"
-            onClick={() =>
-              zustand.ausgewaehlt && dispatch({ typ: 'element-loeschen', id: zustand.ausgewaehlt })
-            }
-            style={{
-              minWidth: 44,
-              minHeight: 44,
-              fontSize: 18,
-              background: '#c62828',
-              color: '#fff',
-              border: 'none',
-              borderRadius: 6,
-              cursor: 'pointer',
-            }}
-          >
-            ✕
-          </button>
-        )}
-
-        {/* Raster */}
-        <button
-          title="Raster ein-/ausblenden"
-          aria-pressed={rasterSichtbar}
-          onClick={() => {
-            const neu = !rasterSichtbar
-            setRasterSichtbar(neu)
-            onAenderung({ ...daten, elemente: zustand.elemente, raster: neu })
-          }}
-          style={{
-            minWidth: 44,
-            minHeight: 44,
-            fontSize: 16,
-            background: rasterSichtbar ? '#e8f5e9' : '#f0f0f0',
-            border: '1px solid #ccc',
-            borderRadius: 6,
-            cursor: 'pointer',
-          }}
-        >
-          ⊞
-        </button>
-      </div>
+        </div>
+      )}
 
       {/* Ausgewähltes Element Info */}
       {ausgewaehltesEl && (
-        <div
-          style={{
-            padding: '4px 10px',
-            background: '#e8f5e9',
-            borderRadius: 4,
-            fontSize: 13,
-            color: '#1b5e20',
-          }}
-        >
+        <p className="skizze-auswahl" aria-live="polite">
           {ausgewaehltesEl.fest
-            ? `Ausgewählt: ${ausgewaehltesEl.typ} (fest, nicht änderbar)`
-            : `Ausgewählt: ${ausgewaehltesEl.typ === 'symbol' ? ausgewaehltesEl.art : ausgewaehltesEl.typ} — Ziehen zum Verschieben, Entf zum Löschen`}
-        </div>
+            ? `Ausgewählt: ${auswahlName} (fest, nicht änderbar)`
+            : `Ausgewählt: ${auswahlName} – ziehen zum Verschieben`}
+        </p>
       )}
 
       {/* Zeichenfläche */}
       <div
+        className="skizze-flaeche"
         style={{
-          width: '100%',
           maxWidth: breite,
           aspectRatio: `${breite} / ${hoehe}`,
-          border: '1px solid #bbb',
-          borderRadius: 4,
-          overflow: 'hidden',
           cursor:
             aktivesWerkzeug === 'auswahl'
               ? 'default'
               : aktivesWerkzeug === 'text'
                 ? 'text'
                 : 'crosshair',
-          touchAction: 'none', // Verhindert Scrollen beim Zeichnen
         }}
       >
         <svg
@@ -814,157 +802,110 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
 
       {/* Text-Eingabe-Dialog */}
       {textDialog && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            padding:
-              'env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px)',
-            background: 'rgba(0,0,0,0.3)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-          }}
-        >
-          <div
-            style={{ background: '#fff', padding: 24, borderRadius: 8, minWidth: 280, display: 'flex', flexDirection: 'column', gap: 12 }}
+        <Dialog titel="Text einfügen" onSchliessen={() => setTextDialog(null)}>
+          <form
+            className="dialog-form"
+            onSubmit={(e) => {
+              e.preventDefault()
+              textBestaetigen()
+            }}
           >
-            <label style={{ fontWeight: 'bold' }}>Text eingeben</label>
-            <input
-              autoFocus
-              value={textEingabe}
-              onChange={(e) => setTextEingabe(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') textBestaetigen()
-                if (e.key === 'Escape') setTextDialog(null)
-              }}
-              style={{ fontSize: 16, padding: 8, border: '1px solid #ccc', borderRadius: 4 }}
-              placeholder="z. B. Laube, Weg, Beete …"
-            />
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button onClick={() => setTextDialog(null)} style={{ padding: '8px 16px' }}>
+            <div className="feld">
+              <label className="label" htmlFor={`${editorId}-text`}>
+                Text
+              </label>
+              <input
+                id={`${editorId}-text`}
+                className="eingabe"
+                autoFocus
+                value={textEingabe}
+                onChange={(e) => setTextEingabe(e.target.value)}
+                enterKeyHint="done"
+                placeholder="z. B. Laube, Weg, Beete …"
+              />
+            </div>
+            <div className="dialog-knoepfe">
+              <button type="button" className="knopf" onClick={() => setTextDialog(null)}>
                 Abbrechen
               </button>
-              <button
-                onClick={textBestaetigen}
-                style={{
-                  padding: '8px 16px',
-                  background: '#1b5e20',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: 4,
-                }}
-              >
-                OK
+              <button type="submit" className="knopf knopf-primaer">
+                Einfügen
               </button>
             </div>
-          </div>
-        </div>
+          </form>
+        </Dialog>
       )}
 
       {/* Maßangabe-Dialog */}
       {massDialog && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            padding:
-              'env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px)',
-            background: 'rgba(0,0,0,0.3)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-          }}
-        >
-          <div
-            style={{ background: '#fff', padding: 24, borderRadius: 8, minWidth: 280, display: 'flex', flexDirection: 'column', gap: 12 }}
+        <Dialog titel="Maß eintragen" onSchliessen={() => setMassDialog(null)}>
+          <form
+            className="dialog-form"
+            onSubmit={(e) => {
+              e.preventDefault()
+              massBestaetigen()
+            }}
           >
-            <label style={{ fontWeight: 'bold' }}>Maßangabe (in m)</label>
-            <input
-              autoFocus
-              value={massEingabe}
-              onChange={(e) => setMassEingabe(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') massBestaetigen()
-                if (e.key === 'Escape') setMassDialog(null)
-              }}
-              style={{ fontSize: 16, padding: 8, border: '1px solid #ccc', borderRadius: 4 }}
-              placeholder="z. B. 3,5 m"
-            />
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button onClick={() => setMassDialog(null)} style={{ padding: '8px 16px' }}>
+            <div className="feld">
+              <label className="label" htmlFor={`${editorId}-mass`}>
+                Maß (in m)
+              </label>
+              <input
+                id={`${editorId}-mass`}
+                className="eingabe"
+                autoFocus
+                value={massEingabe}
+                onChange={(e) => setMassEingabe(e.target.value)}
+                enterKeyHint="done"
+                placeholder="z. B. 3,5 m"
+              />
+            </div>
+            <div className="dialog-knoepfe">
+              <button type="button" className="knopf" onClick={() => setMassDialog(null)}>
                 Abbrechen
               </button>
-              <button
-                onClick={massBestaetigen}
-                style={{
-                  padding: '8px 16px',
-                  background: '#1b5e20',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: 4,
-                }}
-              >
-                OK
+              <button type="submit" className="knopf knopf-primaer">
+                Übernehmen
               </button>
             </div>
-          </div>
-        </div>
+          </form>
+        </Dialog>
       )}
 
-      {/* Kreis-Beschriftungs-Dialog */}
+      {/* Beschriftungs-Dialog für neue Kreise und Symbole (Baumart, Name) */}
       {kreisLabelDialog && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            padding:
-              'env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px)',
-            background: 'rgba(0,0,0,0.3)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-          }}
-        >
-          <div
-            style={{ background: '#fff', padding: 24, borderRadius: 8, minWidth: 280, display: 'flex', flexDirection: 'column', gap: 12 }}
+        <Dialog titel="Beschriftung" onSchliessen={() => setKreisLabelDialog(null)}>
+          <form
+            className="dialog-form"
+            onSubmit={(e) => {
+              e.preventDefault()
+              kreisLabelBestaetigen()
+            }}
           >
-            <label style={{ fontWeight: 'bold' }}>Beschriftung / Name (optional)</label>
-            <input
-              autoFocus
-              value={kreisLabelDialog.beschriftung}
-              onChange={(e) =>
-                setKreisLabelDialog({ ...kreisLabelDialog, beschriftung: e.target.value })
-              }
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') kreisLabelBestaetigen()
-                if (e.key === 'Escape') kreisLabelBestaetigen()
-              }}
-              style={{ fontSize: 16, padding: 8, border: '1px solid #ccc', borderRadius: 4 }}
-              placeholder="z. B. Apfel, Birne, Pflaume …"
-            />
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button onClick={kreisLabelBestaetigen} style={{ padding: '8px 16px' }}>
+            <div className="feld">
+              <label className="label" htmlFor={`${editorId}-label`}>
+                Baumart oder Name (optional)
+              </label>
+              <input
+                id={`${editorId}-label`}
+                className="eingabe"
+                autoFocus
+                value={kreisLabelDialog.beschriftung}
+                onChange={(e) => setKreisLabelDialog({ ...kreisLabelDialog, beschriftung: e.target.value })}
+                enterKeyHint="done"
+                placeholder="z. B. Apfel, Birne, Pflaume …"
+              />
+            </div>
+            <div className="dialog-knoepfe">
+              <button type="button" className="knopf" onClick={() => setKreisLabelDialog(null)}>
                 Überspringen
               </button>
-              <button
-                onClick={kreisLabelBestaetigen}
-                style={{
-                  padding: '8px 16px',
-                  background: '#1b5e20',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: 4,
-                }}
-              >
-                OK
+              <button type="submit" className="knopf knopf-primaer">
+                Übernehmen
               </button>
             </div>
-          </div>
-        </div>
+          </form>
+        </Dialog>
       )}
     </div>
   )

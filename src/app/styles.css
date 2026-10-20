@@ -234,6 +234,11 @@ p {
   color: var(--farbe-grund);
 }
 
+.knopf-loeschen {
+  border-color: var(--farbe-warnung);
+  color: var(--farbe-warnung);
+}
+
 .knopf-breit {
   width: 100%;
 }
@@ -454,8 +459,7 @@ button.zeile:active {
   text-align: left;
 }
 
-button.pos:active,
-.pos[aria-expanded='true'] {
+button.pos:active {
   background: var(--farbe-flaeche);
 }
 
@@ -488,12 +492,6 @@ button.pos:active,
   font-size: var(--schrift-klein);
 }
 
-.pos-aktionen {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--abstand-3);
-  padding: 0 0 var(--abstand-3);
-}
 
 .warnung {
   display: flex;
@@ -512,46 +510,21 @@ button.pos:active,
   margin-top: 1px;
 }
 
-.info {
+.warnung-text {
   display: flex;
-  align-items: flex-start;
+  flex-direction: column;
   gap: var(--abstand-2);
-  margin: 0 0 var(--abstand-3);
-  color: var(--farbe-text-2);
-  font-size: var(--schrift-klein);
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
-.info svg {
-  flex: none;
-  margin-top: 1px;
+.meldung-liste {
+  margin: 0;
+  padding-left: var(--abstand-4);
 }
 
-.hinweise {
-  margin-bottom: var(--abstand-2);
-  color: var(--farbe-text-2);
-  font-size: var(--schrift-klein);
-}
-
-.hinweise > summary {
-  display: flex;
-  align-items: center;
-  gap: var(--abstand-2);
-  min-height: var(--beruehr-min);
-  cursor: pointer;
-  list-style: none;
-}
-
-.hinweise > summary::-webkit-details-marker {
-  display: none;
-}
-
-.hinweise > summary svg {
-  flex: none;
-  transition: transform 0.15s;
-}
-
-.hinweise[open] > summary svg.chevron-auf {
-  transform: rotate(90deg);
+.meldung-liste li + li {
+  margin-top: var(--abstand-1);
 }
 
 .summe {
@@ -684,7 +657,9 @@ button.pos:active,
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--abstand-4);
+  padding: calc(env(safe-area-inset-top, 0px) + var(--abstand-4)) calc(env(safe-area-inset-right, 0px) + var(--abstand-4))
+    calc(env(safe-area-inset-bottom, 0px) + var(--abstand-4)) calc(env(safe-area-inset-left, 0px) + var(--abstand-4));
+  overflow-y: auto;
   background: var(--farbe-flaeche); /* volle Fläche, keine Transparenz */
 }
 
@@ -694,6 +669,7 @@ button.pos:active,
   gap: var(--abstand-4);
   width: 100%;
   max-width: 420px;
+  margin: auto;
   padding: var(--abstand-5);
   border: var(--linie) solid var(--farbe-rand);
   border-radius: var(--radius);
@@ -705,6 +681,10 @@ button.pos:active,
   justify-content: flex-end;
   gap: var(--abstand-3);
   flex-wrap: wrap;
+}
+
+.dialog .eingabe {
+  min-width: 0;
 }
 
 /* ---------------------------------------------------------------------------
@@ -1099,6 +1079,213 @@ select.eingabe {
   color: var(--farbe-text-2);
 }
 
+/* Leerer Zustand einer Liste */
+.leerzustand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--abstand-2);
+  padding: var(--abstand-6) var(--abstand-4);
+  border-top: var(--linie) solid var(--farbe-linie);
+  color: var(--farbe-text-2);
+  text-align: center;
+}
+
+.leer-titel {
+  color: var(--farbe-text);
+  font-weight: var(--gewicht-mittel);
+}
+
+/* Export: gewählte Bau-Excel und Ergebnis */
+.datei {
+  border-top: var(--linie) solid var(--farbe-linie);
+}
+
+.datei .symbolknopf {
+  margin-right: calc(-1 * var(--abstand-2));
+}
+
+.ergebnis {
+  display: flex;
+  flex-direction: column;
+  gap: var(--abstand-3);
+  margin-top: var(--abstand-5);
+}
+
+.ergebnis .warnung,
+.ergebnis .ok {
+  margin: 0;
+}
+
+/* Skizzen-Editor: Werkzeugleiste, Auswahlzeile, Zeichenfläche */
+.skizze-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--abstand-3);
+  user-select: none;
+}
+
+.werkzeuge {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--abstand-2);
+}
+
+.werkzeuge-trenner {
+  align-self: stretch;
+  width: var(--linie);
+  margin: var(--abstand-1) var(--abstand-1);
+  background: var(--farbe-linie);
+}
+
+.werkzeug {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--beruehr-min);
+  min-height: var(--beruehr-min);
+  padding: 0;
+  border: var(--linie) solid var(--farbe-rand);
+  border-radius: var(--radius);
+  background: var(--farbe-grund);
+  color: var(--farbe-text);
+}
+
+.werkzeug:active:not(:disabled) {
+  background: var(--farbe-flaeche);
+}
+
+.werkzeug[aria-pressed='true'] {
+  border-color: var(--farbe-akzent);
+  background: var(--farbe-akzent);
+  color: var(--farbe-auf-akzent);
+}
+
+/* Schalter (Raster): ein-/ausgeschaltet, kein gewähltes Werkzeug – daher nur umrandet */
+.werkzeug-schalter[aria-pressed='true'] {
+  border-color: var(--farbe-akzent);
+  background: var(--farbe-akzent-hell);
+  color: var(--farbe-akzent);
+}
+
+.werkzeug:disabled {
+  border-color: var(--farbe-linie);
+  color: var(--farbe-rand);
+}
+
+.werkzeug-gefahr {
+  border-color: var(--farbe-warnung);
+  color: var(--farbe-warnung);
+}
+
+.skizze-auswahl {
+  padding: var(--abstand-2) var(--abstand-3);
+  border-radius: var(--radius-klein);
+  background: var(--farbe-akzent-hell);
+  color: var(--farbe-akzent);
+  font-size: var(--schrift-klein);
+}
+
+.skizze-flaeche {
+  width: 100%;
+  overflow: hidden;
+  border: var(--linie) solid var(--farbe-rand);
+  border-radius: var(--radius-klein);
+  background: #fff; /* Zeichenfläche bleibt weiß, auch im Dunkelmodus */
+  touch-action: none; /* kein Scrollen beim Zeichnen */
+}
+
+.dialog-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--abstand-4);
+}
+
+/* Skizzen-Chat (nur mit KI_AKTIV) */
+.chat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--abstand-3);
+  margin-top: var(--abstand-4);
+}
+
+.chat-verlauf {
+  display: flex;
+  flex-direction: column;
+  gap: var(--abstand-3);
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.chat-eintrag {
+  display: flex;
+  flex-direction: column;
+  gap: var(--abstand-1);
+}
+
+.chat-frage {
+  align-self: flex-end;
+  max-width: 90%;
+  padding: var(--abstand-2) var(--abstand-3);
+  border-radius: var(--radius);
+  background: var(--farbe-akzent-hell);
+}
+
+.chat-antwort {
+  padding: var(--abstand-2) var(--abstand-3);
+  border: var(--linie) solid var(--farbe-linie);
+  border-radius: var(--radius);
+  background: var(--farbe-flaeche);
+}
+
+.chat-schritte {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chat-schritt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--abstand-2);
+}
+
+.chat-text {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--abstand-2);
+  min-width: 0;
+}
+
+.chat-text svg {
+  flex: none;
+  margin-top: 3px;
+}
+
+.chat-fehler {
+  color: var(--farbe-warnung);
+}
+
+.chat-eingabe {
+  display: flex;
+  align-items: stretch;
+  gap: var(--abstand-2);
+}
+
+.chat-eingabe textarea {
+  flex: 1;
+  min-width: 0;
+}
+
+.chat-eingabe .werkzeug {
+  align-self: stretch;
+}
+
 /* Skizze: Editor darf die volle Breite nutzen */
 .skizze-tab {
   display: flex;
@@ -1277,9 +1464,7 @@ select.eingabe {
     border-top: 0;
   }
 
-  .pos-gruppe > .warnung,
-  .pos-gruppe > .hinweise,
-  .pos-aktionen {
+  .pos-gruppe > .warnung {
     margin-left: calc(120px + 2 * var(--abstand-4));
   }
 
@@ -1302,6 +1487,12 @@ select.eingabe {
 
   .hinzufuegen[data-schritt='formular'] {
     padding-bottom: 0;
+  }
+
+  /* Position/Beseitigung ändern: nur das Formular, in lesbarer Breite */
+  .bearbeiten .split {
+    display: block;
+    max-width: 560px;
   }
 
   .split-suche .suchfeld {
@@ -1344,10 +1535,6 @@ select.eingabe {
 /* Feinheiten */
 .nowrap {
   white-space: nowrap;
-}
-
-.pos-gruppe > .hinweise {
-  margin-top: calc(-1 * var(--abstand-2));
 }
 
 .werte + .liste {

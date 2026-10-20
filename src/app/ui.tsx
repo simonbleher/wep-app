@@ -1,8 +1,8 @@
 // Gemeinsame Bausteine des App-Rahmens (Beta 2, Schritt 4): Kopfzeile (Handy),
 // Seitenleiste (Tablet ≥ 900 px), Einträge darin und Zahlenformate.
 // Strich-Icons aus lucide-react, Farben nur über die Tokens (styles.css).
-import type { ReactNode } from 'react'
-import { CircleUser, FileText, type LucideIcon } from 'lucide-react'
+import { useEffect, useId, type ReactNode } from 'react'
+import { CircleUser, FileText, TriangleAlert, type LucideIcon } from 'lucide-react'
 
 /** Einheitliche Icon-Größe und Strichstärke. */
 export const ICON = { size: 22, strokeWidth: 1.75, 'aria-hidden': true } as const
@@ -85,5 +85,114 @@ export function HauptSeitenleiste({
       </nav>
       {fuss && <div className="sl-fuss">{fuss}</div>}
     </aside>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Dialoge, Rückfragen, Leer- und Fehlerzustände (einheitlich in der ganzen App)
+// ---------------------------------------------------------------------------
+
+/**
+ * Dialog auf voller Fläche (keine Transparenz). Escape schließt ihn; ein Tipp daneben
+ * nicht, damit auf der Parzelle nichts versehentlich verloren geht.
+ */
+export function Dialog({
+  titel,
+  children,
+  onSchliessen,
+  rueckfrage = false,
+}: {
+  titel: string
+  children: ReactNode
+  onSchliessen: () => void
+  /** true: Rückfrage vor einer Aktion (role „alertdialog“) */
+  rueckfrage?: boolean
+}) {
+  const id = useId()
+  useEffect(() => {
+    const taste = (e: KeyboardEvent) => e.key === 'Escape' && onSchliessen()
+    window.addEventListener('keydown', taste)
+    return () => window.removeEventListener('keydown', taste)
+  }, [onSchliessen])
+
+  return (
+    <div className="dialog-hintergrund">
+      <div className="dialog" role={rueckfrage ? 'alertdialog' : 'dialog'} aria-modal="true" aria-labelledby={`${id}-t`}>
+        <h2 className="h2" id={`${id}-t`}>
+          {titel}
+        </h2>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+/** Rückfrage vor dem Löschen: „Abbrechen“ (vorfokussiert) und der rote Knopf. */
+export function Rueckfrage({
+  titel,
+  text,
+  bestaetigen = 'Löschen',
+  onAbbrechen,
+  onBestaetigen,
+}: {
+  titel: string
+  text: string
+  bestaetigen?: string
+  onAbbrechen: () => void
+  onBestaetigen: () => void
+}) {
+  return (
+    <Dialog titel={titel} rueckfrage onSchliessen={onAbbrechen}>
+      <p>{text}</p>
+      <div className="dialog-knoepfe">
+        <button type="button" className="knopf" autoFocus onClick={onAbbrechen}>
+          Abbrechen
+        </button>
+        <button type="button" className="knopf knopf-gefahr" onClick={onBestaetigen}>
+          {bestaetigen}
+        </button>
+      </div>
+    </Dialog>
+  )
+}
+
+/** Leerer Zustand einer Liste oder eines Abschnitts: Icon, Titel, Erklärung, ggf. Aktion. */
+export function LeerZustand({
+  icon: Icon,
+  titel,
+  text,
+  aktion,
+}: {
+  icon: LucideIcon
+  titel: string
+  text?: string
+  aktion?: ReactNode
+}) {
+  return (
+    <div className="leerzustand">
+      <Icon {...ICON} size={32} strokeWidth={1.5} />
+      <p className="leer-titel">{titel}</p>
+      {text && <p className="neben">{text}</p>}
+      {aktion}
+    </div>
+  )
+}
+
+/** Fehler- und Warnmeldung: roter Streifen mit Icon. `alarm`: sofort vorlesen (Fehler). */
+export function Meldung({ children, alarm = false }: { children: ReactNode; alarm?: boolean }) {
+  return (
+    <div className="warnung" role={alarm ? 'alert' : 'note'}>
+      <TriangleAlert {...ICON} size={20} />
+      <div className="warnung-text">{children}</div>
+    </div>
+  )
+}
+
+/** Ladezustand (kurz, nur beim Öffnen aus IndexedDB). */
+export function Laedt() {
+  return (
+    <p className="leertext" role="status">
+      Lade …
+    </p>
   )
 }

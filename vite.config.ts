@@ -52,20 +52,9 @@ export default defineConfig({
       workbox: {
         // Offline-Precaching aller gebauten Assets
         globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest,xlsx}'],
-        // Design-Vorschau nicht in die App umleiten (sonst zeigt der Service Worker index.html)
-        navigateFallbackDenylist: [/^\/entwurf/],
       },
     }),
   ],
-  build: {
-    rollupOptions: {
-      // Zweiter Einstieg: Design-Vorschau (docs/entwurf/README.md), unabhängig von der App
-      input: {
-        main: fileURLToPath(new URL('./index.html', import.meta.url)),
-        entwurf: fileURLToPath(new URL('./entwurf.html', import.meta.url)),
-      },
-    },
-  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

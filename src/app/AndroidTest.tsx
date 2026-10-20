@@ -1,14 +1,13 @@
 // Test-Seite für den Hintergrund-Upload (nur in der Android-App sichtbar, im Profil):
 // Warteschlange, letzte Worker-Läufe, aktueller Netztyp und „Jetzt versuchen“.
 import { useCallback, useEffect, useState } from 'react'
-import { TriangleAlert } from 'lucide-react'
 import {
   WepNative,
   type NetzInfo,
   type ProtokollEintrag,
   type WarteschlangenEintrag,
 } from '@/android/native'
-import { ICON } from './ui'
+import { Meldung } from './ui'
 
 function zeit(iso: string): string {
   const d = new Date(iso)
@@ -86,10 +85,9 @@ export function AndroidTest() {
         </button>
       </div>
       {fehler && (
-        <p className="warnung" role="alert">
-          <TriangleAlert {...ICON} size={20} />
-          <span>{fehler}</span>
-        </p>
+        <Meldung alarm>
+            <p>{fehler}</p>
+          </Meldung>
       )}
       <h3 className="gruppenkopf">Protokoll (neueste zuerst)</h3>
       {protokoll.length === 0 ? (
