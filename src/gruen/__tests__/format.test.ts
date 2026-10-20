@@ -78,6 +78,18 @@ describe('Bezeichnungen', () => {
     expect(gefundeneArt(nachId('aw-obstgehoelz'), '')).toBeUndefined()
   })
 
+  it('Suche nach dem Positionsnamen behält den Namen („Rasen“ → nicht „Rasengräser“)', () => {
+    const rasen = nachId('aw-rasen')
+    expect(gefundeneArt(rasen, 'Rasen')).toBeUndefined()
+    expect(gefundeneArt(rasen, 'rase')).toBeUndefined()
+    expect(kurzeBezeichnung(rasen, undefined, gefundeneArt(rasen, 'Rasen'))).toBe('Rasen')
+    // Wer die Art selbst nennt, bekommt sie weiterhin
+    expect(gefundeneArt(rasen, 'Rasengräser')).toBe('Rasengräser')
+    // Name plus Art: Name zählt nicht, die Art schon
+    expect(gefundeneArt(nachId('aw-hecke'), 'Hecke Liguster')).toBe('Liguster')
+    expect(gefundeneArt(nachId('aw-hecke'), 'Hecke')).toBeUndefined()
+  })
+
   it('ohne Varianten bleibt die Grundbezeichnung', () => {
     const rasen = nachId('aw-rasen')
     expect(kurzeBezeichnung(rasen)).toBe(rasen.bezeichnung.replace(/\s*\(z\.\s*B\.[^)]*\)/g, ''))

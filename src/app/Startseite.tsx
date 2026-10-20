@@ -2,13 +2,13 @@
 // Gelöscht wird nicht hier, sondern in der WEP-Ansicht (Menü „⋯“, mit Rückfrage).
 import { useCallback, useEffect, useState } from 'react'
 import { ChevronRight, CircleUser, FileText, Plus } from 'lucide-react'
-import type { Wep } from '@/model'
+import { WEP_STATUS, naechsteVorgangsNr, wepStatus, type Wep, type WepStatus } from '@/model'
 import type { Konto } from '@/konto'
 import { lokalesProfil, neuerWepMitProfil } from '@/profil'
 import { alleWeps, speichereWep } from './db'
 import { UpdateHinweis } from './UpdateHinweis'
 import { StatusZeile, useAbgleich } from './SyncLeiste'
-import { HauptSeitenleiste, ICON, Laedt, LeerZustand, Meldung, datumDe } from './ui'
+import { HauptSeitenleiste, ICON, Laedt, LeerZustand, Meldung, StatusMarke, datumDe } from './ui'
 
 interface Props {
   /** Angemeldetes Konto oder null („ohne Konto“). */
@@ -18,21 +18,6 @@ interface Props {
   onProfil: () => void
   /** Öffnet die Detailansicht des WEP mit der angegebenen id. */
   onOeffnen: (wepId: string) => void
-}
-
-/**
- * Erzeugt eine neue Vorgangs-Nr. der Form "<Jahr>-<lfd. Nummer>".
- * Die laufende Nummer ergibt sich aus den bereits vorhandenen WEPs des Jahres.
- */
-function naechsteId(vorhandene: Wep[]): string {
-  const jahr = new Date().getFullYear()
-  const prefix = `${jahr}-`
-  const nummern = vorhandene
-    .filter((w) => w.id.startsWith(prefix))
-    .map((w) => Number.parseInt(w.id.slice(prefix.length), 10))
-    .filter((n) => Number.isFinite(n))
-  const naechste = (nummern.length ? Math.max(...nummern) : 0) + 1
-  return `${prefix}${String(naechste).padStart(3, '0')}`
 }
 
 /** Titel eines WEP für die Liste: „Anlage · Parzelle“ (leer, wenn nichts eingetragen). */
@@ -50,6 +35,7 @@ function wepNeben(wep: Wep): string {
 export function Startseite({ konto, verfuegbar, onProfil, onOeffnen }: Props) {
   const [weps, setWeps] = useState<Wep[]>([])
   const [geladen, setGeladen] = useState(false)
+  const [filter, setFilter] = useState<WepStatus | 'alle'>('alle')
 
   const neuLaden = useCallback(() => {
     void alleWeps().then((liste) => {
@@ -63,12 +49,14 @@ export function Startseite({ konto, verfuegbar, onProfil, onOeffnen }: Props) {
   const abgleich = useAbgleich(konto, neuLaden)
 
   async function neuesWep() {
-    const id = naechsteId(weps)
+    const id = naechsteVorgangsNr(weps)
     const wep = neuerWepMitProfil(id, lokalesProfil.lade().profil)
     await speichereWep(wep)
     setWeps((alt) => [wep, ...alt])
     onOeffnen(id)
   }
+
+  const sichtbar = filter === 'alle' ? weps : weps.filter((w) => wepStatus(w) === filter)
 
   const status = <StatusZeile konto={konto} verfuegbar={verfuegbar} abgleich={abgleich} />
 
@@ -103,6 +91,16 @@ export function Startseite({ konto, verfuegbar, onProfil, onOeffnen }: Props) {
           </Meldung>
         ))}
 
+        {geladen && weps.length > 0 && (
+          <div className="segmente status-filter" role="group" aria-label="Nach Status filtern">
+            {(['alle', ...WEP_STATUS] as const).map((f) => (
+              <button key={f} type="button" className="segment" aria-pressed={f === filter} onClick={() => setFilter(f)}>
+                {f === 'alle' ? 'Alle' : f.charAt(0).toUpperCase() + f.slice(1)}
+              </button>
+            ))}
+          </div>
+        )}
+
         {!geladen ? (
           <Laedt />
         ) : weps.length === 0 ? (
@@ -111,9 +109,15 @@ export function Startseite({ konto, verfuegbar, onProfil, onOeffnen }: Props) {
             titel="Noch kein Protokoll"
             text="Mit „Neues WEP“ ein erstes Protokoll anlegen."
           />
+        ) : sichtbar.length === 0 ? (
+          <LeerZustand
+            icon={FileText}
+            titel={`Kein Protokoll „${filter}“`}
+            text="Mit „Alle“ sind wieder alle Protokolle zu sehen."
+          />
         ) : (
           <ul className="liste" aria-label="Protokolle">
-            {weps.map((wep) => {
+            {sichtbar.map((wep) => {
               const titel = wepTitel(wep)
               return (
                 <li key={wep.id}>
@@ -122,6 +126,7 @@ export function Startseite({ konto, verfuegbar, onProfil, onOeffnen }: Props) {
                       <span className={titel ? 'zeile-titel' : 'zeile-titel leer'}>{titel || 'ohne Bezeichnung'}</span>
                       <span className="neben">{wepNeben(wep)}</span>
                     </span>
+                    <StatusMarke status={wepStatus(wep)} />
                     <ChevronRight {...ICON} className="chevron" />
                   </button>
                 </li>

@@ -71,9 +71,13 @@ export function variantenMerkmale(v: KatalogVariante | undefined): string {
  * „Thuja/Lebensbaum“ wird der passende Teil geliefert. Ohne Treffer: undefined.
  */
 export function gefundeneArt(pos: KatalogPosition, suchbegriff: string): string | undefined {
+  // Suchwörter, die nur den Positionsnamen anfangen („Rasen“ bei „Rasen“ → „Rasengräser“),
+  // nennen keine Art: die Position behält ihren Namen.
+  const nameWoerter = normalisiere(grundbezeichnung(pos)).split(/[^a-z0-9]+/).filter(Boolean)
   const tokens = normalisiere(suchbegriff)
     .split(/\s+/)
     .filter((t) => t.length >= 3)
+    .filter((t) => !nameWoerter.some((w) => w.startsWith(t)))
   if (tokens.length === 0) return undefined
   const kandidaten = [...(pos.arten ?? []), ...(pos.synonyme ?? [])]
   for (const eintrag of kandidaten) {

@@ -390,6 +390,33 @@ button.zeile:active {
   color: var(--farbe-akzent);
 }
 
+.status {
+  flex: none;
+  padding: 2px var(--abstand-2);
+  border: var(--linie) solid var(--farbe-rand);
+  border-radius: var(--radius-klein);
+  background: var(--farbe-grund);
+  color: var(--farbe-text-2);
+  font-size: var(--schrift-klein);
+  white-space: nowrap;
+}
+
+.status-filter {
+  margin-bottom: var(--abstand-4);
+}
+
+.status-fertig {
+  border-color: var(--farbe-akzent);
+  background: var(--farbe-akzent-hell);
+  color: var(--farbe-akzent-gedrueckt);
+}
+
+.status-exportiert {
+  border-color: var(--farbe-akzent);
+  background: var(--farbe-akzent);
+  color: var(--farbe-auf-akzent);
+}
+
 .zeile-wert {
   flex: none;
   color: var(--farbe-text-2);
@@ -1353,6 +1380,11 @@ select.eingabe {
     display: flex;
     flex-direction: column;
     min-width: 0;
+  }
+
+  .sl-status {
+    align-self: flex-start;
+    margin-top: var(--abstand-1);
   }
 
   .sl-wep-titel {
