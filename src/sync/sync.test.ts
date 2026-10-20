@@ -35,6 +35,9 @@ class FakeOneDrive implements GraphClient {
     this.dateien.set(name, { inhalt, eTag, geaendertAm })
     return { name, eTag, geaendertAm }
   }
+  async verschiebe(): Promise<'verschoben' | 'vorhanden'> {
+    throw new Error('wird im Engine-Test nicht gebraucht')
+  }
 }
 
 class FakeLokal implements LokalSpeicher {
@@ -298,6 +301,57 @@ describe('Graph-Client', () => {
       expect(a.url.startsWith('https://graph.microsoft.com/v1.0/me/drive/special/approot')).toBe(true)
       expect((a.init?.headers as Record<string, string>).Authorization).toBe('Bearer TOKEN')
     }
+  })
+
+  it('arbeitet in Ordnern: Pfade, fehlender Ordner = leere Liste, Verschieben per Ordner-Id', async () => {
+    const aufrufe: { url: string; methode: string; body?: string }[] = []
+    const holen = (async (url: string, init?: RequestInit) => {
+      aufrufe.push({ url, methode: init?.method ?? 'GET', body: init?.body as string | undefined })
+      if (url.includes('/daten:/children')) return new Response('', { status: 404 })
+      if (url.includes('?$select=id')) return new Response('{"id":"ORDNER-ID"}')
+      if (init?.method === 'PATCH') return new Response('{}')
+      return new Response('{"name":"a.xlsx","eTag":"e9","lastModifiedDateTime":"2026-10-20T10:00:00Z"}')
+    }) as unknown as typeof fetch
+    const basis = 'https://graph.microsoft.com/v1.0/me/drive/special/approot'
+
+    const daten = erstelleGraphClient(async () => 'T', holen, 'daten')
+    expect(await daten.liste()).toEqual([])
+    await daten.schreibe('2026-001.json', '{}')
+    const exporte = erstelleGraphClient(async () => 'T', holen, 'Exporte')
+    await exporte.schreibe('2026-001_WEP.xlsx', new Blob(['x']), 'application/xlsx')
+
+    const wurzel = erstelleGraphClient(async () => 'T', holen)
+    expect(await wurzel.verschiebe('2026-001.json', 'daten')).toBe('verschoben')
+
+    expect(aufrufe.map((a) => a.url)).toEqual([
+      `${basis}:/daten:/children?$select=name,eTag,lastModifiedDateTime,file&$top=200`,
+      `${basis}:/daten/2026-001.json:/content`,
+      `${basis}:/Exporte/2026-001_WEP.xlsx:/content`,
+      `${basis}:/daten?$select=id`,
+      `${basis}:/2026-001.json:`,
+    ])
+    expect(JSON.parse(aufrufe[4].body as string)).toMatchObject({
+      parentReference: { id: 'ORDNER-ID' },
+      '@microsoft.graph.conflictBehavior': 'fail',
+    })
+  })
+
+  it('Verschieben: Konflikt 409 heißt „vorhanden“, ein fehlender Zielordner wird angelegt', async () => {
+    const aufrufe: string[] = []
+    const holen = (async (url: string, init?: RequestInit) => {
+      aufrufe.push(`${init?.method ?? 'GET'} ${url.replace(/^.*approot/, '')}`)
+      if (url.includes('?$select=id')) return new Response('', { status: 404 })
+      if (init?.method === 'POST') return new Response('{"id":"NEU"}')
+      return new Response('', { status: 409 })
+    }) as unknown as typeof fetch
+
+    const wurzel = erstelleGraphClient(async () => 'T', holen)
+    expect(await wurzel.verschiebe('a.json', 'daten')).toBe('vorhanden')
+    expect(aufrufe).toEqual([
+      'GET :/daten?$select=id',
+      'POST /children',
+      'PATCH :/a.json:',
+    ])
   })
 
   it('meldet HTTP-Fehler', async () => {

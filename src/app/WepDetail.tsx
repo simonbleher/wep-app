@@ -33,6 +33,7 @@ import { skizzeAlsPng } from '@/skizze/skizzePng'
 import { skizzeDatenZuFormen, type Kasten } from '@/export/skizzeFormen'
 import { svgZuPngBrowser } from '@/export/svgRaster'
 import { exportWep, type ExportResult } from '@/export'
+import { exportNachOneDrive } from '@/sync'
 import { berechnePreisvorschlag } from '@/gruen/preisvorschlag'
 import { berechneRegelhinweise } from '@/gruen/regelhinweise'
 import { berechneAbschnittSumme } from '@/gruen/summen'
@@ -84,7 +85,7 @@ type HinzufuegenDialog =
 type ExportZustand =
   | { typ: 'idle' }
   | { typ: 'laedt' }
-  | { typ: 'fertig'; result: ExportResult }
+  | { typ: 'fertig'; result: ExportResult; oneDrive?: string }
   | { typ: 'fehler'; meldung: string }
 
 // ---------------------------------------------------------------------------
@@ -1179,7 +1180,20 @@ function ExportTab({
       a.click()
       URL.revokeObjectURL(url)
 
-      setExportZustand({ typ: 'fertig', result })
+      // Zusätzlich nach OneDrive (Exporte/): sofort oder, ohne Netz, per Warteschlange.
+      // Ein Fehler hier darf den fertigen Download nicht entwerten.
+      let oneDrive: string | undefined
+      try {
+        const status = await exportNachOneDrive(result.filename, result.blob)
+        if (status === 'hochgeladen') oneDrive = 'Auch in OneDrive abgelegt (Ordner Exporte).'
+        else if (status === 'wartet') {
+          oneDrive = 'OneDrive: wartet auf Netz und wird beim nächsten Abgleich hochgeladen.'
+        }
+      } catch (e) {
+        oneDrive = `OneDrive: ${e instanceof Error ? e.message : String(e)}`
+      }
+
+      setExportZustand({ typ: 'fertig', result, oneDrive })
     } catch (err) {
       setExportZustand({
         typ: 'fehler',
@@ -1241,6 +1255,7 @@ function ExportTab({
           <p className="hinweis hinweis-ok">
             ✅ Export erfolgreich: {exportZustand.result.filename}
           </p>
+          {exportZustand.oneDrive && <p className="hinweis-klein">{exportZustand.oneDrive}</p>}
           {exportZustand.result.skizzeEingefuegt && (
             <p className="hinweis-klein">
               🖍️ Skizze ins Blatt „Skizze Außenanlage-Aufwuchs“ eingefügt

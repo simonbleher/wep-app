@@ -109,6 +109,15 @@ Stand: Branch katalog/bewrl-katalog – katalog.json (52 Positionen inkl. S. 18 
 > privaten Konto registriert (Redirect-URIs für localhost und die spätere
 > Veröffentlichung). Tests mit gemocktem Graph-Client. PR.
 
+## Beta 2 (Plan: docs/PLAN-BETA2.md)
+
+### B2-2 · Konto, Login, Profil, Ordnerstruktur 👀 (#app-gruen) – Branch app/konto-profil
+Ergebnis: Konto-Modul `src/konto/` (Web/MSAL, Schnittstelle für die spätere Android-Umsetzung),
+Login-Bildschirm mit „Ohne Konto fortfahren“, Profil-Bildschirm, Ordner `daten/` · `Exporte/` ·
+`LIESMICH.txt` im OneDrive (Migration beim ersten Abgleich), Excel-Export zusätzlich nach `Exporte/`
+(Warteschlange offline), Profil-Abgleich über `daten/profil.json`. Playwright-Durchlauf: `npm run e2e`.
+Details: docs/SYNC.md, docs/ENTSCHEIDUNGEN.md. Offen: Schritt 3 (Android-Anmeldung), Schritt 4 (Design).
+
 ## KI-Assistent (Plan: docs/KI-ASSISTENT.md)
 
 > **Abgeschaltet seit 20.10.2026** (Beta 2, Schritt 1 – Branch app/ki-aus 👀): Schalter `KI_AKTIV`,

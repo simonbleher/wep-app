@@ -3,7 +3,7 @@
 // Reine Logik ohne Browser-APIs – dadurch mit gemocktem Graph-Client testbar.
 //
 // Regeln (Beta, ein Nutzer mit mehreren Geräten):
-// - Eine Datei pro WEP: <Vorgangs-Nr>.json
+// - Eine Datei pro WEP: <Vorgangs-Nr>.json (im Client-Ordner, in der App: daten/)
 // - Nur lokal geändert  → hochladen
 // - Nur in OneDrive geändert → herunterladen
 // - Beides geändert (Konflikt) → neuere Änderung (geaendertAm) gewinnt, die
@@ -15,6 +15,7 @@
 // - Löschen wird in der Beta nicht synchronisiert: Ein lokal gelöschtes WEP
 //   bleibt in OneDrive, wird auf diesem Gerät aber nicht wieder geladen.
 import type { Wep } from '@/model'
+import { PROFIL_DATEI } from './ordner'
 import type {
   GraphClient,
   LokalSpeicher,
@@ -30,9 +31,11 @@ export function dateiName(wepId: string): string {
   return `${wepId}.json`
 }
 
-/** Liefert die WEP-id zu einem Dateinamen oder null für fremde/Konflikt-Dateien. */
+/** Liefert die WEP-id zu einem Dateinamen oder null für fremde/Konflikt-/Profil-Dateien. */
 export function wepIdAusName(name: string): string | null {
-  if (!name.endsWith('.json') || name.includes(KONFLIKT_MARKE)) return null
+  if (!name.endsWith('.json') || name.includes(KONFLIKT_MARKE) || name === PROFIL_DATEI) {
+    return null
+  }
   return name.slice(0, -'.json'.length)
 }
 

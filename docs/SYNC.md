@@ -6,11 +6,11 @@ sein **privates OneDrive** ab. Die App sieht dabei **nur ihren eigenen Ordner**
 
 ## So funktioniert es
 
-- Pro WEP liegt eine Datei `<Vorgangs-Nr>.json` im App-Ordner.
+- Pro WEP liegt eine Datei `<Vorgangs-Nr>.json` im Ordner `daten/` des App-Ordners.
 - Jede Änderung wird zuerst lokal gespeichert (IndexedDB, funktioniert offline)
   und als „wartet auf Upload“ markiert.
 - Abgeglichen wird beim Öffnen der Startseite, wenn das Gerät wieder online geht,
-  und über den Knopf **„🔄 Abgleichen“**.
+  und über den Textknopf **„Abgleichen“** in der Statuszeile der Startseite.
 - **Konflikt** (dasselbe WEP auf zwei Geräten geändert): Die neuere Änderung
   gewinnt. Die ältere Fassung bleibt als
   `<Vorgangs-Nr>.konflikt-<Zeit>.json` im OneDrive-Ordner erhalten, und die App
@@ -23,6 +23,49 @@ sein **privates OneDrive** ab. Die App sieht dabei **nur ihren eigenen Ordner**
   dieselbe Nummer bekommen – dann greift die Konflikt-Regel und die ältere
   Fassung liegt als Konflikt-Kopie in OneDrive. Am besten neue WEPs auf einem
   Gerät anlegen, solange das noch nicht gelöst ist.
+
+## Ordnerstruktur im OneDrive
+
+```
+Apps/WEP-App/
+  daten/          WEP-Dateien (<Vorgangs-Nr>.json), Konflikt-Kopien, profil.json
+  Exporte/        fertige Excel-Dateien (<Vorgangs-Nr>_WEP.xlsx)
+  LIESMICH.txt    „Ordner der WEP-App – bitte nichts von Hand ändern; fertige
+                  Excel-Dateien liegen in Exporte/.“
+```
+
+- **Erster Abgleich:** Die App legt `LIESMICH.txt` an und verschiebt WEP- und
+  Konflikt-Dateien, die frühere Versionen direkt in den App-Ordner gelegt haben,
+  nach `daten/` (Graph-Verschieben, pro Gerät einmal; `src/sync/ordner.ts`).
+  Das ist idempotent und überschreibt nie etwas: Gibt es die Datei in `daten/`
+  schon, bleibt die alte im App-Ordner unberührt liegen. Fremde Dateien bleiben
+  ebenfalls, wo sie sind. Schlägt das Einrichten fehl, wird nicht abgeglichen.
+- **Excel-Export:** Beim Export wird die Datei wie bisher heruntergeladen und
+  zusätzlich nach `Exporte/` hochgeladen, wenn die App angemeldet und online ist.
+  Sonst wartet sie in einer Warteschlange auf dem Gerät (IndexedDB-Store
+  `exporte`) und geht beim nächsten Abgleich hoch. Ein neuer Export mit demselben
+  Namen ersetzt die ältere Fassung. Ohne Konto passiert nichts. (Einfacher
+  Graph-Upload, geeignet bis ca. 4 MB je Datei.)
+- **Profil:** `daten/profil.json` (`wep-profil/1`) enthält Name, Rolle und
+  Standard-Kleingartenanlage. Es gibt kein Konflikt-Verfahren, die neuere Änderung
+  gewinnt. Geräte-Einstellungen („Upload nur über WLAN“) bleiben lokal und stehen
+  nie in dieser Datei.
+
+## Anmeldung, „ohne Konto“ und Profil in der App
+
+- Beim ersten Start und nach dem Abmelden erscheint ein Login-Bildschirm mit dem
+  Knopf „Mit Microsoft anmelden“ und dem kleinen Textlink „Ohne Konto fortfahren
+  (nur auf diesem Gerät)“. Die Wahl wird auf dem Gerät gemerkt; danach startet die
+  App direkt, auch offline. Ist keine Client-ID eingetragen, gibt es keinen
+  Login-Bildschirm und die App läuft wie „ohne Konto“.
+- Wer ohne Konto startet, kann sich später im **Profil** (Symbol oben auf der
+  Startseite) anmelden. Der erste Abgleich lädt dann alle lokalen WEPs hoch.
+- **Abmelden** (im Profil) vergisst nur den Abgleich-Stand (damit ein anderes Konto
+  sauber bei null beginnt) – WEPs und Profil bleiben auf dem Gerät.
+- Im Profil: Name (wird „Wertermittler Außenanlagen & Aufwuchs“ in neuen WEPs),
+  Rolle (Grün / Bau / beides, vorerst nur gespeichert), Standard-Kleingartenanlage
+  (Vorbelegung neuer WEPs), „Upload nur über WLAN“ (nur dieses Gerät, Standard an;
+  wirkt erst in der Android-App), Konto, App-Version, Speicherort.
 
 ## Einmalig: App bei Microsoft registrieren
 
@@ -73,12 +116,15 @@ VITE_MS_CLIENT_ID=deine-client-id
 ```
 
 `.env.local` wird nicht eingecheckt. Danach `npm run dev` neu starten. Auf der
-Startseite erscheint **„☁️ Mit OneDrive verbinden“**. Beim ersten Verbinden
+erste Start zeigt den Login-Bildschirm. Beim ersten Anmelden
 fragt Microsoft, ob die App auf ihren eigenen Ordner in deinem OneDrive
 zugreifen darf.
 
 Ohne Client-ID ist der Sync einfach ausgeblendet; die App funktioniert dann wie
 bisher nur lokal.
+
+Für den Durchlauf im Browser (`npm run e2e`) wird mit einer Platzhalter-Client-ID
+gebaut, damit der Login-Bildschirm erscheint; angemeldet wird dabei nie.
 
 ## Datenschutz
 
@@ -92,8 +138,18 @@ bisher nur lokal.
 
 | Datei | Inhalt |
 |-------|--------|
-| `src/sync/engine.ts` | Abgleich-Logik (rein, getestet) |
-| `src/sync/graph.ts` | Microsoft-Graph-Zugriff auf `/me/drive/special/approot` |
-| `src/sync/auth.ts` | Anmeldung mit MSAL.js, Authority `consumers` |
-| `src/sync/speicher.ts` | Anbindung an IndexedDB (`src/app/db.ts`, Store `syncMeta`) |
-| `src/app/SyncLeiste.tsx` | Knopf und Status auf der Startseite |
+| `src/konto/index.ts` | Schnittstelle: `anmelden`, `abmelden`, `aktuellesKonto`, `zugriffstoken`, `istAngemeldet` (Umsetzung austauschbar über `setzeKontoDienst`) |
+| `src/konto/web.ts` | Web-Umsetzung mit MSAL.js, Authority `consumers` |
+| `src/konto/startwahl.ts` | Gemerkte Wahl „mit Konto / ohne Konto“ und Start-Entscheidung |
+| `src/sync/engine.ts` | Abgleich-Logik für die WEPs (rein, getestet) |
+| `src/sync/graph.ts` | Microsoft-Graph-Zugriff auf einen Ordner im App-Ordner (`/me/drive/special/approot`) |
+| `src/sync/ordner.ts` | Ordnerstruktur, `LIESMICH.txt`, Verschieben alter Dateien |
+| `src/sync/profil.ts` | Abgleich von `daten/profil.json` |
+| `src/sync/exporte.ts` | Upload der Excel-Exporte und Warteschlange |
+| `src/sync/speicher.ts` | Anbindung an IndexedDB (`src/app/db.ts`, Stores `syncMeta`, `exporte`) |
+| `src/profil/index.ts` | Profil und Geräte-Einstellungen (localStorage), Vorbelegung neuer WEPs |
+| `src/app/SyncLeiste.tsx` | Statuszeile und Abgleich auf der Startseite |
+
+`src/sync` kennt nur die Schnittstelle aus `src/konto`. Die Android-Umsetzung
+(System-Browser + PKCE mit App-Rücksprung, Schritt 3 in `docs/PLAN-BETA2.md`)
+kommt als zweite `KontoDienst`-Umsetzung daneben.
