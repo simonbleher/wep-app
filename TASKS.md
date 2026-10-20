@@ -111,6 +111,9 @@ Stand: Branch katalog/bewrl-katalog – katalog.json (52 Positionen inkl. S. 18 
 
 ## KI-Assistent (Plan: docs/KI-ASSISTENT.md)
 
+> **Abgeschaltet seit 20.10.2026** (Beta 2, Schritt 1 – Branch app/ki-aus 👀): Schalter `KI_AKTIV`,
+> Code bleibt. Einschalten: docs/KI-ASSISTENT.md.
+
 ### K-A0 · KI-Testlauf 👀 (#00-leitung) – Branch ki/testlauf
 Ergebnis: `tools/ki-test/` (`npm run ki-test`), Prompt `tools/ki-test/prompt-aufnahme.md`,
 3 erfundene Testfälle, Bericht `tools/ki-test/ergebnis.md`. Fotos handschriftlicher Listen
