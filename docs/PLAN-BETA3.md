@@ -81,6 +81,9 @@ nicht mehr. Anleitung: docs/ANDROID.md, Abschnitt „Selbst-Update“.
 
 # Beta 3b
 
+**Abgeschlossen am 21.10.2026** – #46–#51 (Fotos, Bau-Excel, Liste und Alltag, Skizze; Nachträge
+#48 Fotos bei Konflikten, #50 „Speichern unter…“ in der Android-App). Gerätetests laufen.
+
 Mit Simon abgestimmt am 20.10.2026. Gleiche Arbeitsweise wie 3a. Für alle Pakete gilt:
 - Ändert sich `android/`, `capacitor.config.ts` oder ein Capacitor-Plugin → `android/native-version.txt`
   erhöhen (der Workflow „Prüfen“ achtet darauf); sonst kommt das Paket als Live-Update.
