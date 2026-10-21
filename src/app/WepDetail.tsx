@@ -66,7 +66,7 @@ type Tab = Bereich | 'export'
 type ExportZustand =
   | { typ: 'idle' }
   | { typ: 'laedt' }
-  | { typ: 'fertig'; result: ExportResult; oneDrive?: string; fotos?: string }
+  | { typ: 'fertig'; result: ExportResult; datei?: string; oneDrive?: string; fotos?: string }
   | { typ: 'fehler'; meldung: string }
 
 /** Bildschirm statt Abschnitt: Position hinzufügen/ändern, Beseitigung hinzufügen/ändern. */
@@ -822,10 +822,15 @@ function ExportTab({
         formalienAbgeglichen: wep.bauExcel?.abgeglichen === true,
       })
 
-      // Datei an den Nutzer: im Browser als Download. In der Android-App geht sie mit Konto nur
-      // nach OneDrive (kein Dialog bei jedem Export), ohne Konto über „Speichern unter…“.
+      // Datei an den Nutzer: im Browser als Download, im Windows-Programm über „Speichern unter…“.
+      // In der Android-App geht sie mit Konto nur nach OneDrive (kein Dialog bei jedem Export),
+      // ohne Konto über „Speichern unter…“.
       const nativ = Capacitor.isNativePlatform()
-      if (!nativ) await speichereDatei(result.blob, result.filename)
+      let datei: string | undefined
+      if (!nativ) {
+        const e = await speichereDatei(result.blob, result.filename)
+        if (e === 'abgebrochen') datei = speicherText(e, result.filename) + '.'
+      }
 
       // Zusätzlich nach OneDrive (Exporte/): sofort oder, ohne Netz, per Warteschlange.
       // Ein Fehler hier darf den fertigen Download nicht entwerten.
@@ -855,7 +860,7 @@ function ExportTab({
       // Nach gelungenem Export gilt das WEP als „exportiert“ (im Menü „⋯“ zurücksetzbar)
       await onSpeichern({ ...wep, status: 'exportiert' })
 
-      setExportZustand({ typ: 'fertig', result, oneDrive, fotos })
+      setExportZustand({ typ: 'fertig', result, datei, oneDrive, fotos })
     } catch (err) {
       setExportZustand({
         typ: 'fehler',
@@ -921,6 +926,7 @@ function ExportTab({
             <Check {...ICON} />
             <span>Export erfolgreich: {ergebnis.result.filename}</span>
           </p>
+          {ergebnis.datei && <p className="neben">{ergebnis.datei}</p>}
           {ergebnis.oneDrive && <p className="neben">{ergebnis.oneDrive}</p>}
           {ergebnis.fotos && <p className="neben">{ergebnis.fotos}</p>}
           {ergebnis.result.skizzeEingefuegt && (

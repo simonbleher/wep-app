@@ -1,17 +1,18 @@
-// Unaufdringliche Update-Anzeigen (nur in der Android-App):
+// Unaufdringliche Update-Anzeigen (nur in der Android-App und im Windows-Programm):
 // - UpdateHinweis: „Neue App-Version – jetzt installieren“, wenn der native Teil neu ist.
-//   Tippen lädt die APK in der App und öffnet den Android-Installer.
+//   Android: Tippen lädt die APK in der App und öffnet den Android-Installer.
+//   Windows: Klick lädt die neue .exe (Tauri-Updater) und startet den Installer.
 // - UpdateStandZeilen (Profil): laufende Version/Commit, Stand der letzten Prüfung.
 // Live-Updates des Web-Teils laufen still im Hintergrund und brauchen keinen Hinweis.
 import { useEffect, useState } from 'react'
-import { Capacitor } from '@capacitor/core'
 import { kurzCommit, type VersionInfo } from '@/android/update'
+import { hatSelbstUpdate, ladeUpdateDienst, type UpdateDienstModul } from './updateModul'
 
-type DienstModul = typeof import('@/android/updateDienst')
+type DienstModul = UpdateDienstModul
 type Stand = ReturnType<DienstModul['aktuellerUpdateStand']>
 
 function useUpdateStand(): { dienst: DienstModul | null; stand: Stand } {
-  const nativ = Capacitor.isNativePlatform()
+  const nativ = hatSelbstUpdate()
   const [dienst, setDienst] = useState<DienstModul | null>(null)
   const [stand, setStand] = useState<Stand>(null)
 
@@ -19,8 +20,8 @@ function useUpdateStand(): { dienst: DienstModul | null; stand: Stand } {
     if (!nativ) return
     let aktiv = true
     let ab: (() => void) | undefined
-    void import('@/android/updateDienst').then((m) => {
-      if (!aktiv) return
+    void ladeUpdateDienst().then((m) => {
+      if (!aktiv || !m) return
       setDienst(m)
       setStand(m.aktuellerUpdateStand())
       ab = m.beobachteUpdate(setStand)

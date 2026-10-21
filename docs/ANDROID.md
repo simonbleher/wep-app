@@ -161,6 +161,10 @@ Workflow **Android Release** die signierte APK zusätzlich in ein eigenes Cloudf
    Mal selbst an (`wrangler pages project create`) und lädt dann `wep.apk` und `apk.json` hoch.
    Danach unter den oben genannten Adressen prüfen.
 
+Dasselbe Projekt liefert auch das Windows-Programm unter `/windows/` (docs/WINDOWS.md). Weil jeder Deploy die
+ganze Seite ersetzt, holt der Workflow vor dem Upload die Windows-Dateien von der Live-Seite und nimmt sie mit
+(`tools/apk-site.mjs`); das Verhalten für die APK ändert sich dadurch nicht.
+
 Hinweise: Fehlen die Secrets, warnt der Lauf nur, das GitHub Release entsteht trotzdem. Schlägt
 nur der Cloudflare-Upload fehl, ebenfalls Warnung (Token-Rechte, Account ID prüfen). Ist der Name
 `wep-pankow-apk` bei Cloudflare schon vergeben, in `android-release.yml` (`APK_PROJEKT`) und in

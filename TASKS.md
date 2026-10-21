@@ -289,3 +289,15 @@ Test `editorBedienung.test.tsx`). Tests: `ansicht.test.ts`, `einrasten.test.ts`,
 Abschnitt 10f) mit Mausrad, Maus-Ziehen und Zwei-Finger-Gesten über CDP-Touch. Screenshots: `docs/paket7/` (`npm run paket7:screenshots`). `native-version` bleibt 4
 (kein Android-Eingriff).
 **Offen:** Gerätetest der Gesten auf Android/Tablet; Simon prüft Fangbereich und Greifradius (Konstanten `FANG_PIXEL`, `GREIF_PIXEL_FINGER`).
+
+## Windows-Programm (Plan: docs/PLAN-EXE.md, Doku: docs/WINDOWS.md)
+- W-1 · .exe mit Tauri ✅ PR offen – Branch exe/tauri. `src-tauri/` (Tauri 2, NSIS ohne Admin), Anmeldung über System-Browser +
+  PKCE mit Loopback `http://localhost:<Port>`, Refresh-Token im Windows-Credential-Manager, „Speichern unter…“ über
+  `dateiSpeichern.ts`, Live-Update des Web-Teils mit Rückfall, Programm-Updates über den Tauri-Updater (`latest.json` auf
+  `wep-pankow-apk.pages.dev/windows/`), Workflows „Windows Release“ / „Windows Test-Build“ / „Windows-Schlüssel erzeugen“.
+  Tests: `windows.test.ts` (Loopback-Anmeldung), `update.test.ts` (Update-Entscheidung), `dateiSpeichern.test.ts`
+  (Speichern-Weiche), `pruefe-windows-version.test.ts`, `apk-site.test.ts`, Rust-Tests (`cargo test` in `src-tauri/`).
+  `native-version` bleibt 5 (kein Android-Eingriff).
+  **Offen (Simon):** Azure-Eintrag `http://localhost` (docs/WINDOWS.md, Abschnitt 1), Update-Schlüssel erzeugen und als
+  Secrets/Variable anlegen (Abschnitt 3); danach Windows Release starten und auf einem Windows-PC ausprobieren
+  (Installation, Anmeldung, Speichern unter, Live-Update, Programm-Update).

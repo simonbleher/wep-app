@@ -1,10 +1,13 @@
 // Öffentliche Schnittstelle des Konto-Moduls: anmelden, abmelden, aktuellesKonto,
-// zugriffstoken, istAngemeldet. Welche Umsetzung dahinter steckt (Web/Android),
-// entscheidet `setzeKontoDienst` – in der Web-App ist es MSAL.js,
-// in der Android-App die Anmeldung über den System-Browser (android.ts).
+// zugriffstoken, istAngemeldet. Welche Umsetzung dahinter steckt (Web/Android/Windows),
+// entscheidet `setzeKontoDienst` – in der Web-App ist es MSAL.js, in der Android-App
+// (android.ts) und im Windows-Programm (windows.ts) die Anmeldung über den System-Browser.
 import { Capacitor } from '@capacitor/core'
 import { erstelleAndroidKontoDienst } from './android'
 import { androidAbhaengigkeiten } from './android-plattform'
+import { windowsAbhaengigkeiten } from './windows-plattform'
+import { erstelleWindowsKontoDienst } from './windows'
+import { istWindowsApp } from '@/windows/plattform'
 import { erstelleWebKontoDienst } from './web'
 import { ermittleStart, type Start } from './startwahl'
 import type { Konto, KontoDienst } from './types'
@@ -12,12 +15,15 @@ import type { Konto, KontoDienst } from './types'
 export type { Konto, KontoDienst } from './types'
 export { speichereStartWahl, type Start } from './startwahl'
 
-/** Plattform automatisch: in der Android-App System-Browser + PKCE, sonst MSAL.js. */
+/**
+ * Plattform automatisch: in der Android-App System-Browser + PKCE (Rücksprung per App-Link),
+ * im Windows-Programm System-Browser + PKCE (Rücksprung über localhost), sonst MSAL.js.
+ */
 function standardDienst(): KontoDienst {
   const clientId = import.meta.env.VITE_MS_CLIENT_ID
-  return Capacitor.isNativePlatform()
-    ? erstelleAndroidKontoDienst(clientId, androidAbhaengigkeiten())
-    : erstelleWebKontoDienst(clientId)
+  if (Capacitor.isNativePlatform()) return erstelleAndroidKontoDienst(clientId, androidAbhaengigkeiten())
+  if (istWindowsApp()) return erstelleWindowsKontoDienst(clientId, windowsAbhaengigkeiten())
+  return erstelleWebKontoDienst(clientId)
 }
 
 let dienst: KontoDienst = standardDienst()

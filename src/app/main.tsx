@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client'
 import { Capacitor, SystemBars, SystemBarsStyle } from '@capacitor/core'
 import { registerSW } from 'virtual:pwa-register'
 import App from './App'
+import { istWindowsApp } from '@/windows/plattform'
 import { wendeKontrastAn } from '@/profil'
 import '@/design/tokens.css'
 import './styles.css'
@@ -20,6 +21,10 @@ if (Capacitor.isNativePlatform()) {
   // Helle App: dunkle Symbole in Status- und Navigationsleiste (auch im Dunkelmodus des Geräts)
   void SystemBars.setStyle({ style: SystemBarsStyle.Light }).catch(() => undefined)
   void import('@/android').then((m) => m.startAndroid())
+} else if (istWindowsApp()) {
+  // Windows-Programm: Die Dateien liegen in der .exe (oder im geladenen Live-Update-Paket), kein
+  // Service Worker nötig – er würde ein Live-Update nur mit altem Zwischenspeicher überlagern.
+  void import('@/windows').then((m) => m.startWindows())
 } else {
   // Service Worker für Offline-Betrieb registrieren (autoUpdate, kein Prompt nötig).
   registerSW({ immediate: true })

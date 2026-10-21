@@ -1,0 +1,70 @@
+name: Windows Test-Build
+
+# Baut das Windows-Programm (Tauri) auf Branches, die src-tauri/ ändern, und führt die Rust-Tests
+# aus. Der Installer liegt danach als Artefakt am Lauf (unsigniert, ohne Programm-Update-Schlüssel).
+# Läuft nicht auf main (dort baut „Windows Release“) und nicht bei reinen Web-Änderungen:
+# Windows-Minuten zählen bei privaten Repos doppelt. Von Hand startbar (Run workflow).
+# Client-ID: Repository-Variable VITE_MS_CLIENT_ID, wie bei der Android-App (docs/WINDOWS.md).
+on:
+  push:
+    branches-ignore: [main]
+    paths:
+      - 'src-tauri/**'
+      - '.github/workflows/windows-test.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    env:
+      VITE_MS_CLIENT_ID: ${{ vars.VITE_MS_CLIENT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Rust bereitstellen
+        run: rustup toolchain install stable --profile minimal && rustup default stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Hinweis zur Client-ID
+        if: ${{ env.VITE_MS_CLIENT_ID == '' }}
+        run: echo "::warning::Repository-Variable VITE_MS_CLIENT_ID fehlt – das Programm baut, hat aber keinen Login (siehe docs/WINDOWS.md)."
+
+      - run: npm ci
+      - run: npm run build
+      # Das Live-Update-Paket gehört nicht in die .exe
+      - name: Update-Paket aus dem Web-Teil entfernen
+        run: rm -rf dist/updates
+
+      - name: Rust-Tests
+        working-directory: src-tauri
+        run: cargo test --locked
+
+      - name: Installer bauen
+        run: npx tauri build --bundles nsis
+
+      - name: Installer prüfen
+        run: |
+          ls -la src-tauri/target/release/bundle/nsis/
+          ls src-tauri/target/release/bundle/nsis/*-setup.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wep-windows-test
+          path: src-tauri/target/release/bundle/nsis/*-setup.exe
+          if-no-files-found: error
+          retention-days: 30

@@ -16,6 +16,12 @@ if (!Number.isInteger(nativeVersion) || nativeVersion < 1) {
   throw new Error('android/native-version.txt muss eine ganze Zahl ab 1 enthalten.')
 }
 
+/** Nummer der Windows-Hülle (src-tauri/huelle-version.txt, siehe docs/WINDOWS.md). */
+const windowsHuelle = Number.parseInt(readFileSync('./src-tauri/huelle-version.txt', 'utf-8').trim(), 10)
+if (!Number.isInteger(windowsHuelle) || windowsHuelle < 1) {
+  throw new Error('src-tauri/huelle-version.txt muss eine ganze Zahl ab 1 enthalten.')
+}
+
 /** Release-Seite, auf die der Update-Hinweis der Android-App verweist. */
 const RELEASE_URL = 'https://github.com/simonbleher/wep-app/releases/latest'
 
@@ -24,6 +30,7 @@ const RELEASE_URL = 'https://github.com/simonbleher/wep-app/releases/latest'
  * WEP_VERSION_CODE (Release-Workflow: Lauf-Nummer, sonst 0 = unbekannt), `commit`
  * (Cloudflare: CF_PAGES_COMMIT_SHA, GitHub Actions: GITHUB_SHA) und `gebautAm` (ISO-Zeit).
  * `nativeVersion` (android/native-version.txt) sagt, zu welchem nativen Teil der Web-Teil passt;
+ * `windowsHuelle` (src-tauri/huelle-version.txt) ist dasselbe für das Windows-Programm.
  * `bundleUrl` (nur wenn der Commit bekannt ist) zeigt auf das Live-Update-Paket, das
  * tools/update-paket.mjs nach dem Build als updates/<commit>.zip erzeugt.
  * Die Android-App liest die eingebaute Datei als „installiert“ und die gehostete als „neueste“
@@ -45,6 +52,7 @@ function versionJson(): Plugin {
               versionCode,
               ...(commit ? { commit, bundleUrl: `${HOST_URL}/updates/${commit}.zip` } : {}),
               nativeVersion,
+              windowsHuelle,
               gebautAm: new Date().toISOString(),
               releaseUrl: RELEASE_URL,
             },

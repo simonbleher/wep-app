@@ -4,6 +4,8 @@ name: Prüfen
 # Ändert ein Pull Request etwas unter android/ (oder Capacitor-Plugins), muss
 # android/native-version.txt erhöht werden – sonst bekommen installierte Apps keinen
 # Hinweis auf eine neue App-Version (docs/ANDROID.md, „Selbst-Update“).
+# Entsprechend für das Windows-Programm: Ändert ein Pull Request etwas unter src-tauri/, muss die
+# Version in src-tauri/tauri.conf.json steigen (docs/WINDOWS.md, „Updates“).
 on:
   pull_request:
   push:
@@ -34,3 +36,7 @@ jobs:
       - name: native-version geprüft
         if: ${{ github.event_name == 'pull_request' }}
         run: node tools/pruefe-native-version.mjs "origin/${{ github.base_ref }}"
+
+      - name: Windows-Version geprüft
+        if: ${{ github.event_name == 'pull_request' }}
+        run: node tools/pruefe-windows-version.mjs "origin/${{ github.base_ref }}"
