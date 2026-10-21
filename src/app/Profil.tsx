@@ -19,6 +19,7 @@ import { Fehlersuche } from './Fehlersuche'
 import { Sicherung } from './Sicherung'
 import { Synchronisierung } from './Synchronisierung'
 import { UpdateHinweis, UpdateStandZeilen } from './UpdateHinweis'
+import { hatSelbstUpdate, ladeUpdateDienst } from './updateModul'
 import { HauptSeitenleiste, ICON, Kopf } from './ui'
 
 interface Props {
@@ -35,6 +36,8 @@ export function Profil({ konto, verfuegbar, onZurueck, onAnmelden, onAbmelden }:
   const [nurWlan, setNurWlan] = useState(() => ladeGeraeteEinstellungen().nurWlan)
   const [sonne, setSonne] = useState(() => ladeGeraeteEinstellungen().sonnenKontrast)
   const nativ = Capacitor.isNativePlatform()
+  // Android-App oder Windows-Programm: Selbst-Update (Anzeige, Knopf „Nach Update suchen“)
+  const mitUpdate = hatSelbstUpdate()
   const [fehlersuche, setFehlersuche] = useState(false)
   const [updateMeldung, setUpdateMeldung] = useState('')
   const [suche, setSuche] = useState(false)
@@ -50,8 +53,8 @@ export function Profil({ konto, verfuegbar, onZurueck, onAnmelden, onAbmelden }:
   async function nachUpdateSuchen() {
     setSuche(true)
     setUpdateMeldung('')
-    const m = await import('@/android/updateDienst')
-    const s = await m.pruefeUndMerke(true)
+    const m = await ladeUpdateDienst()
+    const s = await m?.pruefeUndMerke(true)
     setUpdateMeldung(s?.meldung ?? '')
     setSuche(false)
   }
@@ -227,7 +230,7 @@ export function Profil({ konto, verfuegbar, onZurueck, onAnmelden, onAbmelden }:
               <dt>Version</dt>
               <dd>{__APP_VERSION__}</dd>
             </div>
-            {nativ && <UpdateStandZeilen />}
+            {mitUpdate && <UpdateStandZeilen />}
             <div>
               <dt>Speicherort</dt>
               <dd>
@@ -236,7 +239,7 @@ export function Profil({ konto, verfuegbar, onZurueck, onAnmelden, onAbmelden }:
               </dd>
             </div>
           </dl>
-          {nativ && (
+          {mitUpdate && (
             <>
               <UpdateHinweis />
               <div className="knopf-reihe">

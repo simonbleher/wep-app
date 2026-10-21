@@ -3,6 +3,7 @@
 // liefert eine eigene Umsetzung:
 // - Web: web.ts (MSAL.js, Weiterleitung zu Microsoft)
 // - Android: android.ts (System-Browser + PKCE mit App-Rücksprung, Token nativ)
+// - Windows: windows.ts (System-Browser + PKCE mit Rücksprung über http://localhost:<Port>)
 
 /** Das angemeldete Microsoft-Konto, soweit die App es anzeigt. */
 export interface Konto {

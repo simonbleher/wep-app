@@ -177,6 +177,10 @@ jobs:
             Content-Type: application/vnd.android.package-archive
           EOF
           cat apk-site/apk.json
+          # Die Windows-Dateien (/windows/…) der Live-Seite mitnehmen, sonst löscht der Deploy sie
+          # (Windows-Programm, docs/WINDOWS.md). Fehlen sie noch, ist das in Ordnung; bei einem Fehler
+          # bricht der Schritt ab, damit nichts versehentlich gelöscht wird.
+          node tools/apk-site.mjs uebernehmen windows apk-site
           # Projekt beim ersten Mal anlegen (schlägt fehl, wenn es schon existiert – dann egal)
           npx --yes wrangler@4 pages project create "$APK_PROJEKT" --production-branch main || true
           npx --yes wrangler@4 pages deploy apk-site --project-name "$APK_PROJEKT" --branch main --commit-dirty=true

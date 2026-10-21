@@ -1,0 +1,68 @@
+name: Windows-Schlüssel erzeugen
+
+# EINMALIG und nur manuell: erzeugt den Schlüssel, mit dem Programm-Updates des Windows-Programms
+# signiert werden (Tauri-Updater; das ist KEINE Windows-Code-Signatur). Der geheime Schlüssel liegt
+# danach nur als Artefakt (1 Tag) am Lauf – Anleitung: docs/WINDOWS.md.
+# Das Passwort steht nie im Log (::add-mask:: und Datei), der öffentliche Schlüssel schon (er ist nicht geheim).
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  schluessel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Schlüssel erzeugen
+        run: |
+          set -euo pipefail
+          mkdir -p schluessel
+          PW=$(openssl rand -hex 24)
+          echo "::add-mask::$PW"
+          npx tauri signer generate --ci -w schluessel/wep-windows.key -p "$PW" > /dev/null 2>&1
+          # Prüfen, dass Schlüssel und Passwort zusammenpassen
+          echo test > schluessel/probe.txt
+          TAURI_SIGNING_PRIVATE_KEY="$(cat schluessel/wep-windows.key)" TAURI_SIGNING_PRIVATE_KEY_PASSWORD="$PW" \
+            npx tauri signer sign schluessel/probe.txt > /dev/null 2>&1
+          rm -f schluessel/probe.txt schluessel/probe.txt.sig
+          {
+            echo "TAURI_SIGNING_PRIVATE_KEY (Secret, eine Zeile, komplett kopieren):"
+            cat schluessel/wep-windows.key
+            echo
+            echo
+            echo "TAURI_SIGNING_PRIVATE_KEY_PASSWORD (Secret):"
+            echo "$PW"
+            echo
+            echo "TAURI_SIGNING_PUBLIC_KEY (Variable, nicht geheim, eine Zeile):"
+            cat schluessel/wep-windows.key.pub
+            echo
+          } > schluessel/zugangsdaten.txt
+          {
+            echo "### Öffentlicher Schlüssel (Repository-Variable \`TAURI_SIGNING_PUBLIC_KEY\`)"
+            echo
+            echo '```'
+            cat schluessel/wep-windows.key.pub
+            echo
+            echo '```'
+            echo
+            echo "Der geheime Schlüssel und das Passwort stehen im Artefakt \`wep-windows-schluessel\` (Datei \`zugangsdaten.txt\`). Anleitung: docs/WINDOWS.md."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "Schlüssel erzeugt."
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wep-windows-schluessel
+          path: schluessel/
+          if-no-files-found: error
+          retention-days: 1
