@@ -9,13 +9,37 @@
  */
 
 import { useCallback, useEffect, useId, useReducer, useRef, useState } from 'react'
-import { Circle, Grid3x3, MousePointer2, Redo2, Ruler, Slash, Square, Trash2, TreePine, Type, Undo2, type LucideIcon } from 'lucide-react'
+import { Circle, Grid3x3, Magnet, Maximize, MousePointer2, Redo2, Ruler, Slash, Square, Trash2, TreePine, Type, Undo2, ZoomIn, ZoomOut, type LucideIcon } from 'lucide-react'
 import { Dialog, ICON } from '@/app/ui'
 import type { SkizzeDaten, SkizzeElement, SkizzeWerkzeug, SymbolArt } from './types.js'
 import { SYMBOL_ARTEN, leereSkizze, neueId } from './types.js'
 import { primsZuSvg, symbolPrims } from './symbole.js'
 import { STANDARD_GROESSE } from './szene.js'
-import { trefferSuchen, elementVerschieben } from './geometrie.js'
+import { alleTreffer, elementVerschieben, naechsterTreffer, type Punkt } from './geometrie.js'
+import {
+  GANZE_SKIZZE,
+  ZOOM_MAX,
+  ZOOM_MIN,
+  ZOOM_SCHRITT,
+  bildschirmZuSkizze,
+  pixelProEinheit,
+  radFaktor,
+  verschiebeUmPixel,
+  viewBoxText,
+  zoomUmMitte,
+  zoomUmPunkt,
+  zweiFingerAnsicht,
+  type Ansicht,
+} from './ansicht.js'
+import {
+  FANG_PIXEL,
+  rasteLinienEnde,
+  rastePunkt,
+  rasteVerschiebung,
+  zielLinien,
+  type Treffer,
+  type ZielLinien,
+} from './einrasten.js'
 import {
   neuerVerlauf,
   verlaufSchreiben,
@@ -51,6 +75,10 @@ type EditorAktion =
   | { typ: 'element-aktualisieren'; element: SkizzeElement }
   | { typ: 'element-loeschen'; id: string }
   | { typ: 'element-auswaehlen'; id: string | null }
+  /** Zwischenstand beim Ziehen: ersetzt das Element, ohne einen Verlaufsschritt zu schreiben. */
+  | { typ: 'verschieben-live'; element: SkizzeElement }
+  /** Ende des Ziehens: ein einziger Verlaufsschritt gegenüber dem Stand vor dem Ziehen. */
+  | { typ: 'verschieben-fertig'; vorher: SkizzeElement[] }
   | { typ: 'undo' }
   | { typ: 'redo' }
 
@@ -91,6 +119,17 @@ function editorReducer(zustand: EditorZustand, aktion: EditorAktion): EditorZust
     case 'element-auswaehlen':
       return { ...zustand, ausgewaehlt: aktion.id }
 
+    case 'verschieben-live':
+      return {
+        ...zustand,
+        elemente: zustand.elemente.map((el) => (el.id === aktion.element.id ? aktion.element : el)),
+      }
+
+    case 'verschieben-fertig': {
+      if (zustand.elemente === aktion.vorher) return zustand
+      return { ...zustand, verlauf: verlaufSchreiben(zustand.verlauf, aktion.vorher, zustand.elemente) }
+    }
+
     case 'undo': {
       const ergebnis = verlaufUndo(zustand.verlauf, zustand.elemente)
       if (!ergebnis) return zustand
@@ -109,19 +148,30 @@ function editorReducer(zustand: EditorZustand, aktion: EditorAktion): EditorZust
 // Hilfsfunktionen für SVG-Koordinaten
 // ---------------------------------------------------------------------------
 
-function svgKoordinaten(
-  svgElement: SVGSVGElement,
-  event: React.PointerEvent<SVGSVGElement>,
-): { x: number; y: number } {
-  const rect = svgElement.getBoundingClientRect()
-  const viewBox = svgElement.viewBox.baseVal
-  const scaleX = viewBox.width / rect.width
-  const scaleY = viewBox.height / rect.height
-  return {
-    x: (event.clientX - rect.left) * scaleX,
-    y: (event.clientY - rect.top) * scaleY,
+const EINRASTEN_SCHLUESSEL = 'wep-skizze-einrasten'
+
+/** Einrasten ist eine Geräte-Einstellung (nicht Teil der Skizze); ohne Speicher gilt „an“. */
+function einrastenLesen(): boolean {
+  try {
+    return localStorage.getItem(EINRASTEN_SCHLUESSEL) !== 'aus'
+  } catch {
+    return true
   }
 }
+
+function einrastenSpeichern(an: boolean): void {
+  try {
+    localStorage.setItem(EINRASTEN_SCHLUESSEL, an ? 'an' : 'aus')
+  } catch {
+    // Speicher gesperrt: die Einstellung gilt dann nur für diese Sitzung
+  }
+}
+
+/** Greifradius in Bildschirmpixeln: Finger brauchen mehr Fläche als Maus oder Stift. */
+const GREIF_PIXEL_FINGER = 20
+const GREIF_PIXEL_MAUS = 8
+/** Ab dieser Wegstrecke (Pixel) gilt eine Berührung als Ziehen und nicht mehr als Antippen. */
+const ZIEH_SCHWELLE_PIXEL = 6
 
 // ---------------------------------------------------------------------------
 // Werkzeug-Metadaten
@@ -229,16 +279,47 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
     startX: number
     startY: number
     vorschau: SkizzeElement | null
-  }>({ aktiv: false, startX: 0, startY: 0, vorschau: null })
+    ziele: ZielLinien
+  }>({ aktiv: false, startX: 0, startY: 0, vorschau: null, ziele: { xs: [], ys: [] } })
   const [vorschauElement, setVorschauElement] = useState<SkizzeElement | null>(null)
 
-  // Verschieben-Status
+  // Ansicht (Zoom/Ausschnitt) und Einrasten – beides nur Darstellung bzw. Geräte-Einstellung
+  const [ansicht, setAnsicht] = useState<Ansicht>(GANZE_SKIZZE)
+  const ansichtRef = useRef<Ansicht>(GANZE_SKIZZE)
+  const setzeAnsicht = useCallback((a: Ansicht) => {
+    ansichtRef.current = a
+    setAnsicht(a)
+  }, [])
+  const [einrasten, setEinrasten] = useState(einrastenLesen)
+  const [hilfslinien, setHilfslinien] = useState<Treffer | null>(null)
+  /** Anzahl der Formen an der angetippten Stelle und Position der gewählten (für die Auswahlzeile). */
+  const [stapel, setStapel] = useState<{ anzahl: number; index: number } | null>(null)
+
+  const flaeche = { breite, hoehe }
+
+  // Zeiger (Finger/Maus) und Gesten
+  const zeigerRef = useRef(new Map<number, Punkt>())
+  const gesteRef = useRef<{ ids: [number, number]; start: Ansicht; finger: [Punkt, Punkt] } | null>(null)
+  // Nach einer Zwei-Finger-Geste zeichnet/verschiebt der übrig gebliebene Finger nichts mehr
+  const gesteVorbeiRef = useRef(false)
+  const schwenkRef = useRef<{ id: number; letzte: Punkt } | null>(null)
+  // Auswahl vor dem ersten Finger: eine Geste mit zwei Fingern lässt die Auswahl unverändert
+  const auswahlVorDownRef = useRef<string | null>(null)
+
+  // Verschieben-/Antipp-Status
   const verschiebenRef = useRef<{
-    aktiv: boolean
-    elementId: string | null
-    letzteX: number
-    letzteY: number
-  }>({ aktiv: false, elementId: null, letzteX: 0, letzteY: 0 })
+    id: number
+    ausgang: SkizzeElement
+    vorher: SkizzeElement[]
+    startX: number
+    startY: number
+    startClient: Punkt
+    ziele: ZielLinien
+    bewegt: boolean
+    warAusgewaehlt: boolean
+    treffer: SkizzeElement[]
+    verschiebbar: boolean
+  } | null>(null)
 
   // ---------------------------------------------------------------------------
   // Tastatur-Shortcuts
@@ -269,32 +350,108 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
   // Pointer-Ereignisse
   // ---------------------------------------------------------------------------
 
+  const holeKasten = () => svgRef.current!.getBoundingClientRect()
+  const zuSkizze = (e: { clientX: number; clientY: number }): Punkt =>
+    bildschirmZuSkizze({ x: e.clientX, y: e.clientY }, ansichtRef.current, flaeche, holeKasten())
+  const fangSchwelle = () => FANG_PIXEL / pixelProEinheit(ansichtRef.current, flaeche, holeKasten())
+  const greifRadius = (e: React.PointerEvent) =>
+    (e.pointerType === 'mouse' || e.pointerType === 'pen' ? GREIF_PIXEL_MAUS : GREIF_PIXEL_FINGER) /
+    pixelProEinheit(ansichtRef.current, flaeche, holeKasten())
+  // Alt gedrückt = Einrasten für diese Bewegung aus (am PC)
+  const rastetEin = (e: { altKey: boolean }) => einrasten && !e.altKey
+
+  /** Abbruch laufender Aktionen, z. B. wenn ein zweiter Finger dazukommt. */
+  const aktionAbbrechen = () => {
+    const v = verschiebenRef.current
+    if (v?.bewegt) dispatch({ typ: 'verschieben-live', element: v.ausgang })
+    verschiebenRef.current = null
+    zeichnenRef.current.aktiv = false
+    schwenkRef.current = null
+    setVorschauElement(null)
+    setHilfslinien(null)
+  }
+
+  /** Endpunkt einer Zeichen-Geste mit Einrasten (Rechteck: Ecke, Linie/Maß: gerade Richtung, Kreis: frei). */
+  const endpunkt = (roh: Punkt, e: { altKey: boolean }): { punkt: Punkt; treffer: Treffer } => {
+    const { startX, startY, ziele } = zeichnenRef.current
+    if (!rastetEin(e) || aktivesWerkzeug === 'kreis') return { punkt: roh, treffer: {} }
+    if (aktivesWerkzeug === 'linie' || aktivesWerkzeug === 'massangabe') {
+      return rasteLinienEnde({ x: startX, y: startY }, roh, ziele, fangSchwelle())
+    }
+    return rastePunkt(roh, ziele, fangSchwelle())
+  }
+
   const handlePointerDown = useCallback(
     (e: React.PointerEvent<SVGSVGElement>) => {
       if (!svgRef.current) return
       e.currentTarget.setPointerCapture(e.pointerId)
+      zeigerRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
 
-      const { x, y } = svgKoordinaten(svgRef.current, e)
+      // Zweiter Finger: Zoomen/Verschieben statt Zeichnen oder Ziehen
+      if (zeigerRef.current.size >= 2) {
+        if (verschiebenRef.current || schwenkRef.current) {
+          dispatch({ typ: 'element-auswaehlen', id: auswahlVorDownRef.current })
+          setStapel(null)
+        }
+        aktionAbbrechen()
+        const ids = [...zeigerRef.current.keys()].slice(0, 2) as [number, number]
+        gesteRef.current = {
+          ids,
+          start: ansichtRef.current,
+          finger: [zeigerRef.current.get(ids[0])!, zeigerRef.current.get(ids[1])!],
+        }
+        gesteVorbeiRef.current = true
+        return
+      }
+      if (gesteVorbeiRef.current) return
+
+      // Mittlere Maustaste: Ausschnitt verschieben
+      if (e.pointerType === 'mouse' && e.button === 1) {
+        e.preventDefault()
+        schwenkRef.current = { id: e.pointerId, letzte: { x: e.clientX, y: e.clientY } }
+        return
+      }
+      if (e.pointerType === 'mouse' && e.button !== 0) return
+
+      const roh = zuSkizze(e)
+      const { x, y } = roh
 
       if (aktivesWerkzeug === 'auswahl') {
-        const getroffen = trefferSuchen(zustand.elemente, { x, y })
-        dispatch({ typ: 'element-auswaehlen', id: getroffen?.id ?? null })
-        if (getroffen && !getroffen.fest) {
-          verschiebenRef.current = {
-            aktiv: true,
-            elementId: getroffen.id,
-            letzteX: x,
-            letzteY: y,
-          }
+        const treffer = alleTreffer(zustand.elemente, roh, greifRadius(e))
+        const warAusgewaehlt = treffer.some((t) => t.id === zustand.ausgewaehlt)
+        // Ist die gewählte Form hier getroffen, bleibt sie (zum Ziehen); sonst die kleinste Form an dieser Stelle
+        const gewaehlt = warAusgewaehlt ? treffer.find((t) => t.id === zustand.ausgewaehlt)! : (treffer[0] ?? null)
+        auswahlVorDownRef.current = zustand.ausgewaehlt
+        dispatch({ typ: 'element-auswaehlen', id: gewaehlt?.id ?? null })
+        setStapel(gewaehlt ? { anzahl: treffer.length, index: treffer.indexOf(gewaehlt) } : null)
+        if (!gewaehlt) {
+          // Leere Stelle: Ziehen verschiebt den Ausschnitt
+          schwenkRef.current = { id: e.pointerId, letzte: { x: e.clientX, y: e.clientY } }
+          return
+        }
+        verschiebenRef.current = {
+          id: e.pointerId,
+          ausgang: gewaehlt,
+          vorher: zustand.elemente,
+          startX: x,
+          startY: y,
+          startClient: { x: e.clientX, y: e.clientY },
+          ziele: zielLinien(zustand.elemente, new Set([gewaehlt.id]), breite, hoehe),
+          bewegt: false,
+          warAusgewaehlt,
+          treffer,
+          verschiebbar: !gewaehlt.fest,
         }
         return
       }
+
+      const ziele = zielLinien(zustand.elemente, new Set(), breite, hoehe)
 
       // Symbol setzen: ein Tipp genügt, Größe nach Standard
       if (aktivesWerkzeug === 'symbol') {
         const faktor = breite / 445
         const [sb, sh] = STANDARD_GROESSE[symbolArt]
-        const symbol: SkizzeElement = {
+        let symbol: SkizzeElement = {
           id: neueId(),
           typ: 'symbol',
           art: symbolArt,
@@ -302,6 +459,10 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
           y: y - (sh * faktor) / 2,
           breite: sb * faktor,
           hoehe: sh * faktor,
+        }
+        if (rastetEin(e)) {
+          const r = rasteVerschiebung(symbol, 0, 0, ziele, fangSchwelle())
+          symbol = elementVerschieben(symbol, r.dx, r.dy)
         }
         dispatch({ typ: 'element-hinzufuegen', element: symbol })
         setKreisLabelDialog({ id: symbol.id, beschriftung: '' })
@@ -315,34 +476,67 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
         return
       }
 
-      zeichnenRef.current = { aktiv: true, startX: x, startY: y, vorschau: null }
+      const start = rastetEin(e) ? rastePunkt(roh, ziele, fangSchwelle()) : { punkt: roh, treffer: {} }
+      setHilfslinien(start.treffer)
+      zeichnenRef.current = { aktiv: true, startX: start.punkt.x, startY: start.punkt.y, vorschau: null, ziele }
     },
-    [aktivesWerkzeug, zustand.elemente, symbolArt, breite],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [aktivesWerkzeug, zustand.elemente, zustand.ausgewaehlt, symbolArt, breite, hoehe, einrasten],
   )
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent<SVGSVGElement>) => {
       if (!svgRef.current) return
-      const { x, y } = svgKoordinaten(svgRef.current, e)
+      if (zeigerRef.current.has(e.pointerId)) zeigerRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
 
-      // Verschieben
-      if (verschiebenRef.current.aktiv && verschiebenRef.current.elementId) {
-        const { elementId, letzteX, letzteY } = verschiebenRef.current
-        const dx = x - letzteX
-        const dy = y - letzteY
-        const el = zustand.elemente.find((e) => e.id === elementId)
-        if (el) {
-          // Verschieben direkt ohne Verlauf-Snapshot (nur bei PointerUp speichern)
-          const verschoben = elementVerschieben(el, dx, dy)
-          dispatch({ typ: 'element-aktualisieren', element: verschoben })
+      // Zwei-Finger-Geste
+      const geste = gesteRef.current
+      if (geste) {
+        const a = zeigerRef.current.get(geste.ids[0])
+        const b = zeigerRef.current.get(geste.ids[1])
+        if (a && b) setzeAnsicht(zweiFingerAnsicht(geste.start, geste.finger, [a, b], flaeche, holeKasten()))
+        return
+      }
+      if (gesteVorbeiRef.current) return
+
+      // Ausschnitt mit einem Zeiger verschieben (Maus: mittlere Taste oder leere Stelle ziehen)
+      const schwenk = schwenkRef.current
+      if (schwenk && schwenk.id === e.pointerId) {
+        setzeAnsicht(verschiebeUmPixel(ansichtRef.current, e.clientX - schwenk.letzte.x, e.clientY - schwenk.letzte.y, flaeche, holeKasten()))
+        schwenk.letzte = { x: e.clientX, y: e.clientY }
+        return
+      }
+
+      const roh = zuSkizze(e)
+
+      // Verschieben (erst nach einer kleinen Strecke, damit Antippen nichts verrückt)
+      const v = verschiebenRef.current
+      if (v && v.id === e.pointerId) {
+        if (!v.bewegt) {
+          if (Math.hypot(e.clientX - v.startClient.x, e.clientY - v.startClient.y) < ZIEH_SCHWELLE_PIXEL) return
+          v.bewegt = true
         }
-        verschiebenRef.current.letzteX = x
-        verschiebenRef.current.letzteY = y
+        if (!v.verschiebbar) return
+        let dx = roh.x - v.startX
+        let dy = roh.y - v.startY
+        if (rastetEin(e)) {
+          const r = rasteVerschiebung(v.ausgang, dx, dy, v.ziele, fangSchwelle())
+          dx = r.dx
+          dy = r.dy
+          setHilfslinien(r.treffer)
+        } else {
+          setHilfslinien(null)
+        }
+        // Zwischenstände ohne Verlaufsschritt; ein Schritt beim Loslassen
+        dispatch({ typ: 'verschieben-live', element: elementVerschieben(v.ausgang, dx, dy) })
         return
       }
 
       if (!zeichnenRef.current.aktiv) return
       const { startX, startY } = zeichnenRef.current
+      const ende = endpunkt(roh, e)
+      const { x, y } = ende.punkt
+      setHilfslinien(ende.treffer)
 
       // Vorschau berechnen
       let vorschau: SkizzeElement | null = null
@@ -382,17 +576,54 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
 
       setVorschauElement(vorschau)
     },
-    [aktivesWerkzeug, zustand.elemente],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [aktivesWerkzeug, zustand.elemente, einrasten, breite, hoehe],
+  )
+
+  /** Zeiger los: Gesten und Ziehen beenden. Rückgabe true = Ereignis ist fertig behandelt. */
+  const zeigerLoesen = (e: React.PointerEvent<SVGSVGElement>): boolean => {
+    zeigerRef.current.delete(e.pointerId)
+    const geste = gesteRef.current
+    if (geste && (geste.ids[0] === e.pointerId || geste.ids[1] === e.pointerId)) gesteRef.current = null
+    if (gesteVorbeiRef.current) {
+      if (zeigerRef.current.size === 0) gesteVorbeiRef.current = false
+      return true
+    }
+    if (schwenkRef.current?.id === e.pointerId) {
+      schwenkRef.current = null
+      return true
+    }
+    return false
+  }
+
+  const handlePointerCancel = useCallback(
+    (e: React.PointerEvent<SVGSVGElement>) => {
+      if (zeigerLoesen(e)) return
+      aktionAbbrechen()
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
   )
 
   const handlePointerUp = useCallback(
     (e: React.PointerEvent<SVGSVGElement>) => {
       if (!svgRef.current) return
-      const { x, y } = svgKoordinaten(svgRef.current, e)
+      if (zeigerLoesen(e)) return
+      setHilfslinien(null)
 
-      // Verschieben beenden
-      if (verschiebenRef.current.aktiv) {
-        verschiebenRef.current.aktiv = false
+      // Ziehen beenden: ein Verlaufsschritt; reines Antippen einer schon gewählten Form wechselt zur nächsten
+      const v = verschiebenRef.current
+      if (v && v.id === e.pointerId) {
+        verschiebenRef.current = null
+        if (v.bewegt) {
+          dispatch({ typ: 'verschieben-fertig', vorher: v.vorher })
+        } else if (v.warAusgewaehlt && v.treffer.length > 1) {
+          const naechste = naechsterTreffer(v.treffer, v.ausgang.id)
+          if (naechste) {
+            dispatch({ typ: 'element-auswaehlen', id: naechste.id })
+            setStapel({ anzahl: v.treffer.length, index: v.treffer.indexOf(naechste) })
+          }
+        }
         return
       }
 
@@ -401,6 +632,7 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
       setVorschauElement(null)
 
       const { startX, startY } = zeichnenRef.current
+      const { x, y } = endpunkt(zuSkizze(e), e).punkt
       const minGroesse = 4
 
       switch (aktivesWerkzeug) {
@@ -455,8 +687,26 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
           break
       }
     },
-    [aktivesWerkzeug],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [aktivesWerkzeug, einrasten],
   )
+
+  // Mausrad (und Trackpad-Pinch): zoomt um den Mauszeiger. Muss ein nicht-passiver Listener sein,
+  // damit die Seite dabei nicht mitscrollt; ganz herausgezoomt scrollt die Seite normal weiter.
+  useEffect(() => {
+    const svg = svgRef.current
+    if (!svg) return
+    const beiRad = (e: WheelEvent) => {
+      if (ansichtRef.current.zoom <= ZOOM_MIN && e.deltaY > 0) return
+      e.preventDefault()
+      const delta = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY
+      setzeAnsicht(
+        zoomUmPunkt(ansichtRef.current, radFaktor(delta), { x: e.clientX, y: e.clientY }, { breite, hoehe }, svg.getBoundingClientRect()),
+      )
+    }
+    svg.addEventListener('wheel', beiRad, { passive: false })
+    return () => svg.removeEventListener('wheel', beiRad)
+  }, [breite, hoehe, setzeAnsicht])
 
   // ---------------------------------------------------------------------------
   // Dialog-Bestätigungen
@@ -728,6 +978,22 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
         >
           <Grid3x3 {...ICON} />
         </button>
+
+        <button
+          type="button"
+          className="werkzeug werkzeug-schalter"
+          title="Einrasten an Ecken, Kanten, Grundstücksrand und geraden Linien (am PC: Alt gedrückt halten schaltet kurz aus)"
+          aria-label="Einrasten"
+          aria-pressed={einrasten}
+          onClick={() => {
+            const neu = !einrasten
+            setEinrasten(neu)
+            einrastenSpeichern(neu)
+            setHilfslinien(null)
+          }}
+        >
+          <Magnet {...ICON} />
+        </button>
       </div>
 
       {/* Symbol-Auswahl */}
@@ -751,53 +1017,126 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
         </div>
       )}
 
-      {/* Ausgewähltes Element Info */}
-      {ausgewaehltesEl && (
-        <p className="skizze-auswahl" aria-live="polite">
-          {ausgewaehltesEl.fest
-            ? `Ausgewählt: ${auswahlName} (fest, nicht änderbar)`
-            : `Ausgewählt: ${auswahlName} – ziehen zum Verschieben`}
-        </p>
-      )}
+      {/* Ausgewähltes Element Info – Platz bleibt reserviert, damit die Zeichenfläche beim Antippen nicht springt */}
+      <p className="skizze-auswahl" aria-live="polite">
+        {ausgewaehltesEl ? (
+          <>
+            {ausgewaehltesEl.fest
+              ? `Ausgewählt: ${auswahlName} (fest)`
+              : `Ausgewählt: ${auswahlName} – ziehen zum Verschieben`}
+            {stapel && stapel.anzahl > 1 && ` · ${stapel.index + 1} von ${stapel.anzahl} hier – nochmal tippen`}
+          </>
+        ) : (
+          <span className="neben">Nichts ausgewählt</span>
+        )}
+      </p>
 
-      {/* Zeichenfläche */}
-      <div
-        className="skizze-flaeche"
-        style={{
-          maxWidth: breite,
-          aspectRatio: `${breite} / ${hoehe}`,
-          cursor:
-            aktivesWerkzeug === 'auswahl'
-              ? 'default'
-              : aktivesWerkzeug === 'text'
-                ? 'text'
-                : 'crosshair',
-        }}
-      >
-        <svg
-          ref={svgRef}
-          viewBox={`0 0 ${breite} ${hoehe}`}
-          width="100%"
-          height="100%"
-          style={{ display: 'block' }}
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerCancel={handlePointerUp}
+      {/* Zeichenfläche (mit Ansicht-Knöpfen darüber, die nicht zur Zeichnung gehören) */}
+      <div className="skizze-bereich" style={{ maxWidth: breite }}>
+        <div
+          className="skizze-flaeche"
+          style={{
+            aspectRatio: `${breite} / ${hoehe}`,
+            cursor:
+              aktivesWerkzeug === 'auswahl'
+                ? 'default'
+                : aktivesWerkzeug === 'text'
+                  ? 'text'
+                  : 'crosshair',
+          }}
         >
-          {/* Hintergrund */}
-          <rect width={breite} height={hoehe} fill="#fff" />
+          <svg
+            ref={svgRef}
+            viewBox={viewBoxText(ansicht, flaeche)}
+            width="100%"
+            height="100%"
+            style={{ display: 'block' }}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerCancel}
+          >
+            {/* Hintergrund */}
+            <rect width={breite} height={hoehe} fill="#fff" />
 
-          {/* Raster */}
-          {rasterLinien}
+            {/* Raster */}
+            {rasterLinien}
 
-          {/* Elemente */}
-          {zustand.elemente.map((el) => elementZuSvg(el, el.id === zustand.ausgewaehlt))}
+            {/* Elemente */}
+            {zustand.elemente.map((el) => elementZuSvg(el, el.id === zustand.ausgewaehlt))}
 
-          {/* Vorschau */}
-          {vorschauElement &&
-            elementZuSvg({ ...vorschauElement, id: '__vorschau__' }, false)}
-        </svg>
+            {/* Hilfslinien beim Einrasten (nur Anzeige, nicht in der Skizze) */}
+            {hilfslinien?.x !== undefined && (
+              <line
+                className="skizze-hilfslinie"
+                x1={hilfslinien.x}
+                y1={0}
+                x2={hilfslinien.x}
+                y2={hoehe}
+                stroke="#d6336c"
+                strokeWidth={1}
+                strokeDasharray="4 3"
+                vectorEffect="non-scaling-stroke"
+                pointerEvents="none"
+              />
+            )}
+            {hilfslinien?.y !== undefined && (
+              <line
+                className="skizze-hilfslinie"
+                x1={0}
+                y1={hilfslinien.y}
+                x2={breite}
+                y2={hilfslinien.y}
+                stroke="#d6336c"
+                strokeWidth={1}
+                strokeDasharray="4 3"
+                vectorEffect="non-scaling-stroke"
+                pointerEvents="none"
+              />
+            )}
+
+            {/* Vorschau */}
+            {vorschauElement &&
+              elementZuSvg({ ...vorschauElement, id: '__vorschau__' }, false)}
+          </svg>
+        </div>
+        <div role="group" aria-label="Ansicht" className="skizze-ansicht">
+          <button
+            type="button"
+            className="werkzeug"
+            title="Hineinzoomen (zwei Finger auseinander, Mausrad)"
+            aria-label="Hineinzoomen"
+            disabled={ansicht.zoom >= ZOOM_MAX}
+            onClick={() => setzeAnsicht(zoomUmMitte(ansichtRef.current, ZOOM_SCHRITT, flaeche, holeKasten()))}
+          >
+            <ZoomIn {...ICON} />
+          </button>
+          <button
+            type="button"
+            className="werkzeug"
+            title="Herauszoomen"
+            aria-label="Herauszoomen"
+            disabled={ansicht.zoom <= ZOOM_MIN}
+            onClick={() => setzeAnsicht(zoomUmMitte(ansichtRef.current, 1 / ZOOM_SCHRITT, flaeche, holeKasten()))}
+          >
+            <ZoomOut {...ICON} />
+          </button>
+          <button
+            type="button"
+            className="werkzeug"
+            title="Ganze Skizze zeigen"
+            aria-label="Ganze Skizze"
+            disabled={ansicht.zoom === GANZE_SKIZZE.zoom && ansicht.x === 0 && ansicht.y === 0}
+            onClick={() => setzeAnsicht(GANZE_SKIZZE)}
+          >
+            <Maximize {...ICON} />
+          </button>
+        </div>
+        {ansicht.zoom > ZOOM_MIN && (
+          <span className="skizze-zoom" aria-live="off">
+            Zoom {Math.round(ansicht.zoom * 100)} %
+          </span>
+        )}
       </div>
 
       {/* Text-Eingabe-Dialog */}

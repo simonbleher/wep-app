@@ -335,8 +335,10 @@ try {
   )
   pruefe(kleinste >= 48, `Skizze: Werkzeug-Knöpfe mindestens 48 px (kleinster: ${kleinste} px)`)
   pruefe((await seite.getByRole('toolbar').locator('svg.lucide').count()) >= 10, 'Skizze: Werkzeuge sind lucide-Icons')
-  const flaeche = await seite.locator('.skizze-flaeche svg').boundingBox()
+  let flaeche = await seite.locator('.skizze-flaeche svg').boundingBox()
   const zeichne = async (x1, y1, x2, y2) => {
+    await seite.locator('.skizze-flaeche svg').evaluate((e) => e.scrollIntoView({ block: 'center' })); 
+    flaeche = await seite.locator('.skizze-flaeche svg').boundingBox() // Lage kann sich mit der Werkzeug-Leiste ändern
     await seite.mouse.move(flaeche.x + x1, flaeche.y + y1)
     await seite.mouse.down()
     await seite.mouse.move(flaeche.x + x2, flaeche.y + y2, { steps: 5 })
@@ -359,18 +361,188 @@ try {
   pruefe(await seite.locator('.skizze-flaeche svg text', { hasText: '3,5 m' }).isVisible(), 'Skizze: Maß-Dialog')
   await seite.getByRole('button', { name: 'Symbol', exact: true }).click()
   await seite.getByRole('combobox', { name: 'Symbol' }).waitFor()
+  await seite.locator('.skizze-flaeche svg').evaluate((e) => e.scrollIntoView({ block: 'center' })); 
+  flaeche = await seite.locator('.skizze-flaeche svg').boundingBox()
   await seite.mouse.click(flaeche.x + 260, flaeche.y + 200)
   await seite.getByRole('dialog', { name: 'Beschriftung' }).waitFor()
   await seite.getByLabel(/^Baumart oder Name/).fill('Apfel')
   await seite.getByRole('button', { name: 'Übernehmen' }).click()
   pruefe(await seite.locator('.skizze-flaeche svg text', { hasText: 'Apfel' }).first().isVisible(), 'Skizze: Beschriftungs-Dialog (Baumart)')
   await seite.getByRole('button', { name: 'Text', exact: true }).click()
-  await seite.mouse.click(flaeche.x + 300, flaeche.y + 300)
+  await seite.locator('.skizze-flaeche svg').evaluate((e) => e.scrollIntoView({ block: 'center' })); 
+  const flaecheNeu = await seite.locator('.skizze-flaeche svg').boundingBox() // Symbol-Auswahl ist weg, Fläche ist verrutscht
+  await seite.mouse.click(flaecheNeu.x + 300, flaecheNeu.y + 200)
   await seite.getByRole('dialog', { name: 'Text einfügen' }).waitFor()
   await seite.keyboard.press('Escape')
   pruefe((await seite.getByRole('dialog').count()) === 0, 'Skizze: Escape schließt den Dialog')
   await seite.getByRole('button', { name: 'Rückgängig' }).click()
   pruefe((await seite.getByRole('main').getByText('Apfel').count()) === 0, 'Skizze: Rückgängig nimmt das Symbol zurück')
+
+  // 10f. Skizze bedienen (Paket 7): Zoomen/Verschieben mit Knöpfen, Mausrad, Maus und zwei Fingern, Einrasten, Auswählen
+  const svgOrt = seite.locator('.skizze-flaeche svg')
+  const viewBox = async () => (await svgOrt.getAttribute('viewBox')).split(' ').map(Number)
+  const zoomFaktor = async () => 800 / (await viewBox())[2]
+  const kasten = async () => {
+    await svgOrt.evaluate((e) => e.scrollIntoView({ block: 'center' }))
+    return svgOrt.boundingBox()
+  }
+  pruefe((await viewBox()).join(' ') === '0 0 800 600', 'Zoom: Start zeigt die ganze Skizze')
+  pruefe(await seite.getByRole('button', { name: 'Ganze Skizze' }).isDisabled(), 'Zoom: „Ganze Skizze“ ist bei ganzer Skizze aus')
+  const elementeAnzahl = () => seite.locator('.skizze-flaeche svg rect[stroke], .skizze-flaeche svg circle').count()
+  const vorher = await elementeAnzahl()
+
+  await seite.getByRole('button', { name: 'Hineinzoomen' }).click()
+  pruefe(Math.abs((await zoomFaktor()) - 1.5) < 0.01, 'Zoom: Plus-Knopf vergrößert um das Eineinhalbfache')
+  pruefe(await seite.getByText('Zoom 150 %').isVisible(), 'Zoom: Anzeige „Zoom 150 %“')
+  await seite.getByRole('button', { name: 'Ganze Skizze' }).click()
+  pruefe((await viewBox()).join(' ') === '0 0 800 600', 'Zoom: „Ganze Skizze“ stellt alles wieder her')
+
+  // Mausrad zoomt um den Mauszeiger; Mittelpunkt-Skizzenpunkt unter dem Zeiger bleibt
+  let k = await kasten()
+  await seite.mouse.move(k.x + k.width * 0.25, k.y + k.height * 0.25)
+  await seite.mouse.wheel(0, -400)
+  await seite.waitForTimeout(100)
+  let vb = await viewBox()
+  pruefe((await zoomFaktor()) > 1.2, `Zoom: Mausrad vergrößert (Faktor ${(await zoomFaktor()).toFixed(2)})`)
+  const skizzeUnterZeiger = ((k.width * 0.25) / k.width) * vb[2] + vb[0]
+  pruefe(Math.abs(skizzeUnterZeiger - 200) < 2, `Zoom: Mausrad hält den Punkt unter dem Zeiger (${skizzeUnterZeiger.toFixed(1)} ≈ 200)`)
+
+  // Verschieben: Auswählen-Werkzeug, auf leere Stelle ziehen; mittlere Maustaste geht ebenfalls
+  await seite.getByRole('button', { name: 'Auswählen' }).click()
+  const vbVorPan = await viewBox()
+  await seite.mouse.move(k.x + k.width * 0.92, k.y + k.height * 0.1)
+  await seite.mouse.down()
+  await seite.mouse.move(k.x + k.width * 0.62, k.y + k.height * 0.3, { steps: 6 })
+  await seite.mouse.up()
+  const vbNachPan = await viewBox()
+  pruefe(vbNachPan[0] > vbVorPan[0] && vbNachPan[1] < vbVorPan[1], 'Verschieben: Ziehen auf leerer Stelle verschiebt den Ausschnitt (Inhalt folgt der Maus)')
+  pruefe(Math.abs(vbNachPan[2] - vbVorPan[2]) < 0.001, 'Verschieben: Zoom bleibt dabei gleich')
+  await seite.getByRole('button', { name: 'Ganze Skizze' }).click()
+
+  // Zwei Finger (Chromium-Touch über CDP): zoomen, verschieben; dabei darf nichts gezeichnet werden
+  const cdp = await kontext.newCDPSession(seite)
+  const beruehrung = (type, punkte) =>
+    cdp.send('Input.dispatchTouchEvent', { type, touchPoints: punkte.map(([x, y], i) => ({ x, y, id: i + 1 })) })
+  await seite.getByRole('button', { name: 'Rechteck', exact: true }).click()
+  k = await kasten()
+  const mx = k.x + k.width / 2
+  const my = k.y + k.height / 2
+  await beruehrung('touchStart', [[mx - 40, my], [mx + 40, my]])
+  for (let i = 1; i <= 6; i++) await beruehrung('touchMove', [[mx - 40 - i * 15, my], [mx + 40 + i * 15, my]])
+  await beruehrung('touchEnd', [])
+  await seite.waitForTimeout(100)
+  const faktorFinger = await zoomFaktor()
+  pruefe(faktorFinger > 2.5 && faktorFinger < 3.7, `Gesten: zwei Finger auseinander zoomen (Faktor ${faktorFinger.toFixed(2)}, erwartet ≈ 3)`)
+  pruefe((await elementeAnzahl()) === vorher, 'Gesten: Zwei-Finger-Zoom zeichnet nichts (Rechteck-Werkzeug aktiv)')
+  const vbGeste = await viewBox()
+  await beruehrung('touchStart', [[mx - 40, my], [mx + 40, my]])
+  for (let i = 1; i <= 6; i++) await beruehrung('touchMove', [[mx - 40 + i * 10, my + i * 5], [mx + 40 + i * 10, my + i * 5]])
+  await beruehrung('touchEnd', [])
+  await seite.waitForTimeout(100)
+  const vbGeschoben = await viewBox()
+  pruefe(vbGeschoben[0] < vbGeste[0] && vbGeschoben[1] < vbGeste[1], 'Gesten: zwei Finger gemeinsam verschieben den Ausschnitt')
+  pruefe(Math.abs(vbGeschoben[2] - vbGeste[2]) < 0.5, 'Gesten: gleichmäßiges Verschieben ändert den Zoom nicht')
+  pruefe((await elementeAnzahl()) === vorher, 'Gesten: Zwei-Finger-Verschieben zeichnet nichts')
+  await beruehrung('touchStart', [[mx - 60, my], [mx + 60, my]])
+  for (let i = 1; i <= 6; i++) await beruehrung('touchMove', [[mx - 60 + i * 8, my], [mx + 60 - i * 8, my]])
+  await beruehrung('touchEnd', [])
+  await seite.waitForTimeout(100)
+  pruefe((await zoomFaktor()) < faktorFinger, 'Gesten: zwei Finger zusammen zoomen heraus')
+  if (await seite.getByRole('button', { name: 'Ganze Skizze' }).isEnabled()) await seite.getByRole('button', { name: 'Ganze Skizze' }).click()
+
+  // Einrasten: neues Rechteck beginnt knapp neben der rechten unteren Ecke des ersten (160/120 in Pixeln) und rastet ein
+  const rechtecke = () =>
+    seite.locator('.skizze-flaeche svg rect[stroke]').evaluateAll((r) =>
+      r.map((x) => ({ x: +x.getAttribute('x'), y: +x.getAttribute('y'), b: +x.getAttribute('width'), h: +x.getAttribute('height') })),
+    )
+  const ersteR = (await rechtecke())[0]
+  pruefe(await seite.getByRole('button', { name: 'Einrasten' }).getAttribute('aria-pressed') === 'true', 'Einrasten: ist standardmäßig an')
+  k = await kasten()
+  const px = k.width / 800
+  const ecke = { x: k.x + (ersteR.x + ersteR.b) * px, y: k.y + (ersteR.y + ersteR.h) * px }
+  await seite.mouse.move(ecke.x + 4, ecke.y + 3)
+  await seite.mouse.down()
+  await seite.mouse.move(ecke.x + 100, ecke.y + 60, { steps: 5 })
+  pruefe((await seite.locator('.skizze-hilfslinie').count()) >= 1, 'Einrasten: Hilfslinie erscheint beim Zeichnen')
+  await seite.mouse.up()
+  let alle = await rechtecke()
+  let neuR = alle[alle.length - 1]
+  pruefe(Math.abs(neuR.x - (ersteR.x + ersteR.b)) < 0.001 && Math.abs(neuR.y - (ersteR.y + ersteR.h)) < 0.001, 'Einrasten: Anfang des neuen Rechtecks sitzt genau auf der Ecke des ersten')
+  // aus: gleiche Bewegung ohne Einrasten landet daneben
+  await seite.getByRole('button', { name: 'Einrasten' }).click()
+  pruefe(await seite.getByRole('button', { name: 'Einrasten' }).getAttribute('aria-pressed') === 'false', 'Einrasten: lässt sich abschalten')
+  await seite.mouse.move(ecke.x + 4, ecke.y + 3)
+  await seite.mouse.down()
+  await seite.mouse.move(ecke.x + 100, ecke.y + 150, { steps: 5 })
+  await seite.mouse.up()
+  alle = await rechtecke()
+  neuR = alle[alle.length - 1]
+  pruefe(Math.abs(neuR.x - (ersteR.x + ersteR.b)) > 1, 'Einrasten aus: Anfang bleibt dort, wo gesetzt')
+  await nav.getByRole('button', { name: 'Aufwuchs' }).click()
+  await nav.getByRole('button', { name: 'Skizze' }).click()
+  await seite.getByRole('toolbar', { name: 'Zeichenwerkzeuge' }).waitFor()
+  pruefe(await seite.getByRole('button', { name: 'Einrasten' }).getAttribute('aria-pressed') === 'false', 'Einrasten: Einstellung bleibt beim erneuten Öffnen der Skizze')
+  await seite.getByRole('button', { name: 'Einrasten' }).click()
+
+  // Linie: fast waagerecht wird gerade
+  await seite.getByRole('button', { name: 'Linie', exact: true }).click()
+  k = await kasten()
+  await seite.mouse.move(k.x + 30, k.y + 20)
+  await seite.mouse.down()
+  await seite.mouse.move(k.x + 200, k.y + 25, { steps: 5 })
+  await seite.mouse.up()
+  const linien = await seite.locator('.skizze-flaeche svg line[stroke]').evaluateAll((l) =>
+    l.map((x) => [+x.getAttribute('y1'), +x.getAttribute('y2')]),
+  )
+  pruefe(linien.some(([a, b]) => Math.abs(a - b) < 0.001 && a > 0), 'Einrasten: fast waagerechte Linie wird genau waagerecht')
+
+  // Auswählen: kleiner Kreis unter einem großen Rechteck wird zuerst gewählt, Antippen wechselt durch
+  await seite.getByRole('button', { name: 'Kreis', exact: true }).click()
+  k = await kasten()
+  const cx = k.x + 250
+  const cy = k.y + 150
+  await seite.mouse.move(cx, cy)
+  await seite.mouse.down()
+  await seite.mouse.move(cx + 9, cy, { steps: 3 })
+  await seite.mouse.up()
+  await seite.getByRole('dialog', { name: 'Beschriftung' }).getByRole('button', { name: 'Überspringen' }).click()
+  await seite.getByRole('button', { name: 'Rechteck', exact: true }).click()
+  await seite.getByRole('button', { name: 'Einrasten' }).click() // ohne Einrasten, damit der Kreis nicht verschoben wird
+  await seite.mouse.move(cx - 60, cy - 50)
+  await seite.mouse.down()
+  await seite.mouse.move(cx + 80, cy + 70, { steps: 5 })
+  await seite.mouse.up()
+  await seite.getByRole('button', { name: 'Auswählen' }).click()
+  const auswahlZeile = seite.locator('.skizze-auswahl')
+  await seite.mouse.click(k.x + k.width - 8, k.y + 8) // leere Stelle: nichts gewählt
+  pruefe(/Nichts ausgewählt/.test(await auswahlZeile.innerText()), 'Auswahl: leere Stelle wählt nichts')
+  await seite.mouse.click(cx, cy)
+  pruefe(/Ausgewählt: Kreis/.test(await auswahlZeile.innerText()), 'Auswahl: kleiner Kreis unter dem großen Rechteck wird zuerst gewählt')
+  const stapelText = await auswahlZeile.innerText()
+  const stapelAnzahl = +(/1 von (\d+) hier/.exec(stapelText)?.[1] ?? 0)
+  pruefe(stapelAnzahl >= 3, `Auswahl: Zeile nennt die Zahl der Formen an der Stelle (${stapelAnzahl})`)
+  await seite.mouse.click(cx, cy)
+  pruefe(/Ausgewählt: Rechteck/.test(await auswahlZeile.innerText()) && /2 von \d+/.test(await auswahlZeile.innerText()), 'Auswahl: erneutes Antippen wechselt zur Form darunter')
+  for (let i = 2; i <= stapelAnzahl; i++) await seite.mouse.click(cx, cy)
+  pruefe(/Ausgewählt: Kreis/.test(await auswahlZeile.innerText()), 'Auswahl: nach der letzten Form beginnt es von vorn')
+  // Greiffläche: 20 px neben dem kleinen Kreis (Radius ≈ 9 px) trifft ihn mit dem Finger, mit der Maus nicht
+  await seite.mouse.click(k.x + k.width - 8, k.y + 8)
+  await seite.mouse.click(cx + 20, cy)
+  pruefe(/Ausgewählt: Rechteck/.test(await auswahlZeile.innerText()), 'Auswahl: Maus 20 px neben dem kleinen Kreis trifft ihn nicht')
+  await seite.mouse.click(k.x + k.width - 8, k.y + 8)
+  await beruehrung('touchStart', [[cx + 20, cy]])
+  await beruehrung('touchEnd', [])
+  pruefe(/Ausgewählt: Kreis/.test(await auswahlZeile.innerText()), 'Auswahl: Fingerberührung 20 px daneben trifft den kleinen Kreis (größere Greiffläche)')
+  // Ziehen nach Auswahl: ein einziger Rückgängig-Schritt, Form wandert
+  const kreisX = () => seite.locator('.skizze-flaeche svg > g > circle[r]').first().getAttribute('cx')
+  const kreisVorher = +(await kreisX())
+  await seite.mouse.move(cx, cy)
+  await seite.mouse.down()
+  await seite.mouse.move(cx + 30, cy + 10, { steps: 8 })
+  await seite.mouse.up()
+  pruefe(Math.abs(+(await kreisX()) - kreisVorher) > 30, 'Auswahl: gewählte Form lässt sich verschieben')
+  await seite.getByRole('button', { name: 'Rückgängig' }).click()
+  pruefe(Math.abs(+(await kreisX()) - kreisVorher) < 0.001, 'Auswahl: Verschieben ist ein einziger Rückgängig-Schritt')
 
   // 11. WEP-Liste hat keinen Löschen-Knopf; Status sichtbar
   const liste = seite.getByRole('list', { name: 'Protokolle' })
