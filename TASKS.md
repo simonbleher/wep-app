@@ -234,7 +234,7 @@ guten Katalogtreffern (nur im passenden Abschnitt), Verwaltung im Profil (Liste,
 Screenshots: `docs/paket3/` (`npm run paket3:screenshots`). Kein `android/`-Eingriff, `native-version` unverändert.
 **Noch offen:** Gerätetest mit echtem OneDrive (zwei Geräte).
 
-### B3-4 · Fotos ✅ PR offen – Branch beta3/paket4
+### B3-4 · Fotos ✅ #46, #48 – Branch beta3/paket4
 Ergebnis: Fotos an Positionen (Außenanlagen, Aufwuchs, Beseitigung) und am WEP allgemein (Registerkarte „Fotos“, Gruppen
 je Position, Großansicht mit Text, Löschen mit Rückfrage; Kamera oder Galerie, mehrere auf einmal). Beim Speichern
 verkleinert (längste Seite 2000 px, JPEG, Ziel < 500 KB), EXIF-Ausrichtung korrigiert, Standortdaten/EXIF entfernt,
@@ -253,7 +253,7 @@ OneDrive); der Kotlin-Teil wurde hier nicht kompiliert (kein Android-SDK) – de
 
 ### Beta 3b (Plan: docs/PLAN-BETA3.md, Abschnitt „Beta 3b“)
 
-### B3-5 · Bau-Excel am WEP, Formalien vorbefüllen ✅ PR offen – Branch beta3/paket5
+### B3-5 · Bau-Excel am WEP, Formalien vorbefüllen ✅ #47 – Branch beta3/paket5
 Ergebnis: Bau-Excel über die Dateiauswahl des Systems wählen (am WEP unter Formalien und Export, oder „Neues WEP aus Bau-Excel“ auf der
 Startseite); sie bleibt am WEP (`Wep.bauExcel`, lokal IndexedDB DB-Version 6, OneDrive `daten/bau/<Nr>.xlsx`, Papierkorb
 `daten/papierkorb/bau/`), austauschen/entfernen mit Rückfrage; Abgleich und Papierkorb wie bei Fotos (`src/sync/bauExcel.ts`, Kennung = Hash,
@@ -265,7 +265,7 @@ Außenanlagen und Aufwuchs“ (**Simon bestätigt Wortlaut noch**). Code: `src/b
 FakeDrive), `app/__tests__/paket5.test.tsx`; e2e erweitert (DB 6). Test-Bau-Excel aus der Vorlage mit erfundenen Werten: `src/bauexcel/testBauExcel.ts`.
 Screenshots: `docs/paket5/` (`npm run paket5:screenshots`). `native-version` bleibt 4 (kein Android-Eingriff).
 **Noch offen:** Gerätetest (Dateiauswahl auf Android mit OneDrive-App, zwei Geräte mit echtem OneDrive).
-### B3-6 · Liste und Alltag ✅ PR offen – Branch beta3/paket6
+### B3-6 · Liste und Alltag ✅ #49, #50 – Branch beta3/paket6
 Ergebnis: (1) Suche in der WEP-Liste (Vorgangs-Nr., Anlage, Parzelle, Weg, Unterpächter, Auftraggeber; jedes Wort, Umlaute egal) zusammen mit
 dem Status-Filter, Sortierung „Zuletzt geändert“ (Standard) / „Nummer“ (`src/app/wepListe.ts`). (2) Problempflanzen: `data/problempflanzen.json`
 (Quelle je Eintrag, `richtlinie` mit Seite oder `praxis`, noch unbestätigt), Warnung mit Knopf „Zur Beseitigung“ (Beseitigung vorbelegt), nur
@@ -277,7 +277,7 @@ Block `:root[data-kontrast='sonne']` in `src/design/tokens.css`. Tests: `app/__t
 (`npm run paket6:screenshots`, auch mit Sonnen-Kontrast). `native-version` bleibt 4 (kein Android-Eingriff).
 **Offen:** Simon bestätigt die Praxis-Einträge der Problempflanzen (Quelle BfN-Schwarze-Liste, nicht Teil der Richtlinie); Gerätetest der Sicherung auf Android
 (Datei speichern/wählen).
-### B3-7 · Skizze bedienen (Zoomen, Einrasten, Auswählen) ✅ PR offen – Branch beta3/paket7
+### B3-7 · Skizze bedienen (Zoomen, Einrasten, Auswählen) ✅ #51 – Branch beta3/paket7
 (1) Zoomen/Verschieben: zwei Finger (Zoom + Verschieben), Mausrad (um den Mauszeiger), Ziehen auf leerer Stelle im Auswählen-Werkzeug, mittlere Maustaste,
 Knöpfe Hinein/Heraus/„Ganze Skizze“ (über der Zeichenfläche), Zoom 100–800 %. Die Ansicht ist nur ein viewBox-Ausschnitt (`src/skizze/ansicht.ts`), nicht Teil der
 Skizzendaten. (2) Einrasten (`src/skizze/einrasten.ts`): Ecken, Mitten und Kanten benachbarter Formen, Grundstücksrand (= Rand der Zeichenfläche), gerade Linien
