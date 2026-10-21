@@ -289,3 +289,6 @@ Test `editorBedienung.test.tsx`). Tests: `ansicht.test.ts`, `einrasten.test.ts`,
 Abschnitt 10f) mit Mausrad, Maus-Ziehen und Zwei-Finger-Gesten über CDP-Touch. Screenshots: `docs/paket7/` (`npm run paket7:screenshots`). `native-version` bleibt 4
 (kein Android-Eingriff).
 **Offen:** Gerätetest der Gesten auf Android/Tablet; Simon prüft Fangbereich und Greifradius (Konstanten `FANG_PIXEL`, `GREIF_PIXEL_FINGER`).
+
+## Windows-Programm (Plan: docs/PLAN-EXE.md)
+- W-1 · .exe mit Tauri ⏳ – Branch exe/tauri
