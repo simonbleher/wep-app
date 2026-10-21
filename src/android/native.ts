@@ -115,6 +115,11 @@ export interface WepNativePlugin {
   jetztVersuchen(): Promise<void>
   netzTyp(): Promise<NetzInfo>
 
+  /** „Speichern unter…“: Datei in Stücken (Base64) übergeben, dann den System-Dialog öffnen. */
+  dateiBeginnen(): Promise<void>
+  dateiAnhaengen(a: { daten: string }): Promise<void>
+  dateiSpeichern(a: { name: string; typ: string }): Promise<{ gespeichert: boolean }>
+
   /** Nummer des nativen Teils (android/native-version.txt) und versionCode der installierten APK. */
   nativeVersion(): Promise<{ nativeVersion: number; versionCode: number }>
   /**

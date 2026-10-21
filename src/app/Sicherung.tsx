@@ -21,6 +21,7 @@ import {
   type Vorschau,
 } from '@/sicherung'
 import { ICON, Meldung, zeitDe } from './ui'
+import { speichereDatei } from './dateiSpeichern'
 
 const LETZTE_KEY = 'wep-letzte-sicherung'
 
@@ -88,12 +89,11 @@ export function Sicherung({ id, appVersion }: { id: string; appVersion: string }
     setMeldung(undefined)
     try {
       const s = await erstelleSicherung(lokalerStand, { mitFotos, mitBauExcel: mitBau, appVersion })
-      const url = URL.createObjectURL(s.blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = s.dateiname
-      a.click()
-      URL.revokeObjectURL(url)
+      const gespeichert = await speichereDatei(s.blob, s.dateiname)
+      if (gespeichert === 'abgebrochen') {
+        setMeldung({ text: 'Die Sicherung wurde nicht gespeichert (abgebrochen).' })
+        return
+      }
       const jetzt = new Date().toISOString()
       merkeLetzteSicherung(jetzt)
       setLetzte(jetzt)
@@ -187,11 +187,16 @@ export function Sicherung({ id, appVersion }: { id: string; appVersion: string }
           <p className="neben">{letzte ? `Letzte Sicherung auf diesem Gerät: ${zeitDe(letzte)}.` : 'Auf diesem Gerät wurde noch keine Sicherung erstellt.'}</p>
         </>
       )}
-      {meldung && (
-        <Meldung alarm={meldung.alarm}>
-          <p>{meldung.text}</p>
-        </Meldung>
-      )}
+      {meldung &&
+        (meldung.alarm ? (
+          <Meldung alarm>
+            <p>{meldung.text}</p>
+          </Meldung>
+        ) : (
+          <p className="neben" role="status">
+            {meldung.text}
+          </p>
+        ))}
       {geoeffnet && (
         <VorschauAnsicht
           vorschau={geoeffnet.vorschau}
