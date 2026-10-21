@@ -52,6 +52,8 @@ import { svgZuPngBrowser } from '@/export/svgRaster'
 import { exportWep, type ExportResult } from '@/export'
 import { exportFotosNachOneDrive, exportNachOneDrive, ladeBauExcelAusOneDrive, ladeFotoAusOneDrive } from '@/sync'
 import { berechneAbschnittSumme } from '@/gruen/summen'
+import { Capacitor } from '@capacitor/core'
+import { speichereDatei, speicherText } from './dateiSpeichern'
 import { leseZahl, zahlDe, zahlFuerEingabe } from '@/gruen/format'
 
 // ---------------------------------------------------------------------------
@@ -753,13 +755,10 @@ async function exportiereFotos(wep: Wep): Promise<string> {
   const od = await exportFotosNachOneDrive(ordner, dateien)
   if (od === 'ohne-konto') {
     const zip = await zipDateien(dateien)
-    const url = URL.createObjectURL(zip)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${ordner}.zip`
-    a.click()
-    URL.revokeObjectURL(url)
-    return `${dateien.length} Foto${dateien.length === 1 ? '' : 's'} als ZIP heruntergeladen (${ordner}.zip).${fehlt}`
+    const e = await speichereDatei(zip, `${ordner}.zip`)
+    if (e === 'abgebrochen') return `Fotos: ${speicherText(e, `${ordner}.zip`)}.${fehlt}`
+    const verb = e === 'gespeichert' ? 'gespeichert' : 'heruntergeladen'
+    return `${dateien.length} Foto${dateien.length === 1 ? '' : 's'} als ZIP ${verb} (${ordner}.zip).${fehlt}`
   }
   if (od.status === 'hochgeladen') return `${dateien.length} Foto${dateien.length === 1 ? '' : 's'} in OneDrive abgelegt (Ordner Exporte/${ordner}).${fehlt}`
   return `Fotos: ${od.wartend} Datei${od.wartend === 1 ? '' : 'en'} warten auf Netz und gehen beim nächsten Abgleich nach OneDrive (Exporte/${ordner}).${fehlt}`
@@ -823,20 +822,19 @@ function ExportTab({
         formalienAbgeglichen: wep.bauExcel?.abgeglichen === true,
       })
 
-      // Datei-Download auslösen
-      const url = URL.createObjectURL(result.blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = result.filename
-      a.click()
-      URL.revokeObjectURL(url)
+      // Datei an den Nutzer: im Browser als Download. In der Android-App geht sie mit Konto nur
+      // nach OneDrive (kein Dialog bei jedem Export), ohne Konto über „Speichern unter…“.
+      const nativ = Capacitor.isNativePlatform()
+      if (!nativ) await speichereDatei(result.blob, result.filename)
 
       // Zusätzlich nach OneDrive (Exporte/): sofort oder, ohne Netz, per Warteschlange.
       // Ein Fehler hier darf den fertigen Download nicht entwerten.
       let oneDrive: string | undefined
       try {
         const status = await exportNachOneDrive(result.filename, result.blob)
-        if (status === 'hochgeladen') oneDrive = 'Auch in OneDrive abgelegt (Ordner Exporte).'
+        if (status === 'ohne-konto' && nativ) {
+          oneDrive = `Ohne Konto: ${speicherText(await speichereDatei(result.blob, result.filename), result.filename)}.`
+        } else if (status === 'hochgeladen') oneDrive = nativ ? 'In OneDrive abgelegt (Ordner Exporte).' : 'Auch in OneDrive abgelegt (Ordner Exporte).'
         else if (status === 'wartet') {
           oneDrive = 'OneDrive: wartet auf Netz und wird beim nächsten Abgleich hochgeladen.'
         }

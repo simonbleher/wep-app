@@ -36,7 +36,10 @@ const bytesVon = async (d: Blob | Uint8Array): Promise<Uint8Array> =>
 
 /** Dateiname mit Datum: `WEP-Sicherung_2026-10-20.zip`. */
 export function sicherungsDateiname(jetzt: string): string {
-  return `WEP-Sicherung_${jetzt.slice(0, 10)}.zip`
+  // Lokales Datum (nachts nach Mitternacht sonst der Vortag in UTC)
+  const d = new Date(jetzt)
+  const zwei = (n: number) => String(n).padStart(2, '0')
+  return `WEP-Sicherung_${d.getFullYear()}-${zwei(d.getMonth() + 1)}-${zwei(d.getDate())}.zip`
 }
 
 /** Erstellt die Sicherung. Fehlende Fotodateien werden gezählt, brechen aber nichts ab. */

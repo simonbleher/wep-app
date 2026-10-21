@@ -1,10 +1,14 @@
 package de.wep.app
 
+import android.app.Activity
+import android.content.Intent
+import androidx.activity.result.ActivityResult
 import com.getcapacitor.JSArray
 import com.getcapacitor.JSObject
 import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
+import com.getcapacitor.annotation.ActivityCallback
 import com.getcapacitor.annotation.CapacitorPlugin
 
 /**
@@ -310,5 +314,61 @@ class WepNativePlugin : Plugin() {
         } catch (e: Exception) {
             fehler(call, e)
         }
+    }
+
+    /** Datei für „Speichern unter…“ neu beginnen (verwirft einen abgebrochenen Rest). */
+    @PluginMethod
+    fun dateiBeginnen(call: PluginCall) {
+        try {
+            DateiSpeichern.beginne(ctx)
+            call.resolve()
+        } catch (e: Exception) {
+            fehler(call, e)
+        }
+    }
+
+    /** Ein Stück der Datei (Base64) anhängen. */
+    @PluginMethod
+    fun dateiAnhaengen(call: PluginCall) {
+        try {
+            DateiSpeichern.haengeAn(ctx, call.getString("daten") ?: return call.reject("daten fehlt"))
+            call.resolve()
+        } catch (e: Exception) {
+            fehler(call, e)
+        }
+    }
+
+    /** System-Dialog „Speichern unter…“ öffnen; Ergebnis { gespeichert: true/false }. */
+    @PluginMethod
+    fun dateiSpeichern(call: PluginCall) {
+        val name = call.getString("name") ?: return call.reject("name fehlt")
+        val typ = call.getString("typ") ?: "application/octet-stream"
+        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT)
+            .addCategory(Intent.CATEGORY_OPENABLE)
+            .setType(typ)
+            .putExtra(Intent.EXTRA_TITLE, name)
+        startActivityForResult(call, intent, "dateiGewaehlt")
+    }
+
+    @ActivityCallback
+    private fun dateiGewaehlt(call: PluginCall?, ergebnis: ActivityResult) {
+        if (call == null) return
+        val ziel = ergebnis.data?.data
+        if (ergebnis.resultCode != Activity.RESULT_OK || ziel == null) {
+            DateiSpeichern.verwerfe(ctx)
+            call.resolve(JSObject().put("gespeichert", false))
+            return
+        }
+        // Kopieren nicht auf dem UI-Thread
+        Thread {
+            try {
+                val groesse = DateiSpeichern.kopiereNach(ctx, ziel)
+                Protokoll.eintrag(ctx, "info", "Datei gespeichert ($groesse Bytes)")
+                call.resolve(JSObject().put("gespeichert", true))
+            } catch (e: Exception) {
+                Protokoll.eintrag(ctx, "fehler", "Datei speichern: ${e.message}")
+                fehler(call, e)
+            }
+        }.start()
     }
 }

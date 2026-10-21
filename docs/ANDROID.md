@@ -360,3 +360,17 @@ Das Themen-Icon wirkt ab Android 13 (Einstellungen → Hintergrund und Stil → 
 - `android/` hat sich geändert: **`native-version` ist 4.** Der Web-Teil (Foto-Ansicht) kommt zusammen mit der neuen APK; ältere
   Apps ohne die Foto-Methoden im Plugin laden Fotos nur im Vordergrund hoch (die Live-Updates werden wegen `nativeVersion`
   nicht auf eine alte APK angewendet).
+
+## Dateien speichern („Speichern unter…“)
+
+Die WebView der App kann Blob-Downloads (`<a download>`) nicht speichern. Alles, was die Web-App
+als Datei herausgibt, läuft deshalb über `src/app/dateiSpeichern.ts`: im Browser als Download, in
+der App über den System-Dialog „Speichern unter…“ (`ACTION_CREATE_DOCUMENT`, `DateiSpeichern.kt`).
+Dort lassen sich „Downloads“, ein Ordner auf dem Gerät oder die OneDrive-App wählen. Die Datei
+geht in Stücken von 512 KB (Base64) über die Brücke, damit auch große Sicherungen mit Fotos
+nicht auf einmal im Speicher liegen müssen.
+
+- **Sicherung erstellen:** immer der Dialog. Einspielen wählt die Datei wie gewohnt aus.
+- **Excel-Export:** mit Konto nur nach OneDrive (`Exporte/`), kein Dialog bei jedem Export;
+  ohne Konto der Dialog.
+- **Fotos ohne Konto:** ZIP über den Dialog.
