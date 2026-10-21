@@ -34,7 +34,7 @@ jobs:
       VITE_MS_CLIENT_ID: ${{ vars.VITE_MS_CLIENT_ID }}
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-      TAURI_SIGNING_PUBLIC_KEY: ${{ vars.TAURI_SIGNING_PUBLIC_KEY }}
+      TAURI_SIGNING_PUBLIC_KEY: ${{ vars.TAURI_SIGNING_PUBLIC_KEY || secrets.TAURI_SIGNING_PUBLIC_KEY }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       APK_PROJEKT: wep-pankow-apk # muss zu BASIS_URL in tools/apk-site.mjs und zur Adresse in src-tauri/tauri.conf.json passen
