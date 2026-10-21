@@ -5,6 +5,9 @@ import {
   trifftElement,
   trefferSuchen,
   elementVerschieben,
+  alleTreffer,
+  naechsterTreffer,
+  elementFlaeche,
 } from '../geometrie.js'
 import type { SkizzeElement } from '../types.js'
 
@@ -150,5 +153,60 @@ describe('elementVerschieben', () => {
       y2: 5,
       beschriftung: '5 m',
     })
+  })
+})
+
+describe('Auswahl bei kleinen und überlagerten Formen', () => {
+  const grundstueck: SkizzeElement = { id: 'grund', typ: 'rechteck', x: 0, y: 0, breite: 800, hoehe: 600 }
+  const haus: SkizzeElement = { id: 'haus', typ: 'rechteck', x: 100, y: 100, breite: 200, hoehe: 100 }
+  const pfosten: SkizzeElement = { id: 'pfosten', typ: 'symbol', art: 'gegenstand', x: 150, y: 140, breite: 10, hoehe: 10 }
+  // Reihenfolge: Grundstück ganz unten, Pfosten sogar UNTER dem Haus
+  const elemente: SkizzeElement[] = [grundstueck, pfosten, haus]
+
+  it('größere Greifradius trifft auch danebenliegende kleine Formen', () => {
+    const daneben = { x: 175, y: 145 }
+    expect(trifftElement(pfosten, daneben)).toBe(false)
+    expect(trifftElement(pfosten, daneben, 20)).toBe(true)
+  })
+
+  it('Standardverhalten ohne Toleranz bleibt wie bisher', () => {
+    expect(trifftElement(pfosten, { x: 148, y: 145 })).toBe(true)
+    expect(trifftElement(pfosten, { x: 140, y: 145 })).toBe(false)
+  })
+
+  it('Pfosten unter dem Haus und auf dem Grundstück wird zuerst angeboten', () => {
+    const treffer = alleTreffer(elemente, { x: 155, y: 145 })
+    expect(treffer.map((t) => t.id)).toEqual(['pfosten', 'haus', 'grund'])
+  })
+
+  it('Linien (dünn) kommen vor Flächen', () => {
+    const weg: SkizzeElement = { id: 'weg', typ: 'linie', x1: 0, y1: 150, x2: 400, y2: 150 }
+    expect(alleTreffer([grundstueck, haus, weg], { x: 200, y: 150 }).map((t) => t.id)).toEqual(['weg', 'haus', 'grund'])
+  })
+
+  it('bei gleicher Größe liegt das obere zuerst', () => {
+    const a: SkizzeElement = { id: 'a', typ: 'rechteck', x: 0, y: 0, breite: 50, hoehe: 50 }
+    const b: SkizzeElement = { id: 'b', typ: 'rechteck', x: 10, y: 10, breite: 50, hoehe: 50 }
+    expect(alleTreffer([a, b], { x: 20, y: 20 }).map((t) => t.id)).toEqual(['b', 'a'])
+  })
+
+  it('keine Treffer → leere Liste', () => {
+    expect(alleTreffer([haus], { x: 700, y: 500 })).toEqual([])
+  })
+
+  it('Antippen wechselt der Reihe nach durch und beginnt von vorn', () => {
+    const treffer = alleTreffer(elemente, { x: 155, y: 145 })
+    expect(naechsterTreffer(treffer, null)?.id).toBe('pfosten')
+    expect(naechsterTreffer(treffer, 'pfosten')?.id).toBe('haus')
+    expect(naechsterTreffer(treffer, 'haus')?.id).toBe('grund')
+    expect(naechsterTreffer(treffer, 'grund')?.id).toBe('pfosten')
+    expect(naechsterTreffer(treffer, 'anderes')?.id).toBe('pfosten')
+    expect(naechsterTreffer([], 'x')).toBeNull()
+  })
+
+  it('Flächen: Kreis, Linie, Symbol', () => {
+    expect(elementFlaeche({ id: 'k', typ: 'kreis', cx: 0, cy: 0, radius: 5 })).toBe(100)
+    expect(elementFlaeche({ id: 'l', typ: 'linie', x1: 0, y1: 0, x2: 5, y2: 5 })).toBe(0)
+    expect(elementFlaeche(pfosten)).toBe(100)
   })
 })

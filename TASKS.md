@@ -277,4 +277,15 @@ Block `:root[data-kontrast='sonne']` in `src/design/tokens.css`. Tests: `app/__t
 (`npm run paket6:screenshots`, auch mit Sonnen-Kontrast). `native-version` bleibt 4 (kein Android-Eingriff).
 **Offen:** Simon bestätigt die Praxis-Einträge der Problempflanzen (Quelle BfN-Schwarze-Liste, nicht Teil der Richtlinie); Gerätetest der Sicherung auf Android
 (Datei speichern/wählen).
-- B3-7 · Skizze bedienen (Zoomen, Einrasten, Auswählen) ⏳ – Branch beta3/paket7
+### B3-7 · Skizze bedienen (Zoomen, Einrasten, Auswählen) ✅ PR offen – Branch beta3/paket7
+(1) Zoomen/Verschieben: zwei Finger (Zoom + Verschieben), Mausrad (um den Mauszeiger), Ziehen auf leerer Stelle im Auswählen-Werkzeug, mittlere Maustaste,
+Knöpfe Hinein/Heraus/„Ganze Skizze“ (über der Zeichenfläche), Zoom 100–800 %. Die Ansicht ist nur ein viewBox-Ausschnitt (`src/skizze/ansicht.ts`), nicht Teil der
+Skizzendaten. (2) Einrasten (`src/skizze/einrasten.ts`): Ecken, Mitten und Kanten benachbarter Formen, Grundstücksrand (= Rand der Zeichenfläche), gerade Linien
+0/45/90° (±6°); Hilfslinien beim Zeichnen/Ziehen; Schalter „Einrasten“ in der Werkzeugleiste (Geräte-Einstellung), am PC Alt gedrückt = kurz aus. Fangbereich 10 px
+(zoom-unabhängig). (3) Auswählen (`geometrie.ts`): Greifradius 20 px (Finger) bzw. 8 px (Maus/Stift) statt fest 8 Einheiten, Treffer nach Größe sortiert (kleine Form vor
+großer, Linien zuerst), erneutes Antippen der gewählten Form wechselt durch die Formen an der Stelle („2 von 3 hier“); Ziehen erst ab 6 px; Verschieben ist jetzt ein
+einziger Rückgängig-Schritt. Eine Zwei-Finger-Geste lässt Auswahl und Zeichnung unberührt. (4) Export unverändert (keine Änderung an `src/export`, Skizzendaten gleich;
+Test `editorBedienung.test.tsx`). Tests: `ansicht.test.ts`, `einrasten.test.ts`, `geometrie.test.ts` (Überlagerung), `editorBedienung.test.tsx`; e2e (`konto-durchlauf.mjs`,
+Abschnitt 10f) mit Mausrad, Maus-Ziehen und Zwei-Finger-Gesten über CDP-Touch. Screenshots: `docs/paket7/` (`npm run paket7:screenshots`). `native-version` bleibt 4
+(kein Android-Eingriff).
+**Offen:** Gerätetest der Gesten auf Android/Tablet; Simon prüft Fangbereich und Greifradius (Konstanten `FANG_PIXEL`, `GREIF_PIXEL_FINGER`).

@@ -1265,6 +1265,8 @@ select.eingabe {
   background: var(--farbe-akzent-hell);
   color: var(--farbe-akzent);
   font-size: var(--schrift-klein);
+  /* zwei Zeilen, immer vorhanden: die Zeichenfläche darf beim Antippen/Durchwechseln nicht springen */
+  min-height: calc(var(--schrift-klein) * 1.5 * 2 + 2 * var(--abstand-2));
 }
 
 .skizze-flaeche {
@@ -1273,7 +1275,41 @@ select.eingabe {
   border: var(--linie) solid var(--farbe-rand);
   border-radius: var(--radius-klein);
   background: #fff; /* Zeichenfläche bleibt weiß, auch im Dunkelmodus */
-  touch-action: none; /* kein Scrollen beim Zeichnen */
+  touch-action: none; /* kein Scrollen beim Zeichnen, Zoomen und Verschieben macht der Editor selbst */
+}
+
+.skizze-bereich {
+  position: relative;
+  width: 100%;
+}
+
+.skizze-ansicht {
+  position: absolute;
+  left: var(--abstand-2);
+  bottom: var(--abstand-2);
+  display: flex;
+  gap: var(--abstand-1);
+}
+
+.skizze-ansicht .werkzeug {
+  background: rgba(255, 255, 255, 0.92);
+  color: #1a1a1a;
+}
+
+.skizze-ansicht .werkzeug:disabled {
+  opacity: 0.45;
+}
+
+.skizze-zoom {
+  position: absolute;
+  right: var(--abstand-2);
+  bottom: var(--abstand-2);
+  padding: 2px var(--abstand-2);
+  border-radius: var(--radius-klein);
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: var(--schrift-mini);
+  pointer-events: none;
 }
 
 .dialog-form {
