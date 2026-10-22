@@ -276,7 +276,7 @@ export function rnEffektiv(b: Bauteil, spalte: 2 | 3 | 4 | 5, wertjahr: number, 
   return rn
 }
 
-function rechneHaupt(
+export function rechneHaupt(
   b: Bauteil,
   flaeche: number,
   nichtBerechnet: number,

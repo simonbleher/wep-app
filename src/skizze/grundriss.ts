@@ -332,12 +332,32 @@ const rund2 = (n: number) => Math.round(n * 100) / 100
  * ist es eine Näherung (der Hinweis steht in `hinweise`). Fehlt `hoeheOben`, gilt das Dach als flach.
  */
 export function massenVon(teil: Pick<GrundrissTeil, 'punkte' | 'hoehe' | 'dachform' | 'hoeheOben'>): Massen {
-  const flaeche = rund2(flaecheVon(teil.punkte))
-  const umfang = rund2(umfangVon(teil.punkte))
-  const dachform = teil.dachform ?? 'flach'
+  return massenAusFlaeche(
+    rund2(flaecheVon(teil.punkte)),
+    rund2(umfangVon(teil.punkte)),
+    teil.dachform,
+    teil.hoehe,
+    teil.hoeheOben,
+    Boolean(rechteckMasse(teil.punkte)),
+  )
+}
+
+/**
+ * Die Rechnung hinter `massenVon`, ohne Polygon: auch der Kubatur-Rechner im Reiter „Rechner“ (Beta 4, Paket 4)
+ * benutzt sie, damit Grundriss und Rechner nie verschieden rechnen. `rechteck`: false = Näherung mit Hinweis.
+ */
+export function massenAusFlaeche(
+  flaeche: number,
+  umfang: number,
+  dachformWahl: Dachform | undefined,
+  hoehe: number | undefined,
+  hoeheOben: number | undefined,
+  rechteck: boolean,
+): Massen {
+  const dachform = dachformWahl ?? 'flach'
   const hinweise: string[] = []
-  const h = teil.hoehe && teil.hoehe > 0 ? teil.hoehe : undefined
-  const o = teil.hoeheOben && teil.hoeheOben > 0 ? teil.hoeheOben : undefined
+  const h = hoehe && hoehe > 0 ? hoehe : undefined
+  const o = hoeheOben && hoeheOben > 0 ? hoeheOben : undefined
   const m: Massen = { flaeche, umfang, dachform, hinweise }
   if (h === undefined) {
     hinweise.push('Höhe fehlt – die Kubatur wird erst mit der Höhe berechnet.')
@@ -351,7 +371,7 @@ export function massenVon(teil: Pick<GrundrissTeil, 'punkte' | 'hoehe' | 'dachfo
   if (oben < h) {
     hinweise.push(`${dachform === 'pult' ? 'Die hohe Wand' : 'Die Firsthöhe'} (${meterText(oben)}) ist niedriger als die Wandhöhe (${meterText(h)}) – bitte prüfen.`)
   }
-  if (dachform !== 'flach' && !rechteckMasse(teil.punkte)) {
+  if (dachform !== 'flach' && !rechteck) {
     hinweise.push('Kein Rechteck: Dachraum als Näherung (Fläche × Höhenunterschied ÷ 2).')
   }
   m.hoeheOben = oben

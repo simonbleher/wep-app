@@ -119,3 +119,15 @@
   nur bei Teil `bau`/`beides`. Gleicher Mechanismus wie die Grün-Skizze (`fuegeSkizzeFormenEin`, neue Option `blatt`); Formen tragen `descr="wep-app"`, ein erneuter Export ersetzt nur diese.
   Fremde Formen im Blatt bleiben, der Export meldet ihre Anzahl. Text in Freiformen sitzt über Innenränder (LibreOffice liest benannte Textrechtecke nicht).
 - **Keine Änderung an `android/`, Plugins oder `src-tauri/`**, daher keine neue Versionsnummer.
+
+## 2026-10-22 · Beta 4, Paket 4: Rechen-Tools im WEP
+
+- **Ein Rechenweg:** `src/bau/rechner.ts` rechnet nichts selbst nach. Altersabzug und €/m² kommen aus `berechneBau` (das Bauteil liegt allein in einem Probe-WEP, 24-m²-Kürzung entfällt;
+  beim Keller fehlt die Begrenzung auf die Restnutzung der Laube), die Kubatur aus `massenAusFlaeche`, herausgelöst aus `massenVon` (der Grundriss in „Skizze Bau“ benutzt dieselbe Funktion),
+  der Index aus `ermittleBaupreisindex`/`indexFuer`, die 24 m² aus `weisePlaetzeZu`/`verteileFlaeche`. `rechneHaupt` ist dafür exportiert. Tests: Rechner = Bewertung = Grundriss.
+- **Flächenrechner:** Zerlegung in Rechteck, Dreieck (Grundseite/Höhe oder drei Seiten nach Heron), Trapez, jeweils auch als Abzug; keine Koordinateneingabe (auf der Parzelle messbar sind Seiten).
+- **Übernehmen auf Wunsch:** Ziel-Bauteil wählen, dann Knopf. Fläche/Kubatur setzen `flaecheManuell`; war das Bauteil mit dem Grundriss verknüpft, wird `ausGrundriss` false (wie beim Überschreiben der Fläche).
+  Altersangaben setzen Baujahr, Restnutzung (von Hand, mit Begründung) bzw. Minderung je Jahr. Rechner-Eingaben selbst werden nicht gespeichert (nur Ergebnisse).
+- **Index:** Ein Wert aus der Tabelle lässt sich für das WEP wählen (`bau.index`, manuell); Umrechnung von Beträgen früherer Jahre auf das Wertjahr.
+- **24-m²-Check:** Zulässige Fläche probeweise änderbar, dauerhaft nur mit „Übernehmen“ (`bau.zulaessigeFlaeche`). Der nicht berechnete Anteil des Vorplatzes steht im Check, nicht in I38 der Vorlage (Hinweis).
+- Keine Änderung an `android/`, Plugins oder `src-tauri/`, daher keine neue Versionsnummer.
