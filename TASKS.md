@@ -314,5 +314,10 @@ Abschnitt 10f) mit Mausrad, Maus-Ziehen und Zwei-Finger-Gesten über CDP-Touch. 
   Bauteil-Kürzel verknüpft mit Paket 2 (Fläche, Maße, Höhe, Kubatur fließen in die Bewertung; überschreibbar), Massenberechnung nach Dachform (Flach/Pult/Sattel),
   Export als bearbeitbare Formen in „Skizze Bau“. Zoom/Einrasten/Auswahl aus Beta 3; Grün-Skizze unverändert. Code: `src/skizze/grundriss*.ts`, `GrundrissEditor.tsx`,
   `src/bau/grundriss.ts`, `src/export/grundrissFormen.ts`, `src/app/SkizzeBauTab.tsx`. Screenshots: `docs/beta4-paket3/` (`npm run beta4-paket3:screenshots`, Excel-Bild: `npm run beta4-paket3:export-bild`).
-- B4-4 · Rechen-Tools ⏳ – Branch beta4/paket4
+- B4-4 · Rechen-Tools ✅ PR offen – Branch beta4/paket4. Neuer Bau-Reiter „Rechner“: Flächenrechner (Rechteck, Dreieck, Dreieck aus drei Seiten, Trapez, Abzüge → auch unregelmäßig),
+  Kubatur nach Dachform (Flach/Pult/Sattel), Altersabzug/Restnutzung je Bauteil (Probewerte), Baupreisindex (Umrechnung, Werte je Jahr, Wert für das WEP wählen),
+  24-m²-Check (Anrechnung L → A → Ü1, nicht berechnete Fläche, was nicht zählt, zulässige Fläche nach Vertrag). Ergebnis auf Wunsch ins Bauteil übernehmen.
+  **Nichts doppelt gerechnet:** `src/bau/rechner.ts` ruft `berechneBau`, `massenAusFlaeche` (jetzt auch von `massenVon` im Grundriss benutzt), `ermittleBaupreisindex`, `verteileFlaeche` auf; Tests vergleichen Rechner = Bewertung = Grundriss.
+  Code: `src/bau/rechner.ts`, `src/app/BauRechner.tsx`. Screenshots: `docs/beta4-paket4/` (`npm run beta4-paket4:screenshots`, zugleich Bedienungsdurchlauf mit Prüfungen).
+  Offen (Simon): Der überdachte Vorplatz zählt auf die 24 m²; die Vorlage (I38) summiert seinen nicht berechneten Anteil nicht – der Check zeigt ihn mit Hinweis.
 - B4-5 · 3D-Ansicht ⏳ – Branch beta4/paket5

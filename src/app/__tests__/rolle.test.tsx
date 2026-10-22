@@ -12,13 +12,13 @@ describe('Reiter je Rolle', () => {
   it('Grün: Außenanlagen, Aufwuchs, Beseitigung, Skizze, Fotos, Formalien', () => {
     expect(ids('gruen')).toEqual(['formalien', 'aussenanlagen', 'aufwuchs', 'beseitigung', 'fotos', 'skizze'])
   })
-  it('Bau: Baulichkeiten, Mängel, Abwasser, Beseitigung Bau, Skizze Bau, Fotos, Formalien', () => {
-    expect(ids('bau')).toEqual(['formalien', 'baulichkeiten', 'maengel', 'abwasser', 'beseitigungBau', 'fotos', 'skizzeBau'])
+  it('Bau: Baulichkeiten, Mängel, Abwasser, Beseitigung Bau, Skizze Bau, Rechner, Fotos, Formalien', () => {
+    expect(ids('bau')).toEqual(['formalien', 'baulichkeiten', 'maengel', 'abwasser', 'beseitigungBau', 'fotos', 'skizzeBau', 'rechner'])
   })
   it('Beides: alles, ohne doppelte Reiter', () => {
     const alle = ids('beides')
-    expect(alle).toHaveLength(11)
-    expect(new Set(alle).size).toBe(11)
+    expect(alle).toHaveLength(12)
+    expect(new Set(alle).size).toBe(12)
     expect(alle).toEqual(expect.arrayContaining([...ids('gruen'), ...ids('bau')]))
   })
   it('Marke zeigt den Teil', () => {

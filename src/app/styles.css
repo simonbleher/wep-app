@@ -2075,3 +2075,42 @@ select.eingabe {
   border-bottom: 0;
   font-weight: var(--gewicht-mittel);
 }
+
+/* Rechner (Beta 4, Paket 4): Werkzeug-Wahl – Handy zweispaltig, Tablet in einer Reihe */
+.segmente-rechner {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.segmente-rechner .segment {
+  border-top: var(--linie) solid var(--farbe-rand);
+}
+
+.segmente-rechner .segment:nth-child(-n + 2) {
+  border-top: 0;
+}
+
+.segmente-rechner .segment:nth-child(odd) {
+  border-left: 0;
+}
+
+.segmente-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+@media (min-width: 640px) {
+  .segmente-rechner {
+    grid-template-columns: repeat(5, 1fr);
+  }
+
+  .segmente-rechner .segment {
+    border-top: 0;
+  }
+
+  .segmente-rechner .segment:nth-child(odd) {
+    border-left: var(--linie) solid var(--farbe-rand);
+  }
+
+  .segmente-rechner .segment:first-child {
+    border-left: 0;
+  }
+}

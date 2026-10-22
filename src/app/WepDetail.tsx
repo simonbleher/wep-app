@@ -24,6 +24,7 @@ import {
   Droplets,
   Hammer,
   Ruler,
+  Calculator,
   TriangleAlert,
   FileSpreadsheet,
   FileText,
@@ -52,6 +53,7 @@ import { PositionHinzufuegen } from './PositionHinzufuegen'
 import { PositionBearbeiten } from './PositionBearbeiten'
 import { BeseitigungFormular, beseitigungSumme } from './BeseitigungFormular'
 import { BaulichkeitenTab, BauteilFormular } from './BauBaulichkeiten'
+import { RechnerTab } from './BauRechner'
 import { MaengelTab } from './BauMaengel'
 import { AbwasserTab } from './BauAbwasser'
 import { BeseitigungBauTab, EINHEITEN_BAU } from './BauBeseitigung'
@@ -76,7 +78,7 @@ import { leseZahl, zahlDe, zahlFuerEingabe } from '@/gruen/format'
 // ---------------------------------------------------------------------------
 
 type GruenBereich = 'aussenanlagen' | 'aufwuchs' | 'beseitigung' | 'skizze'
-type BauBereich = 'baulichkeiten' | 'maengel' | 'abwasser' | 'beseitigungBau' | 'skizzeBau'
+type BauBereich = 'baulichkeiten' | 'maengel' | 'abwasser' | 'beseitigungBau' | 'skizzeBau' | 'rechner'
 type Bereich = 'formalien' | 'fotos' | GruenBereich | BauBereich
 type Tab = Bereich | 'export'
 
@@ -114,6 +116,7 @@ const BEREICHE: { id: Bereich; titel: string; kurz: string; icon: LucideIcon; te
   { id: 'fotos', titel: 'Fotos', kurz: 'Fotos', icon: Camera, teil: 'alle' },
   { id: 'skizze', titel: 'Skizze', kurz: 'Skizze', icon: PencilRuler, teil: 'gruen', titelMitTeil: 'Skizze Grün' },
   { id: 'skizzeBau', titel: 'Skizze Bau', kurz: 'Skizze', icon: Ruler, teil: 'bau', titelMitTeil: 'Skizze Bau' },
+  { id: 'rechner', titel: 'Rechner', kurz: 'Rechner', icon: Calculator, teil: 'bau' },
 ]
 
 /** Abschnitte, die zur Rolle passen (Reihenfolge wie in BEREICHE). */
@@ -527,6 +530,7 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
             {tab === 'abwasser' && bereiche.some((b) => b.id === tab) && <AbwasserTab wep={wep} aendere={aendere} profilIndex={profilIndex} />}
             {tab === 'beseitigungBau' && bereiche.some((b) => b.id === tab) && <BeseitigungBauTab wep={wep} aendere={aendere} profilIndex={profilIndex} onOeffnen={(id) => oeffneMaske({ art: 'bauBeseitigung', id })} />}
             {tab === 'skizzeBau' && bereiche.some((b) => b.id === tab) && <SkizzeBauTab wep={wep} aendere={aendere} />}
+            {tab === 'rechner' && bereiche.some((b) => b.id === tab) && <RechnerTab wep={wep} aendere={aendere} profilIndex={profilIndex} />}
             {tab === 'fotos' && <FotosTab wep={wep} aendere={aendere} records={fotoRecords} nachladen={fotoNachladen} />}
             {tab === 'skizze' && <SkizzeTab wep={wep} onSpeichern={speichere} />}
             {tab === 'export' && (
