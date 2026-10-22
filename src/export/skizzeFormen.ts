@@ -87,6 +87,9 @@ export type FormTyp =
   | 'wildling'
   | 'kletterpflanze'
   | 'rasen'
+  // Grundriss „Skizze Bau“ (Beta 4, Paket 3)
+  | 'bauteil'
+  | 'massenberechnung'
 
 /**
  * Ein Element der Grün-Skizze. Welche Felder gebraucht werden, hängt vom Typ ab:
@@ -117,6 +120,12 @@ export interface FormElement {
    * Reihenfolge und relative Lage bleiben erhalten.
    */
   gruppe?: string
+  /** bauteil: Eckpunkte des Grundrisses (Freiform; Rechtecke werden normale Rechtecke). */
+  punkte?: Punkt[]
+  /** bauteil: gestrichelt ohne Füllung (Keller, Hauswasser). */
+  gestrichelt?: boolean
+  /** massangabe: Text bei waagerechter Linie unter statt über der Linie (Maßketten unter dem Grundriss). */
+  textUnten?: boolean
 }
 
 /** Wandelt SVG in PNG (Fallback für Excel-Versionen ohne SVG). Im Browser: `svgZuPngBrowser`. */
@@ -129,6 +138,8 @@ export interface SkizzeFormenOptionen {
   rasterisiere?: SvgRaster
   /** Grundstück + Gras zeichnen, wenn das Blatt noch leer ist (Standard: ja). */
   graswiese?: boolean
+  /** Zielblatt (Standard: „Skizze Außenanlage-Aufwuchs“; der Grundriss schreibt in „Skizze Bau“). */
+  blatt?: string
 }
 
 export interface SkizzeFormenKontext {
@@ -155,6 +166,8 @@ export interface SkizzeFormenErgebnis {
   verkleinert: string[]
   /** Formen, die eine vorhandene Beschriftung oder Bau-Form überdecken und nicht verschoben werden konnten. */
   ueberdeckt: string[]
+  /** Anzahl fremder Formen, die das Blatt schon vor dem Export hatte (z. B. von Hand gezeichnete Skizze). */
+  fremdeFormen: number
 }
 
 // ---------------------------------------------------------------------------
@@ -274,6 +287,8 @@ const FARBE = {
   brunnenFuellung: 'DDEBF7',
   brunnenLinie: '2E75B6',
   linieDunkel: '262626',
+  gebaeude: 'E7E6E6',
+  tabelleLinie: '7F7F7F',
 }
 
 /** Ebenen von unten nach oben (Skill, Schritt 3). */
@@ -281,12 +296,13 @@ const EBENE = {
   wiese: 0,
   gras: 1,
   weg: 2,
-  gruen: 3,
-  kleinteile: 4,
-  entfernen: 5,
-  beschriftung: 6,
-  hinweis: 7,
-  mass: 8,
+  gebaeude: 3,
+  gruen: 4,
+  kleinteile: 5,
+  entfernen: 6,
+  beschriftung: 7,
+  hinweis: 8,
+  mass: 9,
 } as const
 
 // ---------------------------------------------------------------------------
@@ -321,6 +337,12 @@ interface SpForm {
   textfeld?: boolean
   /** Text umbrechen (Standard: nein) */
   umbruch?: boolean
+  /** Freiform statt `prst`: Eckpunkte in EMU ab Blattecke (Grundriss mit schrägen Kanten, L-Form …). */
+  pfad?: Punkt[]
+  /** Textfläche der Freiform (EMU ab Blattecke); Standard: umgebendes Rechteck. */
+  textKasten?: Kasten
+  /** Text linksbündig (Massenberechnung). */
+  links?: boolean
 }
 
 interface CxnForm {
@@ -528,7 +550,8 @@ function formenFuer(el: FormElement, mitSvg: boolean): Form[] {
         const t = beschriftung(`${n}_Text`, text, (von.x + nach.x) / 2, 0, pt)
         // Text neben die Linie: bei (fast) waagerechter Linie darüber, sonst rechts daneben
         const waagerecht = Math.abs(dx) >= Math.abs(dy)
-        t.kasten.y = Math.round((von.y + nach.y) / 2 - (waagerecht ? t.kasten.h + 1 * PT : t.kasten.h / 2))
+        const unten = waagerecht && el.textUnten
+        t.kasten.y = Math.round((von.y + nach.y) / 2 - (waagerecht ? (unten ? -1 * PT : t.kasten.h + 1 * PT) : t.kasten.h / 2))
         if (!waagerecht) t.kasten.x = Math.round((von.x + nach.x) / 2 + 3 * PT)
         t.schriftFarbe = FARBE.rot
         t.ebene = EBENE.mass
@@ -750,6 +773,52 @@ function formenFuer(el: FormElement, mitSvg: boolean): Form[] {
       return f
     }
 
+    case 'bauteil': {
+      const pts = el.punkte
+      if (!pts || pts.length < 3) return []
+      const box = umgebendes(pts)
+      const rechteck =
+        pts.length === 4 &&
+        pts.every((p, i) => {
+          const q = pts[(i + 1) % 4]
+          return Math.abs(p.x - q.x) < PT / 10 || Math.abs(p.y - q.y) < PT / 10
+        })
+      return [
+        {
+          art: 'sp',
+          name: n,
+          ebene: EBENE.gebaeude,
+          kasten: box,
+          prst: 'rect',
+          ...(rechteck ? {} : { pfad: pts, textKasten: textFlaeche(pts, box, text, el.schriftPt ?? 11) }),
+          ...(el.gestrichelt ? {} : { fuellung: FARBE.gebaeude }),
+          linie: linie(FARBE.linieDunkel, 1.5, el.gestrichelt),
+          text,
+          schriftPt: el.schriftPt ?? 11,
+          schriftFarbe: FARBE.schwarz,
+        },
+      ]
+    }
+
+    case 'massenberechnung': {
+      if (!k || !text) return []
+      return [
+        {
+          art: 'sp',
+          name: n,
+          ebene: EBENE.beschriftung,
+          kasten: k,
+          prst: 'rect',
+          fuellung: FARBE.weiss,
+          linie: linie(FARBE.tabelleLinie, 0.75),
+          text,
+          schriftPt: el.schriftPt ?? 8,
+          schriftFarbe: FARBE.schwarz,
+          links: true,
+        },
+      ]
+    }
+
     case 'mangelhinweis': {
       if (!k) return []
       const f: Form[] = [hinweisFeld(n, k, text, pt)]
@@ -757,6 +826,67 @@ function formenFuer(el: FormElement, mitSvg: boolean): Form[] {
       return f
     }
   }
+}
+
+function umgebendes(pts: Punkt[]): Kasten {
+  const x1 = Math.min(...pts.map((p) => p.x))
+  const y1 = Math.min(...pts.map((p) => p.y))
+  const x2 = Math.max(...pts.map((p) => p.x))
+  const y2 = Math.max(...pts.map((p) => p.y))
+  return { x: Math.round(x1), y: Math.round(y1), w: Math.round(x2 - x1), h: Math.round(y2 - y1) }
+}
+
+function imPolygon(p: Punkt, pts: Punkt[]): boolean {
+  let innen = false
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const a = pts[i]
+    const b = pts[j]
+    if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) innen = !innen
+  }
+  return innen
+}
+
+/**
+ * Textfläche einer Freiform (z. B. L-Form): ein Rechteck in der Größe des Textes, das ganz im Polygon liegt und dem
+ * Schwerpunkt am nächsten ist – damit der Text nicht in der Aussparung oder auf der Kante steht. Ausgemessen wird in
+ * absoluten EMU; passt der Text nirgends hinein, steht er am Schwerpunkt.
+ */
+function textFlaeche(pts: Punkt[], box: Kasten, text: string, pt: number): Kasten {
+  let a = 0
+  let cx = 0
+  let cy = 0
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i]
+    const q = pts[(i + 1) % pts.length]
+    const k = p.x * q.y - q.x * p.y
+    a += k
+    cx += (p.x + q.x) * k
+    cy += (p.y + q.y) * k
+  }
+  const m = Math.abs(a) < 1e-6 ? { x: box.x + box.w / 2, y: box.y + box.h / 2 } : { x: cx / (3 * a), y: cy / (3 * a) }
+  const zeilen = text.split('\n')
+  const w = Math.round(Math.max(...zeilen.map((z) => z.length), 1) * pt * 0.6 * PT + 4 * PT)
+  const h = Math.round(zeilen.length * (pt + 3) * PT)
+  const passt = (x: number, y: number) => {
+    for (const fx of [0, 0.5, 1]) for (const fy of [0, 0.5, 1]) if (!imPolygon({ x: x - w / 2 + fx * w, y: y - h / 2 + fy * h }, pts)) return false
+    return true
+  }
+  let best: { x: number; y: number } | undefined
+  let bestD = Infinity
+  const schritte = 28
+  for (let i = 0; i <= schritte; i++) {
+    for (let j = 0; j <= schritte; j++) {
+      const x = box.x + (box.w * i) / schritte
+      const y = box.y + (box.h * j) / schritte
+      const d = Math.hypot(x - m.x, y - m.y)
+      if (d < bestD && passt(x, y)) {
+        best = { x, y }
+        bestD = d
+      }
+    }
+  }
+  const c = best ?? m
+  return { x: Math.round(c.x - w / 2), y: Math.round(c.y - h / 2), w, h }
 }
 
 function hinweisFeld(name: string, kasten: Kasten, text: string, pt: number): SpForm {
@@ -832,19 +962,38 @@ export function ankerAuf(geo: BlattGeometrie, k: Kasten, inhalt: string): string
   )
 }
 
+/** Freiform (custGeom) aus Eckpunkten; Pfadkoordinaten relativ zur Form `k`. Der Text sitzt über die Innenränder (`bodyPr`). */
+function freiform(pfad: Punkt[], k: Kasten): string {
+  const pt = (p: Punkt) => `<a:pt x="${Math.max(0, r(p.x - k.x))}" y="${Math.max(0, r(p.y - k.y))}"/>`
+  return (
+    '<a:custGeom><a:avLst/><a:gdLst/><a:ahLst/><a:cxnLst/><a:rect l="l" t="t" r="r" b="b"/>' +
+    `<a:pathLst><a:path w="${k.w}" h="${k.h}"><a:moveTo>${pt(pfad[0])}</a:moveTo>` +
+    pfad.slice(1).map((p) => `<a:lnTo>${pt(p)}</a:lnTo>`).join('') +
+    '<a:close/></a:path></a:pathLst></a:custGeom>'
+  )
+}
+
+/** Innenränder (EMU), die den Text einer Freiform in die Textfläche `text` schieben (links, oben, rechts, unten). */
+function textRaender(k: Kasten, text: Kasten): [number, number, number, number] {
+  const l = Math.max(0, r(text.x - k.x))
+  const t = Math.max(0, r(text.y - k.y))
+  return [l, t, Math.max(0, r(k.x + k.w - (text.x + text.w))), Math.max(0, r(k.y + k.h - (text.y + text.h)))]
+}
+
 function spXml(f: SpForm, id: number, geo: BlattGeometrie): string {
   const k = { x: Math.max(0, r(f.kasten.x)), y: Math.max(0, r(f.kasten.y)), w: Math.max(1, r(f.kasten.w)), h: Math.max(1, r(f.kasten.h)) }
   const fill = f.fuellung ? `<a:solidFill><a:srgbClr val="${f.fuellung}"/></a:solidFill>` : '<a:noFill/>'
   const pt = f.schriftPt ?? 9
+  const raender: [number, number, number, number] = f.pfad && f.textKasten ? textRaender(k, f.textKasten) : f.links ? [50800, 25400, 12700, 0] : [12700, 0, 12700, 0]
   const body = f.text
     ? '<xdr:txBody>' +
-      `<a:bodyPr vertOverflow="clip" horzOverflow="clip" wrap="${f.umbruch ? 'square' : 'none'}" lIns="12700" tIns="0" rIns="12700" bIns="0" rtlCol="0" anchor="ctr"/>` +
+      `<a:bodyPr vertOverflow="${f.pfad ? 'overflow' : 'clip'}" horzOverflow="${f.pfad ? 'overflow' : 'clip'}" wrap="${f.umbruch ? 'square' : 'none'}" lIns="${raender[0]}" tIns="${raender[1]}" rIns="${raender[2]}" bIns="${raender[3]}" rtlCol="0" anchor="${f.links ? 't' : 'ctr'}"/>` +
       '<a:lstStyle/>' +
       f.text
         .split('\n')
         .map(
           (z) =>
-            '<a:p><a:pPr algn="ctr"/>' +
+            `<a:p><a:pPr algn="${f.links ? 'l' : 'ctr'}"/>` +
             `<a:r><a:rPr lang="de-DE" sz="${r(pt * 100)}"><a:solidFill><a:srgbClr val="${f.schriftFarbe ?? FARBE.schwarz}"/></a:solidFill><a:latin typeface="+mn-lt"/></a:rPr><a:t>${esc(z)}</a:t></a:r></a:p>`,
         )
         .join('') +
@@ -856,7 +1005,7 @@ function spXml(f: SpForm, id: number, geo: BlattGeometrie): string {
     `<xdr:sp macro="" textlink=""><xdr:nvSpPr><xdr:cNvPr id="${id}" name="${esc(f.name)}" descr="${WEP_APP_MARKER}"/>` +
       `<xdr:cNvSpPr${f.textfeld ? ' txBox="1"' : ''}/></xdr:nvSpPr>` +
       `<xdr:spPr><a:xfrm><a:off x="${k.x}" y="${k.y}"/><a:ext cx="${k.w}" cy="${k.h}"/></a:xfrm>` +
-      `<a:prstGeom prst="${f.prst}"><a:avLst/></a:prstGeom>${fill}${lnXml(f.linie)}</xdr:spPr>${body}</xdr:sp>`,
+      `${f.pfad ? freiform(f.pfad, k) : `<a:prstGeom prst="${f.prst}"><a:avLst/></a:prstGeom>`}${fill}${lnXml(f.linie)}</xdr:spPr>${body}</xdr:sp>`,
   )
 }
 
@@ -1193,7 +1342,7 @@ export async function fuegeSkizzeFormenEin(
   zip: JSZip,
   optionen: SkizzeFormenOptionen,
 ): Promise<SkizzeFormenErgebnis | undefined> {
-  const blattPfad = await findeBlattPfad(zip, SKIZZE_BLATTNAME)
+  const blattPfad = await findeBlattPfad(zip, optionen.blatt ?? SKIZZE_BLATTNAME)
   const blattXml = blattPfad ? await zip.file(blattPfad)?.async('string') : undefined
   if (!blattPfad || !blattXml) return undefined
   const geo = leseBlattGeometrie(blattXml)
@@ -1202,7 +1351,8 @@ export async function fuegeSkizzeFormenEin(
   const entfernt = await entferneEigeneFormen(zip, drawingPfad)
 
   let drawingXml = (await zip.file(drawingPfad)?.async('string')) ?? LEERES_DRAWING
-  const hatFormen = zaehleFremdeFormen(drawingXml) > 0
+  const fremdeFormen = zaehleFremdeFormen(drawingXml)
+  const hatFormen = fremdeFormen > 0
   const zeichenbereich = zeichenbereichVon(geo)
   let elemente =
     typeof optionen.elemente === 'function' ? optionen.elemente({ hatFormen, zeichenbereich }) : [...optionen.elemente]
@@ -1272,5 +1422,5 @@ export async function fuegeSkizzeFormenEin(
 
   drawingXml = drawingXml.replace('</xdr:wsDr>', `${anker}</xdr:wsDr>`)
   zip.file(drawingPfad, drawingXml)
-  return { anzahlFormen: formen.length, entfernt, graswiese, svgBilder, verschoben, versetzt, verkleinert, ueberdeckt }
+  return { anzahlFormen: formen.length, entfernt, graswiese, svgBilder, verschoben, versetzt, verkleinert, ueberdeckt, fremdeFormen }
 }

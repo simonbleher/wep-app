@@ -98,4 +98,24 @@
   (Formularsteuerelemente) der Mängelliste setzt der Export nicht; die angekreuzten Mängel stehen in der Baubeschreibung.
 - **Baubeschreibung:** Textfeld der Vorlage bricht nicht um; der Export schreibt sie zeilenweise in B83:B99 (17 Zeilen, Rest wird gemeldet).
 - **Oberfläche:** Reiter Baulichkeiten (Bauteile, Index, Beschreibung), Mängel, Abwasser, Beseitigung Bau; Bauteil- und Beseitigungsformular füllen die Seite wie die
-  Grün-Formulare (`Maske`). „Skizze Bau“ bleibt Platzhalter (Paket 3). Keine Änderung an `android/`, Plugins oder `src-tauri/`, daher keine neue Versionsnummer.
+  Grün-Formulare (`Maske`). „Skizze Bau“ folgt mit Paket 3. Keine Änderung an `android/`, Plugins oder `src-tauri/`, daher keine neue Versionsnummer.
+
+## 2026-10-22 · Beta 4, Paket 3: Zeichen-Tools Bau (Grundriss mit echten Maßen)
+
+- **Eigenes Datenmodell, Grün-Skizze unberührt:** `wep.grundriss` (`GrundrissDaten`: Teile mit Eckpunkten in **Metern**, Höhe, Dachform, Bauteil-Verknüpfung)
+  statt der Pixel-Elemente von `wep.skizze`. `SkizzeEditor`, `types.ts` und der Grün-Export bleiben unverändert (Test: Grün-Formen mit/ohne Grundriss identisch).
+  Rechnung rein in `src/skizze/grundriss.ts`, Editor `GrundrissEditor.tsx`, Reiter `SkizzeBauTab.tsx`.
+- **Länge eintippen:** Rechtwinklige Polygone (Rechteck, L-Form): die Kante wird verlängert, alles „dahinter“ wandert mit, die Form bleibt rechtwinklig. Schräge Kanten:
+  nur der Endpunkt wandert. Eckengriffe halten waagerechte/senkrechte Nachbarkanten. Auf Zentimeter gerundet; Eintippen einer Zahl zählt als ein Rückgängig-Schritt.
+- **Beta-3-Bausteine weiterverwendet:** Zoom/Verschieben (`ansicht.ts`), Einrasten (`einrasten.ts`, ergänzt um 5-cm-Raster in `grundrissEinrasten.ts`), Auswahl überlagerter
+  Formen (kleinste zuerst, erneutes Antippen wechselt).
+- **Verknüpfung mit Paket 2:** Teil ↔ `Bauteil.id`. `uebernehmeGrundriss` (`src/bau/grundriss.ts`) setzt Fläche, Länge × Breite, Höhe und Kubatur des Bauteils (mehrere Teile eines
+  Bauteils werden addiert); läuft beim Speichern des Grundrisses und vor dem Export. Der Wertermittler kann die Fläche in der Bauteil-Maske überschreiben
+  (`Bauteil.ausGrundriss = false`), dann lässt der Grundriss sie in Ruhe. Neues Rechteck verknüpft sich mit dem ersten Bauteil ohne Grundriss und übernimmt dessen Maße.
+- **Kubatur (Richtlinie S. 4 Nr. 9):** Flachdach Fläche × Höhe; Pultdach Fläche × (niedrige + hohe Wand) ÷ 2; Satteldach Fläche × Traufhöhe + Fläche × (First − Traufe) ÷ 2.
+  Exakt für Rechtecke, bei anderen Grundrissen Näherung (Hinweis). Fehlende Höhe → Fläche ja, Kubatur nein. Nur Warnungen.
+- **Maßketten:** Teilstrecken über alle Ecken aller Teile (unter und rechts), dazu Gesamtmaß; schräge Kanten mit eigenem Maß. Ein-/ausschaltbar, gelten auch im Export.
+- **Export:** `grundrissZuFormen` → bearbeitbare Excel-Formen in „Skizze Bau“ (Rechteck bzw. Freiform `custGeom`, Keller gestrichelt, rote Maßlinien, Massenberechnung als Tabellen-Textfeld),
+  nur bei Teil `bau`/`beides`. Gleicher Mechanismus wie die Grün-Skizze (`fuegeSkizzeFormenEin`, neue Option `blatt`); Formen tragen `descr="wep-app"`, ein erneuter Export ersetzt nur diese.
+  Fremde Formen im Blatt bleiben, der Export meldet ihre Anzahl. Text in Freiformen sitzt über Innenränder (LibreOffice liest benannte Textrechtecke nicht).
+- **Keine Änderung an `android/`, Plugins oder `src-tauri/`**, daher keine neue Versionsnummer.
