@@ -143,3 +143,20 @@
 - **Farben:** Laube = `--farbe-akzent` (Dach), Anbau Grünton, Schuppen Grau, Gewächshaus bläulich/durchsichtig, Vorplatz hell/Grau, Keller grau/durchsichtig; Test prüft, dass die Grundfarben Tokens aus `tokens.css` sind. Legende nennt Art und Kürzel.
 - Nur Ansicht: nichts fließt in Bewertung, Excel oder Datenmodell. Keine Änderung an `android/`, Plugins oder `src-tauri/`, daher keine neue Versionsnummer.
 | 2026-10-22 | **Windows-Programm 0.1.1:** Das Live-Update lieferte die Dateien des neuen Web-Pakets nie aus, weil Tauri die Schlüssel mit führendem „/“ übergibt (`/index.html`) und die Pfadprüfung sie deshalb verwarf – jede neue Fassung startete leer und wurde nach 20 s zurückgenommen. Der Schrägstrich wird jetzt entfernt (`paket_datei`, Test mit echtem `AssetKey`). Programmversion 0.1.0 → 0.1.1, Hülle bleibt 1. | Fehler beim ersten Live-Update auf Simons PC („Die letzte Version ließ sich nicht starten“). Installierte 0.1.0 brauchen einmal das Programm-Update. |
+## 2026-10-22 · Prüfwerkzeug für alte WEPs (`tools/pruef-weps`)
+
+- **Zweck:** WEPs, die vor der Korrektur der Vorlage erstellt wurden (Fehler siehe „Beta 4, Paket 2“), lassen sich gesammelt prüfen: welche Datei enthält welchen Fehler,
+  wirkt er auf das Ergebnis, und um wie viel Euro weicht das Deckblatt (E21/E25/E26/E28) ab. Eigenes Werkzeug außerhalb der App, damit die Wertermittler es ohne App-Installation nutzen können.
+- **Python + openpyxl statt TypeScript:** Das Werkzeug läuft auf einem Windows-PC mit einem Doppelklick (`pruefe_weps.bat`), ohne Node und ohne Build. Einzige Abhängigkeit `openpyxl`
+  (liest nur; Originale werden nie geschrieben, geöffnet wird mit `read_only`). Es wird nichts ins Netz gesendet; die einzige Netzverbindung ist die Installation von openpyxl auf Rückfrage in der `.bat`.
+- **Rechnen mit gespeicherten Werten:** „Ist“ = von Excel gespeicherter Wert, „Soll“ = eigene Nachrechnung der richtigen Formel mit denselben gespeicherten Eingangswerten (Decimal, ROUND wie Excel
+  halb weg von null). Betrag = Soll − Ist am Gesamtbetrag (E28): minus = Protokoll zu hoch. Dateien ohne gespeicherte Werte werden gemeldet (mit den gefundenen fehlerhaften Formeln), nicht gerechnet.
+- **Erkennung der Fehler:** nach der (normalisierten) Formel der Zelle: fehlerhaft / korrekt / von Hand geändert („abweichend“, nicht bewertet). Eine Datei gilt als WEP-Vorlage, wenn die Blätter
+  Formalien, Deckbl UPV, Baulichkeiten, Beseitigungskosten da sind und das Deckblatt auf `Baulichkeiten!K81` und `Beseitigungskosten!K24` zeigt.
+- **Beispielwerte:** F104/G104 (5 m³ × 50 €) unverändert gilt nur als **Verdacht** – der Betrag steht getrennt und fließt nicht in die Summe der gesicherten Formelfehler. I19/I28/I37 (1/2/3 m²)
+  nur als Hinweis ohne Euro (sie gehen nicht in einen Betrag ein). Die Beispielwerte 150 € in Beseitigungskosten H12/H105 prüft das Werkzeug nicht (nicht beauftragt).
+- **Bericht:** `pruefbericht.html` (ohne Skripte und externe Ressourcen, alles maskiert) und `pruefbericht.csv` (UTF-8 mit BOM, Semikolon, Dezimalkomma, Text gegen Formel-Einschleusung mit `'` geschützt).
+  Beide enthalten Personendaten (Anlage, Parzelle, Vorgangs-Nr.; bewusst **ohne** Namen des Unterpächters) und stehen in `.gitignore`.
+- **Tests:** `tools/pruef-weps/tests` erzeugen erfundene WEPs aus `docs/WEP_Vorlage.xlsx`, lassen LibreOffice die Werte speichern und vergleichen jeden einzelnen Betrag mit der LibreOffice-Rechnung
+  derselben Datei mit je einer korrigierten Formel. Der Workflow „Prüfen“ installiert dafür LibreOffice und führt `pytest` aus; ohne LibreOffice werden diese Tests übersprungen. Keine Änderung an `android/`,
+  Plugins oder `src-tauri/`, daher keine neue Versionsnummer.

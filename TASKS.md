@@ -324,3 +324,7 @@ Abschnitt 10f) mit Mausrad, Maus-Ziehen und Zwei-Finger-Gesten über CDP-Touch. 
   Modell aus Grundriss, Höhen und Dachform (Flach/Pult/Sattel, Keller unter dem Boden), Bauteile farbig im App-Design, drehbar (Finger/Maus), zoombar (zwei Finger, Mausrad, Knöpfe, Tasten), nur Ansicht.
   Gezeichnet wird nur bei Bewegung (Tablet-tauglich). Code: `src/skizze/modell3d.ts` (Rechnung, getestet: Rauminhalt unter dem Dach = Kubatur der Massenberechnung), `kamera3d.ts`, `Ansicht3D.tsx`, `Bereich3D` in `src/app/SkizzeBauTab.tsx`.
   Screenshots + Bedienungsdurchlauf (auch offline): `docs/beta4-paket5/` (`npm run beta4-paket5:screenshots`).
+- T-1 · Prüfwerkzeug für alte WEPs ✅ PR offen – Branch tools/pruef-weps. `tools/pruef-weps/` (Python 3.10+, nur openpyxl): prüft alle .xlsx/.xlsm eines Ordners (rekursiv, nur lesend)
+  auf die fünf Vorlagenfehler (Baulichkeiten C33, K81, J52, C64; Beseitigungskosten K21) und die Beispielwerte (F104/G104 „nicht beräumt“ als Verdacht, I19/I28/I37 als Hinweis),
+  rechnet mit den gespeicherten Werten und eigener Nachrechnung den Euro-Unterschied bis zum Deckblatt (E21/E25/E26/E28). Ausgabe `pruefbericht.html` + `pruefbericht.csv` im geprüften Ordner
+  (enthalten Personendaten, in `.gitignore`), `pruefe_weps.bat` für Windows, README für Laien. Tests (pytest, erfundene Dateien aus der Vorlage, Werte über LibreOffice) im Workflow „Prüfen“.
