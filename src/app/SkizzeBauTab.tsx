@@ -2,18 +2,22 @@
 //
 // Wie `SkizzeTab` bekommt der Editor seinen Startwert nur einmal; gespeichert wird entprellt und beim Verlassen sofort.
 // Mit jedem Speichern fließen Fläche, Maße, Höhe und Kubatur der verknüpften Teile in die Bauteile (`uebernehmeGrundriss`).
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { TriangleAlert } from 'lucide-react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Box, TriangleAlert } from 'lucide-react'
 import type { Bauteil, BauteilArt, GrundrissDaten, Wep } from '@/model'
 import type { WepAendern } from '@/fotos'
 import { uebernehmeGrundriss } from '@/bau'
 import { GrundrissEditor } from '@/skizze/GrundrissEditor'
+import { baueModell3D, ART_TEXT_3D } from '@/skizze/modell3d'
 import { dachformText, leererGrundriss, massenberechnung, meterText, zahl2Text } from '@/skizze/grundriss'
 import { ICON } from './ui'
 import { aendereBauTeil, ersetzeBauteil, neuesBauteil } from './bauHelfer'
 import { entprelle } from './entprellen'
 
 const SPEICHER_VERZOEGERUNG_MS = 400
+
+// three.js steckt nur in diesem Teil; er wird erst beim Antippen von „3D-Ansicht zeigen“ geladen (und liegt für offline im Zwischenspeicher).
+const Ansicht3D = lazy(() => import('@/skizze/Ansicht3D'))
 
 export function SkizzeBauTab({ wep, aendere }: { wep: Wep; aendere: WepAendern }) {
   const [startwert] = useState<GrundrissDaten>(() => wep.grundriss ?? leererGrundriss())
@@ -65,6 +69,55 @@ export function SkizzeBauTab({ wep, aendere }: { wep: Wep; aendere: WepAendern }
       </p>
       <GrundrissEditor wert={startwert} bauteile={bauteile} onAenderung={beiAenderung} onNeuesBauteil={neuesBauteilAnlegen} />
       <Massenberechnung daten={aktuell} bauteile={bauteile} />
+      <Bereich3D daten={aktuell} bauteile={bauteile} />
+    </section>
+  )
+}
+
+/** 3D-Ansicht der Bauteile aus dem Grundriss (nur Ansicht, Beta 4 Paket 5); three.js wird erst nach dem Antippen geladen. */
+export function Bereich3D({ daten, bauteile }: { daten: GrundrissDaten; bauteile: ReadonlyArray<Bauteil> }) {
+  const [offen, setOffen] = useState(false)
+  const modell = useMemo(() => baueModell3D(daten, bauteile), [daten, bauteile])
+  if (!modell.teile.length) return null
+  const arten = [...new Map(modell.teile.map((t) => [t.art, t])).values()]
+  return (
+    <section className="abschnitt ansicht3d-bereich" aria-labelledby="ansicht3d-titel" data-testid="bereich3d">
+      <h2 className="gruppenkopf" id="ansicht3d-titel">
+        3D-Ansicht
+      </h2>
+      {!offen ? (
+        <>
+          <p className="neben">Die Laube und die übrigen Bauteile als Modell aus Grundriss, Höhen und Dachform – nur zum Ansehen, drehbar und zoombar.</p>
+          <button type="button" className="knopf" onClick={() => setOffen(true)}>
+            <Box {...ICON} /> 3D-Ansicht zeigen
+          </button>
+        </>
+      ) : (
+        <>
+          <Suspense fallback={<p className="neben" role="status">3D-Ansicht wird geladen …</p>}>
+            <Ansicht3D modell={modell} />
+          </Suspense>
+          <ul className="ansicht3d-legende" aria-label="Farben der Bauteile">
+            {arten.map((t) => (
+              <li key={t.art}>
+                <span className="ansicht3d-farbe" style={{ background: t.farben.dach }} aria-hidden="true" />
+                {ART_TEXT_3D[t.art]} ({modell.teile.filter((x) => x.art === t.art).map((x) => x.kuerzel).join(', ')})
+              </li>
+            ))}
+          </ul>
+          <p className="neben">Mit einem Finger oder der Maus drehen, mit zwei Fingern oder dem Mausrad zoomen. Nur Ansicht – ohne Einfluss auf Bewertung und Export.</p>
+          {modell.hinweise.length > 0 && (
+            <div className="warnung" role="note">
+              <TriangleAlert {...ICON} />
+              <ul className="meldung-liste">
+                {modell.hinweise.map((h) => (
+                  <li key={h}>{h}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </>
+      )}
     </section>
   )
 }
