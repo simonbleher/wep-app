@@ -320,4 +320,7 @@ Abschnitt 10f) mit Mausrad, Maus-Ziehen und Zwei-Finger-Gesten über CDP-Touch. 
   **Nichts doppelt gerechnet:** `src/bau/rechner.ts` ruft `berechneBau`, `massenAusFlaeche` (jetzt auch von `massenVon` im Grundriss benutzt), `ermittleBaupreisindex`, `verteileFlaeche` auf; Tests vergleichen Rechner = Bewertung = Grundriss.
   Code: `src/bau/rechner.ts`, `src/app/BauRechner.tsx`. Screenshots: `docs/beta4-paket4/` (`npm run beta4-paket4:screenshots`, zugleich Bedienungsdurchlauf mit Prüfungen).
   Offen (Simon): Der überdachte Vorplatz zählt auf die 24 m²; die Vorlage (I38) summiert seinen nicht berechneten Anteil nicht – der Check zeigt ihn mit Hinweis.
-- B4-5 · 3D-Ansicht ⏳ – Branch beta4/paket5
+- B4-5 · 3D-Ansicht ✅ PR offen – Branch beta4/paket5. In „Skizze Bau“ unter der Massenberechnung: „3D-Ansicht zeigen“ lädt three.js erst dann nach (eigener Teil, ~120 kB gzip; Hauptteil unverändert, liegt für offline im Service-Worker-Cache).
+  Modell aus Grundriss, Höhen und Dachform (Flach/Pult/Sattel, Keller unter dem Boden), Bauteile farbig im App-Design, drehbar (Finger/Maus), zoombar (zwei Finger, Mausrad, Knöpfe, Tasten), nur Ansicht.
+  Gezeichnet wird nur bei Bewegung (Tablet-tauglich). Code: `src/skizze/modell3d.ts` (Rechnung, getestet: Rauminhalt unter dem Dach = Kubatur der Massenberechnung), `kamera3d.ts`, `Ansicht3D.tsx`, `Bereich3D` in `src/app/SkizzeBauTab.tsx`.
+  Screenshots + Bedienungsdurchlauf (auch offline): `docs/beta4-paket5/` (`npm run beta4-paket5:screenshots`).
