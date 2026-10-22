@@ -599,6 +599,21 @@ button.pos:active {
   border-top: var(--linie) solid var(--farbe-linie);
 }
 
+/* Bei „Grün + Bau“ sind es mehr Abschnitte, als nebeneinander passen: wischbar */
+.unten-scroll {
+  grid-auto-columns: minmax(72px, 1fr);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.unten-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.status-teil {
+  color: var(--farbe-text);
+}
+
 .unten-knopf {
   display: flex;
   flex-direction: column;

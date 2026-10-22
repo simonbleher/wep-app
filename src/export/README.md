@@ -117,6 +117,12 @@ namens „WEP-App Skizze“ aus einem früheren Export wird vorher entfernt.
 - Überschrift des Blatts „Skizze Außenanlage-Aufwuchs“: steht in A1 „Baulichkeiten“ (Vorlage: „Skizze – Baulichkeiten“), wird A1 durch
   `SKIZZE_AA_UEBERSCHRIFT` („Skizze – Außenanlagen und Aufwuchs“) ersetzt (`skizzeUeberschriftGeaendert`); „Skizze Bau“ bleibt unverändert.
 
+## Teil (Beta 4, Paket 1)
+
+`exportWep(wep, excel, { teil })`: `'bau'` schreibt nur die Formalien (ohne E13) in die Quelle, lässt Grün-Blätter und
+Grün-Skizze aus, Dateiname `<Nr>_WEP_Bau.xlsx`. `'gruen'`/`'beides'`/leer wie oben beschrieben. Bau-Inhalte (Paket 2) kommen
+später in diesen Zweig; bis dahin bleiben die Bau-Blätter der Quelle byte-gleich.
+
 ## Regeln
 
 - **Bau-Blätter werden niemals verändert.**

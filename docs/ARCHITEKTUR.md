@@ -22,6 +22,8 @@ genutzt. Alles unten zu Rollen-Sync, Bau-Teil und BV-OneDrive ist Zielbild für 
   Grün-Teil hinein (Außenanlagen, Aufwuchs I/II, Beseitigungskosten Abschnitt 2,
   Formalien E13 und noch leere Formalien). Bau-Blätter werden nie verändert.
 - Ohne Bau-Excel wird die leere Vorlage `docs/WEP_Vorlage.xlsx` befüllt.
+- **Rolle (Beta 4):** Grün / Bau / Beides aus dem Profil schaltet Reiter und Export frei, pro WEP
+  umschaltbar (`Wep.rolle`). Bau-Reiter sind bis Paket 2 Platzhalter.
 - Personendaten (Unterpächter-Namen) liegen nur lokal und in Simons OneDrive,
   nie im Repo.
 

@@ -21,6 +21,7 @@
     "icons:windows": "node tools/icons/erzeuge-windows-icons.mjs",
     "tauri": "tauri",
     "windows:bauen": "npm run build && node -e \"require('fs').rmSync('dist/updates',{recursive:true,force:true})\" && tauri build --bundles nsis",
+    "beta4-paket1:screenshots": "VITE_MS_CLIENT_ID=00000000-0000-0000-0000-000000000000 vite build --outDir dist-e2e && node tools/beta4-paket1/screenshots.mjs",
     "paket1:screenshots": "VITE_MS_CLIENT_ID=00000000-0000-0000-0000-000000000000 vite build --outDir dist-e2e && node tools/paket1/screenshots.mjs",
     "paket2:screenshots": "VITE_MS_CLIENT_ID=00000000-0000-0000-0000-000000000000 vite build --outDir dist-e2e && node tools/paket2/screenshots.mjs",
     "paket3:screenshots": "VITE_MS_CLIENT_ID=00000000-0000-0000-0000-000000000000 vite build --outDir dist-e2e && node tools/paket3/screenshots.mjs",

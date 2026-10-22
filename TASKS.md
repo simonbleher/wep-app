@@ -303,7 +303,7 @@ Abschnitt 10f) mit Mausrad, Maus-Ziehen und Zwei-Finger-Gesten über CDP-Touch. 
   (Installation, Anmeldung, Speichern unter, Live-Update, Programm-Update).
 
 ## Beta 4 – Bau-Teil (Plan: docs/PLAN-BETA4.md)
-- B4-1 · Rolle schaltet Funktionen frei ⏳ – Branch beta4/paket1
+- B4-1 · Rolle schaltet Funktionen frei ✅ PR offen – Branch beta4/paket1 (Reiter und Export je Rolle, pro WEP umschaltbar, Bau-Reiter als Platzhalter, Export `<Nr>_WEP_Bau.xlsx`; Screenshots docs/beta4-paket1/)
 - B4-2 · Bau erfassen und bewerten ⏳ – Branch beta4/paket2
 - B4-3 · Zeichen-Tools Bau ⏳ – Branch beta4/paket3
 - B4-4 · Rechen-Tools ⏳ – Branch beta4/paket4

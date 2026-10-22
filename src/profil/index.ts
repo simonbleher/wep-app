@@ -4,9 +4,9 @@
 // - Profil: wird über OneDrive (daten/profil.json) zwischen den Geräten abgeglichen,
 //   siehe src/sync/profil.ts. Lokal in localStorage.
 // - Geräte-Einstellungen: bleiben nur auf diesem Gerät.
-import { neuerWep, type Wep } from '@/model'
+import { neuerWep, type Rolle, type Wep } from '@/model'
 
-export type Rolle = 'gruen' | 'bau' | 'beides'
+export type { Rolle }
 
 export const ROLLEN: { wert: Rolle; text: string }[] = [
   { wert: 'gruen', text: 'Grün' },
@@ -16,7 +16,7 @@ export const ROLLEN: { wert: Rolle; text: string }[] = [
 
 export interface Profil {
   name: string
-  /** Wird vorerst nur gespeichert. */
+  /** Schaltet Reiter und Export frei (Grün / Bau / Beides); pro WEP umschaltbar (`Wep.rolle`). */
   rolle: Rolle
   standardAnlage: string
 }
@@ -83,7 +83,9 @@ export function aendereProfil(
 /** Neues WEP mit Vorbelegung aus dem Profil (Wertermittler, Kleingartenanlage). */
 export function neuerWepMitProfil(id: string, profil: Profil): Wep {
   const wep = neuerWep(id)
-  wep.formalien.wertermittlerAussenAufwuchs = profil.name.trim()
+  // Der Name kommt in die Zelle des eigenen Teils: Grün E13, Bau E12 (Beides: beide)
+  if (profil.rolle !== 'bau') wep.formalien.wertermittlerAussenAufwuchs = profil.name.trim()
+  if (profil.rolle !== 'gruen') wep.formalien.wertermittlerBaulichkeiten = profil.name.trim()
   wep.formalien.kleingartenanlage = profil.standardAnlage.trim()
   return wep
 }
