@@ -198,6 +198,17 @@ impl Live {
     }
 }
 
+/// Liest eine Datei des aktiven Pakets. Tauri übergibt Schlüssel mit führendem „/“
+/// (`/index.html`, `/assets/x.js`); der wird entfernt. Danach sind nur normale Pfadteile erlaubt
+/// (kein „..“, kein Laufwerk).
+pub fn paket_datei(ordner: &Path, schluessel: &str) -> Option<Cow<'static, [u8]>> {
+    let rel = Path::new(schluessel.trim_start_matches(['/', '\\']));
+    if rel.as_os_str().is_empty() || rel.components().any(|c| !matches!(c, std::path::Component::Normal(_))) {
+        return None;
+    }
+    fs::read(ordner.join(rel)).ok().map(Cow::Owned)
+}
+
 /// Liefert die Dateien des aktiven Pakets; ohne Paket (oder bei Rückfall) die der .exe.
 pub struct LiveAssets<R: Runtime> {
     innen: Box<dyn Assets<R>>,
@@ -217,14 +228,7 @@ impl<R: Runtime> Assets<R> for LiveAssets<R> {
 
     fn get(&self, key: &AssetKey) -> Option<Cow<'_, [u8]>> {
         match self.live.ordner() {
-            Some(ordner) => {
-                let rel = Path::new(key.as_ref());
-                // Nur normale Pfadteile: kein „..“, kein Laufwerk, kein führender Schrägstrich.
-                if rel.components().any(|c| !matches!(c, std::path::Component::Normal(_))) {
-                    return None;
-                }
-                fs::read(ordner.join(rel)).ok().map(Cow::Owned)
-            }
+            Some(ordner) => paket_datei(&ordner, key.as_ref()),
             None => self.innen.get(key),
         }
     }
@@ -416,6 +420,24 @@ mod tests {
         let ziel = tempdir("ohneindex");
         assert!(entpacke(&paket(&[("a.js", "x")]), &ziel).is_err());
         let _ = fs::remove_dir_all(&ziel);
+    }
+
+    #[test]
+    fn paket_datei_mit_fuehrendem_schraegstrich() {
+        let ordner = tempdir("schluessel");
+        fs::create_dir_all(ordner.join("assets")).unwrap();
+        fs::write(ordner.join("index.html"), "neu").unwrap();
+        fs::write(ordner.join("assets").join("a.js"), "js").unwrap();
+        // So übergibt Tauri die Schlüssel (AssetKey mit führendem „/“)
+        assert_eq!(paket_datei(&ordner, "/index.html").as_deref(), Some(&b"neu"[..]));
+        assert_eq!(paket_datei(&ordner, "/assets/a.js").as_deref(), Some(&b"js"[..]));
+        assert_eq!(paket_datei(&ordner, "index.html").as_deref(), Some(&b"neu"[..]));
+        // Tauri-Schlüssel selbst
+        let key = tauri::utils::assets::AssetKey::from("index.html");
+        assert_eq!(paket_datei(&ordner, key.as_ref()).as_deref(), Some(&b"neu"[..]));
+        assert!(paket_datei(&ordner, "/../geheim.txt").is_none());
+        assert!(paket_datei(&ordner, "/").is_none());
+        let _ = fs::remove_dir_all(&ordner);
     }
 
     #[test]
