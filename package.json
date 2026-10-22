@@ -26,6 +26,7 @@
     "beta4-paket2:screenshots": "VITE_MS_CLIENT_ID=00000000-0000-0000-0000-000000000000 vite build --outDir dist-e2e && node tools/beta4-paket2/screenshots.mjs",
     "beta4-paket3:screenshots": "VITE_MS_CLIENT_ID=00000000-0000-0000-0000-000000000000 vite build --outDir dist-e2e && node tools/beta4-paket3/screenshots.mjs",
     "beta4-paket4:screenshots": "VITE_MS_CLIENT_ID=00000000-0000-0000-0000-000000000000 vite build --outDir dist-e2e && node tools/beta4-paket4/screenshots.mjs",
+    "beta4-paket5:screenshots": "VITE_MS_CLIENT_ID=00000000-0000-0000-0000-000000000000 vite build --outDir dist-e2e && node tools/beta4-paket5/screenshots.mjs",
     "paket1:screenshots": "VITE_MS_CLIENT_ID=00000000-0000-0000-0000-000000000000 vite build --outDir dist-e2e && node tools/paket1/screenshots.mjs",
     "paket2:screenshots": "VITE_MS_CLIENT_ID=00000000-0000-0000-0000-000000000000 vite build --outDir dist-e2e && node tools/paket2/screenshots.mjs",
     "paket3:screenshots": "VITE_MS_CLIENT_ID=00000000-0000-0000-0000-000000000000 vite build --outDir dist-e2e && node tools/paket3/screenshots.mjs",
@@ -45,7 +46,8 @@
     "jszip": "^3.10.2",
     "lucide-react": "0.460.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "three": "^0.170.0"
   },
   "devDependencies": {
     "@capacitor/android": "^8.5.3",
@@ -55,6 +57,7 @@
     "@types/node": "^26.6.5",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
+    "@types/three": "^0.170.0",
     "@vitejs/plugin-react": "^4.3.4",
     "@xmldom/xmldom": "^0.9.12",
     "mammoth": "^1.13.0",
