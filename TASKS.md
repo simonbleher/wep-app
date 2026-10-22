@@ -310,6 +310,9 @@ Abschnitt 10f) mit Mausrad, Maus-Ziehen und Zwei-Finger-Gesten über CDP-Touch. 
   **Test App = Excel:** `src/export/__tests__/exportBauRechnung.test.ts` (24 Fälle über LibreOffice). Fehler in den Formeln der Vorlage werden im Export korrigiert
   (docs/ENTSCHEIDUNGEN.md). Code: `src/bau/`, `src/export/exportBau.ts`, `src/app/Bau*.tsx`. Screenshots: `docs/beta4-paket2/` (`npm run beta4-paket2:screenshots`).
   Offen: fachliche Fragen im PR (Simon).
-- B4-3 · Zeichen-Tools Bau ⏳ – Branch beta4/paket3
+- B4-3 · Zeichen-Tools Bau ✅ PR offen – Branch beta4/paket3. Grundriss mit echten Maßen (Rechteck/Vieleck, Kante antippen → Länge eintippen → Form passt sich an), Maßketten,
+  Bauteil-Kürzel verknüpft mit Paket 2 (Fläche, Maße, Höhe, Kubatur fließen in die Bewertung; überschreibbar), Massenberechnung nach Dachform (Flach/Pult/Sattel),
+  Export als bearbeitbare Formen in „Skizze Bau“. Zoom/Einrasten/Auswahl aus Beta 3; Grün-Skizze unverändert. Code: `src/skizze/grundriss*.ts`, `GrundrissEditor.tsx`,
+  `src/bau/grundriss.ts`, `src/export/grundrissFormen.ts`, `src/app/SkizzeBauTab.tsx`. Screenshots: `docs/beta4-paket3/` (`npm run beta4-paket3:screenshots`, Excel-Bild: `npm run beta4-paket3:export-bild`).
 - B4-4 · Rechen-Tools ⏳ – Branch beta4/paket4
 - B4-5 · 3D-Ansicht ⏳ – Branch beta4/paket5

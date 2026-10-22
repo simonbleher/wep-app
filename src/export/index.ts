@@ -31,12 +31,15 @@ import { schreibeBau, BAULICHKEITEN_BLATT, MAENGEL_BLATT, BESEITIGUNG_BLATT, TAB
 import { fuegeSkizzeFormenEin, type SkizzeFormenErgebnis, type SkizzeFormenOptionen } from './skizzeFormen'
 
 export { skizzeBlattHatFormen } from './skizzeBild'
+export { grundrissZuFormen } from './grundrissFormen'
 export { VORLAGEN_KORREKTUREN, type BauExportErgebnis, type VorlagenKorrektur } from './exportBau'
 export * from './skizzeFormen'
 export { leseBauFormalien, vergleichsWert, type BauFormalien } from './bauExcelLesen'
 
 /** Blatt, dessen Überschrift in der Vorlage fälschlich „Skizze – Baulichkeiten“ lautet. */
 export const SKIZZE_AA_BLATT = 'Skizze Außenanlage-Aufwuchs'
+/** Blatt für den Grundriss mit echten Maßen (Bau-Teil, Beta 4, Paket 3). */
+export const SKIZZE_BAU_BLATT = 'Skizze Bau'
 /** Neue Überschrift für das Skizzen-Blatt Außenanlage-Aufwuchs (statt „Skizze – Baulichkeiten“). */
 export const SKIZZE_AA_UEBERSCHRIFT = 'Skizze – Außenanlagen und Aufwuchs'
 
@@ -67,6 +70,12 @@ export interface ExportOptionen {
    * Siehe `skizzeFormen.ts`.
    */
   skizzeFormen?: SkizzeFormenOptionen
+  /**
+   * Grundriss (Beta 4, Paket 3) als bearbeitbare Excel-Formen ins Blatt „Skizze Bau“, nur bei Teil `'bau'` oder `'beides'`.
+   * Gebäude, Maßketten und Massenberechnung kommen aus `grundrissZuFormen`; Formen eines früheren Exports werden ersetzt,
+   * fremde Formen des Blatts (z. B. eine von Hand gezeichnete Skizze) bleiben unverändert.
+   */
+  grundrissFormen?: Omit<SkizzeFormenOptionen, 'blatt' | 'graswiese'>
   /**
    * Fallback: Skizze statt als Formen als Bild einfügen, auch wenn `skizzeFormen`
    * übergeben wurde (z. B. wenn die Formen in einer Excel-Version Probleme machen).
@@ -118,6 +127,8 @@ export interface ExportResult {
   skizzeTransparent: boolean
   /** Ergebnis des Bau-Exports (undefined: Bau-Blätter wurden nicht geschrieben) */
   bau?: BauExportErgebnis
+  /** Ergebnis des Grundriss-Exports ins Blatt „Skizze Bau“ (undefined: nichts geschrieben) */
+  grundriss?: SkizzeFormenErgebnis
   /** Das fertige XLSX als Blob (zum Download) */
   blob: Blob
   /** Vorgeschlagener Dateiname, z. B. "2026-999_WEP.xlsx" (nur Bau: "2026-999_WEP_Bau.xlsx") */
@@ -187,6 +198,12 @@ export async function exportWep(
     ? await schreibeBau(zip, wep, { profilIndex: optionen.profilIndex, vorlagenfehlerKorrigieren: optionen.vorlagenfehlerKorrigieren })
     : undefined
 
+  // 3c. Grundriss mit echten Maßen als Formen ins Blatt „Skizze Bau“ (Beta 4, Paket 3)
+  const grundrissErgebnis =
+    (optionen.teil === 'bau' || optionen.teil === 'beides') && optionen.grundrissFormen
+      ? await fuegeSkizzeFormenEin(zip, { ...optionen.grundrissFormen, blatt: SKIZZE_BAU_BLATT, graswiese: false })
+      : undefined
+
   // 4b. Parzellenskizze als Bild ins Blatt „Skizze Außenanlage-Aufwuchs“
   //     (das PNG erzeugt die App im Browser mit skizzeAlsPng)
   //     Vorhandene Formen im Blatt (Bau-Skizze) → PNG transparent anfordern.
@@ -247,6 +264,7 @@ export async function exportWep(
 
   return {
     bau: bauErgebnis,
+    grundriss: grundrissErgebnis,
     blob,
     filename,
     konflikte,

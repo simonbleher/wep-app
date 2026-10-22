@@ -2018,3 +2018,60 @@ select.eingabe {
 .fehlertext {
   color: var(--farbe-warnung);
 }
+
+/* Grundriss „Skizze Bau“ (Beta 4, Paket 3): Auswahlfeld und Massenberechnung */
+.grundriss-auswahl {
+  display: flex;
+  flex-direction: column;
+  gap: var(--abstand-3);
+  user-select: text;
+}
+
+.grundriss-kante {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--abstand-2);
+  padding: var(--abstand-3);
+  border-radius: var(--radius-klein);
+  background: var(--farbe-akzent-hell);
+}
+
+.grundriss-hinweis {
+  color: var(--farbe-warnung);
+}
+
+.massen-scroll {
+  overflow-x: auto;
+}
+
+.massen-tabelle {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--schrift-klein);
+  font-variant-numeric: tabular-nums;
+}
+
+.massen-tabelle th,
+.massen-tabelle td {
+  padding: var(--abstand-2) var(--abstand-2);
+  border-bottom: var(--linie) solid var(--farbe-linie);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.massen-tabelle thead th,
+.massen-tabelle tbody th,
+.massen-tabelle tfoot th {
+  text-align: left;
+}
+
+.massen-tabelle tbody th {
+  font-weight: var(--gewicht-mittel);
+}
+
+.massen-tabelle tfoot th,
+.massen-tabelle tfoot td {
+  border-bottom: 0;
+  font-weight: var(--gewicht-mittel);
+}

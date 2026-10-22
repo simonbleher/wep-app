@@ -131,9 +131,16 @@ Restnutzung, Mängel %, Fläche; Gewächshaus, Vorplatz, Abwasser, Baubeschreibu
 Vorlagenfehlern (`VORLAGEN_KORREKTUREN`), nicht exportierte Bauteile und gekürzte Texte. Rechnung der App: `src/bau/rechnen.ts` (Test gegen LibreOffice).
 Ohne `teil` Bau oder ohne `wep.bau` bleiben die Bau-Blätter byte-gleich.
 
+## Grundriss in „Skizze Bau“ (Beta 4, Paket 3)
+
+`exportWep(wep, excel, { teil: 'bau' | 'beides', grundrissFormen: { elemente: ({ zeichenbereich }) => grundrissZuFormen(wep.grundriss, zeichenbereich, wep.bau.bauteile) } })`.
+`grundrissFormen.ts` rechnet Meter in EMU um (ein Maßstab, in B7:G48 eingepasst): je Teil eine Form `bauteil` (Rechteck, sonst Freiform `custGeom`, Keller gestrichelt, Text „Kürzel + m²“),
+rote Maßketten (`massangabe`) und unten die Massenberechnung (`massenberechnung`). Schreibt über `fuegeSkizzeFormenEin` mit `blatt: 'Skizze Bau'`, `graswiese: false`; fremde Formen bleiben
+(`ExportResult.grundriss.fremdeFormen`), eigene eines früheren Exports werden ersetzt. Bei Teil `gruen` oder ohne Option bleibt das Blatt byte-gleich. Sichtprüfung: `npm run beta4-paket3:export-bild`.
+
 ## Regeln
 
-- **Bau-Blätter werden nur vom Bau-Export (Teil `bau`/`beides` mit Bau-Daten am WEP) verändert, sonst nie.**
+- **Bau-Blätter werden nur vom Bau-Export (Teil `bau`/`beides` mit Bau-Daten oder Grundriss am WEP) verändert, sonst nie.**
 - Formeln in Spalte L (Außenanlagen/Aufwuchs) und Spalte K
   (Beseitigungskosten) bleiben unberührt.
 - Formalien-Felder, die in der Bau-Excel bereits belegt sind und einen

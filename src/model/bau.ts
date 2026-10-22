@@ -39,6 +39,12 @@ export interface Bauteil {
   flaecheManuell?: boolean
   /** Umbauter Raum in m³ (Beseitigungskosten). Vorschlag Fläche × Höhe, überschreibbar. */
   kubaturM3?: number
+  /**
+   * Fläche, Maße, Höhe und Kubatur kommen aus dem Grundriss („Skizze Bau“, Paket 3), solange ein Teil des Grundrisses
+   * mit diesem Bauteil verknüpft ist. `false`: der Wertermittler hat sie von Hand gesetzt, der Grundriss überschreibt sie
+   * nicht mehr (Schalter in der Bauteil-Maske).
+   */
+  ausGrundriss?: boolean
 
   baujahr?: number
   /** „lt. Bauschein“, „lt. Angabe“, „geschätzt“ (Vorlage D13). */

@@ -11,6 +11,8 @@
 import type { SkizzeDaten } from '../skizze/types.js'
 export type { SkizzeDaten } from '../skizze/types.js'
 import type { BauDaten } from './bau.js'
+import type { GrundrissDaten } from '../skizze/grundriss.js'
+export type { GrundrissDaten, GrundrissTeil, Dachform } from '../skizze/grundriss.js'
 export * from './bau.js'
 
 /** Teil des WEP, den ein Wertermittler bearbeitet: Grün, Bau oder beides. */
@@ -57,6 +59,11 @@ export interface Wep {
    */
   rolle?: Rolle
   skizze?: SkizzeDaten
+  /**
+   * Grundriss mit echten Maßen für „Skizze Bau“ (Beta 4, Paket 3). Getrennt von der Grün-Skizze `skizze`.
+   * Fläche und Kubatur der verknüpften Bauteile kommen von hier (`src/bau/grundriss.ts`).
+   */
+  grundriss?: GrundrissDaten
   /** Bearbeitungsstand; fehlt = „in Arbeit“. Wird mit OneDrive abgeglichen. */
   status?: WepStatus
   /**

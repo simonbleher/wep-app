@@ -1,7 +1,7 @@
 // Hilfen für die Bau-Oberfläche (reine Funktionen, getestet in __tests__/bau.test.tsx):
 // neue Bauteile mit sinnvollen Vorgaben, Änderungen am WEP, Index am WEP merken.
 import { neueBauDaten, type BauDaten, type Bauteil, type BauteilArt, type MangelAbzug, type Wep } from '@/model'
-import { GEWAECHSHAUS, MINDERUNG_REGEL, kuerzelFuer, flaecheAusMassen, indexFuer, schlageBaubeschreibungVor, wertjahrVon } from '@/bau'
+import { GEWAECHSHAUS, MINDERUNG_REGEL, kuerzelFuer, flaecheAusMassen, indexFuer, schlageBaubeschreibungVor, uebernehmeGrundriss, wertjahrVon } from '@/bau'
 
 export const BAUTEIL_ARTEN: { art: BauteilArt; text: string; kurz: string }[] = [
   { art: 'laube', text: 'Laube', kurz: 'L' },
@@ -81,7 +81,7 @@ export function setzeMangel(b: Bauteil, gruppe: string, aenderung: Partial<Mange
  * sie nicht selbst geschrieben hat (so ist sie auch dann aktuell, wenn er nach einer Änderung nicht mehr im Reiter war).
  */
 export function bauFuerExport(wep: Wep, profilIndex?: Record<string, number>): Wep {
-  let w = merkeIndex(wep, profilIndex) ?? wep
+  let w = uebernehmeGrundriss(merkeIndex(wep, profilIndex) ?? wep)
   if (w.bau && !w.bau.beschreibungManuell) {
     const text = schlageBaubeschreibungVor(w, { profilIndex })
     if (text !== w.bau.beschreibung) w = { ...w, bau: { ...w.bau, beschreibung: text } }

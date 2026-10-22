@@ -1,7 +1,7 @@
 // WepDetail – Erfassung eines Wertermittlungsprotokolls.
 //
 // Abschnitte: Formalien | Außenanlagen | Aufwuchs | Beseitigung | Fotos | Skizze (Grün-Teil) und
-// Baulichkeiten | Mängel | Abwasser | Beseitigung Bau | Skizze Bau (Bau-Teil, vorerst Platzhalter).
+// Baulichkeiten | Mängel | Abwasser | Beseitigung Bau | Skizze Bau (Bau-Teil).
 // Welche Abschnitte und welchen Export es gibt, bestimmt die Rolle (Profil, pro WEP umschaltbar).
 // Handy: Kopfzeile (Zurück, Titel, Export, Menü „⋯“) und untere Leiste (bei „Beides“ wischbar). Tablet (≥ 900 px): Seitenleiste mit Abschnitten, Summen und Export.
 // Export ist eine Aktion, kein Abschnitt. Löschen liegt im Menü „⋯“ mit Rückfrage.
@@ -40,6 +40,7 @@ import type { KonfliktInfo } from '@/sync/types'
 import { KonfliktHinweis } from './KonfliktHinweis'
 import { ladeWep, speichereWep } from './db'
 import { SkizzeTab } from './SkizzeTab'
+import { SkizzeBauTab } from './SkizzeBauTab'
 import { BauExcelBereich, useBauNachladen, useBauStand, type BauNachladeStand, type BauStand } from './BauExcel'
 import { bauExcelFuerExport } from '@/bauexcel'
 import { FotoGruppe, FotosTab, useFotoNachladen, useFotoRecords } from './Fotos'
@@ -61,6 +62,7 @@ import { ICON, Kopf, TEIL_TEXT, Laedt, LeerZustand, Meldung, Rueckfrage, SlEintr
 import { lokalesProfil } from '@/profil'
 import { skizzeAlsPng } from '@/skizze/skizzePng'
 import { skizzeDatenZuFormen, type Kasten } from '@/export/skizzeFormen'
+import { grundrissZuFormen } from '@/export/grundrissFormen'
 import { svgZuPngBrowser } from '@/export/svgRaster'
 import { exportWep, type ExportResult } from '@/export'
 import { exportFotosNachOneDrive, exportNachOneDrive, ladeBauExcelAusOneDrive, ladeFotoAusOneDrive } from '@/sync'
@@ -122,15 +124,6 @@ export function bereicheFuerRolle(rolle: Rolle): typeof BEREICHE {
 /** Titel eines Abschnitts; bei „Grün + Bau“ mit Teil, wo sonst zwei gleich hießen. */
 function bereichTitel(b: (typeof BEREICHE)[number], beides: boolean): string {
   return beides && b.titelMitTeil ? b.titelMitTeil : b.titel
-}
-
-/** Text über der Platzhalter-Seite eines Bau-Reiters. */
-const BAU_PLATZHALTER: Record<BauBereich, string> = {
-  baulichkeiten: 'Laube, Anbauten, Schuppen, Gewächshaus: Maße, Baujahr, Bauklasse und Bewertung.',
-  maengel: 'Mängelabzug mit Checkliste aus der Richtlinie.',
-  abwasser: 'Sammelgrube oder Kanal: Alter, Größe und Wert.',
-  beseitigungBau: 'Beseitigungskosten für Bauteile (Anlage 4, Teil 1).',
-  skizzeBau: 'Grundriss mit Maßen für das Blatt „Skizze Bau“.',
 }
 
 // ---------------------------------------------------------------------------
@@ -533,9 +526,7 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
             {tab === 'maengel' && bereiche.some((b) => b.id === tab) && <MaengelTab wep={wep} aendere={aendere} profilIndex={profilIndex} start={maengelStart} />}
             {tab === 'abwasser' && bereiche.some((b) => b.id === tab) && <AbwasserTab wep={wep} aendere={aendere} profilIndex={profilIndex} />}
             {tab === 'beseitigungBau' && bereiche.some((b) => b.id === tab) && <BeseitigungBauTab wep={wep} aendere={aendere} profilIndex={profilIndex} onOeffnen={(id) => oeffneMaske({ art: 'bauBeseitigung', id })} />}
-            {BAU_PLATZHALTER[tab as BauBereich] !== undefined && tab === 'skizzeBau' && bereiche.some((b) => b.id === tab) && (
-              <BauPlatzhalter titel={bereichTitel(bereiche.find((b) => b.id === tab)!, beides)} icon={bereiche.find((b) => b.id === tab)!.icon} text={BAU_PLATZHALTER[tab as BauBereich]} />
-            )}
+            {tab === 'skizzeBau' && bereiche.some((b) => b.id === tab) && <SkizzeBauTab wep={wep} aendere={aendere} />}
             {tab === 'fotos' && <FotosTab wep={wep} aendere={aendere} records={fotoRecords} nachladen={fotoNachladen} />}
             {tab === 'skizze' && <SkizzeTab wep={wep} onSpeichern={speichere} />}
             {tab === 'export' && (
@@ -842,18 +833,6 @@ function FormalienTab({
   )
 }
 
-/** Platzhalter für einen Bau-Reiter (Inhalt kommt mit Beta 4, Paket 2). */
-function BauPlatzhalter({ titel, icon, text }: { titel: string; icon: LucideIcon; text: string }) {
-  return (
-    <>
-      <header className="seitenkopf">
-        <h1 className="h1">{titel}</h1>
-      </header>
-      <LeerZustand icon={icon} titel="Kommt mit dem Bau-Teil" text={`${text} Noch ohne Eingabe – der Reiter ist schon da, damit Aufbau und Export stehen.`} />
-    </>
-  )
-}
-
 // ---------------------------------------------------------------------------
 // Beseitigung (Liste; Formular: BeseitigungFormular.tsx)
 // ---------------------------------------------------------------------------
@@ -1010,8 +989,15 @@ function ExportTab({
 
       // Bau-Teil: Index am WEP merken, Baubeschreibung aktualisieren
       const wepFuerExport = hatBauTeil(rolle) ? bauFuerExport(wep, profilIndex) : wep
+      // Grundriss (Paket 3) als bearbeitbare Formen ins Blatt „Skizze Bau“
+      const grundriss = hatBauTeil(rolle) ? wepFuerExport.grundriss : undefined
+      const grundrissFormen =
+        grundriss && grundriss.teile.length
+          ? { elemente: ({ zeichenbereich }: { zeichenbereich: Kasten }) => grundrissZuFormen(grundriss, zeichenbereich, wepFuerExport.bau?.bauteile ?? []) }
+          : undefined
       const result = await exportWep(wepFuerExport, sourceBuffer, {
         profilIndex,
+        grundrissFormen,
         skizzeFormen,
         skizzePng,
         skizzeAlsBild,
@@ -1139,6 +1125,18 @@ function ExportTab({
               Skizze ins Blatt „Skizze Außenanlage-Aufwuchs“ eingefügt
               {ergebnis.result.skizzeFormen ? ' (bearbeitbare Excel-Formen).' : ' (als Bild).'}
             </p>
+          )}
+
+          {ergebnis.result.grundriss && (
+            <p className="neben">Grundriss ins Blatt „Skizze Bau“ eingefügt (bearbeitbare Excel-Formen mit Maßketten und Massenberechnung).</p>
+          )}
+          {ergebnis.result.grundriss && ergebnis.result.grundriss.fremdeFormen > 0 && (
+            <Meldung>
+              <p>
+                Das Blatt „Skizze Bau“ hatte schon {ergebnis.result.grundriss.fremdeFormen} eigene Formen (z. B. eine von Hand gezeichnete Skizze). Sie sind unverändert; der Grundriss der App liegt
+                darüber – bitte im Excel prüfen und ggf. eine der beiden Skizzen löschen.
+              </p>
+            </Meldung>
           )}
 
           {ergebnis.result.konflikte.length > 0 && (

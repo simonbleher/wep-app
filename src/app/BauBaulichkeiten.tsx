@@ -361,13 +361,26 @@ export function BauteilFormular({
               label="Fläche"
               einheit="m²"
               wert={b.flaeche > 0 ? b.flaeche : undefined}
-              onChange={(v) => setB((x) => ({ ...x, flaeche: v ?? 0, flaecheManuell: v !== undefined }))}
-              hilfe={b.flaecheManuell && b.laenge && b.breite ? `Von Hand gesetzt (Länge × Breite wären ${zahlDe(b.laenge * b.breite)} m²).` : 'Länge × Breite, überschreibbar.'}
+              onChange={(v) => setB((x) => ({ ...x, flaeche: v ?? 0, flaecheManuell: v !== undefined, ...(x.ausGrundriss ? { ausGrundriss: false } : {}) }))}
+              hilfe={
+                b.ausGrundriss
+                  ? 'Aus dem Grundriss (Skizze Bau). Ändern Sie das Maß dort – oder überschreiben Sie die Fläche hier von Hand.'
+                  : b.ausGrundriss === false
+                    ? 'Von Hand gesetzt; der Grundriss überschreibt sie nicht.'
+                    : b.flaecheManuell && b.laenge && b.breite
+                      ? `Von Hand gesetzt (Länge × Breite wären ${zahlDe(b.laenge * b.breite)} m²).`
+                      : 'Länge × Breite, überschreibbar.'
+              }
             />
             <ZahlFeld label={b.art === 'gewaechshaus' ? 'Firsthöhe' : 'Höhe'} einheit="m" wert={b.hoehe} onChange={(v) => set({ hoehe: v })} />
           </div>
-          {b.flaecheManuell && (
-            <button type="button" className="textknopf" onClick={() => setB((x) => mitFlaeche({ ...x, flaecheManuell: false }))}>
+          {b.ausGrundriss === false && (
+            <button type="button" className="textknopf" onClick={() => setB((x) => ({ ...x, ausGrundriss: undefined }))}>
+              Fläche wieder aus dem Grundriss übernehmen
+            </button>
+          )}
+          {b.flaecheManuell && !b.ausGrundriss && (
+            <button type="button" className="textknopf" onClick={() => setB((x) => mitFlaeche({ ...x, flaecheManuell: false, ausGrundriss: undefined }))}>
               Fläche wieder aus den Maßen berechnen
             </button>
           )}

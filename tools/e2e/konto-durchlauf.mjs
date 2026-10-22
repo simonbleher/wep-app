@@ -1103,7 +1103,8 @@ try {
   pruefe((await rnav.getByRole('button', { name: 'Baulichkeiten' }).count()) === 1 && (await rnav.getByRole('button', { name: 'Außenanlagen' }).count()) === 0, 'Rolle Bau: Bau-Reiter da, Grün-Reiter weg')
   pruefe((await seite.getByLabel('Wertermittler Baulichkeiten').inputValue()) === 'Erika Musterfrau', 'Rolle Bau: Name steht bei „Wertermittler Baulichkeiten“')
   await rnav.getByRole('button', { name: 'Skizze Bau' }).click()
-  pruefe(await seite.getByText('Kommt mit dem Bau-Teil').isVisible(), 'Rolle Bau: Skizze Bau ist noch ein Platzhalter (Paket 3)')
+  await seite.getByTestId('grundriss-flaeche').waitFor()
+  pruefe(await seite.getByText('Noch kein Grundriss').isVisible(), 'Rolle Bau: Skizze Bau zeigt den Grundriss-Editor (Paket 3)')
   // Beta 4, Paket 2: Bauteil anlegen, Bauklasse-Assistent, Mängel, Abwasser, Beseitigung Bau, Export in die Bau-Blätter
   await rnav.getByRole('button', { name: 'Baulichkeiten' }).click()
   await seite.getByRole('button', { name: 'Laube anlegen' }).click()
