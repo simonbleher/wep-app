@@ -3,7 +3,7 @@
 // Strich-Icons aus lucide-react, Farben nur über die Tokens (styles.css).
 import { useEffect, useId, type ReactNode } from 'react'
 import { CircleUser, FileText, Trash2, TriangleAlert, type LucideIcon } from 'lucide-react'
-import type { WepStatus } from '@/model'
+import type { Rolle, WepStatus } from '@/model'
 
 /** Einheitliche Icon-Größe und Strichstärke. */
 export const ICON = { size: 22, strokeWidth: 1.75, 'aria-hidden': true } as const
@@ -11,6 +11,18 @@ export const ICON = { size: 22, strokeWidth: 1.75, 'aria-hidden': true } as cons
 /** Kleine Statusmarke eines WEP: in Arbeit · fertig · exportiert. */
 export function StatusMarke({ status }: { status: WepStatus }) {
   return <span className={`status status-${status === 'in Arbeit' ? 'arbeit' : status}`}>{status === 'in Arbeit' ? 'In Arbeit' : status.charAt(0).toUpperCase() + status.slice(1)}</span>
+}
+
+/** Kurztext für den bearbeiteten Teil eines WEP. */
+export const TEIL_TEXT: Record<Rolle, string> = { gruen: 'Grün', bau: 'Bau', beides: 'Grün + Bau' }
+
+/** Kleine Marke: welcher Teil des WEP bearbeitet wird (Grün · Bau · Grün + Bau). */
+export function TeilMarke({ rolle }: { rolle: Rolle }) {
+  return (
+    <span className={`status status-teil status-teil-${rolle}`} title="Bearbeiteter Teil">
+      {TEIL_TEXT[rolle]}
+    </span>
+  )
 }
 
 export function euroFormat(wert: number): string {

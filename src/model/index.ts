@@ -7,10 +7,11 @@ export type {
   BeseitigungsPosition,
   SkizzeDaten,
   WepStatus,
+  Rolle,
   Foto,
   BauExcel,
 } from './types'
-export { ZUSTANDSSTUFEN, neuerWep, WEP_STATUS, wepStatus, dupliziereWep, naechsteVorgangsNr } from './types'
+export { hatGruenTeil, hatBauTeil, wepRolle, rolleAusTeilen, ZUSTANDSSTUFEN, neuerWep, WEP_STATUS, wepStatus, dupliziereWep, naechsteVorgangsNr } from './types'
 
 // Katalog- und Invasive-Typen (data/katalog.json, data/invasive.json).
 export type {

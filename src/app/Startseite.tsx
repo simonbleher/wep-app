@@ -2,7 +2,7 @@
 // Gelöscht wird nicht hier, sondern in der WEP-Ansicht (Menü „⋯“, mit Rückfrage).
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ChevronRight, CircleUser, FileSpreadsheet, FileText, Plus, Search, Trash2, X } from 'lucide-react'
-import { WEP_STATUS, naechsteVorgangsNr, wepStatus, type Wep, type WepStatus } from '@/model'
+import { WEP_STATUS, naechsteVorgangsNr, wepRolle, wepStatus, type Wep, type WepStatus } from '@/model'
 import type { Konto } from '@/konto'
 import { lokalesProfil, neuerWepMitProfil } from '@/profil'
 import { belegteNummern, ladePapierkorb, offeneKonflikte, raeumePapierkorbAuf } from '@/sync/aktionen'
@@ -12,7 +12,7 @@ import { UpdateHinweis } from './UpdateHinweis'
 import { BAU_EXCEL_ACCEPT } from './BauExcel'
 import { legeWepAusBauExcelAn } from '@/bauexcel/neu'
 import { StatusZeile, useAbgleich } from './SyncLeiste'
-import { HauptSeitenleiste, ICON, Laedt, LeerZustand, Meldung, StatusMarke, datumDe } from './ui'
+import { HauptSeitenleiste, ICON, Laedt, LeerZustand, Meldung, StatusMarke, TeilMarke, datumDe } from './ui'
 
 interface Props {
   /** Angemeldetes Konto oder null („ohne Konto“). */
@@ -48,6 +48,8 @@ export function Startseite({ konto, verfuegbar, onProfil, onOeffnen, onPapierkor
   const [imPapierkorb, setImPapierkorb] = useState(0)
   const [fehler, setFehler] = useState<string>()
   const bauEingabe = useRef<HTMLInputElement>(null)
+  // Rolle aus dem Profil; ein WEP kann davon abweichen (`Wep.rolle`)
+  const profilRolle = lokalesProfil.lade().profil.rolle
 
   const neuLaden = useCallback(() => {
     // Was länger als 30 Tage im Papierkorb liegt, wird beim Öffnen der Liste endgültig gelöscht
@@ -218,6 +220,7 @@ export function Startseite({ konto, verfuegbar, onProfil, onOeffnen, onPapierkor
                       <span className="neben">{wepNeben(wep)}</span>
                     </span>
                     {konflikte.has(wep.id) && <span className="status status-konflikt">Konflikt</span>}
+                    <TeilMarke rolle={wepRolle(wep, profilRolle)} />
                     <StatusMarke status={wepStatus(wep)} />
                     <ChevronRight {...ICON} className="chevron" />
                   </button>

@@ -11,6 +11,28 @@
 import type { SkizzeDaten } from '../skizze/types.js'
 export type { SkizzeDaten } from '../skizze/types.js'
 
+/** Teil des WEP, den ein Wertermittler bearbeitet: Grün, Bau oder beides. */
+export type Rolle = 'gruen' | 'bau' | 'beides'
+
+/** Gibt es den Grün-Teil (Außenanlagen, Aufwuchs, Beseitigung Grün, Skizze Grün)? */
+export const hatGruenTeil = (rolle: Rolle): boolean => rolle !== 'bau'
+/** Gibt es den Bau-Teil (Baulichkeiten, Mängel, Abwasser, Beseitigung Bau, Skizze Bau)? */
+export const hatBauTeil = (rolle: Rolle): boolean => rolle !== 'gruen'
+
+/**
+ * Rolle für dieses WEP. Neue WEPs bekommen sie beim Anlegen fest aus dem Profil (ein späterer
+ * Rollenwechsel im Profil ändert bestehende WEPs nicht). WEPs von vor Beta 4 haben keine Rolle und
+ * sind Grün-WEPs. `_profilRolle` bleibt für die Aufrufer, wird aber nicht mehr benutzt.
+ */
+export function wepRolle(wep: Pick<Wep, 'rolle'>, _profilRolle?: Rolle): Rolle {
+  return wep.rolle ?? 'gruen'
+}
+
+/** Rolle aus den beiden Teilen. */
+export function rolleAusTeilen(gruen: boolean, bau: boolean): Rolle {
+  return gruen && bau ? 'beides' : bau ? 'bau' : 'gruen'
+}
+
 /**
  * Ein vollständiges Wertermittlungsprotokoll.
  * `id` entspricht der Vorgangs-Nr., z. B. "2026-999".
@@ -26,6 +48,11 @@ export interface Wep {
     beseitigungAA: BeseitigungsPosition[]
   }
   bau?: unknown // später
+  /**
+   * Welche Teile dieses WEP bearbeitet werden (Grün / Bau / Beides). Fehlt = Rolle aus dem Profil.
+   * Wird nur gesetzt, wenn dieses WEP vom Profil abweicht („Dieses WEP auch als Bau/Grün bearbeiten“).
+   */
+  rolle?: Rolle
   skizze?: SkizzeDaten
   /** Bearbeitungsstand; fehlt = „in Arbeit“. Wird mit OneDrive abgeglichen. */
   status?: WepStatus

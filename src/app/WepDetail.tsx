@@ -1,8 +1,9 @@
 // WepDetail – Erfassung eines Wertermittlungsprotokolls.
 //
-// Abschnitte: Formalien | Außenanlagen | Aufwuchs | Beseitigung | Fotos | Skizze.
-// Handy: Kopfzeile (Zurück, Titel, Export, Menü „⋯“) und untere Leiste mit den
-// sechs Abschnitten. Tablet (≥ 900 px): Seitenleiste mit Abschnitten, Summen und Export.
+// Abschnitte: Formalien | Außenanlagen | Aufwuchs | Beseitigung | Fotos | Skizze (Grün-Teil) und
+// Baulichkeiten | Mängel | Abwasser | Beseitigung Bau | Skizze Bau (Bau-Teil, vorerst Platzhalter).
+// Welche Abschnitte und welchen Export es gibt, bestimmt die Rolle (Profil, pro WEP umschaltbar).
+// Handy: Kopfzeile (Zurück, Titel, Export, Menü „⋯“) und untere Leiste (bei „Beides“ wischbar). Tablet (≥ 900 px): Seitenleiste mit Abschnitten, Summen und Export.
 // Export ist eine Aktion, kein Abschnitt. Löschen liegt im Menü „⋯“ mit Rückfrage.
 // Positionen (Außenanlagen, Aufwuchs, Beseitigung) werden per Antippen geändert; Formular
 // und „Löschen“ (mit Rückfrage) sind eigene Bildschirme, ohne untere Leiste.
@@ -19,6 +20,11 @@ import {
   CopyPlus,
   Ellipsis,
   Fence,
+  Building2,
+  Droplets,
+  Hammer,
+  Ruler,
+  TriangleAlert,
   FileSpreadsheet,
   FileText,
   PencilRuler,
@@ -28,7 +34,7 @@ import {
   Trash2,
   type LucideIcon,
 } from 'lucide-react'
-import { dupliziereWep, naechsteVorgangsNr, wepStatus, type Wep, type Position, type BeseitigungsPosition, type Formalien, type WepStatus } from '@/model'
+import { dupliziereWep, hatBauTeil, hatGruenTeil, naechsteVorgangsNr, rolleAusTeilen, wepRolle, wepStatus, type Rolle, type Wep, type Position, type BeseitigungsPosition, type Formalien, type WepStatus } from '@/model'
 import { PAPIERKORB_TAGE, belegteNummern, ladeKonflikt, loescheWep } from '@/sync/aktionen'
 import type { KonfliktInfo } from '@/sync/types'
 import { KonfliktHinweis } from './KonfliktHinweis'
@@ -45,7 +51,8 @@ import { PositionHinzufuegen } from './PositionHinzufuegen'
 import { PositionBearbeiten } from './PositionBearbeiten'
 import { BeseitigungFormular, beseitigungSumme } from './BeseitigungFormular'
 import type { Abschnitt } from './katalogDaten'
-import { ICON, Kopf, Laedt, LeerZustand, Meldung, Rueckfrage, SlEintrag, StatusMarke, euroFormat } from './ui'
+import { ICON, Kopf, TEIL_TEXT, Laedt, LeerZustand, Meldung, Rueckfrage, SlEintrag, StatusMarke, TeilMarke, euroFormat } from './ui'
+import { lokalesProfil } from '@/profil'
 import { skizzeAlsPng } from '@/skizze/skizzePng'
 import { skizzeDatenZuFormen, type Kasten } from '@/export/skizzeFormen'
 import { svgZuPngBrowser } from '@/export/svgRaster'
@@ -60,7 +67,9 @@ import { leseZahl, zahlDe, zahlFuerEingabe } from '@/gruen/format'
 // Typen
 // ---------------------------------------------------------------------------
 
-type Bereich = 'formalien' | 'aussenanlagen' | 'aufwuchs' | 'beseitigung' | 'fotos' | 'skizze'
+type GruenBereich = 'aussenanlagen' | 'aufwuchs' | 'beseitigung' | 'skizze'
+type BauBereich = 'baulichkeiten' | 'maengel' | 'abwasser' | 'beseitigungBau' | 'skizzeBau'
+type Bereich = 'formalien' | 'fotos' | GruenBereich | BauBereich
 type Tab = Bereich | 'export'
 
 type ExportZustand =
@@ -82,14 +91,39 @@ interface Props {
   onOeffnen?: (wepId: string) => void
 }
 
-const BEREICHE: { id: Bereich; titel: string; kurz: string; icon: LucideIcon }[] = [
-  { id: 'formalien', titel: 'Formalien', kurz: 'Formalien', icon: FileText },
-  { id: 'aussenanlagen', titel: 'Außenanlagen', kurz: 'Außen', icon: Fence },
-  { id: 'aufwuchs', titel: 'Aufwuchs', kurz: 'Aufwuchs', icon: Sprout },
-  { id: 'beseitigung', titel: 'Beseitigung', kurz: 'Beseitigung', icon: Shovel },
-  { id: 'fotos', titel: 'Fotos', kurz: 'Fotos', icon: Camera },
-  { id: 'skizze', titel: 'Skizze', kurz: 'Skizze', icon: PencilRuler },
+/** `teil`: zu welchem Teil der Abschnitt gehört; `titelMitTeil`: Titel, wenn beide Teile sichtbar sind (sonst nicht eindeutig). */
+const BEREICHE: { id: Bereich; titel: string; kurz: string; icon: LucideIcon; teil: 'alle' | 'gruen' | 'bau'; titelMitTeil?: string }[] = [
+  { id: 'formalien', titel: 'Formalien', kurz: 'Formalien', icon: FileText, teil: 'alle' },
+  { id: 'aussenanlagen', titel: 'Außenanlagen', kurz: 'Außen', icon: Fence, teil: 'gruen' },
+  { id: 'aufwuchs', titel: 'Aufwuchs', kurz: 'Aufwuchs', icon: Sprout, teil: 'gruen' },
+  { id: 'beseitigung', titel: 'Beseitigung', kurz: 'Beseitigung', icon: Shovel, teil: 'gruen', titelMitTeil: 'Beseitigung Grün' },
+  { id: 'baulichkeiten', titel: 'Baulichkeiten', kurz: 'Bauten', icon: Building2, teil: 'bau' },
+  { id: 'maengel', titel: 'Mängel', kurz: 'Mängel', icon: TriangleAlert, teil: 'bau' },
+  { id: 'abwasser', titel: 'Abwasser', kurz: 'Abwasser', icon: Droplets, teil: 'bau' },
+  { id: 'beseitigungBau', titel: 'Beseitigung Bau', kurz: 'Beseitigung', icon: Hammer, teil: 'bau', titelMitTeil: 'Beseitigung Bau' },
+  { id: 'fotos', titel: 'Fotos', kurz: 'Fotos', icon: Camera, teil: 'alle' },
+  { id: 'skizze', titel: 'Skizze', kurz: 'Skizze', icon: PencilRuler, teil: 'gruen', titelMitTeil: 'Skizze Grün' },
+  { id: 'skizzeBau', titel: 'Skizze Bau', kurz: 'Skizze', icon: Ruler, teil: 'bau', titelMitTeil: 'Skizze Bau' },
 ]
+
+/** Abschnitte, die zur Rolle passen (Reihenfolge wie in BEREICHE). */
+export function bereicheFuerRolle(rolle: Rolle): typeof BEREICHE {
+  return BEREICHE.filter((b) => b.teil === 'alle' || (b.teil === 'gruen' ? hatGruenTeil(rolle) : hatBauTeil(rolle)))
+}
+
+/** Titel eines Abschnitts; bei „Grün + Bau“ mit Teil, wo sonst zwei gleich hießen. */
+function bereichTitel(b: (typeof BEREICHE)[number], beides: boolean): string {
+  return beides && b.titelMitTeil ? b.titelMitTeil : b.titel
+}
+
+/** Text über der Platzhalter-Seite eines Bau-Reiters. */
+const BAU_PLATZHALTER: Record<BauBereich, string> = {
+  baulichkeiten: 'Laube, Anbauten, Schuppen, Gewächshaus: Maße, Baujahr, Bauklasse und Bewertung.',
+  maengel: 'Mängelabzug mit Checkliste aus der Richtlinie.',
+  abwasser: 'Sammelgrube oder Kanal: Alter, Größe und Wert.',
+  beseitigungBau: 'Beseitigungskosten für Bauteile (Anlage 4, Teil 1).',
+  skizzeBau: 'Grundriss mit Maßen für das Blatt „Skizze Bau“.',
+}
 
 // ---------------------------------------------------------------------------
 // Hilfsfunktionen
@@ -118,6 +152,8 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
   const [loeschFrage, setLoeschFrage] = useState(false)
   const [exportZustand, setExportZustand] = useState<ExportZustand>({ typ: 'idle' })
   const [konflikt, setKonflikt] = useState<KonfliktInfo | undefined>()
+  // Rolle aus dem Profil dieses Geräts; das WEP kann abweichen (`wep.rolle`)
+  const [profilRolle] = useState<Rolle>(() => lokalesProfil.lade().profil.rolle)
   // Immer der neueste Stand: Fotos werden asynchron (nach dem Verkleinern) eingetragen
   const wepRef = useRef<Wep | null>(null)
   const fotoRecords = useFotoRecords(wepId)
@@ -182,6 +218,18 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
   }
 
   const titel = wepTitel(wep)
+  const rolle = wepRolle(wep, profilRolle)
+  const bereiche = bereicheFuerRolle(rolle)
+  const beides = rolle === 'beides'
+  // Schaltet den Grün- oder Bau-Teil für dieses WEP (die Rolle steht immer am WEP)
+  function setzeTeil(teil: 'gruen' | 'bau', an: boolean) {
+    const neu = rolleAusTeilen(teil === 'gruen' ? an : hatGruenTeil(rolle), teil === 'bau' ? an : hatBauTeil(rolle))
+    const naechste = { ...wep!, rolle: neu }
+    // War der sichtbare Abschnitt Teil des abgeschalteten Teils, geht es zurück zu den Formalien
+    if (!bereicheFuerRolle(neu).some((b) => b.id === tab) && tab !== 'export') setTab('formalien')
+    setExportZustand({ typ: 'idle' })
+    void speichere(naechste)
+  }
 
   async function setzeStatus(status: WepStatus) {
     await speichere({ ...wep!, status })
@@ -273,19 +321,20 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
               <span className="nowrap">{wep.id}</span>
             </span>
             <span className="sl-status">
+              <TeilMarke rolle={rolle} />
               <StatusMarke status={wepStatus(wep)} />
             </span>
           </div>
           <WepMenue status={wepStatus(wep)} onStatus={(st) => void setzeStatus(st)} onDuplizieren={() => void duplizieren()} onLoeschen={() => setLoeschFrage(true)} />
         </div>
         <nav className="sl-nav">
-          {BEREICHE.map((b) => {
+          {bereiche.map((b) => {
             const summe = bereichSumme(wep, b.id)
             return (
               <SlEintrag
                 key={b.id}
                 icon={b.icon}
-                text={b.titel}
+                text={bereichTitel(b, beides)}
                 wert={summe === undefined ? undefined : euroFormat(summe)}
                 aktiv={tab === b.id}
                 onClick={() => wechsle(b.id)}
@@ -348,7 +397,7 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
           <>
             <Kopf
               titel={titel}
-              unter={[wep.formalien.kleingartenanlage.trim(), wepStatus(wep)].filter(Boolean).join(' · ')}
+              unter={[wep.formalien.kleingartenanlage.trim(), TEIL_TEXT[rolle], wepStatus(wep)].filter(Boolean).join(' · ')}
               links={zurueckKnopf}
               rechts={
                 <>
@@ -386,6 +435,9 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
                 leseWep={() => wepRef.current}
                 bauStand={bauStand}
                 bauNachladen={bauNachladen}
+                rolle={rolle}
+                profilRolle={profilRolle}
+                onTeil={setzeTeil}
               />
             )}
             {(tab === 'aussenanlagen' || tab === 'aufwuchs') && (
@@ -409,6 +461,9 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
                 onBearbeiten={(id) => oeffneMaske({ art: 'beseitigung', id })}
               />
             )}
+            {BAU_PLATZHALTER[tab as BauBereich] !== undefined && bereiche.some((b) => b.id === tab) && (
+              <BauPlatzhalter titel={bereichTitel(bereiche.find((b) => b.id === tab)!, beides)} icon={bereiche.find((b) => b.id === tab)!.icon} text={BAU_PLATZHALTER[tab as BauBereich]} />
+            )}
             {tab === 'fotos' && <FotosTab wep={wep} aendere={aendere} records={fotoRecords} nachladen={fotoNachladen} />}
             {tab === 'skizze' && <SkizzeTab wep={wep} onSpeichern={speichere} />}
             {tab === 'export' && (
@@ -421,6 +476,7 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
                 leseWep={() => wepRef.current}
                 bauStand={bauStand}
                 bauNachladen={bauNachladen}
+                rolle={rolle}
               />
             )}
           </>
@@ -428,18 +484,18 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
       </main>
 
       {!maskeSichtbar && (
-        <nav className="unten nur-handy" aria-label="Abschnitte">
-          {BEREICHE.map((b) => (
+        <nav className={beides ? 'unten unten-scroll nur-handy' : 'unten nur-handy'} aria-label="Abschnitte">
+          {bereiche.map((b) => (
             <button
               key={b.id}
               type="button"
               className="unten-knopf"
-              aria-label={b.titel}
+              aria-label={bereichTitel(b, beides)}
               aria-current={tab === b.id ? 'page' : undefined}
               onClick={() => wechsle(b.id)}
             >
               <b.icon {...ICON} />
-              <span>{b.kurz}</span>
+              <span>{beides && b.titelMitTeil ? b.titelMitTeil.replace('Beseitigung', 'Besei.') : b.kurz}</span>
             </button>
           ))}
         </nav>
@@ -580,6 +636,9 @@ function FormalienTab({
   leseWep,
   bauStand,
   bauNachladen,
+  rolle,
+  profilRolle,
+  onTeil,
 }: {
   wep: Wep
   onSpeichern: (wep: Wep) => Promise<void>
@@ -587,6 +646,9 @@ function FormalienTab({
   leseWep: () => Wep | null
   bauStand: BauStand
   bauNachladen: BauNachladeStand
+  rolle: Rolle
+  profilRolle: Rolle
+  onTeil: (teil: 'gruen' | 'bau', an: boolean) => void
 }) {
   function setFeld(key: keyof Formalien, wert: string | number) {
     void onSpeichern({ ...wep, formalien: { ...wep.formalien, [key]: wert } })
@@ -601,7 +663,9 @@ function FormalienTab({
         <h1 className="h1">Formalien</h1>
       </header>
 
-      <BauExcelBereich wep={wep} aendere={aendere} leseWep={leseWep} stand={bauStand} nachladen={bauNachladen} />
+      {hatGruenTeil(rolle) && (
+        <BauExcelBereich wep={wep} aendere={aendere} leseWep={leseWep} stand={bauStand} nachladen={bauNachladen} />
+      )}
 
       <section className="abschnitt" aria-labelledby={`${id}-anlage`}>
         <h2 className="gruppenkopf" id={`${id}-anlage`}>
@@ -647,11 +711,20 @@ function FormalienTab({
           Wertermittlung
         </h2>
         <div className="formular">
-          <Eingabe
-            label="Wertermittler Außenanlagen & Aufwuchs"
-            wert={f.wertermittlerAussenAufwuchs}
-            onChange={(v) => setFeld('wertermittlerAussenAufwuchs', v)}
-          />
+          {hatBauTeil(rolle) && (
+            <Eingabe
+              label="Wertermittler Baulichkeiten"
+              wert={f.wertermittlerBaulichkeiten}
+              onChange={(v) => setFeld('wertermittlerBaulichkeiten', v)}
+            />
+          )}
+          {hatGruenTeil(rolle) && (
+            <Eingabe
+              label="Wertermittler Außenanlagen & Aufwuchs"
+              wert={f.wertermittlerAussenAufwuchs}
+              onChange={(v) => setFeld('wertermittlerAussenAufwuchs', v)}
+            />
+          )}
           <div className="feld-reihe">
             <Eingabe
               label="Wertermittlung am"
@@ -663,6 +736,47 @@ function FormalienTab({
           </div>
         </div>
       </section>
+
+      <section className="abschnitt" aria-labelledby={`${id}-teil`}>
+        <h2 className="gruppenkopf" id={`${id}-teil`}>
+          Bearbeiteter Teil
+        </h2>
+        <p className="neben block">
+          Aus dem Profil: {TEIL_TEXT[profilRolle]}. {wep.rolle ? `Für dieses WEP: ${TEIL_TEXT[wep.rolle]}.` : 'Für Sonderfälle lässt sich dieses WEP umschalten.'}
+        </p>
+        <label className="schalter-zeile">
+          <span>Dieses WEP als Grün bearbeiten</span>
+          <input
+            type="checkbox"
+            className="schalter"
+            checked={hatGruenTeil(rolle)}
+            disabled={!hatBauTeil(rolle)}
+            onChange={(e) => onTeil('gruen', e.target.checked)}
+          />
+        </label>
+        <label className="schalter-zeile">
+          <span>Dieses WEP als Bau bearbeiten</span>
+          <input
+            type="checkbox"
+            className="schalter"
+            checked={hatBauTeil(rolle)}
+            disabled={!hatGruenTeil(rolle)}
+            onChange={(e) => onTeil('bau', e.target.checked)}
+          />
+        </label>
+      </section>
+    </>
+  )
+}
+
+/** Platzhalter für einen Bau-Reiter (Inhalt kommt mit Beta 4, Paket 2). */
+function BauPlatzhalter({ titel, icon, text }: { titel: string; icon: LucideIcon; text: string }) {
+  return (
+    <>
+      <header className="seitenkopf">
+        <h1 className="h1">{titel}</h1>
+      </header>
+      <LeerZustand icon={icon} titel="Kommt mit dem Bau-Teil" text={`${text} Noch ohne Eingabe – der Reiter ist schon da, damit Aufbau und Export stehen.`} />
     </>
   )
 }
@@ -773,6 +887,7 @@ function ExportTab({
   leseWep,
   bauStand,
   bauNachladen,
+  rolle,
 }: {
   wep: Wep
   onSpeichern: (wep: Wep) => Promise<void>
@@ -782,7 +897,10 @@ function ExportTab({
   leseWep: () => Wep | null
   bauStand: BauStand
   bauNachladen: BauNachladeStand
+  rolle: Rolle
 }) {
+  // Nur Bau: eigener Export mit Bau-Blättern und Formalien, ohne Grün-Teil und ohne Bau-Excel
+  const nurBau = rolle === 'bau'
   // Standard: Skizze als bearbeitbare Excel-Formen; Fallback: Bild (PNG)
   const [skizzeAlsBild, setSkizzeAlsBild] = useState(false)
   const id = useId()
@@ -791,7 +909,7 @@ function ExportTab({
     setExportZustand({ typ: 'laedt' })
     try {
       // Die am WEP gemerkte Bau-Excel (lokal, sonst aus OneDrive geholt); ohne sie die leere Vorlage
-      let sourceBuffer = await bauExcelFuerExport({ wep, quelle: { hole: ladeBauExcelAusOneDrive } })
+      let sourceBuffer = nurBau ? undefined : await bauExcelFuerExport({ wep, quelle: { hole: ladeBauExcelAusOneDrive } })
       if (!sourceBuffer) {
         const resp = await fetch('/WEP_Vorlage.xlsx')
         if (!resp.ok) throw new Error(`Vorlage nicht gefunden: ${resp.statusText}`)
@@ -820,6 +938,7 @@ function ExportTab({
         skizzePng,
         skizzeAlsBild,
         formalienAbgeglichen: wep.bauExcel?.abgeglichen === true,
+        teil: rolle,
       })
 
       // Datei an den Nutzer: im Browser als Download, im Windows-Programm über „Speichern unter…“.
@@ -869,7 +988,7 @@ function ExportTab({
     }
   }
 
-  const hatSkizze = Boolean(wep.skizze?.elemente.length)
+  const hatSkizze = !nurBau && Boolean(wep.skizze?.elemente.length)
   const ergebnis = exportZustand.typ === 'fertig' ? exportZustand : null
 
   return (
@@ -879,10 +998,16 @@ function ExportTab({
       </header>
 
       <p className="neben block">
-        Die App schreibt die Grün-Daten in die WEP-Vorlage. Bau-Blätter werden nicht verändert.
+        {nurBau
+          ? 'Die App schreibt die Bau-Blätter und die Formalien in die WEP-Vorlage (Datei „…_WEP_Bau.xlsx“). Die Grün-Blätter bleiben leer.'
+          : rolle === 'beides'
+            ? 'Die App schreibt die Grün-Daten in die WEP-Vorlage (oder in die eingelesene Bau-Excel). Die Bau-Blätter bleiben, wie sie sind.'
+            : 'Die App schreibt die Grün-Daten in die WEP-Vorlage. Bau-Blätter werden nicht verändert.'}
       </p>
 
-      <BauExcelBereich wep={wep} aendere={aendere} leseWep={leseWep} stand={bauStand} nachladen={bauNachladen} />
+      {!nurBau && (
+        <BauExcelBereich wep={wep} aendere={aendere} leseWep={leseWep} stand={bauStand} nachladen={bauNachladen} />
+      )}
 
       {hatSkizze && (
         <section className="abschnitt" aria-labelledby={`${id}-skizze`}>

@@ -9,7 +9,7 @@
  */
 
 import JSZip from 'jszip'
-import type { Wep, Position, BeseitigungsPosition, Formalien } from '../model'
+import type { Wep, Position, BeseitigungsPosition, Formalien, Rolle } from '../model'
 import {
   FORMALIEN_MAP,
   AUSSENANLAGEN,
@@ -90,6 +90,13 @@ export interface ExportOptionen {
    * Werte kommen als `konflikte` zurück.
    */
   formalienAbgeglichen?: boolean
+  /**
+   * Welcher Teil exportiert wird. `'bau'`: nur Bau-Blätter + Formalien (keine Grün-Blätter, keine
+   * Grün-Skizze, Formalien-Zelle E13 bleibt unberührt), Dateiname `<Nr>_WEP_Bau.xlsx`.
+   * `'gruen'` oder `'beides'` (Standard): wie bisher, auch mit eingelesener Bau-Excel.
+   * Bau-Inhalte kommen mit Beta 4, Paket 2; bis dahin bleiben die Bau-Blätter der Quelle unverändert.
+   */
+  teil?: Rolle
 }
 
 export interface ExportResult {
@@ -103,7 +110,7 @@ export interface ExportResult {
   skizzeTransparent: boolean
   /** Das fertige XLSX als Blob (zum Download) */
   blob: Blob
-  /** Vorgeschlagener Dateiname, z. B. "2026-999_WEP.xlsx" */
+  /** Vorgeschlagener Dateiname, z. B. "2026-999_WEP.xlsx" (nur Bau: "2026-999_WEP_Bau.xlsx") */
   filename: string
   /**
    * Formalien-Felder, die in der Bau-Excel bereits gefüllt waren und
@@ -143,31 +150,35 @@ export async function exportWep(
   let aufwuchsUeberlauf = false
   let aufwuchsAbgeschnitten = false
 
-  // 1. Formalien-Blatt patchen
-  await patchFormalien(zip, wep, konflikte, optionen.formalienAbgeglichen === true)
+  const nurBau = optionen.teil === 'bau'
+
+  // 1. Formalien-Blatt patchen (Bau: ohne E13, das ist eine Grün-Zelle)
+  await patchFormalien(zip, wep, konflikte, optionen.formalienAbgeglichen === true, nurBau)
 
   // 1b. Überschrift des Skizzen-Blatts Außenanlage-Aufwuchs (Vorlage: „Skizze – Baulichkeiten“)
-  const skizzeUeberschriftGeaendert = await korrigiereSkizzeUeberschrift(zip)
+  const skizzeUeberschriftGeaendert = nurBau ? false : await korrigiereSkizzeUeberschrift(zip)
 
-  // 2. Außenanlagen-Blatt patchen
-  await patchPositionen(zip, AUSSENANLAGEN, wep.gruen.aussenanlagen, wep.gruen.beschreibungAussen)
+  if (!nurBau) {
+    // 2. Außenanlagen-Blatt patchen
+    await patchPositionen(zip, AUSSENANLAGEN, wep.gruen.aussenanlagen, wep.gruen.beschreibungAussen)
 
-  // 3. Aufwuchs I/II patchen (mit Überlauf)
-  const aufwuchsErgebnis = await patchAufwuchs(zip, wep)
-  aufwuchsUeberlauf = aufwuchsErgebnis.ueberlauf
-  aufwuchsAbgeschnitten = aufwuchsErgebnis.abgeschnitten
+    // 3. Aufwuchs I/II patchen (mit Überlauf)
+    const aufwuchsErgebnis = await patchAufwuchs(zip, wep)
+    aufwuchsUeberlauf = aufwuchsErgebnis.ueberlauf
+    aufwuchsAbgeschnitten = aufwuchsErgebnis.abgeschnitten
 
-  // 4. Beseitigungskosten Abschnitt 2 patchen
-  await patchBeseitigung(zip, wep)
+    // 4. Beseitigungskosten Abschnitt 2 patchen
+    await patchBeseitigung(zip, wep)
+  }
 
   // 4b. Parzellenskizze als Bild ins Blatt „Skizze Außenanlage-Aufwuchs“
   //     (das PNG erzeugt die App im Browser mit skizzeAlsPng)
   //     Vorhandene Formen im Blatt (Bau-Skizze) → PNG transparent anfordern.
   //     Standard sind native Formen (`skizzeFormen`); das PNG ist nur Fallback.
   let skizzeFormen: SkizzeFormenErgebnis | undefined
-  const alsFormen = Boolean(optionen.skizzeFormen) && !optionen.skizzeAlsBild
+  const alsFormen = !nurBau && Boolean(optionen.skizzeFormen) && !optionen.skizzeAlsBild
   if (alsFormen) skizzeFormen = await fuegeSkizzeFormenEin(zip, optionen.skizzeFormen!)
-  const pngNutzen = Boolean(optionen.skizzePng) && !alsFormen
+  const pngNutzen = !nurBau && Boolean(optionen.skizzePng) && !alsFormen
   const skizzeTransparent = pngNutzen ? await skizzeBlattHatFormen(zip) : false
   let skizzeEingefuegt = Boolean(skizzeFormen)
   if (pngNutzen && optionen.skizzePng) {
@@ -195,10 +206,7 @@ export async function exportWep(
   //     Öffnen immer berechnet. Bau-Blätter bleiben unangetastet.
   await entferneZwischenwerte(zip, [
     'xl/worksheets/sheet1.xml', // Formalien
-    AUSSENANLAGEN.sheetPath,
-    AUFWUCHS_I.sheetPath,
-    AUFWUCHS_II.sheetPath,
-    BESEITIGUNG_AA.sheetPath,
+    ...(nurBau ? [] : [AUSSENANLAGEN.sheetPath, AUFWUCHS_I.sheetPath, AUFWUCHS_II.sheetPath, BESEITIGUNG_AA.sheetPath]),
     ...(await deckblattPfade(zip)),
   ])
 
@@ -211,7 +219,7 @@ export async function exportWep(
     compressionOptions: { level: 6 },
   })
 
-  const filename = `${wep.formalien.vorgangsNr || wep.id}_WEP.xlsx`
+  const filename = `${wep.formalien.vorgangsNr || wep.id}_WEP${nurBau ? '_Bau' : ''}.xlsx`
 
   return {
     blob,
@@ -235,6 +243,7 @@ async function patchFormalien(
   wep: Wep,
   konflikte: FormalienKonflikt[],
   abgeglichen: boolean,
+  ohneGruenZellen = false,
 ): Promise<void> {
   const sheetPath = await formalienBlattPfad(zip)
   const file = zip.file(sheetPath)
@@ -246,6 +255,7 @@ async function patchFormalien(
 
   for (const key of Object.keys(FORMALIEN_MAP) as (keyof Formalien)[]) {
     const def = FORMALIEN_MAP[key]
+    if (ohneGruenZellen && key === 'wertermittlerAussenAufwuchs') continue // E13 gehört zum Grün-Teil
     const appWert = formalienWertAlsString(key, wep)
 
     if (!appWert) continue // Kein Wert in der App → nichts schreiben
