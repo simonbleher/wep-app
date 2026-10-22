@@ -34,7 +34,7 @@ import {
   Trash2,
   type LucideIcon,
 } from 'lucide-react'
-import { dupliziereWep, hatBauTeil, hatGruenTeil, naechsteVorgangsNr, rolleAusTeilen, wepRolle, wepStatus, type Rolle, type Wep, type Position, type BeseitigungsPosition, type Formalien, type WepStatus } from '@/model'
+import { dupliziereWep, hatBauTeil, type BauteilArt, hatGruenTeil, naechsteVorgangsNr, rolleAusTeilen, wepRolle, wepStatus, type Rolle, type Wep, type Position, type BeseitigungsPosition, type Formalien, type WepStatus } from '@/model'
 import { PAPIERKORB_TAGE, belegteNummern, ladeKonflikt, loescheWep } from '@/sync/aktionen'
 import type { KonfliktInfo } from '@/sync/types'
 import { KonfliktHinweis } from './KonfliktHinweis'
@@ -50,6 +50,12 @@ import { PositionenAbschnitt } from './Positionen'
 import { PositionHinzufuegen } from './PositionHinzufuegen'
 import { PositionBearbeiten } from './PositionBearbeiten'
 import { BeseitigungFormular, beseitigungSumme } from './BeseitigungFormular'
+import { BaulichkeitenTab, BauteilFormular } from './BauBaulichkeiten'
+import { MaengelTab } from './BauMaengel'
+import { AbwasserTab } from './BauAbwasser'
+import { BeseitigungBauTab, EINHEITEN_BAU } from './BauBeseitigung'
+import { aendereBauTeil, bauFuerExport, entferneBauteil, ersetzeBauteil, neuesBauteil } from './bauHelfer'
+import { BESEITIGUNG_TEXTBAUSTEINE } from '@/bau'
 import type { Abschnitt } from './katalogDaten'
 import { ICON, Kopf, TEIL_TEXT, Laedt, LeerZustand, Meldung, Rueckfrage, SlEintrag, StatusMarke, TeilMarke, euroFormat } from './ui'
 import { lokalesProfil } from '@/profil'
@@ -83,6 +89,8 @@ type Maske =
   | { art: 'hinzufuegen'; abschnitt: Abschnitt }
   | { art: 'position'; abschnitt: Abschnitt; id: string }
   | { art: 'beseitigung'; id?: string; vorlage?: { gegenstand: string; einheit: string; menge: number } }
+  | { art: 'bauteil'; id?: string; bauteilArt?: BauteilArt }
+  | { art: 'bauBeseitigung'; id?: string }
 
 interface Props {
   wepId: string
@@ -154,6 +162,9 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
   const [konflikt, setKonflikt] = useState<KonfliktInfo | undefined>()
   // Rolle aus dem Profil dieses Geräts; das WEP kann abweichen (`wep.rolle`)
   const [profilRolle] = useState<Rolle>(() => lokalesProfil.lade().profil.rolle)
+  // Baupreisindex-Werte aus dem Profil dieses Geräts (überschreiben die Tabelle der App)
+  const [profilIndex] = useState<Record<string, number> | undefined>(() => lokalesProfil.lade().profil.baupreisindex)
+  const [maengelStart, setMaengelStart] = useState<string | undefined>()
   // Immer der neueste Stand: Fotos werden asynchron (nach dem Verkleinern) eingetragen
   const wepRef = useRef<Wep | null>(null)
   const fotoRecords = useFotoRecords(wepId)
@@ -305,9 +316,13 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
   const bearbeitePos = maske?.art === 'position' ? positionen(maske.abschnitt).find((p) => p.id === maske.id) : undefined
   const bearbeiteBes =
     maske?.art === 'beseitigung' && maske.id ? wep.gruen.beseitigungAA.find((p) => p.id === maske.id) : undefined
+  const bearbeiteBauteil = maske?.art === 'bauteil' && maske.id ? wep.bau?.bauteile.find((b) => b.id === maske.id) : undefined
+  const bearbeiteBauBes = maske?.art === 'bauBeseitigung' && maske.id ? wep.bau?.beseitigung.find((p) => p.id === maske.id) : undefined
   const maskeSichtbar =
     maske !== null &&
-    (maske.art === 'hinzufuegen' || (maske.art === 'position' && bearbeitePos) || (maske.art === 'beseitigung' && (!maske.id || bearbeiteBes)))
+    (maske.art === 'hinzufuegen' ||
+      (maske.art === 'bauteil' && (Boolean(maske.bauteilArt) || Boolean(bearbeiteBauteil))) ||
+      maske.art === 'bauBeseitigung' || (maske.art === 'position' && bearbeitePos) || (maske.art === 'beseitigung' && (!maske.id || bearbeiteBes)))
 
   return (
     <div className={maskeSichtbar ? 'rahmen' : 'rahmen mit-unten'}>
@@ -347,7 +362,7 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
         </nav>
       </aside>
 
-      <main className={maskeSichtbar && maske?.art !== 'beseitigung' ? 'inhalt inhalt-breit' : 'inhalt'}>
+      <main className={maskeSichtbar && maske?.art !== 'beseitigung' && maske?.art !== 'bauteil' && maske?.art !== 'bauBeseitigung' ? 'inhalt inhalt-breit' : 'inhalt'}>
         {maskeSichtbar && maske?.art === 'hinzufuegen' ? (
           <PositionHinzufuegen
             abschnitt={maske.abschnitt}
@@ -391,6 +406,52 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
                   titel="Fotos zu dieser Position"
                 />
               )
+            }
+          />
+        ) : maskeSichtbar && maske?.art === 'bauteil' ? (
+          <BauteilFormular
+            key={bearbeiteBauteil?.id ?? 'neu'}
+            wep={wep}
+            start={bearbeiteBauteil ?? neuesBauteil(maske.bauteilArt ?? 'laube', wep.bau?.bauteile ?? [])}
+            neu={!bearbeiteBauteil}
+            profilIndex={profilIndex}
+            onAbbrechen={() => setMaske(null)}
+            onFertig={(b) => {
+              void aendere((w) => aendereBauTeil(w, (d) => ersetzeBauteil(d, b)))
+              setMaske(null)
+            }}
+            onLoeschen={() => {
+              void aendere((w) => aendereBauTeil(w, (d) => entferneBauteil(d, maske.id ?? '')))
+              setMaske(null)
+            }}
+            onMaengel={(b) => {
+              void aendere((w) => aendereBauTeil(w, (d) => ersetzeBauteil(d, b)))
+              setMaengelStart(b.id)
+              setMaske(null)
+              setTab('maengel')
+            }}
+          />
+        ) : maskeSichtbar && maske?.art === 'bauBeseitigung' ? (
+          <BeseitigungFormular
+            key={maske.id ?? 'neu'}
+            bearbeiten={bearbeiteBauBes}
+            abschnittText="Beseitigungskosten Bau (Abschnitt 1, Anlage 4)"
+            einheiten={EINHEITEN_BAU}
+            bausteine={BESEITIGUNG_TEXTBAUSTEINE}
+            onAbbrechen={() => setMaske(null)}
+            onFertig={(p) => {
+              void aendere((w) =>
+                aendereBauTeil(w, (d) => ({ ...d, beseitigung: d.beseitigung.some((x) => x.id === p.id) ? d.beseitigung.map((x) => (x.id === p.id ? p : x)) : [...d.beseitigung, p] })),
+              )
+              setMaske(null)
+            }}
+            onLoeschen={
+              bearbeiteBauBes
+                ? () => {
+                    void aendere((w) => aendereBauTeil(w, (d) => ({ ...d, beseitigung: d.beseitigung.filter((x) => x.id !== bearbeiteBauBes.id) })))
+                    setMaske(null)
+                  }
+                : undefined
             }
           />
         ) : (
@@ -461,7 +522,18 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
                 onBearbeiten={(id) => oeffneMaske({ art: 'beseitigung', id })}
               />
             )}
-            {BAU_PLATZHALTER[tab as BauBereich] !== undefined && bereiche.some((b) => b.id === tab) && (
+            {tab === 'baulichkeiten' && bereiche.some((b) => b.id === tab) && (
+              <BaulichkeitenTab
+                wep={wep}
+                aendere={aendere}
+                profilIndex={profilIndex}
+                onOeffnen={(ziel) => oeffneMaske('id' in ziel ? { art: 'bauteil', id: ziel.id } : { art: 'bauteil', bauteilArt: ziel.neu })}
+              />
+            )}
+            {tab === 'maengel' && bereiche.some((b) => b.id === tab) && <MaengelTab wep={wep} aendere={aendere} profilIndex={profilIndex} start={maengelStart} />}
+            {tab === 'abwasser' && bereiche.some((b) => b.id === tab) && <AbwasserTab wep={wep} aendere={aendere} profilIndex={profilIndex} />}
+            {tab === 'beseitigungBau' && bereiche.some((b) => b.id === tab) && <BeseitigungBauTab wep={wep} aendere={aendere} profilIndex={profilIndex} onOeffnen={(id) => oeffneMaske({ art: 'bauBeseitigung', id })} />}
+            {BAU_PLATZHALTER[tab as BauBereich] !== undefined && tab === 'skizzeBau' && bereiche.some((b) => b.id === tab) && (
               <BauPlatzhalter titel={bereichTitel(bereiche.find((b) => b.id === tab)!, beides)} icon={bereiche.find((b) => b.id === tab)!.icon} text={BAU_PLATZHALTER[tab as BauBereich]} />
             )}
             {tab === 'fotos' && <FotosTab wep={wep} aendere={aendere} records={fotoRecords} nachladen={fotoNachladen} />}
@@ -477,6 +549,7 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
                 bauStand={bauStand}
                 bauNachladen={bauNachladen}
                 rolle={rolle}
+                profilIndex={profilIndex}
               />
             )}
           </>
@@ -888,9 +961,11 @@ function ExportTab({
   bauStand,
   bauNachladen,
   rolle,
+  profilIndex,
 }: {
   wep: Wep
   onSpeichern: (wep: Wep) => Promise<void>
+  profilIndex?: Record<string, number>
   exportZustand: ExportZustand
   setExportZustand: (z: ExportZustand) => void
   aendere: WepAendern
@@ -933,7 +1008,10 @@ function ExportTab({
           ? async (o: { transparent: boolean }) => (await skizzeAlsPng(skizze, undefined, undefined, o)).arrayBuffer()
           : undefined
 
-      const result = await exportWep(wep, sourceBuffer, {
+      // Bau-Teil: Index am WEP merken, Baubeschreibung aktualisieren
+      const wepFuerExport = hatBauTeil(rolle) ? bauFuerExport(wep, profilIndex) : wep
+      const result = await exportWep(wepFuerExport, sourceBuffer, {
+        profilIndex,
         skizzeFormen,
         skizzePng,
         skizzeAlsBild,
@@ -977,7 +1055,7 @@ function ExportTab({
       }
 
       // Nach gelungenem Export gilt das WEP als „exportiert“ (im Menü „⋯“ zurücksetzbar)
-      await onSpeichern({ ...wep, status: 'exportiert' })
+      await onSpeichern({ ...wepFuerExport, status: 'exportiert' })
 
       setExportZustand({ typ: 'fertig', result, datei, oneDrive, fotos })
     } catch (err) {
@@ -1001,7 +1079,9 @@ function ExportTab({
         {nurBau
           ? 'Die App schreibt die Bau-Blätter und die Formalien in die WEP-Vorlage (Datei „…_WEP_Bau.xlsx“). Die Grün-Blätter bleiben leer.'
           : rolle === 'beides'
-            ? 'Die App schreibt die Grün-Daten in die WEP-Vorlage (oder in die eingelesene Bau-Excel). Die Bau-Blätter bleiben, wie sie sind.'
+            ? wep.bau
+              ? 'Die App schreibt Grün- und Bau-Daten in die WEP-Vorlage. Die Bau-Blätter werden aus den Bau-Eingaben der App gefüllt (auch in einer eingelesenen Bau-Excel).'
+              : 'Die App schreibt die Grün-Daten in die WEP-Vorlage (oder in die eingelesene Bau-Excel). Die Bau-Blätter bleiben, wie sie sind.'
             : 'Die App schreibt die Grün-Daten in die WEP-Vorlage. Bau-Blätter werden nicht verändert.'}
       </p>
 
@@ -1074,6 +1154,8 @@ function ExportTab({
             </Meldung>
           )}
 
+          {ergebnis.result.bau && <BauExportHinweise bau={ergebnis.result.bau} />}
+
           {ergebnis.result.aufwuchsUeberlauf && (
             <Meldung>
               <p>Aufwuchs-Positionen laufen auf Anlage III a (Aufwuchs II) über (mehr als 28 Positionen in Aufwuchs I).</p>
@@ -1089,6 +1171,51 @@ function ExportTab({
             </Meldung>
           )}
         </div>
+      )}
+    </>
+  )
+}
+
+/** Hinweise zum Bau-Export: korrigierte Formeln der Vorlage, Bauteile ohne Platz, gekürzte Texte. */
+function BauExportHinweise({ bau }: { bau: NonNullable<ExportResult['bau']> }) {
+  return (
+    <>
+      {bau.index && (
+        <p className="neben">
+          Baupreisindex {bau.index.jahr}: {zahlDe(bau.index.wert, 1)} ({bau.index.quelle})
+        </p>
+      )}
+      {bau.korrekturen.length > 0 && (
+        <Meldung>
+          <p>Die App hat offensichtliche Fehler in den Formeln der Vorlage in dieser Datei korrigiert:</p>
+          <ul className="meldung-liste">
+            {bau.korrekturen.map((k) => (
+              <li key={`${k.blatt}${k.zelle}`}>
+                <strong>
+                  {k.blatt} {k.zelle}
+                </strong>
+                : {k.grund}
+              </li>
+            ))}
+          </ul>
+        </Meldung>
+      )}
+      {bau.nichtExportiert.length > 0 && (
+        <Meldung>
+          <p>
+            Für {bau.nichtExportiert.map((b) => b.kuerzel).join(', ')} hat die Vorlage keinen Platz; {bau.nichtExportiert.length === 1 ? 'das Bauteil wurde' : 'die Bauteile wurden'} nicht exportiert.
+          </p>
+        </Meldung>
+      )}
+      {bau.beschreibungGekuerzt > 0 && (
+        <Meldung>
+          <p>Die Baubeschreibung ist länger als das Feld in der Vorlage: {bau.beschreibungGekuerzt} Zeilen fehlen am Ende.</p>
+        </Meldung>
+      )}
+      {bau.beseitigungGekuerzt > 0 && (
+        <Meldung>
+          <p>Die Vorlage hat nur 11 Zeilen für Beseitigungskosten Bau: {bau.beseitigungGekuerzt} Position(en) wurden nicht exportiert.</p>
+        </Meldung>
       )}
     </>
   )

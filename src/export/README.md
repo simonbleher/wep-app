@@ -123,9 +123,17 @@ namens „WEP-App Skizze“ aus einem früheren Export wird vorher entfernt.
 Grün-Skizze aus, Dateiname `<Nr>_WEP_Bau.xlsx`. `'gruen'`/`'beides'`/leer wie oben beschrieben. Bau-Inhalte (Paket 2) kommen
 später in diesen Zweig; bis dahin bleiben die Bau-Blätter der Quelle byte-gleich.
 
+## Bau-Teil (Beta 4, Paket 2)
+
+`exportBau.ts`: Mit `teil: 'bau'` oder `'beides'` und `wep.bau` schreibt der Export in die Blätter „Baulichkeiten“ (Index H7/I7, je Bauteil Typ, Baujahr,
+Restnutzung, Mängel %, Fläche; Gewächshaus, Vorplatz, Abwasser, Baubeschreibung B83:B99, nicht beräumt F104/G104), „Mängelliste“ (Abzug konkret F5 …) und
+„Beseitigungskosten“ Abschnitt 1 (Zeilen 12, 14–23). Nur Eingabezellen; die Formeln der Vorlage rechnen. `ExportResult.bau` nennt die Korrekturen von
+Vorlagenfehlern (`VORLAGEN_KORREKTUREN`), nicht exportierte Bauteile und gekürzte Texte. Rechnung der App: `src/bau/rechnen.ts` (Test gegen LibreOffice).
+Ohne `teil` Bau oder ohne `wep.bau` bleiben die Bau-Blätter byte-gleich.
+
 ## Regeln
 
-- **Bau-Blätter werden niemals verändert.**
+- **Bau-Blätter werden nur vom Bau-Export (Teil `bau`/`beides` mit Bau-Daten am WEP) verändert, sonst nie.**
 - Formeln in Spalte L (Außenanlagen/Aufwuchs) und Spalte K
   (Beseitigungskosten) bleiben unberührt.
 - Formalien-Felder, die in der Bau-Excel bereits belegt sind und einen

@@ -11,6 +11,8 @@ export type {
   Foto,
   BauExcel,
 } from './types'
+export type { BauDaten, Bauteil, BauteilArt, BauMaterial, MangelAbzug, Grube, GrubenTyp, Kanal, Abwasser, NichtBeraeumt, BauAusstattung, BauIndex } from './bau'
+export { neueBauDaten } from './bau'
 export { hatGruenTeil, hatBauTeil, wepRolle, rolleAusTeilen, ZUSTANDSSTUFEN, neuerWep, WEP_STATUS, wepStatus, dupliziereWep, naechsteVorgangsNr } from './types'
 
 // Katalog- und Invasive-Typen (data/katalog.json, data/invasive.json).

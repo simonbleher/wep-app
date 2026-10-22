@@ -27,9 +27,11 @@ import {
 } from './xmlPatcher'
 import { blattPfadNachName, formalienBlattPfad, sharedStrings, vergleichsWert, zellenWert } from './bauExcelLesen'
 import { fuegeSkizzeEin, skizzeBlattHatFormen } from './skizzeBild'
+import { schreibeBau, BAULICHKEITEN_BLATT, MAENGEL_BLATT, BESEITIGUNG_BLATT, TABELLE1_BLATT, type BauExportErgebnis } from './exportBau'
 import { fuegeSkizzeFormenEin, type SkizzeFormenErgebnis, type SkizzeFormenOptionen } from './skizzeFormen'
 
 export { skizzeBlattHatFormen } from './skizzeBild'
+export { VORLAGEN_KORREKTUREN, type BauExportErgebnis, type VorlagenKorrektur } from './exportBau'
 export * from './skizzeFormen'
 export { leseBauFormalien, vergleichsWert, type BauFormalien } from './bauExcelLesen'
 
@@ -97,6 +99,12 @@ export interface ExportOptionen {
    * Bau-Inhalte kommen mit Beta 4, Paket 2; bis dahin bleiben die Bau-Blätter der Quelle unverändert.
    */
   teil?: Rolle
+  /**
+   * Bau-Teil schreiben (Teil `'bau'` oder `'beides'` und `wep.bau` vorhanden): Index-Werte aus dem Profil (Jahr → Wert).
+   */
+  profilIndex?: Record<string, number>
+  /** Offensichtliche Fehler in den Formeln der Vorlage im Export korrigieren (Standard: ja), siehe `VORLAGEN_KORREKTUREN`. */
+  vorlagenfehlerKorrigieren?: boolean
 }
 
 export interface ExportResult {
@@ -108,6 +116,8 @@ export interface ExportResult {
   skizzeEingefuegt: boolean
   /** true, wenn das Skizzen-Blatt schon eigene Formen hatte (PNG transparent angefordert) */
   skizzeTransparent: boolean
+  /** Ergebnis des Bau-Exports (undefined: Bau-Blätter wurden nicht geschrieben) */
+  bau?: BauExportErgebnis
   /** Das fertige XLSX als Blob (zum Download) */
   blob: Blob
   /** Vorgeschlagener Dateiname, z. B. "2026-999_WEP.xlsx" (nur Bau: "2026-999_WEP_Bau.xlsx") */
@@ -171,6 +181,12 @@ export async function exportWep(
     await patchBeseitigung(zip, wep)
   }
 
+  // 3b. Bau-Teil (Beta 4, Paket 2): Baulichkeiten, Mängelliste, Beseitigungskosten Abschnitt 1
+  const schreibeBauTeil = (optionen.teil === 'bau' || optionen.teil === 'beides') && Boolean(wep.bau)
+  const bauErgebnis = schreibeBauTeil
+    ? await schreibeBau(zip, wep, { profilIndex: optionen.profilIndex, vorlagenfehlerKorrigieren: optionen.vorlagenfehlerKorrigieren })
+    : undefined
+
   // 4b. Parzellenskizze als Bild ins Blatt „Skizze Außenanlage-Aufwuchs“
   //     (das PNG erzeugt die App im Browser mit skizzeAlsPng)
   //     Vorhandene Formen im Blatt (Bau-Skizze) → PNG transparent anfordern.
@@ -207,6 +223,14 @@ export async function exportWep(
   await entferneZwischenwerte(zip, [
     'xl/worksheets/sheet1.xml', // Formalien
     ...(nurBau ? [] : [AUSSENANLAGEN.sheetPath, AUFWUCHS_I.sheetPath, AUFWUCHS_II.sheetPath, BESEITIGUNG_AA.sheetPath]),
+    ...(schreibeBauTeil
+      ? [
+          await blattPfadNachName(zip, BAULICHKEITEN_BLATT, 'xl/worksheets/sheet3.xml'),
+          await blattPfadNachName(zip, MAENGEL_BLATT, 'xl/worksheets/sheet4.xml'),
+          await blattPfadNachName(zip, BESEITIGUNG_BLATT, BESEITIGUNG_AA.sheetPath),
+          await blattPfadNachName(zip, TABELLE1_BLATT, 'xl/worksheets/sheet21.xml'),
+        ]
+      : []),
     ...(await deckblattPfade(zip)),
   ])
 
@@ -222,6 +246,7 @@ export async function exportWep(
   const filename = `${wep.formalien.vorgangsNr || wep.id}_WEP${nurBau ? '_Bau' : ''}.xlsx`
 
   return {
+    bau: bauErgebnis,
     blob,
     filename,
     konflikte,

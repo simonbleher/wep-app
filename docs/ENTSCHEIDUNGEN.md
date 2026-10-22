@@ -67,3 +67,35 @@
 - `Rolle` liegt jetzt in `src/model/types.ts` (wird aus `src/profil` weiter exportiert). Keine Änderung an `android/`,
   `capacitor.config.ts`, Plugins oder `src-tauri/`, daher keine neue Versionsnummer.
 
+
+## 2026-10-22 · Beta 4, Paket 2: Bau erfassen und bewerten
+
+- **Rechenkern = Nachbau der Vorlagen-Formeln** (`src/bau/rechnen.ts`, Zellbezüge im Kommentar). Der Export schreibt nur Eingabezellen,
+  die Formeln der Vorlage rechnen beim Öffnen. Test `src/export/__tests__/exportBauRechnung.test.ts` exportiert 24 erfundene Fälle, lässt
+  LibreOffice rechnen und vergleicht Zwischenwerte, Bauteilwerte, „Baulichkeiten insgesamt“ und das Deckblatt mit `berechneBau`
+  (u. a. 24 m² genau/24,01/30 m² mit Anbauten, abgeschrieben, fehlende Bauklasse, widerrechtlich, Tabellenende, Vorplatz, Grube, Kanal).
+- **Fehler in den Formeln der Vorlage** (Blätter Baulichkeiten, Beseitigungskosten), im Export korrigiert und im Ergebnis gemeldet
+  (`VORLAGEN_KORREKTUREN`, abschaltbar mit `vorlagenfehlerKorrigieren: false`; `docs/WEP_Vorlage.xlsx` bleibt unverändert):
+  `C33` Anbau A2 rechnete mit dem Ergebnis von A1 (`$H$23` statt `$H$32`); `K81` zählte den Schuppen (K52) doppelt (steckt in K61);
+  `J52` zeigte das Kürzel von A1; `C64` (integrierter Vorplatz) hatte keinen Bezug auf `I63`, der Wert ging verloren; `K21` (Beseitigung Bau,
+  Zeile 9) hatte keine Summenformel. Ohne Korrektur weichen App und Excel genau dort ab (Test).
+- **Beispielwerte der Vorlage werden überschrieben**, sonst stünden sie im Protokoll: 1/2/3 m² „nicht berechnete Baufläche“, 5 m³ × 50 € nicht beräumt,
+  150 € nicht geleerte Grube, 10 % Mängel beim Gewächshaus, 0,05 in der Mängelliste (F44), 150 € Fäkalienabfuhr in Beseitigung Bau.
+- **Tabellen** (`src/bau/tabellen.ts`) mit Quelle und Seite: NHK/Bauklassen S. 5, Mängeltabelle S. 6–8, Restnutzungstabelle S. 10 (Test: identisch mit Blatt
+  Tabelle1 der Vorlage), sonstige Anlagen S. 11, Abwasser S. 13–14, Beseitigung S. 19–20. Seitenzahlen = gedruckte Seitenzahl der Richtlinie.
+- **Baupreisindex** (`src/bau/baupreisindex.ts`): Novemberwert des Vorjahres (= IV. Quartal) je Jahr der Wertermittlung. 2016–2024 aus dem Statistischen Bericht
+  M I 4 – vj 1/24 des Amts für Statistik Berlin-Brandenburg (Neubau Wohngebäude Berlin, 2015 = 100, Tabelle 3); 2025 = 179,2 aus der Vorlage des BV (nicht gegen die
+  Statistik geprüft). 2026 fehlt: Die App nimmt ersatzweise den letzten Wert und warnt. Im Profil je Jahr überschreibbar (`Profil.baupreisindex`, mit dem Profil
+  abgeglichen); das WEP merkt sich den verwendeten Wert (`bau.index`, auch von Hand am WEP änderbar).
+- **Alter:** Das Baujahr zählt als volles Jahr (Richtlinie S. 8: „beginnt mit dem vollen Kalenderjahr der Erstellung“): Alter = Wertjahr − Baujahr + 1.
+  Vorschlag Restnutzung = Ende der Tabellenspalte (IV 40, II/III 60, I 80 Jahre) − Alter, nicht unter 0; vom Wertermittler überschreibbar (mit Begründung).
+- **24 m²:** Laube, Anbauten und überdachter Vorplatz zusammen in dieser Reihenfolge; was darüber liegt, wird als „nicht berechnete Baufläche“ ausgewiesen
+  (Vorlage I19/I28/I37). Zulässige Fläche nach Vertragslage anhebbar (`bau.zulaessigeFlaeche`).
+- **Plätze der Vorlage:** Laube, 2 Anbauten, 1 Gewächshaus, 1 Vorplatz, 1× Schuppen **oder** Keller. Weitere Bauteile werden gemeldet, nicht exportiert.
+- **Abwasser:** Grube nur mit Dichtheitsnachweis bewertet (sonst „fehlt“, 0 €); Alter höchstens 16 Jahre (Tank/monolithisch/Kunststoff) bzw. 33 Jahre, damit nie negativ;
+  nicht geleert → `K77` = −150 € (Richtlinie S. 14); zu beseitigende Grube → Beseitigung (Entfernen 250 €/m³, Abfuhr 150 €, S. 20). Kanal höchstens 2.200 €.
+- **Mängel:** Abzug je Gruppe vom Wertermittler gesetzt (Höchstwert nur als Warnung), Summe → `E14` (Laube auch Blatt Mängelliste, `F5` usw.). Die Häkchen
+  (Formularsteuerelemente) der Mängelliste setzt der Export nicht; die angekreuzten Mängel stehen in der Baubeschreibung.
+- **Baubeschreibung:** Textfeld der Vorlage bricht nicht um; der Export schreibt sie zeilenweise in B83:B99 (17 Zeilen, Rest wird gemeldet).
+- **Oberfläche:** Reiter Baulichkeiten (Bauteile, Index, Beschreibung), Mängel, Abwasser, Beseitigung Bau; Bauteil- und Beseitigungsformular füllen die Seite wie die
+  Grün-Formulare (`Maske`). „Skizze Bau“ bleibt Platzhalter (Paket 3). Keine Änderung an `android/`, Plugins oder `src-tauri/`, daher keine neue Versionsnummer.
