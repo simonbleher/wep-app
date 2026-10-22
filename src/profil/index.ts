@@ -19,6 +19,11 @@ export interface Profil {
   /** Schaltet Reiter und Export frei (Grün / Bau / Beides); pro WEP umschaltbar (`Wep.rolle`). */
   rolle: Rolle
   standardAnlage: string
+  /**
+   * Baupreisindex-Werte (2015 = 100) je Jahr der Wertermittlung, die der Wertermittler selbst eingetragen hat;
+   * sie überschreiben die Tabelle der App (src/bau/baupreisindex.ts). Schlüssel = Jahr als Text.
+   */
+  baupreisindex?: Record<string, number>
 }
 
 export const LEERES_PROFIL: Profil = { name: '', rolle: 'gruen', standardAnlage: '' }

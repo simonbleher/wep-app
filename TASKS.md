@@ -304,7 +304,12 @@ Abschnitt 10f) mit Mausrad, Maus-Ziehen und Zwei-Finger-Gesten über CDP-Touch. 
 
 ## Beta 4 – Bau-Teil (Plan: docs/PLAN-BETA4.md)
 - B4-1 · Rolle schaltet Funktionen frei ✅ PR offen – Branch beta4/paket1 (Reiter und Export je Rolle, pro WEP umschaltbar, Bau-Reiter als Platzhalter, Export `<Nr>_WEP_Bau.xlsx`; Screenshots docs/beta4-paket1/)
-- B4-2 · Bau erfassen und bewerten ⏳ – Branch beta4/paket2
+- B4-2 · Bau erfassen und bewerten ✅ PR offen – Branch beta4/paket2. Bauteile (L, A1/A2, S/U, GWH, Ü1, Keller) mit Maßen/Baujahr, Bauklasse-Assistent (Tabelle S. 5),
+  Mängelabzug (S. 6–8), Alterswertminderung (Tabelle S. 10 = Vorlage), Baupreisindex je Jahr mit Quelle (Profil überschreibbar, WEP merkt ihn), Warnungen mit Quelle,
+  Abwasser (Grube/Kanal, nicht geleert), Laube nicht beräumt, Beseitigung Bau mit Textbausteinen, Baubeschreibung, Export in Baulichkeiten/Mängelliste/Beseitigungskosten.
+  **Test App = Excel:** `src/export/__tests__/exportBauRechnung.test.ts` (24 Fälle über LibreOffice). Fehler in den Formeln der Vorlage werden im Export korrigiert
+  (docs/ENTSCHEIDUNGEN.md). Code: `src/bau/`, `src/export/exportBau.ts`, `src/app/Bau*.tsx`. Screenshots: `docs/beta4-paket2/` (`npm run beta4-paket2:screenshots`).
+  Offen: fachliche Fragen im PR (Simon).
 - B4-3 · Zeichen-Tools Bau ⏳ – Branch beta4/paket3
 - B4-4 · Rechen-Tools ⏳ – Branch beta4/paket4
 - B4-5 · 3D-Ansicht ⏳ – Branch beta4/paket5

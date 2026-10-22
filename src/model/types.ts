@@ -10,6 +10,8 @@
 // funktionieren (kein Breaking Change für andere Bereiche).
 import type { SkizzeDaten } from '../skizze/types.js'
 export type { SkizzeDaten } from '../skizze/types.js'
+import type { BauDaten } from './bau.js'
+export * from './bau.js'
 
 /** Teil des WEP, den ein Wertermittler bearbeitet: Grün, Bau oder beides. */
 export type Rolle = 'gruen' | 'bau' | 'beides'
@@ -47,7 +49,8 @@ export interface Wep {
     aufwuchs: Position[]
     beseitigungAA: BeseitigungsPosition[]
   }
-  bau?: unknown // später
+  /** Bau-Teil (Baulichkeiten, Mängel, Abwasser, Beseitigung Bau); fehlt, solange nichts erfasst ist. */
+  bau?: BauDaten
   /**
    * Welche Teile dieses WEP bearbeitet werden (Grün / Bau / Beides). Fehlt = Rolle aus dem Profil.
    * Wird nur gesetzt, wenn dieses WEP vom Profil abweicht („Dieses WEP auch als Bau/Grün bearbeiten“).

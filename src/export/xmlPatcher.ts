@@ -35,6 +35,11 @@ export function xmlEscape(s: string): string {
     .replace(/'/g, '&apos;')
 }
 
+/** Leerzeichen am Anfang oder Ende (z. B. „Stein 17,50 - 23,99 cm “ in der Vorlage) brauchen xml:space="preserve". */
+function preserve(s: string): string {
+  return s !== s.trim() ? ' xml:space="preserve"' : ''
+}
+
 /**
  * Liest den aktuellen Textwert einer Zelle aus einem Worksheet-XML.
  * Gibt `null` zurück wenn die Zelle leer oder nicht vorhanden ist.
@@ -132,7 +137,7 @@ export function patchCell(
     }
 
     // String als Inline-String
-    return `<c${rAttr}${style} t="inlineStr"><is><t>${xmlEscape(value)}</t></is></c>`
+    return `<c${rAttr}${style} t="inlineStr"><is><t${preserve(value)}>${xmlEscape(value)}</t></is></c>`
   })
 
   if (!found) {
@@ -171,7 +176,7 @@ function insertCell(xml: string, cell: string, value: CellValue): string {
   } else if (typeof value === 'number') {
     newCellXml = `<c r="${cell}"><v>${value}</v></c>`
   } else {
-    newCellXml = `<c r="${cell}" t="inlineStr"><is><t>${xmlEscape(value)}</t></is></c>`
+    newCellXml = `<c r="${cell}" t="inlineStr"><is><t${preserve(value)}>${xmlEscape(value)}</t></is></c>`
   }
 
   // Position in der Zeile finden (nach Spaltenindex sortiert einfügen)
@@ -237,4 +242,33 @@ export function patchCells(xml: string, patches: CellPatch[]): string {
     result = patchCell(result, patch.cell, patch.value)
   }
   return result
+}
+
+// ---------------------------------------------------------------------------
+// Formeln
+// ---------------------------------------------------------------------------
+
+/**
+ * Setzt die Formel einer Zelle (z. B. `$H$32`, ohne „=“); Stil bleibt, ein gespeicherter Zwischenwert entfällt (Excel
+ * und LibreOffice rechnen beim Öffnen). `formelXml` kann auch ein fertiges `<f …/>`-Element sein (gemeinsame Formeln).
+ * Gibt `null` zurück, wenn die Zelle nicht existiert.
+ */
+export function patchFormel(xml: string, cell: string, formel: string): string | null {
+  const escapedCell = cell.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const cellPattern = new RegExp(
+    `<c\\s[^>]*r="${escapedCell}"[^>]*(?<!/)>[\\s\\S]*?</c>|<c\\s[^>]*r="${escapedCell}"[^>]*/>`,
+  )
+  const m = xml.match(cellPattern)
+  if (!m) return null
+  const style = m[0].match(/\bs="(\d+)"/)
+  const f = formel.startsWith('<f') ? formel : `<f>${xmlEscape(formel)}</f>`
+  return xml.replace(cellPattern, `<c r="${cell}"${style ? ` s="${style[1]}"` : ''}>${f}</c>`)
+}
+
+/** Formel einer Zelle (Text ohne „=“) oder `null`. */
+export function readCellFormula(xml: string, cell: string): string | null {
+  const escapedCell = cell.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const m = xml.match(new RegExp(`<c\\s[^>]*r="${escapedCell}"[^>]*(?<!/)>([\\s\\S]*?)</c>`))
+  const f = m && /<f\b[^>]*>([^<]*)<\/f>/.exec(m[1])
+  return f ? f[1].replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"') : null
 }

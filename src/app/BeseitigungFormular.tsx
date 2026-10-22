@@ -24,6 +24,9 @@ export function BeseitigungFormular({
   onFertig,
   onLoeschen,
   fotos,
+  abschnittText = 'Beseitigungskosten (Abschnitt 2)',
+  einheiten: einheitenListe = EINHEITEN,
+  bausteine,
 }: {
   bearbeiten?: BeseitigungsPosition
   /** Vorbelegung beim Hinzufügen (z. B. aus dem Hinweis einer Problempflanze). */
@@ -33,6 +36,12 @@ export function BeseitigungFormular({
   onLoeschen?: () => void
   /** Fotos dieser Position (nur beim Ändern); werden sofort gespeichert, unabhängig von „Speichern“. */
   fotos?: ReactNode
+  /** Untertitel auf dem Tablet (Standard: Abschnitt 2, Grün). */
+  abschnittText?: string
+  /** Auswahl der Einheiten (Standard: Stück, m, m², Pauschale). */
+  einheiten?: readonly string[]
+  /** Textbausteine der Vorlage als Vorschläge für „Gegenstand“; bei Treffer werden Einheit und Preis vorbelegt. */
+  bausteine?: readonly { text: string; einheit?: string; preis?: number }[]
 }) {
   const id = useId()
   const [gegenstand, setGegenstand] = useState(bearbeiten?.gegenstand ?? vorlage?.gegenstand ?? '')
@@ -45,7 +54,7 @@ export function BeseitigungFormular({
 
   const faktorZahl = leseZahlOder(faktor, 1)
   const gesamt = leseZahlOder(menge, 0) * leseZahlOder(einzelpreis, 0) * faktorZahl
-  const einheiten = EINHEITEN.includes(einheit) ? EINHEITEN : [...EINHEITEN, einheit]
+  const einheiten = einheitenListe.includes(einheit) ? einheitenListe : [...einheitenListe, einheit]
   const ungueltig = !gegenstand.trim() || !Number.isFinite(leseZahl(menge)) || (einzelpreis.trim() !== '' && !Number.isFinite(leseZahl(einzelpreis)))
 
   function bestaetigen() {
@@ -67,7 +76,7 @@ export function BeseitigungFormular({
     <div className="hinzufuegen bearbeiten" data-schritt="formular">
       <Kopf
         titel={titel}
-        unter="Beseitigung"
+        unter={abschnittText.startsWith('Beseitigungskosten (') ? 'Beseitigung' : 'Beseitigung Bau'}
         links={
           <button type="button" className="textknopf" onClick={onAbbrechen}>
             Abbrechen
@@ -77,7 +86,7 @@ export function BeseitigungFormular({
       <header className="seitenkopf nur-tablet">
         <div>
           <h1 className="h1">{titel}</h1>
-          <p className="neben">Beseitigungskosten (Abschnitt 2)</p>
+          <p className="neben">{abschnittText}</p>
         </div>
         <button type="button" className="knopf" onClick={onAbbrechen}>
           Abbrechen
@@ -96,10 +105,25 @@ export function BeseitigungFormular({
                 type="text"
                 className="eingabe"
                 value={gegenstand}
-                onChange={(e) => setGegenstand(e.target.value)}
-                placeholder="z. B. Japanischer Knöterich entfernen"
+                onChange={(e) => {
+                  setGegenstand(e.target.value)
+                  const treffer = bausteine?.find((b) => b.text === e.target.value)
+                  if (treffer) {
+                    if (treffer.einheit) setEinheit(treffer.einheit)
+                    if (treffer.preis !== undefined && einzelpreis.trim() === '') setEinzelpreis(zahlFuerEingabe(treffer.preis))
+                  }
+                }}
+                list={bausteine ? `${id}-bausteine` : undefined}
+                placeholder={bausteine ? 'Textbaustein wählen oder eigenen Text schreiben' : 'z. B. Japanischer Knöterich entfernen'}
                 autoFocus={!bearbeiten}
               />
+              {bausteine && (
+                <datalist id={`${id}-bausteine`}>
+                  {bausteine.map((b) => (
+                    <option key={b.text} value={b.text} />
+                  ))}
+                </datalist>
+              )}
             </div>
 
             <div className="feld-reihe">

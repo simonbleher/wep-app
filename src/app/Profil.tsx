@@ -14,6 +14,7 @@ import {
   type Profil as ProfilDaten,
   type Rolle,
 } from '@/profil'
+import { BaupreisindexProfil } from './BauIndexProfil'
 import { EigenePositionen } from './EigenePositionen'
 import { Fehlersuche } from './Fehlersuche'
 import { Sicherung } from './Sicherung'
@@ -135,6 +136,8 @@ export function Profil({ konto, verfuegbar, onZurueck, onAnmelden, onAbmelden }:
               : 'Ohne Konto bleiben diese Angaben auf diesem Gerät.'}
           </p>
         </section>
+
+        {profil.rolle !== 'gruen' && <BaupreisindexProfil profil={profil} onAendern={setProfil} />}
 
         <EigenePositionen id={`${id}-eigene`} konto={konto !== null} />
 

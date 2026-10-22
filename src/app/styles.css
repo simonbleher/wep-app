@@ -1930,3 +1930,91 @@ select.eingabe {
 .sl-fuss .status {
   white-space: normal;
 }
+
+/* Bau-Teil (Beta 4, Paket 2) */
+.bau-hinweise {
+  display: flex;
+  flex-direction: column;
+  gap: var(--abstand-2);
+  margin: var(--abstand-2) 0;
+}
+
+.bau-info {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--abstand-2);
+  color: var(--farbe-text-2);
+  font-size: var(--schrift-klein);
+}
+
+.bau-info svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+.hinweis-quelle {
+  display: block;
+  color: var(--farbe-text-2);
+  font-size: var(--schrift-klein);
+}
+
+.warnung-text .hinweis-quelle {
+  color: var(--farbe-text-2);
+}
+
+.index-karte {
+  gap: var(--abstand-2);
+  padding: var(--abstand-3) 0;
+  border-top: var(--linie) solid var(--farbe-linie);
+  border-bottom: var(--linie) solid var(--farbe-linie);
+}
+
+.rechenweg > div {
+  flex-wrap: wrap;
+  gap: var(--abstand-1) var(--abstand-4);
+}
+
+.rechenweg dt {
+  flex: 1 1 12rem;
+  min-width: 0;
+  text-align: left;
+}
+
+.rechenweg dd {
+  flex: none;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.rechenweg .rechenweg-summe {
+  font-weight: var(--gewicht-fett);
+}
+
+.maengel-gruppen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--abstand-5);
+}
+
+.maengel-gruppe {
+  display: flex;
+  flex-direction: column;
+  gap: var(--abstand-3);
+  padding-bottom: var(--abstand-4);
+  border-bottom: var(--linie) solid var(--farbe-linie);
+}
+
+.ankreuz-liste {
+  display: flex;
+  flex-direction: column;
+}
+
+.vorschlag {
+  display: flex;
+  align-items: center;
+  gap: var(--abstand-3);
+}
+
+.fehlertext {
+  color: var(--farbe-warnung);
+}
