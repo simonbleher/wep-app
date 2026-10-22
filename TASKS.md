@@ -321,3 +321,7 @@ Abschnitt 10f) mit Mausrad, Maus-Ziehen und Zwei-Finger-Gesten über CDP-Touch. 
   Code: `src/bau/rechner.ts`, `src/app/BauRechner.tsx`. Screenshots: `docs/beta4-paket4/` (`npm run beta4-paket4:screenshots`, zugleich Bedienungsdurchlauf mit Prüfungen).
   Offen (Simon): Der überdachte Vorplatz zählt auf die 24 m²; die Vorlage (I38) summiert seinen nicht berechneten Anteil nicht – der Check zeigt ihn mit Hinweis.
 - B4-5 · 3D-Ansicht ⏳ – Branch beta4/paket5
+- T-1 · Prüfwerkzeug für alte WEPs ✅ PR offen – Branch tools/pruef-weps. `tools/pruef-weps/` (Python 3.10+, nur openpyxl): prüft alle .xlsx/.xlsm eines Ordners (rekursiv, nur lesend)
+  auf die fünf Vorlagenfehler (Baulichkeiten C33, K81, J52, C64; Beseitigungskosten K21) und die Beispielwerte (F104/G104 „nicht beräumt“ als Verdacht, I19/I28/I37 als Hinweis),
+  rechnet mit den gespeicherten Werten und eigener Nachrechnung den Euro-Unterschied bis zum Deckblatt (E21/E25/E26/E28). Ausgabe `pruefbericht.html` + `pruefbericht.csv` im geprüften Ordner
+  (enthalten Personendaten, in `.gitignore`), `pruefe_weps.bat` für Windows, README für Laien. Tests (pytest, erfundene Dateien aus der Vorlage, Werte über LibreOffice) im Workflow „Prüfen“.

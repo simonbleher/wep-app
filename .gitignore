@@ -15,3 +15,8 @@ dev-dist/
 # Rohantworten des KI-Testlaufs
 /tools/ki-test/ausgaben/
 dist-e2e/
+
+# Prüfberichte von tools/pruef-weps (enthalten Personendaten aus echten WEPs)
+pruefbericht.*
+__pycache__/
+.pytest_cache/

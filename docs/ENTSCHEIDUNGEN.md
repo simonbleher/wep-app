@@ -131,3 +131,21 @@
 - **Index:** Ein Wert aus der Tabelle lässt sich für das WEP wählen (`bau.index`, manuell); Umrechnung von Beträgen früherer Jahre auf das Wertjahr.
 - **24-m²-Check:** Zulässige Fläche probeweise änderbar, dauerhaft nur mit „Übernehmen“ (`bau.zulaessigeFlaeche`). Der nicht berechnete Anteil des Vorplatzes steht im Check, nicht in I38 der Vorlage (Hinweis).
 - Keine Änderung an `android/`, Plugins oder `src-tauri/`, daher keine neue Versionsnummer.
+
+## 2026-10-22 · Prüfwerkzeug für alte WEPs (`tools/pruef-weps`)
+
+- **Zweck:** WEPs, die vor der Korrektur der Vorlage erstellt wurden (Fehler siehe „Beta 4, Paket 2“), lassen sich gesammelt prüfen: welche Datei enthält welchen Fehler,
+  wirkt er auf das Ergebnis, und um wie viel Euro weicht das Deckblatt (E21/E25/E26/E28) ab. Eigenes Werkzeug außerhalb der App, damit die Wertermittler es ohne App-Installation nutzen können.
+- **Python + openpyxl statt TypeScript:** Das Werkzeug läuft auf einem Windows-PC mit einem Doppelklick (`pruefe_weps.bat`), ohne Node und ohne Build. Einzige Abhängigkeit `openpyxl`
+  (liest nur; Originale werden nie geschrieben, geöffnet wird mit `read_only`). Es wird nichts ins Netz gesendet; die einzige Netzverbindung ist die Installation von openpyxl auf Rückfrage in der `.bat`.
+- **Rechnen mit gespeicherten Werten:** „Ist“ = von Excel gespeicherter Wert, „Soll“ = eigene Nachrechnung der richtigen Formel mit denselben gespeicherten Eingangswerten (Decimal, ROUND wie Excel
+  halb weg von null). Betrag = Soll − Ist am Gesamtbetrag (E28): minus = Protokoll zu hoch. Dateien ohne gespeicherte Werte werden gemeldet (mit den gefundenen fehlerhaften Formeln), nicht gerechnet.
+- **Erkennung der Fehler:** nach der (normalisierten) Formel der Zelle: fehlerhaft / korrekt / von Hand geändert („abweichend“, nicht bewertet). Eine Datei gilt als WEP-Vorlage, wenn die Blätter
+  Formalien, Deckbl UPV, Baulichkeiten, Beseitigungskosten da sind und das Deckblatt auf `Baulichkeiten!K81` und `Beseitigungskosten!K24` zeigt.
+- **Beispielwerte:** F104/G104 (5 m³ × 50 €) unverändert gilt nur als **Verdacht** – der Betrag steht getrennt und fließt nicht in die Summe der gesicherten Formelfehler. I19/I28/I37 (1/2/3 m²)
+  nur als Hinweis ohne Euro (sie gehen nicht in einen Betrag ein). Die Beispielwerte 150 € in Beseitigungskosten H12/H105 prüft das Werkzeug nicht (nicht beauftragt).
+- **Bericht:** `pruefbericht.html` (ohne Skripte und externe Ressourcen, alles maskiert) und `pruefbericht.csv` (UTF-8 mit BOM, Semikolon, Dezimalkomma, Text gegen Formel-Einschleusung mit `'` geschützt).
+  Beide enthalten Personendaten (Anlage, Parzelle, Vorgangs-Nr.; bewusst **ohne** Namen des Unterpächters) und stehen in `.gitignore`.
+- **Tests:** `tools/pruef-weps/tests` erzeugen erfundene WEPs aus `docs/WEP_Vorlage.xlsx`, lassen LibreOffice die Werte speichern und vergleichen jeden einzelnen Betrag mit der LibreOffice-Rechnung
+  derselben Datei mit je einer korrigierten Formel. Der Workflow „Prüfen“ installiert dafür LibreOffice und führt `pytest` aus; ohne LibreOffice werden diese Tests übersprungen. Keine Änderung an `android/`,
+  Plugins oder `src-tauri/`, daher keine neue Versionsnummer.
