@@ -2114,3 +2114,63 @@ select.eingabe {
     border-left: 0;
   }
 }
+
+/* 3D-Ansicht (Beta 4, Paket 5) */
+.ansicht3d {
+  position: relative;
+  width: 100%;
+  height: min(60vh, 440px);
+  min-height: 260px;
+  border: var(--linie) solid var(--farbe-rand);
+  border-radius: var(--radius);
+  background: var(--farbe-grund);
+  overflow: hidden;
+}
+
+.ansicht3d-leinwand {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* Wischen dreht das Modell, nicht die Seite */
+  touch-action: none;
+  cursor: grab;
+}
+
+.ansicht3d-leinwand:active {
+  cursor: grabbing;
+}
+
+.ansicht3d-werkzeuge {
+  position: absolute;
+  right: var(--abstand-2);
+  bottom: var(--abstand-2);
+  display: flex;
+  gap: var(--abstand-2);
+}
+
+.ansicht3d-fehler {
+  padding: var(--abstand-4);
+  border-radius: var(--radius-klein);
+  background: var(--farbe-warnung-hell);
+  color: var(--farbe-warnung);
+}
+
+.ansicht3d-legende {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--abstand-2) var(--abstand-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--schrift-klein);
+}
+
+.ansicht3d-farbe {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-right: var(--abstand-2);
+  border: var(--linie) solid var(--farbe-text);
+  border-radius: 3px;
+  vertical-align: -2px;
+}

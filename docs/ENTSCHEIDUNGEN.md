@@ -131,3 +131,14 @@
 - **Index:** Ein Wert aus der Tabelle lässt sich für das WEP wählen (`bau.index`, manuell); Umrechnung von Beträgen früherer Jahre auf das Wertjahr.
 - **24-m²-Check:** Zulässige Fläche probeweise änderbar, dauerhaft nur mit „Übernehmen“ (`bau.zulaessigeFlaeche`). Der nicht berechnete Anteil des Vorplatzes steht im Check, nicht in I38 der Vorlage (Hinweis).
 - Keine Änderung an `android/`, Plugins oder `src-tauri/`, daher keine neue Versionsnummer.
+
+## 2026-10-22 · Beta 4, Paket 5: 3D-Ansicht
+
+- **three.js, nachgeladen:** `three` (nur die benutzten Klassen, Tree-Shaking) steckt allein im Teil `Ansicht3D` (`React.lazy`, geladen beim Antippen von „3D-Ansicht zeigen“): ~475 kB (120 kB gzip), der Hauptteil wächst nicht.
+  Der Service Worker legt den Teil mit den übrigen Dateien ab (`globPatterns`), die Ansicht läuft offline (Test im Durchlauf: Netz aus, dann laden).
+- **Eigene Kamera statt OrbitControls:** Ein Finger/Maus dreht, zwei Finger/Mausrad zoomen, Pfeiltasten und +/− gehen auch; Rechnung in `kamera3d.ts` (Höhenwinkel begrenzt, Abstand begrenzt), ohne zusätzliche Bibliothek.
+- **Modell ohne three getestet:** `modell3d.ts` erzeugt Dreiecke aus dem Grundriss. Dach wie die Kubatur gerechnet (Pult linear, Satteldach First mittig quer zur längsten Kante, Ohrenschneiden für Vielecke, Giebel an der Firstlinie geteilt);
+  Test: Rauminhalt unter dem Dach = `massenVon(...).kubaturM3`. Fehlende Höhe → 2,2 m mit Hinweis, fehlende/zu niedrige Firsthöhe → Flachdach mit Hinweis (nur Warnungen). Keller unter dem Boden, durchscheinend.
+- **Flüssig auf dem Tablet:** nur Zeichnen bei Bewegung (kein Dauerlauf), Pixeldichte ≤ 2, keine Schatten, wenige Dreiecke. Ohne WebGL oder bei Kontextverlust: Hinweistext statt Fehler.
+- **Farben:** Laube = `--farbe-akzent` (Dach), Anbau Grünton, Schuppen Grau, Gewächshaus bläulich/durchsichtig, Vorplatz hell/Grau, Keller grau/durchsichtig; Test prüft, dass die Grundfarben Tokens aus `tokens.css` sind. Legende nennt Art und Kürzel.
+- Nur Ansicht: nichts fließt in Bewertung, Excel oder Datenmodell. Keine Änderung an `android/`, Plugins oder `src-tauri/`, daher keine neue Versionsnummer.
