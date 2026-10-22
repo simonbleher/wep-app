@@ -221,12 +221,10 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
   const rolle = wepRolle(wep, profilRolle)
   const bereiche = bereicheFuerRolle(rolle)
   const beides = rolle === 'beides'
-  // Schaltet den Grün- oder Bau-Teil für dieses WEP; die Abweichung vom Profil wird am WEP gemerkt
+  // Schaltet den Grün- oder Bau-Teil für dieses WEP (die Rolle steht immer am WEP)
   function setzeTeil(teil: 'gruen' | 'bau', an: boolean) {
     const neu = rolleAusTeilen(teil === 'gruen' ? an : hatGruenTeil(rolle), teil === 'bau' ? an : hatBauTeil(rolle))
-    const naechste = { ...wep! }
-    if (neu === profilRolle) delete naechste.rolle
-    else naechste.rolle = neu
+    const naechste = { ...wep!, rolle: neu }
     // War der sichtbare Abschnitt Teil des abgeschalteten Teils, geht es zurück zu den Formalien
     if (!bereicheFuerRolle(neu).some((b) => b.id === tab) && tab !== 'export') setTab('formalien')
     setExportZustand({ typ: 'idle' })

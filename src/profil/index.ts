@@ -87,6 +87,7 @@ export function neuerWepMitProfil(id: string, profil: Profil): Wep {
   if (profil.rolle !== 'bau') wep.formalien.wertermittlerAussenAufwuchs = profil.name.trim()
   if (profil.rolle !== 'gruen') wep.formalien.wertermittlerBaulichkeiten = profil.name.trim()
   wep.formalien.kleingartenanlage = profil.standardAnlage.trim()
+  wep.rolle = profil.rolle // fest am WEP: ein späterer Rollenwechsel im Profil ändert es nicht
   return wep
 }
 

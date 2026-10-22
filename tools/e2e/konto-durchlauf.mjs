@@ -1096,7 +1096,7 @@ try {
   await seite.getByLabel('Rolle').selectOption('bau')
   await seite.getByRole('button', { name: 'Protokolle' }).click()
   await seite.locator('.status-teil').first().waitFor()
-  pruefe((await seite.locator('.status-teil-bau').count()) > 0, 'Rolle: Liste zeigt den Teil „Bau“ (WEPs ohne eigene Einstellung folgen dem Profil)')
+  pruefe((await seite.locator('.status-teil-bau').count()) === 0, 'Rolle: bestehende WEPs bleiben Grün, auch nach einem Rollenwechsel im Profil')
   await seite.getByRole('button', { name: 'Neues WEP', exact: true }).click()
   await seite.getByLabel(/Kleingartenanlage/).first().waitFor()
   const rnav = seite.getByRole('navigation', { name: 'Abschnitte' })

@@ -19,12 +19,16 @@ export const hatGruenTeil = (rolle: Rolle): boolean => rolle !== 'bau'
 /** Gibt es den Bau-Teil (Baulichkeiten, Mängel, Abwasser, Beseitigung Bau, Skizze Bau)? */
 export const hatBauTeil = (rolle: Rolle): boolean => rolle !== 'gruen'
 
-/** Rolle für dieses WEP: die eigene Einstellung, sonst die aus dem Profil. */
-export function wepRolle(wep: Pick<Wep, 'rolle'>, profilRolle: Rolle): Rolle {
-  return wep.rolle ?? profilRolle
+/**
+ * Rolle für dieses WEP. Neue WEPs bekommen sie beim Anlegen fest aus dem Profil (ein späterer
+ * Rollenwechsel im Profil ändert bestehende WEPs nicht). WEPs von vor Beta 4 haben keine Rolle und
+ * sind Grün-WEPs. `_profilRolle` bleibt für die Aufrufer, wird aber nicht mehr benutzt.
+ */
+export function wepRolle(wep: Pick<Wep, 'rolle'>, _profilRolle?: Rolle): Rolle {
+  return wep.rolle ?? 'gruen'
 }
 
-/** Rolle aus den beiden Teilen; `rolle` ist nur dann ein Abweichen, wenn sie vom Profil verschieden ist. */
+/** Rolle aus den beiden Teilen. */
 export function rolleAusTeilen(gruen: boolean, bau: boolean): Rolle {
   return gruen && bau ? 'beides' : bau ? 'bau' : 'gruen'
 }

@@ -3,9 +3,10 @@ import { hatBauTeil, hatGruenTeil, rolleAusTeilen, wepRolle } from '../types'
 import { neuerWepMitProfil } from '@/profil'
 
 describe('Rolle pro WEP', () => {
-  it('ohne eigene Einstellung gilt die Rolle aus dem Profil', () => {
-    expect(wepRolle({}, 'bau')).toBe('bau')
+  it('die Rolle steht am WEP; WEPs von vor Beta 4 (ohne Rolle) sind Grün – unabhängig vom Profil', () => {
+    expect(wepRolle({}, 'bau')).toBe('gruen')
     expect(wepRolle({ rolle: 'beides' }, 'gruen')).toBe('beides')
+    expect(wepRolle({ rolle: 'bau' }, 'gruen')).toBe('bau')
   })
 
   it('Teile je Rolle', () => {
@@ -29,6 +30,7 @@ describe('Rolle pro WEP', () => {
     const beides = neuerWepMitProfil('2026-003', { ...profil, rolle: 'beides' })
     expect(beides.formalien.wertermittlerAussenAufwuchs).toBe('Erika Musterfrau')
     expect(beides.formalien.wertermittlerBaulichkeiten).toBe('Erika Musterfrau')
-    expect(beides.rolle).toBeUndefined()
+    // Die Rolle wird beim Anlegen fest ans WEP geschrieben
+    expect([gruen.rolle, bau.rolle, beides.rolle]).toEqual(['gruen', 'bau', 'beides'])
   })
 })

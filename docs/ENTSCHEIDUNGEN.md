@@ -55,7 +55,7 @@
 
 - **Entscheidung:** Die Rolle aus dem Profil (Grün / Bau / Beides) bestimmt Reiter und Export. Pro WEP gibt es
   `Wep.rolle` (nur gesetzt, wenn es vom Profil abweicht); die Schalter „Dieses WEP als Grün/Bau bearbeiten“ stehen
-  in den Formalien. WEPs ohne eigene Einstellung folgen dem Profil, auch nach einer Änderung des Profils.
+  in den Formalien. Neue WEPs bekommen die Rolle beim Anlegen fest aus dem Profil (ein späterer Rollenwechsel im Profil ändert bestehende WEPs nicht); WEPs von vor Beta 4 ohne Rolle gelten als Grün (Nachtrag bei der Prüfung von #57).
 - **Reiter:** Grün: Außenanlagen, Aufwuchs, Beseitigung, Skizze. Bau: Baulichkeiten, Mängel, Abwasser, Beseitigung Bau,
   Skizze Bau (Platzhalter bis Paket 2/3). Fotos und Formalien für alle. Bei „Beides“ heißen die doppelten Reiter
   „Beseitigung Grün/Bau“ und „Skizze Grün/Bau“, die untere Leiste auf dem Handy ist wischbar.
