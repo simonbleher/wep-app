@@ -11,7 +11,7 @@ name: Android Release
 # (docs/ANDROID.md); ohne sie gibt es nur eine Warnung, das Release bleibt.
 on:
   push:
-    branches: [main] # jeder Commit auf main bekommt eine APK (Update-Hinweis vergleicht Commits)
+    branches: [release] # nur freigegebene Versionen (Workflow „Version freigeben“, docs/FREIGABE.md)
   workflow_dispatch:
 
 permissions:

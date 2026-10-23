@@ -11,7 +11,7 @@ name: Windows Release
 # Die Version steht in src-tauri/tauri.conf.json; sie muss bei jeder Änderung steigen (Workflow „Prüfen“).
 on:
   push:
-    branches: [main]
+    branches: [release] # nur freigegebene Versionen (docs/FREIGABE.md)
     paths:
       - 'src-tauri/**'
   workflow_dispatch:
