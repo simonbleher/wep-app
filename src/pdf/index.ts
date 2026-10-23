@@ -4,13 +4,17 @@
  * Das PDF entsteht aus derselben Arbeitsmappe, die auch der Excel-Export erzeugt (`exportWep`); die Zahlen sind
  * also die der Excel-Datei. Siehe `docs/ENTSCHEIDUNGEN.md` (Eintrag zum PDF).
  */
-import { exportWep, type ExportOptionen, type ExportResult } from '../export'
-import { neueBauDaten, type Rolle, type Wep } from '../model'
+import { exportWep, mitLeerenBauDaten, type ExportOptionen, type ExportResult } from '../export'
+import type { Rolle, Wep } from '../model'
 import { erzeugePdf, type PdfErgebnis, type PdfOptionen } from './erzeugen'
+import { erzeugeUebersichtPdf, type UebersichtErgebnis } from './uebersicht/erzeugen'
 
 export { erzeugePdf, waehleBlaetter, unterschriftsFelder, BLATT } from './erzeugen'
 export type { PdfErgebnis, PdfOptionen, PdfSkizzen, PdfBlattErgebnis } from './erzeugen'
 export type { PdfFoto } from './fotos'
+export { erzeugeUebersichtPdf } from './uebersicht/erzeugen'
+export type { UebersichtErgebnis } from './uebersicht/erzeugen'
+export type { Protokoll } from './uebersicht/daten'
 
 export const PDF_TYP = 'application/pdf'
 
@@ -41,13 +45,29 @@ export interface WepPdfAusgabe {
  */
 export async function erzeugeWepPdf(eingabe: WepPdfEingabe, optionen: Omit<PdfOptionen, 'rolle'>): Promise<WepPdfAusgabe> {
   const { wep, rolle } = eingabe
-  const ohneBau = !wep.bau && !eingabe.hatBauExcel
-  const fuerExport: Wep = ohneBau ? { ...wep, bau: neueBauDaten() } : wep
-  const exportErg = await exportWep(fuerExport, eingabe.quelle, {
-    ...eingabe.exportOptionen,
-    teil: ohneBau && rolle === 'gruen' ? 'beides' : rolle,
-  })
+  const fuerExport = mitLeerenBauDaten(wep, rolle, eingabe.hatBauExcel)
+  const exportErg = await exportWep(fuerExport.wep, eingabe.quelle, { ...eingabe.exportOptionen, teil: fuerExport.teil })
   const xlsx = await exportErg.blob.arrayBuffer()
   const pdf = await erzeugePdf(xlsx, { ...optionen, rolle })
   return { name: exportErg.filename.replace(/\.xlsx$/i, '.pdf'), pdf, export: exportErg }
+}
+
+export interface WepUebersichtAusgabe {
+  /** Dateiname, z. B. „2026-007_WEP_uebersichtlich.pdf“ (Bau: „…_WEP_Bau_uebersichtlich.pdf“). */
+  name: string
+  pdf: UebersichtErgebnis
+  export: ExportResult
+}
+
+/**
+ * Das zweite, übersichtliche PDF: gleicher Excel-Export und gleiches Rechenwerk wie `erzeugeWepPdf` (die Zahlen sind
+ * dieselben), aber als schlichtes Protokoll statt der Blätter der Vorlage.
+ */
+export async function erzeugeWepUebersichtPdf(eingabe: WepPdfEingabe, optionen: Omit<PdfOptionen, 'rolle'>): Promise<WepUebersichtAusgabe> {
+  const { wep, rolle } = eingabe
+  const fuerExport = mitLeerenBauDaten(wep, rolle, eingabe.hatBauExcel)
+  const exportErg = await exportWep(fuerExport.wep, eingabe.quelle, { ...eingabe.exportOptionen, teil: fuerExport.teil })
+  const xlsx = await exportErg.blob.arrayBuffer()
+  const pdf = await erzeugeUebersichtPdf(xlsx, { ...optionen, rolle, wep: fuerExport.wep })
+  return { name: exportErg.filename.replace(/\.xlsx$/i, '_uebersichtlich.pdf'), pdf, export: exportErg }
 }

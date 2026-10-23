@@ -142,9 +142,12 @@ describe('Überschrift des Blatts „Skizze Außenanlage-Aufwuchs“', () => {
     expect(zellenWert(await blatt(zip, 18), 'A1', geteilt)).toBe('Skizze – Baulichkeiten')
     // Format der Zelle (Stil) bleibt
     expect(await blatt(zip, 19)).toMatch(/<c r="A1" s="570" t="inlineStr">/)
-    // Der gemeinsame Shared String selbst ist unverändert
+    // Der gemeinsame Shared String selbst ist unverändert (der Deckblatt-Text hängt nur neue Einträge hinten an)
     const vorher = await JSZip.loadAsync(vorlage)
-    expect(await zip.file('xl/sharedStrings.xml')!.async('string')).toBe(await vorher.file('xl/sharedStrings.xml')!.async('string'))
+    const eintraege = (x: string) => x.match(/<si>[\s\S]*?<\/si>/g) ?? []
+    const alt = eintraege(await vorher.file('xl/sharedStrings.xml')!.async('string'))
+    const neu = eintraege(await zip.file('xl/sharedStrings.xml')!.async('string'))
+    expect(neu.slice(0, alt.length)).toEqual(alt)
   })
 
   it('ein zweiter Export derselben Datei ändert nichts mehr; eine andere Überschrift bleibt stehen', async () => {

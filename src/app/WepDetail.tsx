@@ -72,7 +72,7 @@ import { lageVon, skizzeMitParzelle } from '@/parzelle'
 import { leererGrundriss } from '@/skizze/grundriss'
 import { hatGrundlage } from '@/skizze/grundlage'
 import { svgZuPngBrowser } from '@/export/svgRaster'
-import { exportWep, type ExportResult } from '@/export'
+import { exportWep, mitLeerenBauDaten, type ExportResult } from '@/export'
 import { exportFotosNachOneDrive, exportNachOneDrive, ladeFotoAusOneDrive } from '@/sync'
 import { berechneAbschnittSumme } from '@/gruen/summen'
 import { Capacitor } from '@capacitor/core'
@@ -992,7 +992,8 @@ function ExportTab({
     setExportZustand({ typ: 'laedt' })
     try {
       // Die am WEP gemerkte Bau-Excel (lokal, sonst aus OneDrive geholt); ohne sie die leere Vorlage
-      const sourceBuffer = (await ladeExportQuelle(wep, nurBau)).buffer
+      const quelle = await ladeExportQuelle(wep, nurBau)
+      const sourceBuffer = quelle.buffer
 
       // Skizze (falls gezeichnet) ins Blatt „Skizze Außenanlage-Aufwuchs“: als bearbeitbare
       // Excel-Formen (Standard), die vorhandene Bau-Skizze bleibt unverändert. Fallback: PNG
@@ -1026,14 +1027,17 @@ function ExportTab({
                 grundrissZuFormen(grundriss ?? leererGrundriss(), zeichenbereich, wepFuerExport.bau?.bauteile ?? [], { parzelle, hatFormen }),
             }
           : undefined
-      const result = await exportWep(wepFuerExport, sourceBuffer, {
+      // Ohne Bau-Daten und ohne Bau-Excel: leere Bau-Daten, damit die Beispielwerte der Vorlage nicht abgezogen werden
+      // (nur für die Datei; gespeichert wird `wepFuerExport`)
+      const fuerDatei = mitLeerenBauDaten(wepFuerExport, rolle, quelle.hatBauExcel)
+      const result = await exportWep(fuerDatei.wep, sourceBuffer, {
         profilIndex,
         grundrissFormen,
         skizzeFormen,
         skizzePng,
         skizzeAlsBild,
         formalienAbgeglichen: wep.bauExcel?.abgeglichen === true,
-        teil: rolle,
+        teil: fuerDatei.teil,
       })
 
       // Datei an den Nutzer: im Browser als Download, im Windows-Programm über „Speichern unter…“.

@@ -25,9 +25,9 @@ export const SHEET_PATHS = {
 /**
  * Bau-Blätter, die niemals verändert werden dürfen.
  * Byte-genaue Gleichheit mit dem Original ist Pflicht (Testfall).
+ * Ausnahme: „Deckbl UPV“ (sheet2) – dort ersetzt `deckblatt.ts` den Text A31–A40, sonst bleibt es gleich.
  */
 export const BAU_SHEET_PATHS = [
-  'xl/worksheets/sheet2.xml', // Deckbl UPV
   'xl/worksheets/sheet3.xml', // Baulichkeiten
   'xl/worksheets/sheet4.xml', // Mängelliste
   'xl/worksheets/sheet8.xml', // AnlIV (Blatt 3)ASG
