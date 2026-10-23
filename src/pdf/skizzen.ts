@@ -10,6 +10,7 @@ import { grundrissZuFormen } from '../export/grundrissFormen'
 import { skizzeAufContext } from '../skizze/skizzePng'
 import type { SkizzeDaten } from '../skizze/types'
 import type { GrundrissDaten } from '../skizze/grundriss'
+import type { ParzellenLage } from '../parzelle/lage'
 import type { Rechteck } from './blatt'
 import { PdfKontext } from './kontext'
 import type { Schriften } from './schrift'
@@ -40,7 +41,7 @@ export function zeichneGruenSkizze(lib: Lib, seite: PDFPage, schriften: Schrifte
 }
 
 const EMU_PRO_PT = 12700
-const FARBE = { gebaeude: '#E7E6E6', dunkel: '#262626', rot: '#C00000', tabelleLinie: '#7F7F7F', schwarz: '#000000' }
+const FARBE = { grundstueck: '#E2F0D9', grundstueckLinie: '#595959', gebaeude: '#E7E6E6', dunkel: '#262626', rot: '#C00000', tabelleLinie: '#7F7F7F', schwarz: '#000000' }
 
 /** Grundriss samt Maßketten und Massenberechnung in den Rahmen `r` zeichnen. */
 export function zeichneGrundriss(
@@ -50,9 +51,10 @@ export function zeichneGrundriss(
   daten: GrundrissDaten,
   bauteile: ReadonlyArray<{ id: string; kuerzel: string }>,
   r: Rechteck,
+  parzelle?: ParzellenLage,
 ): SkizzeLage | undefined {
   const innen: Rechteck = { x: r.x + RAND, y: r.y + RAND, w: r.w - 2 * RAND, h: r.h - 2 * RAND }
-  const formen = grundrissZuFormen(daten, { x: 0, y: 0, w: Math.round(innen.w * EMU_PRO_PT), h: Math.round(innen.h * EMU_PRO_PT) }, bauteile)
+  const formen = grundrissZuFormen(daten, { x: 0, y: 0, w: Math.round(innen.w * EMU_PRO_PT), h: Math.round(innen.h * EMU_PRO_PT) }, bauteile, { parzelle })
   if (!formen.length) return undefined
   // Einheit des Kontexts: EMU; Maßstab 1/12700 macht daraus pt
   const ctx = new PdfKontext(lib, seite, schriften, innen.x, innen.y, 1 / EMU_PRO_PT)
@@ -60,7 +62,24 @@ export function zeichneGrundriss(
   const schrift = (groessePt: number, fett = false) => `${fett ? 'bold ' : ''}${pt(groessePt)}px Arial`
 
   for (const f of formen) {
-    if (f.typ === 'bauteil' && f.punkte && f.punkte.length >= 3) {
+    if ((f.typ === 'grundstueck' || f.typ === 'pfosten') && (f.kasten || f.punkte)) {
+      // Parzelle (Beta 6, Paket 1): Grundstück hell, Pfosten weiß – wie im Excel-Blatt
+      ctx.save()
+      ctx.beginPath()
+      if (f.punkte && f.punkte.length >= 3) {
+        f.punkte.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)))
+        ctx.closePath()
+      } else {
+        const k = f.kasten!
+        ctx.rect(k.x, k.y, k.w, k.h)
+      }
+      ctx.fillStyle = f.typ === 'pfosten' ? '#FFFFFF' : FARBE.grundstueck
+      ctx.fill()
+      ctx.strokeStyle = FARBE.grundstueckLinie
+      ctx.lineWidth = pt(f.typ === 'pfosten' ? 0.75 : 1)
+      ctx.stroke()
+      ctx.restore()
+    } else if (f.typ === 'bauteil' && f.punkte && f.punkte.length >= 3) {
       ctx.save()
       ctx.beginPath()
       f.punkte.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)))

@@ -8,6 +8,7 @@
 import type { Rolle } from '../model'
 import type { GrundrissDaten } from '../skizze/grundriss'
 import type { SkizzeDaten } from '../skizze/types'
+import type { ParzellenLage } from '../parzelle/lage'
 import { setzeBlatt, blattBereich, type Rechteck, type SeitenInhalt } from './blatt'
 import { Rechenwerk } from './formeln'
 import { leseMappe, schluessel, type Blatt, type Mappe } from './mappe'
@@ -33,7 +34,7 @@ export interface PdfSkizzen {
   /** Grün-Skizze (`wep.skizze`). */
   gruen?: SkizzeDaten
   /** Grundriss mit echten Maßen (`wep.grundriss`) und die Kürzel der Bauteile. */
-  grundriss?: { daten: GrundrissDaten; bauteile: ReadonlyArray<{ id: string; kuerzel: string }> }
+  grundriss?: { daten: GrundrissDaten; bauteile: ReadonlyArray<{ id: string; kuerzel: string }>; parzelle?: ParzellenLage }
 }
 
 export interface PdfOptionen {
@@ -101,7 +102,7 @@ export function waehleBlaetter(mappe: Mappe, rechen: Rechenwerk, o: Pick<PdfOpti
   const beseitigung =
     (hatGruen && bereichBelegt(rechen, BLATT.beseitigung, ZEILEN.beseitigungGruen)) || (hatBau && bereichBelegt(rechen, BLATT.beseitigung, ZEILEN.beseitigungBau))
   if (beseitigung) liste.push(BLATT.beseitigung)
-  if (hatBau && o.skizzen?.grundriss?.daten.teile.length) liste.push(BLATT.skizzeBau)
+  if (hatBau && (o.skizzen?.grundriss?.daten.teile.length || o.skizzen?.grundriss?.parzelle)) liste.push(BLATT.skizzeBau)
   if (hatGruen && o.skizzen?.gruen?.elemente.length) liste.push(BLATT.skizzeGruen)
   liste.push(BLATT.abkuerzungen)
   return liste.filter(gibt)
@@ -184,7 +185,7 @@ export async function erzeugePdf(xlsx: ArrayBuffer | Uint8Array, optionen: PdfOp
       }
       if (name === BLATT.skizzeBau && optionen.skizzen?.grundriss) {
         const r = si.lage(7, 2, 48, 7)
-        if (r) zeichneGrundriss(lib, seite, schriften, optionen.skizzen.grundriss.daten, optionen.skizzen.grundriss.bauteile, r)
+        if (r) zeichneGrundriss(lib, seite, schriften, optionen.skizzen.grundriss.daten, optionen.skizzen.grundriss.bauteile, r, optionen.skizzen.grundriss.parzelle)
       }
 
       // Unterschrift über dem Namen des Wertermittlers

@@ -15,6 +15,8 @@
     "ki-test-chat": "vite-node --config tools/ki-test/vite.config.ts tools/ki-test/run-chat.ts --",
     "typecheck:functions": "tsc -p functions/tsconfig.json --noEmit",
     "ki-test-skizze-export": "vite-node --config tools/ki-test/vite.config.ts tools/ki-test/export-skizze.ts --",
+    "beta6-paket1:export-bild": "vite-node --config tools/ki-test/vite.config.ts tools/beta6-paket1/export-bild.ts --",
+    "beta6-paket1:screenshots": "VITE_MS_CLIENT_ID=00000000-0000-0000-0000-000000000000 vite build --outDir dist-e2e && node tools/beta6-paket1/screenshots.mjs",
     "beta5-paket4:vergleich": "vite-node --config tools/ki-test/vite.config.ts tools/beta5-paket4/vergleich.ts --",
     "beta5-paket4:screenshots": "VITE_MS_CLIENT_ID=00000000-0000-0000-0000-000000000000 vite build --outDir dist-e2e && node tools/beta5-paket4/screenshots.mjs",
     "beta5-paket3:screenshots": "VITE_MS_CLIENT_ID=00000000-0000-0000-0000-000000000000 vite build --outDir dist-e2e && node tools/beta5-paket3/screenshots.mjs",

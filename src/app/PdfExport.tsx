@@ -5,6 +5,8 @@ import { useEffect, useId, useState } from 'react'
 import { Check, FileText, Share2 } from 'lucide-react'
 import { hatBauTeil, type Rolle, type Wep } from '@/model'
 import { dbAblage } from '@/fotos/ablage'
+import { lageVon, skizzeMitParzelle } from '@/parzelle'
+import { leererGrundriss } from '@/skizze/grundriss'
 import { sammlePdfFotos } from '@/pdf/fotosSammeln'
 import { PDF_TYP, erzeugeWepPdf, type WepPdfAusgabe } from '@/pdf'
 import { exportNachOneDrive, ladeFotoAusOneDrive } from '@/sync'
@@ -68,6 +70,9 @@ export function PdfBereich({ wep, rolle, profilIndex }: { wep: Wep; rolle: Rolle
 
       setZustand({ typ: 'laedt', schritt: 'Erzeuge das PDF …' })
       const f = wep.formalien
+      // Parzelle (Beta 6, Paket 1): beide Skizzen zeigen sie gleich; die Grün-Skizze entsteht bei Bedarf aus der Parzelle
+      const parzellenLage = lageVon(wepFuerExport)
+      const skizzeFuerExport = skizzeMitParzelle(wepFuerExport)
       const ausgabe = await erzeugeWepPdf(
         {
           wep: wepFuerExport,
@@ -78,8 +83,11 @@ export function PdfBereich({ wep, rolle, profilIndex }: { wep: Wep; rolle: Rolle
         },
         {
           skizzen: {
-            gruen: wepFuerExport.skizze?.elemente.length ? wepFuerExport.skizze : undefined,
-            grundriss: wepFuerExport.grundriss?.teile.length ? { daten: wepFuerExport.grundriss, bauteile: wepFuerExport.bau?.bauteile ?? [] } : undefined,
+            gruen: skizzeFuerExport?.elemente.length ? skizzeFuerExport : undefined,
+            grundriss:
+              wepFuerExport.grundriss?.teile.length || parzellenLage
+                ? { daten: wepFuerExport.grundriss ?? leererGrundriss(), bauteile: wepFuerExport.bau?.bauteile ?? [], parzelle: parzellenLage }
+                : undefined,
           },
           fotos,
           unterschrift: mitUnterschrift ? unterschriftAlsPng() : null,

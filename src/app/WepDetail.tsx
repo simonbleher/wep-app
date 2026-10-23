@@ -68,6 +68,8 @@ import { lokalesProfil } from '@/profil'
 import { skizzeAlsPng } from '@/skizze/skizzePng'
 import { skizzeDatenZuFormen, type Kasten } from '@/export/skizzeFormen'
 import { grundrissZuFormen } from '@/export/grundrissFormen'
+import { lageVon, skizzeMitParzelle } from '@/parzelle'
+import { leererGrundriss } from '@/skizze/grundriss'
 import { hatGrundlage } from '@/skizze/grundlage'
 import { svgZuPngBrowser } from '@/export/svgRaster'
 import { exportWep, type ExportResult } from '@/export'
@@ -995,7 +997,8 @@ function ExportTab({
       // Skizze (falls gezeichnet) ins Blatt „Skizze Außenanlage-Aufwuchs“: als bearbeitbare
       // Excel-Formen (Standard), die vorhandene Bau-Skizze bleibt unverändert. Fallback: PNG
       // (der Export entscheidet, ob es transparent sein muss).
-      const skizze = wep.skizze
+      // Mit Parzelle (Beta 6, Paket 1) bekommt auch ein WEP ohne gespeicherte Grün-Skizze die Parzelle als Grundlage.
+      const skizze = skizzeMitParzelle(wep)
       const hatSkizze = Boolean(skizze?.elemente.length)
       const skizzeFormen =
         hatSkizze && skizze
@@ -1013,11 +1016,15 @@ function ExportTab({
 
       // Bau-Teil: Index am WEP merken, Baubeschreibung aktualisieren
       const wepFuerExport = hatBauTeil(rolle) ? bauFuerExport(wep, profilIndex) : wep
-      // Grundriss (Paket 3) als bearbeitbare Formen ins Blatt „Skizze Bau“
+      // Grundriss (Paket 3) und Parzelle (Beta 6, Paket 1) als bearbeitbare Formen ins Blatt „Skizze Bau“
       const grundriss = hatBauTeil(rolle) ? wepFuerExport.grundriss : undefined
+      const parzelle = hatBauTeil(rolle) ? lageVon(wepFuerExport) : undefined
       const grundrissFormen =
-        grundriss && grundriss.teile.length
-          ? { elemente: ({ zeichenbereich }: { zeichenbereich: Kasten }) => grundrissZuFormen(grundriss, zeichenbereich, wepFuerExport.bau?.bauteile ?? []) }
+        grundriss?.teile.length || parzelle
+          ? {
+              elemente: ({ zeichenbereich, hatFormen }: { zeichenbereich: Kasten; hatFormen: boolean }) =>
+                grundrissZuFormen(grundriss ?? leererGrundriss(), zeichenbereich, wepFuerExport.bau?.bauteile ?? [], { parzelle, hatFormen }),
+            }
           : undefined
       const result = await exportWep(wepFuerExport, sourceBuffer, {
         profilIndex,
@@ -1076,7 +1083,7 @@ function ExportTab({
     }
   }
 
-  const hatSkizze = !nurBau && Boolean(wep.skizze?.elemente.length)
+  const hatSkizze = !nurBau && Boolean(skizzeMitParzelle(wep)?.elemente.length)
   const ergebnis = exportZustand.typ === 'fertig' ? exportZustand : null
 
   return (

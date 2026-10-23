@@ -8,6 +8,8 @@
  */
 
 import type { BauSkizzeForm, BauSkizzeLesen } from '../export/bauSkizzeLesen'
+import { LEINWAND, VORLAGE_SEITENVERHAELTNIS, meterZuPx, type ParzellenLage } from '../parzelle/lage'
+import { legeSkizzeAufParzelle, liegtAufParzelle, parzellenElemente } from '../parzelle/umlegen'
 import type { GrundrissDaten } from './grundriss'
 import { kuerzelVon } from './grundriss'
 import type { SkizzeBauform, SkizzeDaten, SkizzeElement, SkizzeLinie, SkizzeText } from './types'
@@ -16,7 +18,7 @@ import { istGrundlage, neueId } from './types'
 /** Breite der Zeichenfläche, wenn die Grundlage eine leere Skizze bekommt (Pixel). */
 export const GRUNDLAGE_BREITE = 600
 /** Höhe : Breite des Zeichenbereichs B7:G48 der Vorlage („Skizze Außenanlage-Aufwuchs“, 452 × 622 pt). */
-export const VORLAGE_SEITENVERHAELTNIS = 1.3748
+export { VORLAGE_SEITENVERHAELTNIS }
 /** Rand des Grundstücks zum Rand der Zeichenfläche, als Anteil der Breite (8 pt von 452 pt, Skill parzellen-skizze). */
 const RAND_ANTEIL = 8 / 452
 /** Kante eines Zaunpfostens in pt (Skill: 5 × 5 pt) und Höchstmaß, bis zu dem eine Excel-Form als Pfosten gilt. */
@@ -34,7 +36,9 @@ export interface GrundlageErgebnis {
 
 export type GrundlageQuelle =
   | { art: 'bau'; grundriss: GrundrissDaten; bauteile?: ReadonlyArray<{ id: string; kuerzel: string }>; flaecheM2?: number }
-  | { art: 'excel'; lesen: BauSkizzeLesen; excelName?: string }
+  | { art: 'excel'; lesen: BauSkizzeLesen; excelName?: string; lage?: ParzellenLage }
+  /** Mit Parzelle (Beta 6, Paket 1): Grundstück und Pfosten aus der Parzelle, Bauteile (falls vorhanden) in echten Metern. */
+  | { art: 'parzelle'; lage: ParzellenLage; grundriss?: GrundrissDaten; bauteile?: ReadonlyArray<{ id: string; kuerzel: string }> }
 
 /** Gibt es im Bau-Teil überhaupt etwas zu übernehmen? */
 export const grundrissHatTeile = (g: GrundrissDaten | undefined): g is GrundrissDaten => Boolean(g?.teile.some((t) => t.punkte.length >= 3))
@@ -124,6 +128,30 @@ function ausGrundriss(q: Extract<GrundlageQuelle, { art: 'bau' }>, breite: numbe
 }
 
 // ---------------------------------------------------------------------------
+// (a2) Parzelle + Grundriss in echten Metern (Beta 6, Paket 1)
+// ---------------------------------------------------------------------------
+
+function ausParzelle(q: Extract<GrundlageQuelle, { art: 'parzelle' }>): { elemente: SkizzeElement[]; hinweise: string[] } {
+  const elemente = parzellenElemente(q.lage)
+  const hinweise: string[] = []
+  const teile = (q.grundriss?.teile ?? []).filter((t) => t.punkte.length >= 3)
+  // Pfosten liegen unter den Gebäuden, das Grundstück ganz unten (Reihenfolge wie im Excel-Blatt)
+  for (const t of teile) {
+    elemente.push(
+      form('bauteil', t.punkte.map((p) => meterZuPx(q.lage.abb, p)), {
+        beschriftung: kuerzelVon(t, q.bauteile ?? []),
+        ...(t.gestrichelt ? { gestrichelt: true } : {}),
+      }),
+    )
+  }
+  const aussen = teile.filter((t) => t.punkte.some((p) => p.x < -0.01 || p.y < -0.01 || p.x > q.lage.breiteM + 0.01 || p.y > q.lage.hoeheM + 0.01))
+  if (aussen.length) {
+    hinweise.push(`${aussen.map((t) => kuerzelVon(t, q.bauteile ?? [])).join(', ')} liegt im Grundriss außerhalb der Parzelle – im Reiter „Skizze Bau“ in die Parzelle schieben.`)
+  }
+  return { elemente, hinweise }
+}
+
+// ---------------------------------------------------------------------------
 // (b) Formen aus „Skizze Bau“ der Bau-Excel
 // ---------------------------------------------------------------------------
 
@@ -135,13 +163,36 @@ function beschriftungVon(text: string | undefined, eigen: boolean): string | und
   return kurz.length ? kurz.join('\n') : undefined
 }
 
+/** Das Grundstück in der Bau-Excel: die Form „Grundstück“, sonst die erste Form, die mindestens 80 % des Zeichenbereichs füllt. */
+export function grundstueckForm(lesen: BauSkizzeLesen): BauSkizzeForm | undefined {
+  const { bereich, formen } = lesen
+  const vielecke = formen.filter((f) => f.art === 'vieleck' && f.punkte && f.punkte.length >= 3)
+  return (
+    vielecke.find((f) => /^Grundst/i.test(f.name)) ??
+    vielecke.find((f) => (f.kasten.w * f.kasten.h) / Math.max(1, bereich.w * bereich.h) >= 0.8)
+  )
+}
+
 function ausExcel(q: Extract<GrundlageQuelle, { art: 'excel' }>, breite: number, hoehe: number): { elemente: SkizzeElement[]; hinweise: string[] } {
   const { bereich, formen } = q.lesen
   const hinweise: string[] = [...q.lesen.hinweise]
-  const s = Math.min(breite / bereich.w, hoehe / bereich.h) // px je EMU
-  const ox = (breite - bereich.w * s) / 2
-  const oy = (hoehe - bereich.h * s) / 2
-  const P = (p: { x: number; y: number }) => ({ x: ox + (p.x - bereich.x) * s, y: oy + (p.y - bereich.y) * s })
+  // Mit Parzelle: das Grundstück der Bau-Excel wird auf die Parzelle gelegt (gleichmäßig eingepasst), das Grundstück selbst und die
+  // Pfosten kommen aus der Parzelle. Ohne Parzelle füllt der Zeichenbereich die Leinwand wie bisher.
+  const lage = q.lage
+  const gs = lage ? grundstueckForm(q.lesen) : undefined
+  const ziel = lage
+    ? {
+        x: lage.abb.ox,
+        y: lage.abb.oy,
+        w: lage.breiteM * lage.abb.pxProM,
+        h: lage.hoeheM * lage.abb.pxProM,
+      }
+    : { x: 0, y: 0, w: breite, h: hoehe }
+  const quellKasten = gs ? gs.kasten : bereich
+  const s = Math.min(ziel.w / quellKasten.w, ziel.h / quellKasten.h) // px je EMU
+  const ox = ziel.x + (ziel.w - quellKasten.w * s) / 2
+  const oy = ziel.y + (ziel.h - quellKasten.h * s) / 2
+  const P = (p: { x: number; y: number }) => ({ x: ox + (p.x - quellKasten.x) * s, y: oy + (p.y - quellKasten.y) * s })
   const pxProPt = s * EMU_PRO_PT
 
   const grundstueck: SkizzeElement[] = []
@@ -179,10 +230,16 @@ function ausExcel(q: Extract<GrundlageQuelle, { art: 'excel' }>, breite: number,
         const breitePt = f.kasten.w / EMU_PRO_PT
         const hoehePt = f.kasten.h / EMU_PRO_PT
         const flaechenAnteil = (f.kasten.w * f.kasten.h) / (bereich.w * bereich.h)
-        const istGrundstueck = grundstueck.length === 0 && (/^Grundst/i.test(f.name) || flaechenAnteil >= 0.8)
-        if (istGrundstueck) grundstueck.push(form('grundstueck', punkte))
-        else if (breitePt <= PFOSTEN_MAX_PT && hoehePt <= PFOSTEN_MAX_PT && !f.text) pfosten.push(form('pfosten', punkte))
-        else bauteile.push(form('bauteil', punkte, { ...(beschriftungVon(f.text, f.eigen) ? { beschriftung: beschriftungVon(f.text, f.eigen) } : {}), ...(f.gestrichelt ? { gestrichelt: true } : {}) }))
+        const istGrundstueck = lage ? f === gs : grundstueck.length === 0 && (/^Grundst/i.test(f.name) || flaechenAnteil >= 0.8)
+        const istPfosten = breitePt <= PFOSTEN_MAX_PT && hoehePt <= PFOSTEN_MAX_PT && !f.text
+        // Mit Parzelle kommen Grundstück und Pfosten aus der Parzelle
+        if (istGrundstueck) {
+          if (!lage) grundstueck.push(form('grundstueck', punkte))
+        } else if (istPfosten) {
+          if (!lage) pfosten.push(form('pfosten', punkte))
+        } else {
+          bauteile.push(form('bauteil', punkte, { ...(beschriftungVon(f.text, f.eigen) ? { beschriftung: beschriftungVon(f.text, f.eigen) } : {}), ...(f.gestrichelt ? { gestrichelt: true } : {}) }))
+        }
         break
       }
     }
@@ -190,7 +247,8 @@ function ausExcel(q: Extract<GrundlageQuelle, { art: 'excel' }>, breite: number,
 
   if (bilder.length) hinweise.push(`${bilder.length === 1 ? 'Ein Bild' : `${bilder.length} Bilder`} in „Skizze Bau“ nicht übernommen (${[...new Set(bilder)].slice(0, 4).join(', ')}) – bei Bedarf von Hand ergänzen.`)
   if (angenaehert.length) hinweise.push(`Nur angenähert übernommen: ${angenaehert.slice(0, 4).join(', ')}.`)
-  return { elemente: [...grundstueck, ...pfosten, ...bauteile, ...linien, ...texte], hinweise }
+  if (lage && !gs) hinweise.push('In „Skizze Bau“ ist kein Grundstück gezeichnet; die Formen sind auf die Parzelle eingepasst, bitte die Lage prüfen.')
+  return { elemente: [...(lage ? parzellenElemente(lage) : []), ...grundstueck, ...pfosten, ...bauteile, ...linien, ...texte], hinweise }
 }
 
 /** Freies Textfeld → ein Text-Element je Zeile, mittig im Feld. */
@@ -221,9 +279,27 @@ function textElemente(f: BauSkizzeForm, P: (p: { x: number; y: number }) => { x:
 export function uebernehmeGrundlage(daten: SkizzeDaten, quelle: GrundlageQuelle, jetzt: string): GrundlageErgebnis | null {
   if (quelle.art === 'bau' && !grundrissHatTeile(quelle.grundriss)) return null
   if (quelle.art === 'excel' && !quelle.lesen.formen.length) return null
+  // Mit Parzelle liegt die Skizze auf deren Maßstab (Grün in Metern mitgenommen), die Grundlage kommt aus der Parzelle
+  const lage = quelle.art === 'parzelle' ? quelle.lage : quelle.art === 'excel' ? quelle.lage : undefined
+  if (lage) {
+    const auf = liegtAufParzelle(daten, lage) ? daten : legeSkizzeAufParzelle(daten, lage, jetzt)
+    const erg = quelle.art === 'parzelle' ? ausParzelle(quelle) : ausExcel(quelle as Extract<GrundlageQuelle, { art: 'excel' }>, LEINWAND.breite, LEINWAND.hoehe)
+    const neu: SkizzeDaten = {
+      ...auf,
+      elemente: [...erg.elemente, ...gruenElemente(auf)],
+      grundlage: {
+        quelle: quelle.art === 'excel' ? 'excel' : quelle.grundriss && grundrissHatTeile(quelle.grundriss) ? 'bau' : 'parzelle',
+        uebernommen: jetzt,
+        gesperrt: true,
+        ...(quelle.art === 'excel' && quelle.excelName ? { excelName: quelle.excelName } : {}),
+        ...(erg.hinweise.length ? { hinweise: erg.hinweise } : {}),
+      },
+    }
+    return { daten: neu, anzahl: erg.elemente.length, hinweise: erg.hinweise }
+  }
   const verhaeltnis = quelle.art === 'excel' && quelle.lesen.bereich.w > 0 ? quelle.lesen.bereich.h / quelle.lesen.bereich.w : VORLAGE_SEITENVERHAELTNIS
   const { breite, hoehe } = leinwandFuer(daten, verhaeltnis)
-  const erg = quelle.art === 'bau' ? ausGrundriss(quelle, breite, hoehe) : ausExcel(quelle, breite, hoehe)
+  const erg = quelle.art === 'bau' ? ausGrundriss(quelle, breite, hoehe) : ausExcel(quelle as Extract<GrundlageQuelle, { art: 'excel' }>, breite, hoehe)
   if (!erg.elemente.length) return null
   const neu: SkizzeDaten = {
     ...daten,
@@ -231,7 +307,7 @@ export function uebernehmeGrundlage(daten: SkizzeDaten, quelle: GrundlageQuelle,
     hoehe,
     elemente: [...erg.elemente, ...gruenElemente(daten)],
     grundlage: {
-      quelle: quelle.art,
+      quelle: quelle.art === 'bau' ? 'bau' : 'excel',
       uebernommen: jetzt,
       gesperrt: true,
       ...(quelle.art === 'excel' && quelle.excelName ? { excelName: quelle.excelName } : {}),

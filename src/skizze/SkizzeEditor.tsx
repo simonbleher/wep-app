@@ -455,7 +455,8 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
 
       // Symbol setzen: ein Tipp genügt, Größe nach Standard
       if (aktivesWerkzeug === 'symbol') {
-        const faktor = breite / 445
+        // Standardgrößen gelten für eine Leinwand von 445 px (≈ 20 m Parzellenbreite); mit Parzelle richten sie sich nach dem Maßstab
+        const faktor = daten.massstab ? daten.massstab.pxProM / (445 / 20) : breite / 445
         const [sb, sh] = STANDARD_GROESSE[symbolArt]
         let symbol: SkizzeElement = {
           id: neueId(),

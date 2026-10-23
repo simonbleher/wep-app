@@ -22,6 +22,7 @@ import {
 } from '@/bauexcel/abgleich'
 import type { BauExcelRecord } from '@/bauexcel/types'
 import type { BauFormalien } from '@/export/bauExcelLesen'
+import { parzelleAusBauExcel, setzeParzelle } from '@/parzelle'
 import { fotoNetzStatus, ladeBauExcelAusOneDrive, type FotoNetz } from '@/sync'
 import { Dialog, ICON, Meldung, Rueckfrage } from './ui'
 
@@ -337,10 +338,29 @@ export function BauExcelBereich({
         return
       }
       await gleicheAb(erg.bau, datei.name, erg.ersetzt)
+      await uebernehmeParzelleAusExcel(datei)
     } catch (e) {
       setFehler(e instanceof Error ? e.message : String(e))
     } finally {
       setBeschaeftigt(false)
+    }
+  }
+
+  /**
+   * Beta 6, Paket 1: Die Form „Grundstück“ der Bau-Excel wird zur Parzelle des WEP – aber nur, wenn es noch keine gibt
+   * (eine vorhandene wird nie überschrieben).
+   */
+  async function uebernehmeParzelleAusExcel(datei: Blob) {
+    if ((leseWep() ?? wep).parzelle) return
+    try {
+      const r = await parzelleAusBauExcel(new Uint8Array(await datei.arrayBuffer()), new Date().toISOString())
+      if (r.parzelle) {
+        const parzelle = r.parzelle
+        await aendere((w) => (w.parzelle ? w : setzeParzelle(w, parzelle)))
+        setInfo((alt) => [alt, r.hinweis].filter(Boolean).join(' '))
+      }
+    } catch {
+      // Die Parzelle ist eine Zugabe: ein unlesbares Blatt „Skizze Bau“ ändert nichts an der übernommenen Bau-Excel
     }
   }
 

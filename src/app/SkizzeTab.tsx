@@ -11,12 +11,14 @@ import { SkizzeEditor } from '@/skizze/SkizzeEditor'
 import { SkizzeChat } from '@/skizze/SkizzeChat'
 import { leereSkizze, istGrundlage } from '@/skizze/types'
 import { grundrissHatTeile, hatGrundlage, setzeGrundlageGesperrt, uebernehmeGrundlage, type GrundlageQuelle } from '@/skizze/grundlage'
+import { lageVon, massstabText, setzeParzelle, skizzeLage, skizzeMitParzelle, type Parzelle } from '@/parzelle'
 import { bauExcelFuerExport } from '@/bauexcel'
 import { leseBauSkizze } from '@/export/bauSkizzeLesen'
 import { ladeBauExcelAusOneDrive } from '@/sync'
 import { KI_AKTIV } from '@/funktionen'
 import { Dialog, ICON, Meldung, datumDe } from './ui'
 import { entprelle } from './entprellen'
+import { ParzelleBereich } from './ParzelleBereich'
 
 const SPEICHER_VERZOEGERUNG_MS = 400
 
@@ -29,13 +31,15 @@ export function SkizzeTab({
   wep: Wep
   onSpeichern: (wep: Wep) => Promise<void>
 }) {
-  const [startwert] = useState<SkizzeDaten>(() => wep.skizze ?? leereSkizze())
+  // Mit Parzelle (Beta 6, Paket 1) beginnt eine Skizze ohne Grün auf der Parzelle (Maßstab, Grundstück, Pfosten)
+  const [startwert] = useState<SkizzeDaten>(() => skizzeMitParzelle(wep) ?? leereSkizze())
   // Wert für den Editor: ändert sich nur durch den Chat (sonst setzt sich der Editor zurück)
   const [editorWert, setEditorWert] = useState<SkizzeDaten>(startwert)
   const aktuellRef = useRef<SkizzeDaten>(startwert)
   // Stand für die Anzeige der Grundlage-Leiste (Editor und Chat schreiben weiter über aktuellRef)
   const [stand, setStand] = useState<SkizzeDaten>(startwert)
   const [frage, setFrage] = useState(false)
+  const [frageUmlegen, setFrageUmlegen] = useState(false)
   const [arbeitet, setArbeitet] = useState(false)
   const [fehler, setFehler] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
@@ -85,8 +89,30 @@ export function SkizzeTab({
     [speichereSkizze],
   )
   const holeSkizze = useCallback(() => aktuellRef.current, [])
+  /** Neuer Gesamtstand nach einer Änderung der Parzelle: Editor und Anzeige übernehmen ihn, gespeichert wird mit dem WEP. */
+  const uebernehmeStand = useCallback((skizze: SkizzeDaten) => {
+    aktuellRef.current = skizze
+    setStand(skizze)
+    setEditorWert(skizze)
+  }, [])
+
+  /** Parzelle setzen: offene Änderungen der Skizze zuerst speichern, dann Skizze und Parzelle zusammen im WEP ablegen. */
+  const uebernehmeParzelle = useCallback(
+    async (p: Parzelle | undefined) => {
+      speichereSkizze.sofort()
+      const basis = { ...wepRef.current, skizze: aktuellRef.current }
+      const neu = setzeParzelle(basis, p)
+      await speichernRef.current(neu)
+      if (neu.skizze) uebernehmeStand(neu.skizze)
+      setFrageUmlegen(false)
+    },
+    [speichereSkizze, uebernehmeStand],
+  )
 
   const anzahl = stand.elemente.filter((e) => !istGrundlage(e)).length
+  const parzellenLage = lageVon(wep)
+  // Parzelle da, aber Grün liegt noch nach altem Maßstab (z. B. Parzelle auf einem anderen Gerät angelegt): erst nach Rückfrage umlegen
+  const umlegenNoetig = skizzeLage({ parzelle: wep.parzelle, skizze: stand }) === 'umlegen'
   const bauVorhanden = grundrissHatTeile(wep.grundriss)
   const excelVorhanden = Boolean(wep.bauExcel)
   const grundlage = hatGrundlage(stand) ? stand.grundlage : undefined
@@ -101,18 +127,21 @@ export function SkizzeTab({
     try {
       let quelle: GrundlageQuelle
       if (herkunft === 'bau') {
-        quelle = {
-          art: 'bau',
-          grundriss: wepRef.current.grundriss!,
-          bauteile: wepRef.current.bau?.bauteile ?? [],
-          flaecheM2: wepRef.current.formalien.parzellenflaecheM2 || undefined,
-        }
+        const parzellenLage = lageVon(wepRef.current)
+        quelle = parzellenLage
+          ? { art: 'parzelle', lage: parzellenLage, grundriss: wepRef.current.grundriss!, bauteile: wepRef.current.bau?.bauteile ?? [] }
+          : {
+              art: 'bau',
+              grundriss: wepRef.current.grundriss!,
+              bauteile: wepRef.current.bau?.bauteile ?? [],
+              flaecheM2: wepRef.current.formalien.parzellenflaecheM2 || undefined,
+            }
       } else {
         const bytes = await bauExcelFuerExport({ wep: wepRef.current, quelle: { hole: ladeBauExcelAusOneDrive } })
         if (!bytes) throw new Error('Zu diesem WEP ist keine Bau-Excel hinterlegt.')
         const lesen = await leseBauSkizze(bytes)
         if (!lesen.blattVorhanden) throw new Error('In der Bau-Excel fehlt das Blatt „Skizze Bau“. Ist das die WEP-Vorlage?')
-        quelle = { art: 'excel', lesen, excelName: wepRef.current.bauExcel?.name }
+        quelle = { art: 'excel', lesen, excelName: wepRef.current.bauExcel?.name, lage: lageVon(wepRef.current) }
       }
       const erg = uebernehmeGrundlage(aktuellRef.current, quelle, new Date().toISOString())
       if (!erg) {
@@ -147,11 +176,42 @@ export function SkizzeTab({
           <p className="neben">Außenanlagen &amp; Aufwuchs</p>
         </div>
       </header>
+      <ParzelleBereich wep={wep} teil="gruen" onUebernehmen={uebernehmeParzelle} />
+      {umlegenNoetig && (
+        <Meldung>
+          <p data-testid="skizze-umlegen">
+            Die Skizze liegt noch nicht auf der Parzelle (alter Stand ohne Maßstab). Bis du sie auf die Parzelle legst, passen Grün und Bau-Skizze nicht übereinander.
+          </p>
+          <button type="button" className="knopf" onClick={() => setFrageUmlegen(true)}>
+            Skizze auf die Parzelle legen
+          </button>
+        </Meldung>
+      )}
+      {frageUmlegen && (
+        <Dialog titel="Skizze auf die Parzelle legen?" rueckfrage onSchliessen={() => setFrageUmlegen(false)}>
+          <p>
+            Die Skizze hatte bisher keinen Maßstab: Ihr Grundstück (sonst die ganze Zeichenfläche) wird so auf die Parzelle gelegt, dass es sie ausfüllt; alles Grüne bleibt dabei in seiner Lage zueinander. Bitte danach kurz prüfen.
+          </p>
+          <div className="dialog-knoepfe">
+            <button type="button" className="knopf" autoFocus onClick={() => setFrageUmlegen(false)}>
+              Abbrechen
+            </button>
+            <button type="button" className="knopf knopf-primaer" onClick={() => void uebernehmeParzelle(wep.parzelle)}>
+              Auf die Parzelle legen
+            </button>
+          </div>
+        </Dialog>
+      )}
       <p className="neben">
         Rechteck, Linie, Kreis, Text, Maßangabe und Symbole (Baum, Beet, Hecke …){KI_AKTIV && ' – oder per Beschreibung im Chat darunter'}. Grundlage und Grün werden beim
         Excel-Export ins Blatt „Skizze Außenanlage-Aufwuchs“ eingefügt; „Skizze Bau“ bleibt unverändert.
         {anzahl > 0 && ` · ${anzahl} ${anzahl === 1 ? 'Element' : 'Elemente'} gespeichert`}
       </p>
+      {stand.massstab && parzellenLage && (
+        <p className="neben" data-testid="skizze-massstab">
+          Maßstab: {massstabText(stand.massstab.pxProM)} · Parzelle {parzellenLage.breiteM.toLocaleString('de-DE')} × {parzellenLage.hoeheM.toLocaleString('de-DE')} m – wie in „Skizze Bau“
+        </p>
+      )}
       <section className="grundlage" aria-label="Grundlage aus der Bau-Skizze">
         <div className="grundlage-kopf">
           <Layers {...ICON} />
@@ -160,7 +220,12 @@ export function SkizzeTab({
         {grundlage ? (
           <>
             <p className="neben" data-testid="grundlage-stand">
-              {grundlage.quelle === 'bau' ? 'Aus dem Bau-Teil (Grundriss)' : `Aus der Bau-Excel${grundlage.excelName ? ` „${grundlage.excelName}“` : ''}`} · {grundlageAnzahl}{' '}
+              {grundlage.quelle === 'bau'
+                ? 'Aus dem Bau-Teil (Grundriss) auf der Parzelle'
+                : grundlage.quelle === 'parzelle'
+                  ? 'Aus der Parzelle (Grundstück, Pfosten)'
+                  : `Aus der Bau-Excel${grundlage.excelName ? ` „${grundlage.excelName}“` : ''}`}{' '}
+              · {grundlageAnzahl}{' '}
               {grundlageAnzahl === 1 ? 'Form' : 'Formen'} · übernommen am {datumDe(grundlage.uebernommen.slice(0, 10))} ·{' '}
               {grundlage.gesperrt ? 'gesperrt (kein Verschieben aus Versehen)' : 'entsperrt – Formen einzeln antippen und korrigieren'}
             </p>
@@ -169,9 +234,24 @@ export function SkizzeTab({
                 {grundlage.gesperrt ? <Lock {...ICON} /> : <LockOpen {...ICON} />}
                 {grundlage.gesperrt ? 'Entsperren' : 'Sperren'}
               </button>
-              <button type="button" className="knopf" disabled={arbeitet || (!bauVorhanden && !excelVorhanden)} onClick={() => setFrage(true)}>
-                Grundlage neu übernehmen
-              </button>
+              {grundlage.quelle === 'parzelle' && (bauVorhanden || excelVorhanden) ? (
+                <>
+                  {bauVorhanden && (
+                    <button type="button" className="knopf knopf-primaer" disabled={arbeitet} onClick={() => void uebernehmen('bau')}>
+                      Bauteile aus Bau-Teil dazu
+                    </button>
+                  )}
+                  {excelVorhanden && (
+                    <button type="button" className="knopf" disabled={arbeitet} onClick={() => void uebernehmen('excel')}>
+                      Aus Bau-Excel übernehmen
+                    </button>
+                  )}
+                </>
+              ) : (
+                <button type="button" className="knopf" disabled={arbeitet || (!bauVorhanden && !excelVorhanden)} onClick={() => setFrage(true)}>
+                  Grundlage neu übernehmen
+                </button>
+              )}
             </div>
           </>
         ) : bauVorhanden || excelVorhanden ? (

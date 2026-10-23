@@ -55,10 +55,11 @@ function beschreibe(teil: TeilId, w: Wep): string {
   }
   if (teil === 'bauExcel') return w.bauExcel ? w.bauExcel.name : 'keine'
   if (teil === 'fotos') return n(w.fotos?.length ?? 0, 'Foto', 'Fotos')
-  return [w.formalien.kleingartenanlage, w.formalien.parzelle, w.status ?? 'in Arbeit'].filter((t) => t && String(t).trim()).join(' · ') || 'leer'
+  return [w.formalien.kleingartenanlage, w.formalien.parzelle, w.parzelle ? 'Parzelle' : '', w.status ?? 'in Arbeit'].filter((t) => t && String(t).trim()).join(' · ') || 'leer'
 }
 
-const formalienTeil = (w: Wep) => ({ formalien: w.formalien, status: w.status, rolle: w.rolle })
+// Die Parzelle (Beta 6, Paket 1) gehört keinem der beiden Teile allein: Sie reist mit den Formalien
+const formalienTeil = (w: Wep) => ({ formalien: w.formalien, status: w.status, rolle: w.rolle, parzelle: w.parzelle })
 
 /** Welche Teile der Datei unterscheiden sich vom lokalen Stand und wären etwas zum Übernehmen? */
 export function unterschiedlicheTeile(lokal: Wep, datei: Wep): TeilPunkt[] {

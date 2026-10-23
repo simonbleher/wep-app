@@ -123,7 +123,10 @@ export interface FormElement {
    * Reihenfolge und relative Lage bleiben erhalten.
    */
   gruppe?: string
-  /** bauteil: Eckpunkte des Grundrisses (Freiform; Rechtecke werden normale Rechtecke). */
+  /**
+   * bauteil: Eckpunkte des Grundrisses (Freiform; Rechtecke werden normale Rechtecke).
+   * grundstueck/gras: Eckpunkte der Parzelle, wenn sie kein achsenparalleles Rechteck ist (sonst genügt `kasten`).
+   */
   punkte?: Punkt[]
   /** bauteil: gestrichelt ohne Füllung (Keller, Hauswasser). */
   gestrichelt?: boolean
@@ -131,6 +134,8 @@ export interface FormElement {
   grundlage?: boolean
   /** massangabe: Text bei waagerechter Linie unter statt über der Linie (Maßketten unter dem Grundriss). */
   textUnten?: boolean
+  /** massangabe: Text bei senkrechter Linie links statt rechts daneben (Seitenmaße der Parzelle auf der rechten Hälfte). */
+  textLinks?: boolean
 }
 
 /** Wandelt SVG in PNG (Fallback für Excel-Versionen ohne SVG). Im Browser: `svgZuPngBrowser`. */
@@ -272,6 +277,8 @@ const PT = EMU_PRO_PT
 
 const FARBE = {
   wiese: 'C5E0B4',
+  /** Grundstück im Blatt „Skizze Bau“ (Skill, Modus Bau). */
+  wieseBau: 'E2F0D9',
   grundstueckLinie: '595959',
   gras: '70AD47',
   weg: 'EDE4D3',
@@ -430,7 +437,7 @@ export function torSvg(): string {
 }
 
 /** Gras: ca. 20–25 kleine „v“-Häkchen, deterministisch verteilt. */
-export function grasSvg(breite: number, hoehe: number): string {
+export function grasSvg(breite: number, hoehe: number, innen?: (x: number, y: number) => boolean): string {
   let z = 12345
   const zufall = () => {
     z = (z * 1664525 + 1013904223) % 4294967296
@@ -438,10 +445,13 @@ export function grasSvg(breite: number, hoehe: number): string {
   }
   const anzahl = 22
   let pfade = ''
-  for (let i = 0; i < anzahl; i++) {
+  for (let i = 0, versuche = 0; i < anzahl && versuche < 2000; versuche++) {
     const x = 8 + zufall() * (breite - 22)
     const y = 8 + zufall() * (hoehe - 20)
+    // Grundstück mit schrägen Seiten: Häkchen nur innerhalb (mit Platz für das Häkchen selbst)
+    if (innen && !(innen(x, y) && innen(x + 6, y + 6) && innen(x, y + 6))) continue
     pfade += `M${x.toFixed(1)} ${y.toFixed(1)} l3 6 l3 -6 `
+    i++
   }
   return svgRahmen(
     `<path d="${pfade.trim()}" stroke="#70AD47" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`,
@@ -558,7 +568,7 @@ function formenFuer(el: FormElement, mitSvg: boolean): Form[] {
         const waagerecht = Math.abs(dx) >= Math.abs(dy)
         const unten = waagerecht && el.textUnten
         t.kasten.y = Math.round((von.y + nach.y) / 2 - (waagerecht ? (unten ? -1 * PT : t.kasten.h + 1 * PT) : t.kasten.h / 2))
-        if (!waagerecht) t.kasten.x = Math.round((von.x + nach.x) / 2 + 3 * PT)
+        if (!waagerecht) t.kasten.x = Math.round((von.x + nach.x) / 2 + (el.textLinks ? -3 * PT - t.kasten.w : 3 * PT))
         t.schriftFarbe = FARBE.rot
         t.ebene = EBENE.mass
         f.push(t)
@@ -568,15 +578,31 @@ function formenFuer(el: FormElement, mitSvg: boolean): Form[] {
 
     case 'gras': {
       if (!k) return []
+      const poly = el.punkte && el.punkte.length >= 3 ? el.punkte : undefined
+      const innen = poly ? (x: number, y: number) => punktImPolygonEmu({ x: k.x + x * PT, y: k.y + y * PT }, poly) : undefined
       return mitSvg
-        ? [{ art: 'pic', name: n, ebene: EBENE.gras, kasten: k, svg: grasSvg(k.w / PT, k.h / PT) }]
+        ? [{ art: 'pic', name: n, ebene: EBENE.gras, kasten: k, svg: grasSvg(k.w / PT, k.h / PT, innen) }]
         : []
     }
 
-    case 'grundstueck':
-      return k
-        ? [{ art: 'sp', name: n, ebene: EBENE.wiese, kasten: k, prst: 'rect', fuellung: FARBE.wiese, linie: linie(FARBE.grundstueckLinie) }]
-        : []
+    case 'grundstueck': {
+      // Polygon (Parzelle mit schrägen Seiten) als Freiform, sonst Rechteck
+      const pts = el.punkte && el.punkte.length >= 3 ? el.punkte : undefined
+      const box = pts ? umgebendes(pts) : k
+      if (!box) return []
+      return [
+        {
+          art: 'sp',
+          name: n,
+          ebene: EBENE.wiese,
+          kasten: box,
+          prst: 'rect',
+          ...(pts && !istAchsenRechteck(pts) ? { pfad: pts } : {}),
+          fuellung: el.variante === 'bau' ? FARBE.wieseBau : FARBE.wiese,
+          linie: linie(FARBE.grundstueckLinie),
+        },
+      ]
+    }
 
     case 'pfosten':
       return k
@@ -844,6 +870,27 @@ function formenFuer(el: FormElement, mitSvg: boolean): Form[] {
   }
 }
 
+/** Vier Ecken, jede Seite waagerecht oder senkrecht (mit etwas Spiel gegen Rundungen)? */
+export function istAchsenRechteck(pts: readonly Punkt[]): boolean {
+  return (
+    pts.length === 4 &&
+    pts.every((p, i) => {
+      const q = pts[(i + 1) % 4]
+      return Math.abs(p.x - q.x) < PT / 10 || Math.abs(p.y - q.y) < PT / 10
+    })
+  )
+}
+
+function punktImPolygonEmu(p: Punkt, pts: readonly Punkt[]): boolean {
+  let innen = false
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const a = pts[i]
+    const b = pts[j]
+    if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) innen = !innen
+  }
+  return innen
+}
+
 function umgebendes(pts: Punkt[]): Kasten {
   const x1 = Math.min(...pts.map((p) => p.x))
   const y1 = Math.min(...pts.map((p) => p.y))
@@ -1085,6 +1132,20 @@ export function formNamen(elemente: FormElement[], mitSvg = true): string[] {
   return elementeZuFormen(elemente, mitSvg).map((f) => f.name)
 }
 
+/**
+ * Leinwand (Pixel) → Kasten des Blatts (EMU ab Blattecke): Seitenverhältnis bleibt, zentriert. Die Grün-Skizze und der Grundriss mit
+ * Parzelle benutzen dieselbe Abbildung – so liegt die Parzelle auf beiden Blättern an derselben Stelle in derselben Größe.
+ */
+export function leinwandAbbildung(
+  breite: number,
+  hoehe: number,
+  bereich: Kasten,
+): { faktor: number; X: (x: number) => number; Y: (y: number) => number } {
+  const p = einpassen(breite, hoehe, bereich.w, bereich.h)
+  const faktor = p.cx / breite
+  return { faktor, X: (x) => Math.round(bereich.x + p.x + x * faktor), Y: (y) => Math.round(bereich.y + p.y + y * faktor) }
+}
+
 /** Namensbestandteil: Leerzeichen → „_“, nur Buchstaben, Ziffern, „_“ und „-“. */
 const identOf = (s: string) =>
   s
@@ -1100,10 +1161,7 @@ const identOf = (s: string) =>
 export function skizzeDatenZuFormen(daten: SkizzeDaten, bereich: Kasten, optionen: { grundlage?: boolean } = {}): FormElement[] {
   const breite = daten.breite ?? 800
   const hoehe = daten.hoehe ?? 600
-  const p = einpassen(breite, hoehe, bereich.w, bereich.h)
-  const faktor = p.cx / breite
-  const X = (x: number) => Math.round(bereich.x + p.x + x * faktor)
-  const Y = (y: number) => Math.round(bereich.y + p.y + y * faktor)
+  const { faktor, X, Y } = leinwandAbbildung(breite, hoehe, bereich)
   const zaehler: Record<string, number> = {}
   const nummer = (basis: string) => `${basis}_${(zaehler[basis] = (zaehler[basis] ?? -1) + 1)}`
   // Gebäude der Grundlage heißen wie im Skill einfach „L“, „A1“, „K1_HW“; erst ein zweites gleiches bekommt „_2“
@@ -1123,7 +1181,7 @@ export function skizzeDatenZuFormen(daten: SkizzeDaten, bereich: Kasten, optione
         const pts = e.punkte.map((q) => ({ x: X(q.x), y: Y(q.y) }))
         if (pts.length < 3) break
         const box = umgebendes(pts)
-        if (e.art === 'grundstueck') out.push({ typ: 'grundstueck', name: 'Grundstück', kasten: box, ...gl })
+        if (e.art === 'grundstueck') out.push({ typ: 'grundstueck', name: 'Grundstück', kasten: box, ...(istAchsenRechteck(pts) ? {} : { punkte: pts }), ...gl })
         else if (e.art === 'pfosten') out.push({ typ: 'pfosten', name: nummer('Pfosten'), kasten: box, ...gl })
         else {
           const kopf = (e.beschriftung ?? '').split('\n')[0]
@@ -1170,15 +1228,22 @@ export function skizzeDatenZuFormen(daten: SkizzeDaten, bereich: Kasten, optione
         out.push({ typ: 'text', name: nummer('Text'), kasten: { x: X(e.x), y: Y(e.y), w, h: Math.round((pt + 6) * PT) }, text: e.inhalt, schriftPt: pt })
         break
       }
-      case 'massangabe':
+      case 'massangabe': {
+        // Seitenmaße der Parzelle (Grundlage) liegen innen am Rand: der Text steht zur Mitte hin, nicht über den Rand hinaus
+        const seitenmass =
+          e.ebene === 'grundlage'
+            ? { textUnten: (e.y1 + e.y2) / 2 < hoehe / 2, textLinks: (e.x1 + e.x2) / 2 > breite / 2 }
+            : {}
         out.push({
           typ: 'massangabe',
           name: nummer('Maß'),
           von: { x: X(e.x1), y: Y(e.y1) },
           nach: { x: X(e.x2), y: Y(e.y2) },
           text: e.beschriftung,
+          ...seitenmass,
         })
         break
+      }
     }
   }
   return out
@@ -1419,12 +1484,11 @@ export async function fuegeSkizzeFormenEin(
   const grundstueck = elemente.find((e) => e.typ === 'grundstueck')
   if (graswiese) elemente = elemente.filter((e) => e.typ !== 'grundstueck')
   if (graswiese) {
-    const z = grundstueck?.kasten ?? zeichenbereich
-    formen.push({
-      art: 'sp', name: 'Grundstück', ebene: EBENE.wiese, kasten: z, prst: 'rect',
-      fuellung: FARBE.wiese, linie: linie(FARBE.grundstueckLinie),
-    })
-    formen.push(...formenFuer({ typ: 'gras', name: 'Gras', kasten: z }, mitSvg))
+    // Wiese: das Grundstück der Grundlage (Rechteck oder Polygon der Parzelle), sonst der ganze Zeichenbereich
+    const gs: FormElement = grundstueck ?? { typ: 'grundstueck', name: 'Grundstück', kasten: zeichenbereich }
+    formen.push(...formenFuer({ ...gs, name: 'Grundstück', variante: undefined }, mitSvg))
+    const z = gs.punkte && gs.punkte.length >= 3 ? umgebendes(gs.punkte) : (gs.kasten ?? zeichenbereich)
+    formen.push(...formenFuer({ typ: 'gras', name: 'Gras', kasten: z, ...(gs.punkte && !istAchsenRechteck(gs.punkte) ? { punkte: gs.punkte } : {}) }, mitSvg))
   }
   formen.push(...elementeZuFormen(elemente, mitSvg))
   formen.sort((a, b) => a.ebene - b.ebene)

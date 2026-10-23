@@ -7,12 +7,14 @@ import { Box, TriangleAlert } from 'lucide-react'
 import type { Bauteil, BauteilArt, GrundrissDaten, Wep } from '@/model'
 import type { WepAendern } from '@/fotos'
 import { uebernehmeGrundriss } from '@/bau'
+import { lageVon, schiebeGrundrissInParzelle, setzeParzelle, type Parzelle } from '@/parzelle'
 import { GrundrissEditor } from '@/skizze/GrundrissEditor'
 import { baueModell3D, ART_TEXT_3D } from '@/skizze/modell3d'
 import { dachformText, leererGrundriss, massenberechnung, meterText, zahl2Text } from '@/skizze/grundriss'
 import { ICON } from './ui'
 import { aendereBauTeil, ersetzeBauteil, neuesBauteil } from './bauHelfer'
 import { entprelle } from './entprellen'
+import { AusserhalbHinweis, ParzelleBereich } from './ParzelleBereich'
 
 const SPEICHER_VERZOEGERUNG_MS = 400
 
@@ -28,6 +30,9 @@ export function SkizzeBauTab({ wep, aendere }: { wep: Wep; aendere: WepAendern }
   bauteileRef.current = bauteile
   const aendereRef = useRef(aendere)
   aendereRef.current = aendere
+  const wepRef = useRef(wep)
+  wepRef.current = wep
+  const aktuellRef = useRef<GrundrissDaten>(startwert)
 
   const speichere = useMemo(
     () =>
@@ -41,6 +46,7 @@ export function SkizzeBauTab({ wep, aendere }: { wep: Wep; aendere: WepAendern }
   const beiAenderung = useCallback(
     (g: GrundrissDaten) => {
       setAktuell(g)
+      aktuellRef.current = g
       speichere(g)
     },
     [speichere],
@@ -52,6 +58,31 @@ export function SkizzeBauTab({ wep, aendere }: { wep: Wep; aendere: WepAendern }
     void aendereRef.current((w) => aendereBauTeil(w, (bau) => ersetzeBauteil(bau, b)))
     return b
   }, [])
+
+  const lage = lageVon(wep)
+  // Ändert sich die Parzelle oder wird der Grundriss verschoben, startet der Editor neu (er nimmt seinen Startwert nur beim Anlegen)
+  const [neuStand, setNeuStand] = useState(0)
+  const editorKey = lage ? `${lage.abb.pxProM.toFixed(5)}-${lage.breiteM}-${lage.hoeheM}-${neuStand}` : `frei-${neuStand}`
+
+  /** Parzelle setzen: offene Änderungen am Grundriss zuerst speichern, damit nichts Älteres zurückgeschrieben wird. */
+  const uebernehmeParzelle = useCallback(
+    async (p: Parzelle | undefined) => {
+      speichere.sofort()
+      await aendereRef.current((w) => setzeParzelle(w, p))
+      setNeuStand((n) => n + 1)
+    },
+    [speichere],
+  )
+  const schiebeGrundriss = useCallback(async () => {
+    const l = lageVon(wepRef.current)
+    if (!l) return
+    speichere.sofort()
+    const verschoben = schiebeGrundrissInParzelle(aktuellRef.current, l)
+    setAktuell(verschoben)
+    aktuellRef.current = verschoben
+    await aendereRef.current((w) => uebernehmeGrundriss({ ...w, grundriss: verschoben }, verschoben))
+    setNeuStand((n) => n + 1)
+  }, [speichere])
 
   const anzahl = aktuell.teile.length
   return (
@@ -67,7 +98,13 @@ export function SkizzeBauTab({ wep, aendere }: { wep: Wep; aendere: WepAendern }
         der Export schreibt alles als bearbeitbare Formen ins Blatt „Skizze Bau“.
         {anzahl > 0 && ` · ${anzahl} ${anzahl === 1 ? 'Teil' : 'Teile'}`}
       </p>
-      <GrundrissEditor wert={startwert} bauteile={bauteile} onAenderung={beiAenderung} onNeuesBauteil={neuesBauteilAnlegen} />
+      <ParzelleBereich
+        wep={wep}
+        teil="bau"
+        onUebernehmen={uebernehmeParzelle}
+        extra={<AusserhalbHinweis wep={{ ...wep, grundriss: aktuell }} onSchieben={() => void schiebeGrundriss()} />}
+      />
+      <GrundrissEditor key={editorKey} wert={aktuell} bauteile={bauteile} onAenderung={beiAenderung} onNeuesBauteil={neuesBauteilAnlegen} parzelle={lage} />
       <Massenberechnung daten={aktuell} bauteile={bauteile} />
       <Bereich3D daten={aktuell} bauteile={bauteile} />
     </section>

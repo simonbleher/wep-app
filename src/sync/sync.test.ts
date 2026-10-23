@@ -120,6 +120,28 @@ describe('Abgleich zwischen zwei Geräten', () => {
     expect(e3.heruntergeladen).toEqual([])
   })
 
+  it('Parzelle (Beta 6, Paket 1): vom Handy zum Tablet, dort geändert und zurück – mit dem Maßstab der Skizze', async () => {
+    const drive = new FakeOneDrive()
+    const handy = new FakeLokal()
+    const tablet = new FakeLokal()
+    const w = wep('2026-001', 'KGA Sonnenschein')
+    w.parzelle = { form: 'rechteck', laenge: 26, breite: 18, angelegtVon: 'bau', angelegtAm: '2026-10-23T10:00:00.000Z' }
+    w.skizze = { elemente: [], massstab: { pxProM: 30, ox: 10, oy: 20 } }
+    handy.bearbeite(w, jetzt())
+    await sync(drive, handy, 'Handy')
+    await sync(drive, tablet, 'Tablet')
+    expect(tablet.weps.get('2026-001')?.parzelle).toEqual(w.parzelle)
+    expect(tablet.weps.get('2026-001')?.skizze?.massstab).toEqual({ pxProM: 30, ox: 10, oy: 20 })
+
+    // Der Grün-Wertermittler korrigiert die Parzelle auf dem Tablet
+    const geaendert = structuredClone(tablet.weps.get('2026-001')!)
+    geaendert.parzelle = { ...geaendert.parzelle!, breite: 19, geaendertVon: 'gruen', geaendertAm: '2026-10-24T10:00:00.000Z' }
+    tablet.bearbeite(geaendert, jetzt())
+    await sync(drive, tablet, 'Tablet')
+    await sync(drive, handy, 'Handy')
+    expect(handy.weps.get('2026-001')?.parzelle).toMatchObject({ breite: 19, geaendertVon: 'gruen' })
+  })
+
   it('ohne Änderungen wird nichts hoch- oder heruntergeladen', async () => {
     const drive = new FakeOneDrive()
     const handy = new FakeLokal()

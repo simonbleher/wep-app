@@ -401,3 +401,66 @@ describe('Teilen: kaputte und fremde Dateien', () => {
     expect(e).toMatchObject({ fotos: 1, fotosFehlen: 1, fehler: [] })
   })
 })
+
+describe('Parzelle (Beta 6, Paket 1) reist mit', () => {
+  const PARZELLE = { form: 'rechteck', laenge: 26, breite: 18, angelegtVon: 'bau', angelegtAm: JETZT } as const
+  const mitParzelle = (): Stand => {
+    const s = geraetBau()
+    s.weps[0] = { wep: { ...s.weps[0].wep, parzelle: PARZELLE }, geaendertAm: '2026-10-20T10:00:00.000Z' }
+    return s
+  }
+
+  it('Bau → Grün auf ein leeres Gerät: die Parzelle kommt unverändert an', async () => {
+    const { gelesen } = await teile(mitParzelle(), '2026-001')
+    expect(gelesen.daten.wep.parzelle).toEqual(PARZELLE)
+    const b = leer()
+    const g = geraet(b)
+    const v = await erstelleTeilenVorschau(gelesen, g.quelle)
+    await spieleTeilenEin({ gelesen, vorschau: v, wahl: standardTeilenWahl(v), lokal: g.quelle, ziel: g.ziel })
+    expect(b.weps[0].wep.parzelle).toEqual(PARZELLE)
+  })
+
+  it('bei Abweichung gehört die Parzelle zu „Formalien und Status“: nichts ist vorgewählt, gewählt wird sie übernommen', async () => {
+    const a = mitParzelle()
+    const { gelesen } = await teile(a, '2026-001')
+    // Grün-Gerät kennt das WEP schon, ohne Parzelle
+    const b = leer()
+    b.weps = [{ wep: wep('2026-001', { bau: bau('Laube 24 m²'), fotos: [foto('f1'), foto('f2')], bauExcel: BAU_EXCEL }), geaendertAm: '2026-10-21T10:00:00.000Z' }]
+    const gb = geraet(b)
+    const v = await erstelleTeilenVorschau(gelesen, gb.quelle)
+    expect(v.punkt.status).toBe('anders')
+    const formalien = v.teile.find((t) => t.teil === 'formalien')
+    expect(formalien?.detail).toMatch(/Datei: .*Parzelle/)
+    expect(anzahlGewaehlt(v, standardTeilenWahl(v))).toBe(0)
+
+    // behalten: keine Parzelle
+    await spieleTeilenEin({ gelesen, vorschau: v, wahl: standardTeilenWahl(v), lokal: gb.quelle, ziel: gb.ziel })
+    expect(b.weps[0].wep.parzelle).toBeUndefined()
+
+    // übernehmen
+    const wahl: TeilenWahl = { wep: 'uebernehmen', teile: { formalien: 'uebernehmen' } }
+    const e = await spieleTeilenEin({ gelesen, vorschau: v, wahl, lokal: gb.quelle, ziel: gb.ziel })
+    expect(e.teile).toEqual(['formalien'])
+    expect(b.weps[0].wep.parzelle).toEqual(PARZELLE)
+    // die Teile Bau und Grün blieben, wie sie waren
+    expect(b.weps[0].wep.bau?.beschreibung).toBe('Laube 24 m²')
+  })
+
+  it('die Parzelle entfällt auch beim Übernehmen: war sie in der Datei weg, ist sie hier weg', async () => {
+    const hier = mitParzelle()
+    const ohne = geraetBau()
+    const { gelesen } = await teile(ohne, '2026-001')
+    const gb = geraet(hier)
+    const v = await erstelleTeilenVorschau(gelesen, gb.quelle)
+    const wahl: TeilenWahl = { wep: 'uebernehmen', teile: { formalien: 'uebernehmen' } }
+    await spieleTeilenEin({ gelesen, vorschau: v, wahl, lokal: gb.quelle, ziel: gb.ziel })
+    expect(hier.weps[0].wep.parzelle).toBeUndefined()
+  })
+
+  it('eine unlesbare Parzelle in einer fremden Datei bringt nichts zum Absturz', async () => {
+    const s = mitParzelle()
+    s.weps[0] = { wep: { ...s.weps[0].wep, parzelle: { form: 'frei', ecken: [null, 'x'] } as never }, geaendertAm: JETZT }
+    const { gelesen } = await teile(s, '2026-001')
+    expect(gelesen.daten.wep.parzelle).toBeDefined()
+  })
+})
