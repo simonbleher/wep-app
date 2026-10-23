@@ -31,10 +31,12 @@ import {
   PencilRuler,
   Plus,
   Shovel,
+  Share2,
   Sprout,
   Trash2,
   type LucideIcon,
 } from 'lucide-react'
+import { TeilenDialog } from './TeilenDialog'
 import { dupliziereWep, hatBauTeil, type BauteilArt, hatGruenTeil, naechsteVorgangsNr, rolleAusTeilen, wepRolle, wepStatus, type Rolle, type Wep, type Position, type BeseitigungsPosition, type Formalien, type WepStatus } from '@/model'
 import { PAPIERKORB_TAGE, belegteNummern, ladeKonflikt, loescheWep } from '@/sync/aktionen'
 import type { KonfliktInfo } from '@/sync/types'
@@ -155,6 +157,7 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
   const [tab, setTab] = useState<Tab>('formalien')
   const [maske, setMaske] = useState<Maske | null>(null)
   const [loeschFrage, setLoeschFrage] = useState(false)
+  const [teilenOffen, setTeilenOffen] = useState(false)
   const [exportZustand, setExportZustand] = useState<ExportZustand>({ typ: 'idle' })
   const [konflikt, setKonflikt] = useState<KonfliktInfo | undefined>()
   // Rolle aus dem Profil dieses Geräts; das WEP kann abweichen (`wep.rolle`)
@@ -337,7 +340,7 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
               <StatusMarke status={wepStatus(wep)} />
             </span>
           </div>
-          <WepMenue status={wepStatus(wep)} onStatus={(st) => void setzeStatus(st)} onDuplizieren={() => void duplizieren()} onLoeschen={() => setLoeschFrage(true)} />
+          <WepMenue status={wepStatus(wep)} onStatus={(st) => void setzeStatus(st)} onDuplizieren={() => void duplizieren()} onTeilen={() => setTeilenOffen(true)} onLoeschen={() => setLoeschFrage(true)} />
         </div>
         <nav className="sl-nav">
           {bereiche.map((b) => {
@@ -467,7 +470,7 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
                   >
                     Export
                   </button>
-                  <WepMenue status={wepStatus(wep)} onStatus={(st) => void setzeStatus(st)} onDuplizieren={() => void duplizieren()} onLoeschen={() => setLoeschFrage(true)} />
+                  <WepMenue status={wepStatus(wep)} onStatus={(st) => void setzeStatus(st)} onDuplizieren={() => void duplizieren()} onTeilen={() => setTeilenOffen(true)} onLoeschen={() => setLoeschFrage(true)} />
                 </>
               }
             />
@@ -570,6 +573,8 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
         </nav>
       )}
 
+      {teilenOffen && <TeilenDialog wep={wep} appVersion={__APP_VERSION__} onSchliessen={() => setTeilenOffen(false)} />}
+
       {loeschFrage && (
         <Rueckfrage
           titel={`WEP ${wep.id} in den Papierkorb?`}
@@ -591,11 +596,13 @@ function WepMenue({
   status,
   onStatus,
   onDuplizieren,
+  onTeilen,
   onLoeschen,
 }: {
   status: WepStatus
   onStatus: (status: WepStatus) => void
   onDuplizieren: () => void
+  onTeilen: () => void
   onLoeschen: () => void
 }) {
   const [offen, setOffen] = useState(false)
@@ -671,6 +678,20 @@ function WepMenue({
               >
                 <CopyPlus {...ICON} />
                 Duplizieren
+              </button>
+            </li>
+            <li role="none">
+              <button
+                type="button"
+                role="menuitem"
+                className="menue-eintrag"
+                onClick={() => {
+                  setOffen(false)
+                  onTeilen()
+                }}
+              >
+                <Share2 {...ICON} />
+                Teilen …
               </button>
             </li>
             <li role="none">

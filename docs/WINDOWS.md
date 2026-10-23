@@ -31,7 +31,8 @@ gelöscht werden sollen – **ohne OneDrive-Konto sind sie danach weg** (vorher 
 |---|---|---|
 | Anmeldung | MSAL.js, Weiterleitung zu Microsoft | Standardbrowser + PKCE, Rücksprung über `http://localhost:<Port>` |
 | Anmeldedaten | Browser-Speicher | Refresh-Token in der **Windows-Anmeldeinformationsverwaltung** (nicht im Klartext, nicht im Browser-Speicher) |
-| Excel-Export, Sicherung, Foto-ZIP | Download in den Download-Ordner | Windows-Dialog **„Speichern unter…“**; Excel mit Konto **zusätzlich** nach OneDrive (`Exporte/`) |
+| Excel-Export, Sicherung, Foto-ZIP, geteiltes WEP (`.wep`) | Download in den Download-Ordner | Windows-Dialog **„Speichern unter…“**; Excel mit Konto **zusätzlich** nach OneDrive (`Exporte/`) |
+| `.wep`-Datei öffnen | Datei in der App wählen („WEP-Datei öffnen“) | Doppelklick im Explorer (Dateizuordnung) **oder** in der App wählen |
 | Offline-Start | Service Worker | Dateien liegen im Programm (kein Service Worker) |
 | Updates | Service Worker | Live-Update des Web-Teils + Programm-Update (siehe unten) |
 
@@ -197,6 +198,7 @@ unter `src-tauri/` (oder von Hand). Reine Web-Änderungen erreichen das Programm
 | `src/anmeldung.rs` | Loopback-Server auf `127.0.0.1:<freier Port>`, Standardbrowser öffnen, Token-Anfragen an Microsoft (nur `login.microsoftonline.com/consumers`, ohne Origin-Header) |
 | `src/tresor.rs` | Anmeldedaten in der Windows-Anmeldeinformationsverwaltung (große Daten auf mehrere Einträge verteilt) |
 | `src/speichern.rs` | „Speichern unter…“-Dialog, Datei roh (ohne Base64) übernehmen |
+| `src/eingang.rs` | Doppelklick auf `.wep`: Pfad aus den Programmargumenten (Start bzw. zweiter Start über die Einzelinstanz-Weiche) merken, Name und Bytes an die Oberfläche geben, Ereignis `wep-datei` |
 | `src/webupdate.rs` | Live-Update: laden, prüfen, entpacken, ausliefern (`LiveAssets`), Rückfall |
 | `src/programm.rs` | Tauri-Updater (neue .exe) |
 | `capabilities/default.json` | Hauptfenster: nur `core:default`; die eigenen Befehle brauchen keine Plugin-Rechte |
@@ -204,6 +206,14 @@ unter `src-tauri/` (oder von Hand). Reine Web-Änderungen erreichen das Programm
 Oberfläche: `src/windows/` (Brücke `api.ts`, Update-Entscheidung `update.ts`, Ablauf `updateAblauf.ts`,
 Dienst `updateDienst.ts`), `src/konto/windows.ts` (Anmeldung), `src/app/dateiSpeichern.ts` (Speichern-Weiche),
 `src/app/updateModul.ts` (wählt Android- oder Windows-Update-Dienst).
+
+## WEP-Dateien (`.wep`) teilen und öffnen (Beta 5, Paket 2)
+
+- **Teilen:** WEP → „⋯“ → **Teilen** → Schalter „Fotos/Bau-Excel mitschicken“ → **Speichern unter …** (Windows-Dialog); die Datei lässt sich dann per E-Mail, Teams, USB-Stick weitergeben. Windows hat hier kein eigenes Teilen-Menü.
+- **Öffnen:** Der Installer ordnet `.wep` dem Programm zu (`bundle.fileAssociations`, Typ `application/x-wep`). Doppelklick startet WEP (oder bringt das offene Fenster nach vorn) und zeigt die Vorschau; **nichts wird ohne Wahl überschrieben**.
+  Alternativ auf der Startseite „WEP-Datei öffnen“. Die Oberfläche übergibt dem Programm nie einen Pfad, nur das Programm kennt ihn (aus den Startargumenten).
+- Geändert unter `src-tauri/`: **Programmversion 0.1.2**, **Hülle 2** (neue Befehle `eingang_pruefen`, `eingang_lesen`, `eingang_verwerfen`). Programme der Hülle 1 wenden das neue Web-Paket nicht an, sondern melden „Neue App-Version“.
+- Die Zuordnung entsteht beim **Installieren** (neue .exe nötig); ein reines Live-Update ändert sie nicht. Doppelklick auf einem echten Windows-PC ist noch nicht ausprobiert (Checkliste im PR).
 
 ## Fehlersuche
 

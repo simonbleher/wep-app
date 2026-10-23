@@ -119,6 +119,19 @@ export interface WepNativePlugin {
   dateiBeginnen(): Promise<void>
   dateiAnhaengen(a: { daten: string }): Promise<void>
   dateiSpeichern(a: { name: string; typ: string }): Promise<{ gespeichert: boolean }>
+  /**
+   * Teilen-Menü des Systems (WhatsApp, E-Mail …) für die zuvor mit `dateiBeginnen`/`dateiAnhaengen`
+   * übergebene Datei. `geteilt: false`, wenn das Menü nicht geöffnet werden konnte.
+   */
+  dateiTeilen(a: { name: string; typ: string }): Promise<{ geteilt: boolean }>
+
+  /**
+   * „Öffnen mit WEP“: Hat Android die App mit einer Datei gestartet (VIEW-Intent), liegt sie im App-Cache.
+   * `vorhanden: false`, wenn nichts wartet. Die Datei wird stückweise gelesen und danach verworfen.
+   */
+  eingangPruefen(): Promise<{ vorhanden: boolean; name?: string; groesse?: number }>
+  eingangLesen(a: { pos: number; laenge: number }): Promise<{ daten: string }>
+  eingangVerwerfen(): Promise<void>
 
   /** Nummer des nativen Teils (android/native-version.txt) und versionCode der installierten APK. */
   nativeVersion(): Promise<{ nativeVersion: number; versionCode: number }>
@@ -132,6 +145,8 @@ export interface WepNativePlugin {
    * öffnet das Plugin die Einstellung und weist mit dem Code ERLAUBNIS ab.
    */
   installiereApk(): Promise<void>
+  /** Die App läuft schon und bekommt über „Öffnen mit WEP“ eine Datei. */
+  addListener(eventName: 'eingang', fn: (e: { name: string; groesse: number }) => void): Promise<PluginListenerHandle>
   addListener(
     eventName: 'apkFortschritt',
     fn: (f: { geladen: number; gesamt: number }) => void,

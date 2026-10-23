@@ -3,6 +3,7 @@
 //! sicherer Speicher, „Speichern unter…“, Live-Update des Web-Teils und Programm-Updates.
 
 mod anmeldung;
+mod eingang;
 mod programm;
 mod speichern;
 mod tresor;
@@ -32,8 +33,10 @@ pub fn run() {
 
     let live_fuer_start = live.clone();
     tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            // Zweiter Start: das offene Fenster nach vorn (zwei Fenster würden dieselben Daten beschreiben)
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            // Zweiter Start (z. B. Doppelklick auf eine .wep-Datei): die Datei melden, das offene Fenster nach
+            // vorn (zwei Fenster würden dieselben Daten beschreiben)
+            eingang::nimm_an(app, &app.state::<eingang::Eingang>(), &args);
             if let Some(fenster) = app.get_webview_window("main") {
                 let _ = fenster.unminimize();
                 let _ = fenster.set_focus();
@@ -42,6 +45,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .manage(eingang::Eingang::aus_args(&std::env::args().collect::<Vec<_>>()))
         .manage(anmeldung::Lauscher::default())
         .manage(programm::Gefunden::default())
         .manage(live)
@@ -59,6 +63,9 @@ pub fn run() {
             anmeldung::anmeldung_speichern,
             anmeldung::anmeldung_loeschen,
             speichern::datei_speichern,
+            eingang::eingang_pruefen,
+            eingang::eingang_lesen,
+            eingang::eingang_verwerfen,
             webupdate::web_info,
             webupdate::web_start_gemeldet,
             webupdate::web_paket_laden,

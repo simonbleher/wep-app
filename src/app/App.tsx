@@ -16,6 +16,8 @@ import { Papierkorb } from './Papierkorb'
 import { Profil } from './Profil'
 import { Startseite } from './Startseite'
 import { WepDetail } from './WepDetail'
+import { TeilenOeffnen } from './TeilenOeffnen'
+import { beobachteEingang, holeEingang } from '@/teilen/eingang'
 
 type Ansicht = { typ: 'start' } | { typ: 'detail'; wepId: string } | { typ: 'profil' } | { typ: 'papierkorb' }
 
@@ -27,6 +29,10 @@ export default function App() {
   const [phase, setPhase] = useState<Phase>('lade')
   const [konto, setKonto] = useState<Konto | null>(null)
   const [fehler, setFehler] = useState('')
+  // Eine .wep-Datei wartet auf die Vorschau (gewählt, per „Öffnen mit WEP“ oder Doppelklick gekommen)
+  const [wepDatei, setWepDatei] = useState<Blob>()
+  // Zählt hoch, wenn eine WEP-Datei etwas eingespielt hat: ein offenes WEP wird dann neu geladen
+  const [eingespielt, setEingespielt] = useState(0)
 
   // Android/Windows: Die Oberfläche steht → Start gilt als gelungen (sonst Rückfall des Live-Updates)
   useEffect(() => {
@@ -44,6 +50,19 @@ export default function App() {
       aktiv = false
     }
   }, [])
+
+  // „Öffnen mit WEP“ (Android) und Doppelklick (Windows): beim Start wartende Datei und spätere Dateien
+  useEffect(() => {
+    if (phase !== 'bereit') return
+    let aktiv = true
+    let abmelden: (() => void) | undefined
+    void holeEingang().then((e) => aktiv && e && setWepDatei(e.blob))
+    void beobachteEingang((e) => aktiv && setWepDatei(e.blob)).then((a) => (aktiv ? (abmelden = a) : a()))
+    return () => {
+      aktiv = false
+      abmelden?.()
+    }
+  }, [phase])
 
   const melden = useCallback(async () => {
     setFehler('')
@@ -96,11 +115,13 @@ export default function App() {
     <div className="app">
       {ansicht.typ === 'start' ? (
         <Startseite
+          key={`start-${eingespielt}`}
           konto={konto}
           verfuegbar={kontoVerfuegbar()}
           onOeffnen={(wepId) => setAnsicht({ typ: 'detail', wepId })}
           onProfil={() => setAnsicht({ typ: 'profil' })}
           onPapierkorb={() => setAnsicht({ typ: 'papierkorb' })}
+          onWepDatei={setWepDatei}
         />
       ) : ansicht.typ === 'papierkorb' ? (
         <Papierkorb
@@ -120,10 +141,21 @@ export default function App() {
         />
       ) : (
         <WepDetail
-          key={ansicht.wepId}
+          key={`${ansicht.wepId}-${eingespielt}`}
           wepId={ansicht.wepId}
           onZurueck={() => setAnsicht({ typ: 'start' })}
           onOeffnen={(wepId) => setAnsicht({ typ: 'detail', wepId })}
+        />
+      )}
+      {wepDatei && (
+        <TeilenOeffnen
+          datei={wepDatei}
+          onSchliessen={() => setWepDatei(undefined)}
+          onEingespielt={() => setEingespielt((z) => z + 1)}
+          onWepOeffnen={(wepId) => {
+            setWepDatei(undefined)
+            setAnsicht({ typ: 'detail', wepId })
+          }}
         />
       )}
     </div>

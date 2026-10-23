@@ -50,6 +50,12 @@ export interface WepWindowsApi {
   anmeldungLoeschen(): Promise<void>
   // „Speichern unter…“: true = gespeichert, false = abgebrochen
   dateiSpeichern(daten: Uint8Array, name: string): Promise<boolean>
+  // Doppelklick auf eine .wep-Datei: Name der wartenden Datei (null = keine) und ihre Bytes
+  eingangPruefen(): Promise<string | null>
+  eingangLesen(): Promise<Uint8Array>
+  eingangVerwerfen(): Promise<void>
+  /** Ereignis, wenn das schon laufende Programm eine Datei bekommt (zweiter Start / Doppelklick). */
+  eingangBeobachten(fn: (name: string) => void): Promise<() => void>
   // Updates
   webInfo(): Promise<WebInfo>
   webStartGemeldet(): Promise<void>
@@ -76,6 +82,16 @@ export const WepWindows: WepWindowsApi = {
     const { invoke } = await import('@tauri-apps/api/core')
     // Rohe Bytes im Anfragekörper (ohne Base64); der Name geht URL-kodiert im Kopf mit.
     return invoke<boolean>('datei_speichern', daten, { headers: { 'x-dateiname': encodeURIComponent(name) } })
+  },
+  eingangPruefen: () => aufruf('eingang_pruefen'),
+  async eingangLesen() {
+    const { invoke } = await import('@tauri-apps/api/core')
+    return new Uint8Array(await invoke<ArrayBuffer>('eingang_lesen'))
+  },
+  eingangVerwerfen: () => aufruf('eingang_verwerfen'),
+  async eingangBeobachten(fn) {
+    const { listen } = await import('@tauri-apps/api/event')
+    return listen<string>('wep-datei', (e) => fn(e.payload))
   },
   webInfo: () => aufruf('web_info'),
   webStartGemeldet: () => aufruf('web_start_gemeldet'),

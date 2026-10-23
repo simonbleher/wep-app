@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 const { capacitor, windows, wepNative, wepWindows } = vi.hoisted(() => ({
   capacitor: { nativ: false },
   windows: { app: false },
-  wepNative: { dateiBeginnen: vi.fn(), dateiAnhaengen: vi.fn(), dateiSpeichern: vi.fn() },
+  wepNative: { dateiBeginnen: vi.fn(), dateiAnhaengen: vi.fn(), dateiSpeichern: vi.fn(), dateiTeilen: vi.fn() },
   wepWindows: { dateiSpeichern: vi.fn() },
 }))
 
@@ -13,7 +13,7 @@ vi.mock('@/android/native', () => ({ WepNative: wepNative }))
 vi.mock('@/windows/plattform', () => ({ istWindowsApp: () => windows.app }))
 vi.mock('@/windows/api', () => ({ WepWindows: wepWindows }))
 
-import { speichereDatei, speicherText, waehleSpeicherWeg } from './dateiSpeichern'
+import { kannTeilen, speichereDatei, speicherText, teileDatei, waehleSpeicherWeg } from './dateiSpeichern'
 
 afterEach(() => {
   capacitor.nativ = false
@@ -72,5 +72,43 @@ describe('speicherText', () => {
     expect(speicherText('gespeichert', 'a.zip')).toBe('a.zip gespeichert')
     expect(speicherText('abgebrochen', 'a.zip')).toContain('nicht gespeichert')
     expect(speicherText('heruntergeladen', 'a.zip')).toBe('a.zip heruntergeladen')
+  })
+})
+
+describe('teileDatei (Teilen-Menü)', () => {
+  const blob = new Blob([new Uint8Array([1, 2, 3, 4])], { type: 'application/x-wep' })
+
+  it('Android: Datei in Stücken ans Plugin, dann das Teilen-Menü', async () => {
+    capacitor.nativ = true
+    wepNative.dateiTeilen.mockResolvedValueOnce({ geteilt: true })
+    expect(kannTeilen()).toBe(true)
+    expect(await teileDatei(blob, '2026-001_KGA.wep')).toBe('geteilt')
+    expect(wepNative.dateiBeginnen).toHaveBeenCalledOnce()
+    expect(wepNative.dateiAnhaengen).toHaveBeenCalledOnce()
+    expect(wepNative.dateiTeilen).toHaveBeenCalledWith({ name: '2026-001_KGA.wep', typ: 'application/x-wep' })
+    expect(wepNative.dateiSpeichern).not.toHaveBeenCalled()
+  })
+
+  it('Android: Teilen-Menü nicht zu öffnen → abgebrochen', async () => {
+    capacitor.nativ = true
+    wepNative.dateiTeilen.mockResolvedValueOnce({ geteilt: false })
+    expect(await teileDatei(blob, 'a.wep')).toBe('abgebrochen')
+  })
+
+  it('Windows: kein Teilen-Menü (nur „Speichern unter…“)', () => {
+    windows.app = true
+    expect(kannTeilen()).toBe(false)
+  })
+
+  it('Browser: nur mit Teilen für Dateien; Abbruch im Menü ist kein Fehler', async () => {
+    vi.stubGlobal('navigator', {})
+    expect(kannTeilen()).toBe(false)
+    const share = vi.fn().mockRejectedValueOnce(new DOMException('abgebrochen', 'AbortError')).mockResolvedValueOnce(undefined)
+    vi.stubGlobal('navigator', { share, canShare: () => true })
+    expect(kannTeilen()).toBe(true)
+    expect(await teileDatei(blob, 'a.wep')).toBe('abgebrochen')
+    expect(await teileDatei(blob, 'a.wep')).toBe('geteilt')
+    expect((share.mock.calls[1][0] as { files: File[] }).files[0].name).toBe('a.wep')
+    vi.unstubAllGlobals()
   })
 })

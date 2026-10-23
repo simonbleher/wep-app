@@ -378,3 +378,18 @@ nicht auf einmal im Speicher liegen müssen.
 - **Excel-Export:** mit Konto nur nach OneDrive (`Exporte/`), kein Dialog bei jedem Export;
   ohne Konto der Dialog.
 - **Fotos ohne Konto:** ZIP über den Dialog.
+
+## WEPs teilen und „Öffnen mit WEP“ (Beta 5, Paket 2)
+
+Ein einzelnes WEP geht als `.wep`-Datei (ZIP, Format `wep-teilen/1`) von Gerät zu Gerät, siehe `docs/SYNC.md` und `src/teilen/`.
+
+- **Teilen:** WEP → „⋯“ → **Teilen** → Schalter „Fotos mitschicken“ / „Bau-Excel mitschicken“ (mit Größe), dann **Teilen …** (Android-Teilen-Menü: WhatsApp, E-Mail …) oder **Speichern unter …**.
+  Technik: Die Datei geht wie bei „Speichern unter…“ in Stücken (512 KB, Base64) ins Plugin (`dateiBeginnen`/`dateiAnhaengen`), dann öffnet `dateiTeilen` die Auswahl (`ACTION_SEND`, Adresse über den `FileProvider`
+  aus dem Cache-Ordner `teilen/`; dort liegt immer nur die zuletzt geteilte Datei). Dateityp `application/x-wep`.
+- **Öffnen mit WEP:** Dateien mit der Endung `.wep` (WhatsApp, E-Mail, Dateimanager) lassen sich mit **WEP** öffnen. Drei Intent-Filter in `AndroidManifest.xml`: unser Dateityp, Endung `.wep` im Pfad und „unbekannter Dateityp“
+  (`application/octet-stream`; viele Apps melden nichts Genaueres). Darum bietet Android WEP auch bei anderen unbekannten Dateien an – die App prüft den Inhalt und lehnt Fremdes mit Klartext ab. Nur `content://`-Adressen, nie `file://`.
+  `Eingang.kt` kopiert die Datei sofort in den Cache (`eingang/`), die Web-App holt sie stückweise (`eingangPruefen`/`eingangLesen`/`eingangVerwerfen`) und verwirft sie. Bei laufender App meldet `handleOnNewIntent` das Ereignis `eingang`.
+  Danach erscheint dieselbe Vorschau wie bei „WEP-Datei öffnen“ auf der Startseite; **nichts wird ohne Wahl überschrieben**.
+- `android/` hat sich geändert: **`native-version` ist 6.** Ältere Apps bekommen den neuen Web-Teil nicht per Live-Update, sondern erst mit der neuen APK (Teilen und „Öffnen mit WEP“ brauchen die neuen Plugin-Methoden).
+- **Prüfen auf dem Gerät (nicht automatisch testbar):** (1) Teilen → WhatsApp/E-Mail; (2) die Datei dort antippen → „Öffnen mit WEP“; (3) Datei im Dateimanager antippen; (4) App bereits offen und im Hintergrund; (5) eine fremde Datei („Öffnen mit WEP“ bei einem PDF) → Klartext-Fehler.
+

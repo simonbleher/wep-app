@@ -57,7 +57,7 @@ export function alle(v: Vorschau): Punkt[] {
 }
 
 /** JSON mit sortierten Schlüsseln: Reihenfolge der Felder und `undefined` spielen für den Vergleich keine Rolle. */
-function stabil(x: unknown): string {
+export function stabil(x: unknown): string {
   return JSON.stringify(x, (_k, v: unknown) =>
     v && typeof v === 'object' && !Array.isArray(v)
       ? Object.fromEntries(Object.entries(v as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)))

@@ -1,0 +1,11 @@
+// WEPs teilen als .wep-Datei: erstellen, lesen, vergleichen (je Teil), einspielen (Beta 5, Paket 2).
+export { erstelleTeilen, teilenDateiname, anhangGroessen } from './erstellen'
+export type { ErstellteTeilenDatei, TeilenOptionen } from './erstellen'
+export { leseTeilen } from './lesen'
+export type { GeleseneTeilen } from './lesen'
+export { erstelleTeilenVorschau, standardTeilenWahl, anzahlGewaehlt, wepOptionen, unterschiedlicheTeile } from './vorschau'
+export type { TeilenVorschau, TeilenWahl, TeilPunkt, TeilWahl } from './vorschau'
+export { spieleTeilenEin } from './einspielen'
+export type { TeilenErgebnis } from './einspielen'
+export { TEILEN_FORMAT, TEILEN_ENDUNG, TeilenFehler, TEIL_TITEL, TEIL_REIHENFOLGE, groesseText } from './types'
+export type { TeilenDatei, TeilId } from './types'

@@ -335,6 +335,12 @@ Abschnitt 10f) mit Mausrad, Maus-Ziehen und Zwei-Finger-Gesten über CDP-Touch. 
   Export ins Blatt „Skizze Außenanlage-Aufwuchs“ wie im Skill (Modus Außenanlage): Wiese #C5E0B4, Gras, Pfosten, Gebäude #E7E6E6, Keller gestrichelt, darüber Grün; „Skizze Bau“ bleibt byte-gleich (Test). Hat das Blatt schon eigene Formen, wird die Grundlage nicht doppelt geschrieben (Hinweis).
   Code: `src/skizze/grundlage.ts`, `src/export/bauSkizzeLesen.ts`, `src/app/SkizzeTab.tsx`; Test-Bau-Excel mit handgezeichneten Formen: `src/bauexcel/testBauExcel.ts` (`skizzeBau`), `docs/beta5-paket1/Test-Bau-Excel.xlsx`.
   Tests: `src/export/__tests__/grundlage.test.ts`; e2e/Durchlauf `npm run beta5-paket1:screenshots`, Excel-Render `npm run beta5-paket1:export-bild`. Screenshots: `docs/beta5-paket1/`. Keine Änderung an `android/`, Plugins oder `src-tauri/`, daher keine neue Versionsnummer.
-- B5-2 · Teilen als .wep-Datei ⏳ – Branch beta5/paket2
+- B5-2 · Teilen als .wep-Datei ✅ PR offen – Branch beta5/paket2. Menü „⋯“ → **Teilen** erzeugt `<Vorgangs-Nr>_<Anlage>.wep` (ZIP, `wep.json` im Format `wep-teilen/1`, optional `fotos/`, `bau.xlsx`);
+  vorher Schalter „Fotos mitschicken“ und „Bau-Excel mitschicken“ (mit Größe) und der Hinweis auf Personendaten. Weitergabe: Android-Teilen-Menü (`dateiTeilen`, FileProvider), Browser-Teilen, sonst/zusätzlich „Speichern unter…“ (Windows-Dialog).
+  Öffnen: „WEP-Datei öffnen“ auf der Startseite, Android „Öffnen mit WEP“ (Intent-Filter, `Eingang.kt`), Windows-Doppelklick (Dateizuordnung `.wep`, `eingang.rs`). Vorschau nach dem Muster von „Sicherung einspielen“ (neu / gleich / weicht ab / im Papierkorb) und bei Abweichung
+  **Auswahl je Teil** (Bau-Teil, Grün-Teil, Fotos, Bau-Excel, Formalien/Status) – Standard: alles behalten, nichts wird still überschrieben; damit läuft **Bau → Grün** direkt in der App. Unbekannte/neuere Formate, kaputte, fremde Dateien und Sicherungen werden mit Klartext abgelehnt.
+  Wiederverwendet: `src/sicherung/` (Vorschau, Einspielen, Ziel/Quelle). Code: `src/teilen/`, `src/app/TeilenDialog.tsx`, `src/app/TeilenOeffnen.tsx`, `src/teilen/eingang.ts`.
+  Tests: `src/teilen/teilen.test.ts`, `eingang.test.ts`, `src/app/dateiSpeichern.test.ts`, Rust-Test in `src-tauri/src/eingang.rs`; Durchlauf mit zwei „Geräten“ `npm run beta5-paket2:screenshots`, Screenshots `docs/beta5-paket2/`.
+  Geändert unter `android/` und `src-tauri/`: **`native-version` 5 → 6**, Windows-Programm **0.1.1 → 0.1.2**, Hülle **1 → 2**. Echtes Gerät/echter PC: Checkliste im PR (Teilen-Menü, „Öffnen mit WEP“ aus WhatsApp/E-Mail, Doppelklick).
 - B5-3 · Unterschrift im Profil ⏳ – Branch beta5/paket3
 - B5-4 · PDF direkt aus der App ⏳ – Branch beta5/paket4

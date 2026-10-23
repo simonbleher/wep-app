@@ -30,6 +30,32 @@
                 <data android:scheme="de.wep.app" android:host="auth" />
             </intent-filter>
 
+            <!--
+              „Öffnen mit WEP“ für geteilte .wep-Dateien (Beta 5, Paket 2). Die Datei kommt als content://-Adresse
+              (WhatsApp, E-Mail, Dateimanager). Je nach App steht kein oder ein allgemeiner Dateityp dabei, darum drei
+              Filter: unser Typ, Endung .wep im Pfad, und „unbekannter Dateityp“ (die App prüft den Inhalt selbst und
+              lehnt fremde Dateien ab).
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" android:mimeType="application/x-wep" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" android:host="*" android:mimeType="*/*" />
+                <data android:pathPattern=".*\\.wep" />
+                <data android:pathPattern=".*\\..*\\.wep" />
+                <data android:pathPattern=".*\\..*\\..*\\.wep" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.wep" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" android:mimeType="application/octet-stream" />
+            </intent-filter>
+
         </activity>
 
         <provider
