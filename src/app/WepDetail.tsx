@@ -45,7 +45,8 @@ import { ladeWep, speichereWep } from './db'
 import { SkizzeTab } from './SkizzeTab'
 import { SkizzeBauTab } from './SkizzeBauTab'
 import { BauExcelBereich, useBauNachladen, useBauStand, type BauNachladeStand, type BauStand } from './BauExcel'
-import { bauExcelFuerExport } from '@/bauexcel'
+import { ladeExportQuelle } from './exportQuelle'
+import { PdfBereich } from './PdfExport'
 import { FotoGruppe, FotosTab, useFotoNachladen, useFotoRecords } from './Fotos'
 import { fotoOrdnerName, sammleExportFotos, zipDateien } from '@/fotos/exportOrdner'
 import { dbAblage } from '@/fotos/ablage'
@@ -70,7 +71,7 @@ import { grundrissZuFormen } from '@/export/grundrissFormen'
 import { hatGrundlage } from '@/skizze/grundlage'
 import { svgZuPngBrowser } from '@/export/svgRaster'
 import { exportWep, type ExportResult } from '@/export'
-import { exportFotosNachOneDrive, exportNachOneDrive, ladeBauExcelAusOneDrive, ladeFotoAusOneDrive } from '@/sync'
+import { exportFotosNachOneDrive, exportNachOneDrive, ladeFotoAusOneDrive } from '@/sync'
 import { berechneAbschnittSumme } from '@/gruen/summen'
 import { Capacitor } from '@capacitor/core'
 import { speichereDatei, speicherText } from './dateiSpeichern'
@@ -989,12 +990,7 @@ function ExportTab({
     setExportZustand({ typ: 'laedt' })
     try {
       // Die am WEP gemerkte Bau-Excel (lokal, sonst aus OneDrive geholt); ohne sie die leere Vorlage
-      let sourceBuffer = nurBau ? undefined : await bauExcelFuerExport({ wep, quelle: { hole: ladeBauExcelAusOneDrive } })
-      if (!sourceBuffer) {
-        const resp = await fetch('/WEP_Vorlage.xlsx')
-        if (!resp.ok) throw new Error(`Vorlage nicht gefunden: ${resp.statusText}`)
-        sourceBuffer = await resp.arrayBuffer()
-      }
+      const sourceBuffer = (await ladeExportQuelle(wep, nurBau)).buffer
 
       // Skizze (falls gezeichnet) ins Blatt „Skizze Außenanlage-Aufwuchs“: als bearbeitbare
       // Excel-Formen (Standard), die vorhandene Bau-Skizze bleibt unverändert. Fallback: PNG
@@ -1206,6 +1202,8 @@ function ExportTab({
           )}
         </div>
       )}
+
+      <PdfBereich wep={wep} rolle={rolle} profilIndex={profilIndex} />
     </>
   )
 }

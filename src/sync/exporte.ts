@@ -7,6 +7,7 @@ import type { GraphClient, SyncHinweis } from './types'
 
 export const XLSX_TYP = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 export const JPEG_TYP = 'image/jpeg'
+export const PDF_TYP = 'application/pdf'
 
 export interface ExportEintrag {
   name: string
@@ -29,18 +30,19 @@ export interface ExportSpeicher {
 
 export type ExportStatus = 'hochgeladen' | 'wartet'
 
-/** `client` ist der Client für Exporte/; null = gerade nicht möglich (offline). */
+/** `client` ist der Client für Exporte/; null = gerade nicht möglich (offline). `typ`: Medientyp (Standard Excel; PDF: `PDF_TYP`). */
 export async function exportHochladen(opt: {
   client: GraphClient | null
   speicher: ExportSpeicher
   name: string
   blob: Blob
+  typ?: string
   jetzt?: () => string
 }): Promise<ExportStatus> {
   const jetzt = opt.jetzt ?? (() => new Date().toISOString())
   if (opt.client) {
     try {
-      await opt.client.schreibe(opt.name, opt.blob, XLSX_TYP)
+      await opt.client.schreibe(opt.name, opt.blob, opt.typ ?? XLSX_TYP)
       // Eine ältere, noch wartende Fassung ist damit überholt
       await opt.speicher.entferne(opt.name)
       return 'hochgeladen'
@@ -48,7 +50,7 @@ export async function exportHochladen(opt: {
       /* unterwegs ausgefallen → Warteschlange */
     }
   }
-  await opt.speicher.legeAb({ name: opt.name, blob: opt.blob, erstelltAm: jetzt() })
+  await opt.speicher.legeAb({ name: opt.name, blob: opt.blob, erstelltAm: jetzt(), ...(opt.typ ? { typ: opt.typ } : {}) })
   return 'wartet'
 }
 

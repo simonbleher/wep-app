@@ -1,0 +1,208 @@
+// Export als PDF (Beta 5, Paket 4): sieht aus wie die Blätter der BV-Vorlage, wird offline im Browser erzeugt.
+// Die PDF-Bibliothek lädt erst beim Erzeugen nach (src/pdf). Speichern über „Speichern unter…“ bzw. Download
+// (dateiSpeichern.ts), mit Konto zusätzlich nach OneDrive (Exporte/).
+import { useEffect, useId, useState } from 'react'
+import { Check, FileText, Share2 } from 'lucide-react'
+import { hatBauTeil, type Rolle, type Wep } from '@/model'
+import { dbAblage } from '@/fotos/ablage'
+import { sammlePdfFotos } from '@/pdf/fotosSammeln'
+import { PDF_TYP, erzeugeWepPdf, type WepPdfAusgabe } from '@/pdf'
+import { exportNachOneDrive, ladeFotoAusOneDrive } from '@/sync'
+import { unterschriftAlsPng } from '@/unterschrift'
+import { Capacitor } from '@capacitor/core'
+import { bauFuerExport } from './bauHelfer'
+import { kannTeilen, speichereDatei, speicherText, teileDatei } from './dateiSpeichern'
+import { ladeExportQuelle } from './exportQuelle'
+import { ICON, Meldung } from './ui'
+
+type Zustand =
+  | { typ: 'idle' }
+  | { typ: 'laedt'; schritt: string }
+  | { typ: 'fertig'; ausgabe: WepPdfAusgabe; blob: Blob; datei?: string; oneDrive?: string; hinweise: string[] }
+  | { typ: 'fehler'; meldung: string }
+
+const mb = (bytes: number) => `${(bytes / (1024 * 1024)).toLocaleString('de-DE', { maximumFractionDigits: 1 })} MB`
+
+/** Welche Teile ins PDF kommen, in einem Satz. */
+function inhaltsText(rolle: Rolle, wep: Wep): string {
+  if (rolle === 'bau') return 'Deckblatt, Baulichkeiten, Mängelliste, Beseitigungskosten und Skizze Bau (soweit ausgefüllt).'
+  if (rolle === 'beides')
+    return wep.bau
+      ? 'Deckblatt, Baulichkeiten, Mängelliste, Außenanlagen, Aufwuchs, Beseitigungskosten und beide Skizzen (soweit ausgefüllt).'
+      : 'Deckblatt, Baulichkeiten, Mängelliste, Außenanlagen, Aufwuchs, Beseitigungskosten und Skizze (soweit ausgefüllt).'
+  return 'Deckblatt, Außenanlagen, Aufwuchs, Beseitigungskosten und Skizze (soweit ausgefüllt).'
+}
+
+export function PdfBereich({ wep, rolle, profilIndex }: { wep: Wep; rolle: Rolle; profilIndex?: Record<string, number> }) {
+  const id = useId()
+  const [zustand, setZustand] = useState<Zustand>({ typ: 'idle' })
+  const [mitFotos, setMitFotos] = useState(false)
+  const [mitUnterschrift, setMitUnterschrift] = useState(false)
+  const [teilenMeldung, setTeilenMeldung] = useState<string>()
+  const anzahlFotos = wep.fotos?.length ?? 0
+  const fotoGroesse = (wep.fotos ?? []).reduce((s, f) => s + f.groesse, 0)
+  const hatUnterschrift = unterschriftAlsPng() !== null
+  const nurBau = rolle === 'bau'
+
+  // Nach einem Wechsel des WEP oder der Rolle gilt das alte Ergebnis nicht mehr
+  useEffect(() => {
+    setZustand({ typ: 'idle' })
+    setTeilenMeldung(undefined)
+  }, [wep.id, rolle])
+
+  async function erzeugen() {
+    setTeilenMeldung(undefined)
+    setZustand({ typ: 'laedt', schritt: 'Bereite die Daten vor …' })
+    try {
+      const quelle = await ladeExportQuelle(wep, nurBau)
+      const wepFuerExport = hatBauTeil(rolle) ? bauFuerExport(wep, profilIndex) : wep
+
+      let fotos
+      let fehlendeFotos = 0
+      if (mitFotos && anzahlFotos) {
+        setZustand({ typ: 'laedt', schritt: 'Hole die Fotos …' })
+        const g = await sammlePdfFotos(wep, async (fotoId) => (await dbAblage.ladeDatei(wep.id, fotoId)) ?? (await ladeFotoAusOneDrive(wep.id, fotoId).catch(() => undefined)))
+        fotos = g.fotos
+        fehlendeFotos = g.fehlen
+      }
+
+      setZustand({ typ: 'laedt', schritt: 'Erzeuge das PDF …' })
+      const f = wep.formalien
+      const ausgabe = await erzeugeWepPdf(
+        {
+          wep: wepFuerExport,
+          quelle: quelle.buffer,
+          hatBauExcel: quelle.hatBauExcel,
+          rolle,
+          exportOptionen: { profilIndex, formalienAbgeglichen: wep.bauExcel?.abgeglichen === true },
+        },
+        {
+          skizzen: {
+            gruen: wepFuerExport.skizze?.elemente.length ? wepFuerExport.skizze : undefined,
+            grundriss: wepFuerExport.grundriss?.teile.length ? { daten: wepFuerExport.grundriss, bauteile: wepFuerExport.bau?.bauteile ?? [] } : undefined,
+          },
+          fotos,
+          unterschrift: mitUnterschrift ? unterschriftAlsPng() : null,
+          titel: `Wertermittlungsprotokoll ${wep.id}`,
+          fotoKopf: [`Vorgangs-Nr. ${wep.id}`, f.kleingartenanlage, f.parzelle && `Parzelle ${f.parzelle}`].filter(Boolean).join(' – '),
+        },
+      )
+      const blob = new Blob([ausgabe.pdf.bytes as BlobPart], { type: PDF_TYP })
+      const hinweise = [...ausgabe.pdf.hinweise]
+      if (fehlendeFotos) hinweise.push(`${fehlendeFotos} Foto${fehlendeFotos === 1 ? ' fehlt' : 's fehlen'} (noch nicht auf diesem Gerät, kein Netz).`)
+
+      // Wie beim Excel: im Browser und im Windows-Programm gleich speichern, auf dem Handy mit Konto nur nach OneDrive
+      const nativ = Capacitor.isNativePlatform()
+      let datei: string | undefined
+      if (!nativ) {
+        const e = await speichereDatei(blob, ausgabe.name)
+        if (e === 'abgebrochen') datei = speicherText(e, ausgabe.name) + '.'
+      }
+      let oneDrive: string | undefined
+      try {
+        const status = await exportNachOneDrive(ausgabe.name, blob, PDF_TYP)
+        if (status === 'ohne-konto' && nativ) oneDrive = `Ohne Konto: ${speicherText(await speichereDatei(blob, ausgabe.name), ausgabe.name)}.`
+        else if (status === 'hochgeladen') oneDrive = nativ ? 'In OneDrive abgelegt (Ordner Exporte).' : 'Auch in OneDrive abgelegt (Ordner Exporte).'
+        else if (status === 'wartet') oneDrive = 'OneDrive: wartet auf Netz und wird beim nächsten Abgleich hochgeladen.'
+      } catch (e) {
+        oneDrive = `OneDrive: ${e instanceof Error ? e.message : String(e)}`
+      }
+      setZustand({ typ: 'fertig', ausgabe, blob, datei, oneDrive, hinweise })
+    } catch (e) {
+      setZustand({ typ: 'fehler', meldung: e instanceof Error ? e.message : String(e) })
+    }
+  }
+
+  async function nochmalSpeichern(blob: Blob, name: string) {
+    const e = await speichereDatei(blob, name)
+    setTeilenMeldung(speicherText(e, name) + '.')
+  }
+
+  async function teilen(blob: Blob, name: string) {
+    try {
+      const e = await teileDatei(blob, name)
+      setTeilenMeldung(e === 'geteilt' ? 'Geteilt.' : 'Teilen abgebrochen.')
+    } catch (err) {
+      setTeilenMeldung(`Teilen hat nicht geklappt: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+
+  const laedt = zustand.typ === 'laedt'
+  const fertig = zustand.typ === 'fertig' ? zustand : null
+
+  return (
+    <section className="abschnitt" aria-labelledby={`${id}-pdf`} style={{ marginTop: 40 }}>
+      <h2 className="gruppenkopf" id={`${id}-pdf`}>
+        Export als PDF
+      </h2>
+      <p className="neben block">
+        Das PDF sieht aus wie die Blätter der BV-Vorlage (gleiche Seiten, Überschriften, Tabellen und Summen) und entsteht hier auf dem Gerät, auch ohne Netz. Es enthält: {inhaltsText(rolle, wep)} Die Zahlen sind
+        dieselben wie in der Excel-Datei.
+      </p>
+
+      {anzahlFotos > 0 && (
+        <label className="schalter-zeile">
+          <span>
+            Fotos als Anhang ({anzahlFotos}, ca. {mb(fotoGroesse)})
+          </span>
+          <input type="checkbox" className="schalter" checked={mitFotos} onChange={(e) => setMitFotos(e.target.checked)} />
+        </label>
+      )}
+
+      <label className="schalter-zeile">
+        <span>
+          Mit meiner Unterschrift versehen
+          {!hatUnterschrift && <span className="neben"> – noch keine hinterlegt (Profil → „Meine Unterschrift“)</span>}
+        </span>
+        <input type="checkbox" className="schalter" checked={mitUnterschrift && hatUnterschrift} disabled={!hatUnterschrift} onChange={(e) => setMitUnterschrift(e.target.checked)} />
+      </label>
+      {mitUnterschrift && hatUnterschrift && (
+        <p className="neben">Die Unterschrift steht über dem Namen des Wertermittlers (Bau: Blätter des Bau-Teils, Grün: Blätter des Grün-Teils).</p>
+      )}
+
+      <button type="button" className="knopf knopf-primaer knopf-breit" disabled={laedt} onClick={() => void erzeugen()}>
+        <FileText {...ICON} />
+        {laedt ? zustand.schritt : 'PDF exportieren'}
+      </button>
+
+      {zustand.typ === 'fehler' && (
+        <div className="ergebnis">
+          <Meldung alarm>
+            <p>Das PDF konnte nicht erzeugt werden: {zustand.meldung}</p>
+            <p>Die Daten im WEP sind unverändert. Bitte noch einmal versuchen.</p>
+          </Meldung>
+        </div>
+      )}
+
+      {fertig && (
+        <div className="ergebnis" aria-live="polite">
+          <p className="ok zeile">
+            <Check {...ICON} />
+            <span>
+              PDF erstellt: {fertig.ausgabe.name} ({fertig.ausgabe.pdf.seitenZahl} Seiten, {mb(fertig.blob.size)})
+            </span>
+          </p>
+          {fertig.datei && <p className="neben">{fertig.datei}</p>}
+          {fertig.oneDrive && <p className="neben">{fertig.oneDrive}</p>}
+          {fertig.hinweise.map((h) => (
+            <Meldung key={h}>
+              <p>{h}</p>
+            </Meldung>
+          ))}
+          <div className="knopf-reihe">
+            <button type="button" className="knopf" onClick={() => void nochmalSpeichern(fertig.blob, fertig.ausgabe.name)}>
+              Speichern unter …
+            </button>
+            {kannTeilen(new File([fertig.blob], fertig.ausgabe.name, { type: PDF_TYP })) && (
+              <button type="button" className="knopf" onClick={() => void teilen(fertig.blob, fertig.ausgabe.name)}>
+                <Share2 {...ICON} />
+                Teilen
+              </button>
+            )}
+          </div>
+          {teilenMeldung && <p className="neben">{teilenMeldung}</p>}
+        </div>
+      )}
+    </section>
+  )
+}

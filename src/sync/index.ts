@@ -221,12 +221,13 @@ async function abgleichen(): Promise<GesamtErgebnis> {
 }
 
 /**
- * Legt eine fertige Excel-Datei in OneDrive (Exporte/) ab, wenn angemeldet und online;
+ * Legt eine fertige Excel- oder PDF-Datei (`typ`) in OneDrive (Exporte/) ab, wenn angemeldet und online;
  * sonst kommt sie in die Warteschlange. Ohne Konto passiert nichts ('ohne-konto').
  */
 export async function exportNachOneDrive(
   name: string,
   blob: Blob,
+  typ?: string,
 ): Promise<ExportStatus | 'ohne-konto'> {
   if (!kontoVerfuegbar() || !(await aktuellesKonto())) return 'ohne-konto'
   return exportHochladen({
@@ -234,6 +235,7 @@ export async function exportNachOneDrive(
     speicher: exportSpeicher,
     name,
     blob,
+    typ,
   })
 }
 
