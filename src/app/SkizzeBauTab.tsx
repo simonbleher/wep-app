@@ -208,7 +208,7 @@ export function Massenberechnung({ daten, bauteile }: { daten: GrundrissDaten; b
         </table>
       </div>
       <p className="neben">
-        Fläche nach Außenmaßen (Richtlinie S. 3 Nr. 2), Kubatur = Fläche × mittlere Höhe: Flachdach Fläche × Höhe, Pultdach Fläche × Mittel der beiden Wände, Satteldach Fläche × Traufhöhe plus Dachraum.
+        Fläche nach Außenmaßen (Richtlinie S. 3 Nr. 2), Kubatur = Fläche × mittlere Höhe: Flachdach Fläche × Höhe, Pultdach Fläche × Mittel der beiden Wände, Satteldach Fläche × Traufhöhe plus Dachraum; Walm-, Zelt-, Krüppelwalm- und Mansarddach rechnen den Dachraum nach ihrer Form (Formeln in der Hilfe der Dachform).
       </p>
       {hinweise.length > 0 && (
         <div className="warnung" role="note">

@@ -9,7 +9,9 @@ import { GrundrissEditor } from '@/skizze/GrundrissEditor'
 import { SkizzeEditor } from '@/skizze/SkizzeEditor'
 import { leereSkizze } from '@/skizze/types'
 import { neuesBauteil, bauFuerExport } from '../bauHelfer'
-import { rechteckPunkte, type GrundrissDaten } from '@/skizze/grundriss'
+import { rechteckPunkte, DACHFORMEN, type GrundrissDaten } from '@/skizze/grundriss'
+import { DachFelder } from '@/skizze/DachFelder'
+import { DachSkizze } from '@/skizze/DachSkizze'
 
 const render = (el: Parameters<typeof renderToStaticMarkup>[0]) => renderToStaticMarkup(el)
 const nichts = async () => {}
@@ -92,5 +94,42 @@ describe('Export-Vorbereitung und Grün-Skizze', () => {
 
   it('das Wep-Objekt ohne Grundriss bleibt unverändert (kein neues Feld)', () => {
     expect(Object.keys(neuerWep('x')).sort()).toEqual(['formalien', 'gruen', 'id', 'skizze'])
+  })
+})
+
+describe('Dachformen: Eingaben mit Erklär-Skizze (Beta 6, Paket 2)', () => {
+  it('jede geneigte Form zeigt ihre Skizze mit Legende und genau ihre Felder', () => {
+    const erwartet: Record<string, string[]> = {
+      pult: ['Hohe Wand'],
+      sattel: ['Firsthöhe'],
+      walm: ['Firsthöhe', 'Firstlänge'],
+      zelt: ['Höhe der Spitze'],
+      krueppelwalm: ['Firsthöhe', 'Walmhöhe', 'Walmtiefe'],
+      mansard: ['Firsthöhe', 'Knickhöhe', 'Knick-Einzug'],
+    }
+    for (const [form, felder] of Object.entries(erwartet)) {
+      const html = render(createElement(DachFelder, { dachform: form as never, hoeheOben: undefined, dach: {}, onAendern: () => {} }))
+      expect(html, form).toContain(`data-dachform="${form}"`)
+      expect(html, form).toContain('<svg')
+      for (const f of felder) expect(html, `${form}: ${f}`).toContain(`>${f} (m)<`)
+      // keine fremden Zusatzfelder
+      const alle = ['Firstlänge', 'Walmhöhe', 'Walmtiefe', 'Knickhöhe', 'Knick-Einzug']
+      for (const f of alle.filter((x) => !felder.includes(x))) expect(html, `${form}: ${f}`).not.toContain(`>${f} (m)<`)
+    }
+  })
+  it('Flachdach hat keine Dach-Eingaben; jede Form hat eine Skizze', () => {
+    expect(render(createElement(DachFelder, { dachform: 'flach', hoeheOben: undefined, dach: {}, onAendern: () => {} }))).toBe('')
+    for (const d of DACHFORMEN) {
+      const html = render(createElement(DachSkizze, { form: d.id }))
+      expect(html, d.id).toContain('<figcaption')
+      expect(html, d.id).toContain(d.text)
+    }
+  })
+  it('Skizze Bau zeigt Zusatzmaße der Form in der Massenberechnung', () => {
+    const w = wep()
+    w.grundriss = { teile: [{ id: 'w1', kuerzel: 'L', bauteilId: 'l1', punkte: rechteckPunkte(0, 0, 8, 6), hoehe: 2.5, hoeheOben: 5, dachform: 'walm', firstLaenge: 2 }] }
+    const html = render(createElement(SkizzeBauTab, { wep: w, aendere: nichts }))
+    expect(html).toContain('Walmdach · 2,5 m / 5 m')
+    expect(html).toContain('165,00 m³')
   })
 })

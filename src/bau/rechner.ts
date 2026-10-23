@@ -7,7 +7,7 @@
 //
 // Grundsatz wie überall: Eingaben werden nicht gesperrt; Auffälligkeiten sind Hinweise.
 import { neueBauDaten, type Bauteil, type Wep } from '../model'
-import { massenAusFlaeche, type Dachform, type Massen } from '../skizze/grundriss'
+import { dachMasseVon, massenAusFlaeche, type DachMasse, type Dachform, type Massen } from '../skizze/grundriss'
 import { ermittleBaupreisindex } from './baupreisindex'
 import { ZULAESSIGE_FLAECHE_M2 } from './tabellen'
 import {
@@ -102,7 +102,8 @@ export function rechneFlaechen(teile: readonly Teilflaeche[]): FlaechenErgebnis 
 // Kubatur
 // ---------------------------------------------------------------------------
 
-export interface KubaturEingabe {
+/** Die Zusatzmaße der Dachform (Firstlänge, Walmtiefe/-höhe, Knick) stehen direkt in der Eingabe (`DachMasse`). */
+export interface KubaturEingabe extends DachMasse {
   /** Grundfläche in m²; fehlt sie, wird aus Länge × Breite gerechnet. */
   flaeche?: number
   laenge?: number
@@ -110,7 +111,7 @@ export interface KubaturEingabe {
   dachform: Dachform
   /** Wand-/Traufhöhe (Pultdach: niedrige Wand) */
   hoehe?: number
-  /** Pultdach: hohe Wand, Satteldach: Firsthöhe */
+  /** Pultdach: hohe Wand, Zeltdach: Spitze, sonst Firsthöhe */
   hoeheOben?: number
 }
 
@@ -127,7 +128,12 @@ export function rechneKubatur(e: KubaturEingabe): Massen | undefined {
   if (flaeche === undefined) return undefined
   const rechteck = !(e.flaeche && e.flaeche > 0) // aus Länge × Breite = Rechteck, eingegebene Fläche: Form unbekannt
   const umfang = e.laenge && e.breite ? rund2(2 * (e.laenge + e.breite)) : 0
-  return massenAusFlaeche(flaeche, umfang, e.dachform, e.hoehe, e.hoeheOben, rechteck)
+  // Länge/Breite (längere/kürzere Seite) brauchen Walm-, Krüppelwalm- und Mansarddach; bei eingegebener Fläche sind es die Maße des umgebenden Rechtecks
+  return massenAusFlaeche(flaeche, umfang, e.dachform, e.hoehe, e.hoeheOben, rechteck, {
+    ...dachMasseVon(e),
+    laenge: e.laenge && e.breite ? Math.max(e.laenge, e.breite) : undefined,
+    breite: e.laenge && e.breite ? Math.min(e.laenge, e.breite) : undefined,
+  })
 }
 
 // ---------------------------------------------------------------------------
