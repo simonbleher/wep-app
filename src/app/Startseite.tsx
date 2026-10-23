@@ -1,7 +1,7 @@
 // Startseite: Liste aller WEPs, Statuszeile Abgleich und „Neues WEP“.
 // Gelöscht wird nicht hier, sondern in der WEP-Ansicht (Menü „⋯“, mit Rückfrage).
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ChevronRight, CircleUser, FileSpreadsheet, FileText, Plus, Search, Trash2, X } from 'lucide-react'
+import { ChevronRight, CircleUser, FileInput, FileSpreadsheet, FileText, Plus, Search, Trash2, X } from 'lucide-react'
 import { WEP_STATUS, naechsteVorgangsNr, wepRolle, wepStatus, type Wep, type WepStatus } from '@/model'
 import type { Konto } from '@/konto'
 import { lokalesProfil, neuerWepMitProfil } from '@/profil'
@@ -23,6 +23,8 @@ interface Props {
   /** Öffnet die Detailansicht des WEP mit der angegebenen id. */
   onOeffnen: (wepId: string) => void
   onPapierkorb: () => void
+  /** Eine .wep-Datei wurde gewählt: Vorschau zeigen. */
+  onWepDatei: (datei: File) => void
 }
 
 /** Titel eines WEP für die Liste: „Anlage · Parzelle“ (leer, wenn nichts eingetragen). */
@@ -37,7 +39,7 @@ function wepNeben(wep: Wep): string {
   return [wep.id, unterpaechter, datumDe(wertermittlungAm ?? '')].filter((t) => t && t.trim()).join(' · ')
 }
 
-export function Startseite({ konto, verfuegbar, onProfil, onOeffnen, onPapierkorb }: Props) {
+export function Startseite({ konto, verfuegbar, onProfil, onOeffnen, onPapierkorb, onWepDatei }: Props) {
   const [weps, setWeps] = useState<Wep[]>([])
   const [geladen, setGeladen] = useState(false)
   const [filter, setFilter] = useState<WepStatus | 'alle'>('alle')
@@ -48,6 +50,7 @@ export function Startseite({ konto, verfuegbar, onProfil, onOeffnen, onPapierkor
   const [imPapierkorb, setImPapierkorb] = useState(0)
   const [fehler, setFehler] = useState<string>()
   const bauEingabe = useRef<HTMLInputElement>(null)
+  const wepEingabe = useRef<HTMLInputElement>(null)
   // Rolle aus dem Profil; ein WEP kann davon abweichen (`Wep.rolle`)
   const profilRolle = lokalesProfil.lade().profil.rolle
 
@@ -105,6 +108,10 @@ export function Startseite({ konto, verfuegbar, onProfil, onOeffnen, onPapierkor
             <CircleUser {...ICON} size={26} />
           </button>
           <div className="knopf-reihe nur-tablet">
+            <button type="button" className="knopf" onClick={() => wepEingabe.current?.click()}>
+              <FileInput {...ICON} />
+              WEP-Datei öffnen
+            </button>
             <button type="button" className="knopf" onClick={() => bauEingabe.current?.click()}>
               <FileSpreadsheet {...ICON} />
               Neues WEP aus Bau-Excel
@@ -126,7 +133,23 @@ export function Startseite({ konto, verfuegbar, onProfil, onOeffnen, onPapierkor
             <FileSpreadsheet {...ICON} />
             Neues WEP aus Bau-Excel
           </button>
+          <button type="button" className="knopf knopf-breit" onClick={() => wepEingabe.current?.click()}>
+            <FileInput {...ICON} />
+            WEP-Datei öffnen
+          </button>
         </div>
+        <input
+          ref={wepEingabe}
+          type="file"
+          hidden
+          aria-label="WEP-Datei wählen"
+          data-testid="wep-datei-eingabe"
+          onChange={(e) => {
+            const datei = e.target.files?.[0]
+            e.target.value = ''
+            if (datei) onWepDatei(datei)
+          }}
+        />
         <input
           ref={bauEingabe}
           type="file"

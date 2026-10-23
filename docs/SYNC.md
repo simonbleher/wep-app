@@ -138,6 +138,13 @@ Vorschau (neu, gleich, weicht ab, im Papierkorb) und spielt nur ein, was gewähl
 „Aus der Sicherung übernehmen“ oder „Als neues WEP anlegen“ gewählt wird. Eingespielte WEPs gehen über den normalen Abgleich nach OneDrive.
 Code: `src/sicherung/`.
 
+## Einzelnes WEP teilen (.wep-Datei, Beta 5, Paket 2)
+
+Menü „⋯“ im WEP → **Teilen** erzeugt `<Vorgangs-Nr>_<Anlage>.wep` (ZIP, Format `wep-teilen/1`: `wep.json`, optional `fotos/`, `bau.xlsx`), z. B. vom Bau- an den Grün-Wertermittler.
+Öffnen: Startseite → „WEP-Datei öffnen“, Android „Öffnen mit WEP“, Windows Doppelklick. Die Vorschau arbeitet wie bei „Sicherung einspielen“ (neu / gleich / weicht ab), bei Abweichung wählst du je Teil
+(Bau-Teil, Grün-Teil, Fotos, Bau-Excel, Formalien), was übernommen wird; alles andere bleibt, wie es ist. Eingespielte WEPs gehen über den normalen Abgleich nach OneDrive. Die Datei enthält Personendaten.
+Code: `src/teilen/` (nutzt `src/sicherung/`).
+
 ## Anmeldung, „ohne Konto“ und Profil in der App
 
 - Beim ersten Start und nach dem Abmelden erscheint ein Login-Bildschirm mit dem

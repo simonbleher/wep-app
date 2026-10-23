@@ -3,6 +3,7 @@ package de.wep.app
 import android.content.Context
 import android.net.Uri
 import android.util.Base64
+import androidx.core.content.FileProvider
 import java.io.File
 
 /**
@@ -38,5 +39,23 @@ object DateiSpeichern {
 
     fun verwerfe(ctx: Context) {
         datei(ctx).delete()
+    }
+
+    /**
+     * Macht aus der gesammelten Datei eine Adresse für das Teilen-Menü (FileProvider, Cache-Ordner `teilen/`).
+     * Es liegt immer nur die zuletzt geteilte Datei dort.
+     */
+    fun fuerTeilen(ctx: Context, name: String): Uri {
+        val ordner = File(ctx.cacheDir, "teilen").also { it.mkdirs() }
+        ordner.listFiles()?.forEach { it.delete() }
+        val sauber = name.substringAfterLast('/').substringAfterLast('\\').ifBlank { "WEP.wep" }
+        val ziel = File(ordner, sauber)
+        val quelle = datei(ctx)
+        if (!quelle.exists()) throw IllegalStateException("Keine Datei zum Teilen")
+        if (!quelle.renameTo(ziel)) {
+            quelle.copyTo(ziel, overwrite = true)
+            quelle.delete()
+        }
+        return FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", ziel)
     }
 }

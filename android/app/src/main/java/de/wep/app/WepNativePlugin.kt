@@ -1,7 +1,9 @@
 package de.wep.app
 
 import android.app.Activity
+import android.content.ClipData
 import android.content.Intent
+import android.util.Base64
 import androidx.activity.result.ActivityResult
 import com.getcapacitor.JSArray
 import com.getcapacitor.JSObject
@@ -368,6 +370,77 @@ class WepNativePlugin : Plugin() {
             } catch (e: Exception) {
                 Protokoll.eintrag(ctx, "fehler", "Datei speichern: ${e.message}")
                 fehler(call, e)
+            }
+        }.start()
+    }
+
+    /** Teilen-Menü des Systems für die zuvor übergebene Datei (WhatsApp, E-Mail …). */
+    @PluginMethod
+    fun dateiTeilen(call: PluginCall) {
+        val name = call.getString("name") ?: return call.reject("name fehlt")
+        val typ = call.getString("typ") ?: "application/octet-stream"
+        try {
+            val uri = DateiSpeichern.fuerTeilen(ctx, name)
+            val senden = Intent(Intent.ACTION_SEND)
+                .setType(typ)
+                .putExtra(Intent.EXTRA_STREAM, uri)
+                .putExtra(Intent.EXTRA_SUBJECT, name)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            senden.clipData = ClipData.newRawUri(name, uri)
+            val auswahl = Intent.createChooser(senden, "WEP teilen")
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            activity.startActivity(auswahl)
+            Protokoll.eintrag(ctx, "info", "Datei zum Teilen übergeben")
+            call.resolve(JSObject().put("geteilt", true))
+        } catch (e: Exception) {
+            Protokoll.eintrag(ctx, "fehler", "Datei teilen: ${e.message}")
+            fehler(call, e)
+        }
+    }
+
+    /**
+     * „Öffnen mit WEP“: Wartet eine Datei? Beim Kaltstart steckt sie im Start-Intent der Aktivität, bei laufender
+     * App kommt sie über `handleOnNewIntent` (dort wird sie angenommen und das Ereignis „eingang“ gemeldet).
+     */
+    @PluginMethod
+    fun eingangPruefen(call: PluginCall) {
+        try {
+            Eingang.uebernehme(ctx, activity.intent)
+            val info = Eingang.info(ctx)
+            val r = JSObject().put("vorhanden", info != null)
+            if (info != null) r.put("name", info.name).put("groesse", info.groesse)
+            call.resolve(r)
+        } catch (e: Exception) {
+            fehler(call, e)
+        }
+    }
+
+    @PluginMethod
+    fun eingangLesen(call: PluginCall) {
+        try {
+            val pos = call.getLong("pos") ?: return call.reject("pos fehlt")
+            val laenge = call.getInt("laenge") ?: return call.reject("laenge fehlt")
+            val bytes = Eingang.lies(ctx, pos, laenge)
+            call.resolve(JSObject().put("daten", Base64.encodeToString(bytes, Base64.NO_WRAP)))
+        } catch (e: Exception) {
+            fehler(call, e)
+        }
+    }
+
+    @PluginMethod
+    fun eingangVerwerfen(call: PluginCall) {
+        Eingang.verwirf(ctx)
+        call.resolve()
+    }
+
+    /** Die App läuft schon und bekommt eine Datei: annehmen (nicht auf dem UI-Thread) und der Web-App melden. */
+    override fun handleOnNewIntent(intent: Intent) {
+        super.handleOnNewIntent(intent)
+        if (intent.action != Intent.ACTION_VIEW || intent.data?.scheme != "content") return
+        Thread {
+            if (Eingang.uebernehme(ctx, intent)) {
+                val info = Eingang.info(ctx) ?: return@Thread
+                notifyListeners("eingang", JSObject().put("name", info.name).put("groesse", info.groesse))
             }
         }.start()
     }
