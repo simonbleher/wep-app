@@ -2285,3 +2285,135 @@ input[type='range'] {
   min-height: 44px; /* Finger-tauglich */
   accent-color: var(--farbe-akzent);
 }
+
+/* Parzelle (Beta 6, Paket 1): Eingabe in „Skizze Bau“ und „Skizze Grün“ */
+.parzelle {
+  display: flex;
+  flex-direction: column;
+  gap: var(--abstand-3);
+  padding: var(--abstand-3) 0;
+  border-top: var(--linie) solid var(--farbe-linie);
+  border-bottom: var(--linie) solid var(--farbe-linie);
+}
+
+.parzelle-kopf {
+  display: flex;
+  align-items: center;
+  gap: var(--abstand-2);
+}
+
+.parzelle-kopf .h2 {
+  margin: 0;
+}
+
+.segmente-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.segment svg {
+  vertical-align: -3px;
+  margin-right: var(--abstand-1);
+}
+
+.parzelle-flaeche {
+  margin: 0;
+  font-size: var(--schrift-basis);
+}
+
+.parzelle-fehlt {
+  margin: 0;
+}
+
+.parzelle-ergebnis {
+  display: flex;
+  flex-direction: column;
+  gap: var(--abstand-3);
+}
+
+.parzelle-vorschlag {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--abstand-2);
+}
+
+.parzelle-zeile {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--abstand-2);
+  align-items: end;
+  padding: var(--abstand-2) 0;
+}
+
+.parzelle-zeile > .knopf {
+  justify-self: start;
+}
+
+@media (min-width: 640px) {
+  .parzelle-zeile {
+    grid-template-columns: 1fr 1fr 1.4fr auto;
+  }
+
+  .parzelle-seiten {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* Ecken grob zeichnen: quadratische Fläche, Ecken sind Berührpunkte (Greifradius 9 von 100 Einheiten) */
+.parzelle-ecken {
+  display: block;
+  width: 100%;
+  max-width: 360px;
+  aspect-ratio: 1;
+  border: var(--linie) solid var(--farbe-rand);
+  border-radius: var(--radius);
+  background: var(--farbe-grund);
+  cursor: crosshair;
+}
+
+.parzelle-ecken-grund {
+  fill: var(--farbe-flaeche);
+}
+
+.parzelle-ecken-form {
+  stroke: var(--farbe-akzent);
+  stroke-width: 0.8;
+  color: var(--farbe-akzent);
+}
+
+.parzelle-ecke {
+  fill: var(--farbe-grund);
+  stroke: var(--farbe-akzent);
+  stroke-width: 1.2;
+}
+
+.parzelle-ecke-text {
+  fill: var(--farbe-text);
+  font-size: 6px;
+  font-weight: 600;
+}
+
+/* Berechnete Form, maßstäblich */
+.parzelle-vorschau {
+  display: block;
+  width: 100%;
+  max-width: 420px;
+  max-height: 60vh;
+  border: var(--linie) solid var(--farbe-linie);
+  border-radius: var(--radius);
+  background: var(--farbe-grund);
+}
+
+.parzelle-vorschau-form {
+  fill: #e2f0d9;
+  stroke: #595959;
+  stroke-width: 1.5px;
+  vector-effect: non-scaling-stroke;
+}
+
+.parzelle-vorschau-text {
+  fill: #c00000;
+}
+
+.parzelle-vorschau-ecke {
+  fill: var(--farbe-text);
+}

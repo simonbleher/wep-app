@@ -16,6 +16,7 @@ import { ICON } from '@/app/ui'
 import { AuswahlFeld, Schalter, TextFeld, ZahlFeld } from '@/app/BauKomponenten'
 import { BAUTEIL_ARTEN } from '@/app/bauHelfer'
 import type { Bauteil, BauteilArt } from '@/model'
+import { massstabText, rasterMeter, type ParzellenLage } from '@/parzelle/lage'
 import {
   DACHFORMEN,
   FLAECHE_M,
@@ -72,7 +73,9 @@ import {
 
 /** Zeichenfläche: 40 Einheiten je Meter (Raster 1 m = Rasterkästchen der Grün-Skizze). */
 export const PX_PRO_M = 40
-const FLAECHE = { breite: FLAECHE_M.breite * PX_PRO_M, hoehe: FLAECHE_M.hoehe * PX_PRO_M }
+const FLAECHE_STANDARD = { breite: FLAECHE_M.breite * PX_PRO_M, hoehe: FLAECHE_M.hoehe * PX_PRO_M }
+/** Mit Parzelle: Rand um die Parzelle in m (Platz für die Maßketten außerhalb des Grundrisses). */
+const PARZELLEN_RAND_M = 2.5
 
 const EINRASTEN_SCHLUESSEL = 'wep-grundriss-einrasten'
 const GREIF_PIXEL_FINGER = 20
@@ -120,11 +123,22 @@ export interface GrundrissEditorProps {
   onAenderung: (neu: GrundrissDaten) => void
   /** Legt ein neues Bauteil im WEP an (Kürzel, Art) und gibt es zurück. */
   onNeuesBauteil: (art: BauteilArt) => Bauteil
+  /**
+   * Parzelle (Beta 6, Paket 1): Die Zeichenfläche ist die Parzelle mit Rand, ihre Form liegt als Hintergrund unter dem Grundriss,
+   * das Raster folgt ihrem Maßstab (1 Kästchen = `rasterMeter` m wie in der Grün-Skizze). Ohne Parzelle bleibt alles wie bisher.
+   */
+  parzelle?: ParzellenLage
 }
 
 const PX = (m: number) => m * PX_PRO_M
 
-export function GrundrissEditor({ wert, bauteile, onAenderung, onNeuesBauteil }: GrundrissEditorProps) {
+export function GrundrissEditor({ wert, bauteile, onAenderung, onNeuesBauteil, parzelle }: GrundrissEditorProps) {
+  // Zeichenfläche: ohne Parzelle 20 × 15 m, mit Parzelle deren Ausdehnung plus Rand; `versatz` schiebt Meter 0 der Parzelle an den Rand
+  const versatz = parzelle ? PARZELLEN_RAND_M : 0
+  const FLAECHE = parzelle
+    ? { breite: (parzelle.breiteM + 2 * versatz) * PX_PRO_M, hoehe: (parzelle.hoeheM + 2 * versatz) * PX_PRO_M }
+    : FLAECHE_STANDARD
+  const rasterSchritt = parzelle ? rasterMeter(parzelle.abb.pxProM) : 1
   const [zustand, dispatch] = useReducer(grundrissReducer, wert.teile, neuerGrundrissZustand)
   const teile = zustand.teile
   const [raster, setRaster] = useState(wert.raster ?? true)
@@ -195,7 +209,7 @@ export function GrundrissEditor({ wert, bauteile, onAenderung, onNeuesBauteil }:
   const holeKasten = () => svgRef.current!.getBoundingClientRect()
   const zuM = (e: { clientX: number; clientY: number }): GPunkt => {
     const p = bildschirmZuSkizze({ x: e.clientX, y: e.clientY }, ansichtRef.current, FLAECHE, holeKasten())
-    return { x: p.x / PX_PRO_M, y: p.y / PX_PRO_M }
+    return { x: p.x / PX_PRO_M - versatz, y: p.y / PX_PRO_M - versatz }
   }
   const einheitenJePixel = () => 1 / pixelProEinheit(ansichtRef.current, FLAECHE, holeKasten()) / PX_PRO_M // m je Bildschirmpixel
   const fangSchwelle = () => FANG_PIXEL * einheitenJePixel()
@@ -578,13 +592,19 @@ export function GrundrissEditor({ wert, bauteile, onAenderung, onNeuesBauteil }:
   const schrift = 11
   const pfad = (pts: GPunkt[]) => pts.map((p) => `${PX(p.x)},${PX(p.y)}`).join(' ')
 
+  // Raster: ab Meter 0 der Parzelle (bzw. der Fläche), Abstand wie in der Grün-Skizze
   const rasterLinien = []
   if (raster) {
-    for (let x = 0; x <= FLAECHE.breite; x += PX_PRO_M) {
-      rasterLinien.push(<line key={`vr-${x}`} x1={x} y1={0} x2={x} y2={FLAECHE.hoehe} stroke={x % (5 * PX_PRO_M) === 0 ? '#cfcfcf' : '#e6e6e6'} strokeWidth={0.5} vectorEffect="non-scaling-stroke" />)
+    const schritt = rasterSchritt * PX_PRO_M
+    const start = versatz * PX_PRO_M
+    const dunkel = (k: number) => (k % 5 === 0 ? '#cfcfcf' : '#e6e6e6')
+    for (let k = -Math.floor(start / schritt); start + k * schritt <= FLAECHE.breite; k++) {
+      const x = start + k * schritt
+      rasterLinien.push(<line key={`vr-${k}`} x1={x} y1={0} x2={x} y2={FLAECHE.hoehe} stroke={dunkel(k)} strokeWidth={0.5} vectorEffect="non-scaling-stroke" />)
     }
-    for (let y = 0; y <= FLAECHE.hoehe; y += PX_PRO_M) {
-      rasterLinien.push(<line key={`hr-${y}`} x1={0} y1={y} x2={FLAECHE.breite} y2={y} stroke={y % (5 * PX_PRO_M) === 0 ? '#cfcfcf' : '#e6e6e6'} strokeWidth={0.5} vectorEffect="non-scaling-stroke" />)
+    for (let k = -Math.floor(start / schritt); start + k * schritt <= FLAECHE.hoehe; k++) {
+      const y = start + k * schritt
+      rasterLinien.push(<line key={`hr-${k}`} x1={0} y1={y} x2={FLAECHE.breite} y2={y} stroke={dunkel(k)} strokeWidth={0.5} vectorEffect="non-scaling-stroke" />)
     }
   }
 
@@ -722,6 +742,11 @@ export function GrundrissEditor({ wert, bauteile, onAenderung, onNeuesBauteil }:
         ))}
       </p>
 
+      {parzelle && (
+        <p className="neben" data-testid="grundriss-massstab">
+          Parzelle {meterText(parzelle.breiteM)} × {meterText(parzelle.hoeheM)} · {massstabText(parzelle.abb.pxProM)} – wie in der Grün-Skizze
+        </p>
+      )}
       <div className="skizze-bereich">
         <div className="skizze-flaeche" style={{ aspectRatio: `${FLAECHE.breite} / ${FLAECHE.hoehe}`, cursor: werkzeug === 'auswahl' ? 'default' : 'crosshair' }}>
           <svg
@@ -738,6 +763,30 @@ export function GrundrissEditor({ wert, bauteile, onAenderung, onNeuesBauteil }:
           >
             <rect width={FLAECHE.breite} height={FLAECHE.hoehe} fill="#fff" />
             {rasterLinien}
+
+            <g transform={`translate(${versatz * PX_PRO_M} ${versatz * PX_PRO_M})`}>
+            {parzelle && (
+              <g data-testid="grundriss-parzelle" pointerEvents="none">
+                <polygon points={pfad(parzelle.punkte)} fill="#E2F0D9" fillOpacity={0.85} stroke="#595959" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
+                {parzelle.punkte.map((p, i) => {
+                  const q = parzelle.punkte[(i + 1) % parzelle.punkte.length]
+                  const l = parzelle.seiten[i]
+                  const mx = (p.x + q.x) / 2
+                  const my = (p.y + q.y) / 2
+                  // Beschriftung außerhalb der Kante: weg vom Schwerpunkt der Parzelle
+                  const cx = parzelle.punkte.reduce((a, r) => a + r.x, 0) / parzelle.punkte.length
+                  const cy = parzelle.punkte.reduce((a, r) => a + r.y, 0) / parzelle.punkte.length
+                  const dx = mx - cx
+                  const dy = my - cy
+                  const d = Math.hypot(dx, dy) || 1
+                  return (
+                    <text key={`pm${i}`} x={PX(mx + (dx / d) * 0.9)} y={PX(my + (dy / d) * 0.9) + 4} textAnchor="middle" fontSize={12} fill="#595959">
+                      {meterText(l)}
+                    </text>
+                  )
+                })}
+              </g>
+            )}
 
             {teile.map((t) => {
               const istGewaehlt = t.id === auswahl?.teilId
@@ -819,11 +868,12 @@ export function GrundrissEditor({ wert, bauteile, onAenderung, onNeuesBauteil }:
             )}
 
             {hilfslinien?.x !== undefined && (
-              <line className="skizze-hilfslinie" x1={PX(hilfslinien.x)} y1={0} x2={PX(hilfslinien.x)} y2={FLAECHE.hoehe} stroke="#d6336c" strokeWidth={1} strokeDasharray="4 3" vectorEffect="non-scaling-stroke" pointerEvents="none" />
+              <line className="skizze-hilfslinie" x1={PX(hilfslinien.x)} y1={-versatz * PX_PRO_M} x2={PX(hilfslinien.x)} y2={FLAECHE.hoehe} stroke="#d6336c" strokeWidth={1} strokeDasharray="4 3" vectorEffect="non-scaling-stroke" pointerEvents="none" />
             )}
             {hilfslinien?.y !== undefined && (
-              <line className="skizze-hilfslinie" x1={0} y1={PX(hilfslinien.y)} x2={FLAECHE.breite} y2={PX(hilfslinien.y)} stroke="#d6336c" strokeWidth={1} strokeDasharray="4 3" vectorEffect="non-scaling-stroke" pointerEvents="none" />
+              <line className="skizze-hilfslinie" x1={-versatz * PX_PRO_M} y1={PX(hilfslinien.y)} x2={FLAECHE.breite} y2={PX(hilfslinien.y)} stroke="#d6336c" strokeWidth={1} strokeDasharray="4 3" vectorEffect="non-scaling-stroke" pointerEvents="none" />
             )}
+            </g>
           </svg>
         </div>
         <div role="group" aria-label="Ansicht" className="skizze-ansicht">

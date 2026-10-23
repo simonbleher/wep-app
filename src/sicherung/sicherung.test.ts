@@ -365,3 +365,28 @@ describe('Einspielen mit Konflikten: nichts wird still überschrieben', () => {
     expect(v.eigene).toEqual([])
   })
 })
+
+describe('Parzelle (Beta 6, Paket 1) in der Sicherung', () => {
+  it('Parzelle und Skizzen-Maßstab kommen aus der Sicherung unverändert zurück', async () => {
+    const parzelle = {
+      form: 'frei' as const,
+      ecken: [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }, { x: 0, y: 100 }],
+      seiten: [12, 20, 12, 20],
+      diagonalen: [{ von: 0, nach: 2, laenge: 23.32 }],
+      massketten: true,
+      angelegtVon: 'gruen' as const,
+      angelegtAm: JETZT,
+      geaendertVon: 'bau' as const,
+      geaendertAm: JETZT,
+    }
+    const a = leer()
+    a.weps = [{ wep: wep('2026-001', 'KGA Musterwiese', { parzelle, skizze: { elemente: [], massstab: { pxProM: 30, ox: 10, oy: 20 } } }), geaendertAm: JETZT }]
+    const { gelesen } = await sicherungAus(a, { mitFotos: false, mitBauExcel: false })
+    const b = leer()
+    const gb = geraet(b)
+    const v = await erstelleVorschau(gelesen, gb.quelle)
+    await spieleEin({ sicherung: gelesen, vorschau: v, wahl: standardEntscheidungen(v), lokal: gb.quelle, ziel: gb.ziel, jetzt: () => JETZT })
+    expect(b.weps[0].wep.parzelle).toEqual(parzelle)
+    expect(b.weps[0].wep.skizze?.massstab).toEqual({ pxProM: 30, ox: 10, oy: 20 })
+  })
+})

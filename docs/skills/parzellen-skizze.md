@@ -89,3 +89,6 @@ Liste der gezeichneten Elemente (im Modus Außenanlage getrennt: „aus Skizze B
 
 ## Hinweis zur WEP-App (Beta 5, Paket 1)
 Die App setzt Schritt 1b selbst um: Die Grün-Skizze bekommt die Bau-Skizze (aus dem Grundriss des Bau-Teils oder aus „Skizze Bau“ der Bau-Excel) als gesperrte Grundlage; beim Excel-Export entstehen Wiese, Gras, Pfosten, Gebäude und Grün im Blatt „Skizze Außenanlage-Aufwuchs“, „Skizze Bau“ bleibt unangetastet (`docs/ENTSCHEIDUNGEN.md`, 2026-10-23).
+
+## Hinweis zur WEP-App (Beta 6, Paket 1)
+Mit einer Parzelle (`Wep.parzelle`) füllt das Grundstück beide Skizzen-Blätter an derselben Stelle in derselben Größe (Bau: #E2F0D9, Grün: Wiese #C5E0B4); Grundriss und Grün liegen in echten Metern darauf. Schräge Parzellen sind Freiformen; Gras nur innerhalb. Seitenmaße (auf Wunsch) stehen als rote Maßlinien innen am Rand. Siehe `docs/ENTSCHEIDUNGEN.md`.

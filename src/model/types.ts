@@ -12,6 +12,8 @@ import type { SkizzeDaten } from '../skizze/types.js'
 export type { SkizzeDaten } from '../skizze/types.js'
 import type { BauDaten } from './bau.js'
 import type { GrundrissDaten } from '../skizze/grundriss.js'
+import type { Parzelle } from '../parzelle/types.js'
+export type { Parzelle, ParzelleTeil } from '../parzelle/types.js'
 export type { GrundrissDaten, GrundrissTeil, Dachform } from '../skizze/grundriss.js'
 export * from './bau.js'
 
@@ -59,6 +61,11 @@ export interface Wep {
    */
   rolle?: Rolle
   skizze?: SkizzeDaten
+  /**
+   * Parzelle (Beta 6, Paket 1): die Form des Grundstücks, eine je WEP für Bau- und Grün-Skizze. Angelegt von dem, der das
+   * WEP zuerst bearbeitet; beide Teile können sie korrigieren (`src/parzelle/`). Fehlt bei WEPs von vor Beta 6.
+   */
+  parzelle?: Parzelle
   /**
    * Grundriss mit echten Maßen für „Skizze Bau“ (Beta 4, Paket 3). Getrennt von der Grün-Skizze `skizze`.
    * Fläche und Kubatur der verknüpften Bauteile kommen von hier (`src/bau/grundriss.ts`).

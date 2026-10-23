@@ -155,8 +155,11 @@ export type SkizzeElement =
  * hier steht, woher sie kommen und ob sie gegen versehentliches Verschieben gesperrt sind.
  */
 export interface SkizzeGrundlage {
-  /** `bau`: Grundriss aus dem Bau-Teil · `excel`: Formen aus dem Blatt „Skizze Bau“ der Bau-Excel. */
-  quelle: 'bau' | 'excel'
+  /**
+   * `bau`: Grundriss aus dem Bau-Teil · `excel`: Formen aus dem Blatt „Skizze Bau“ der Bau-Excel · `parzelle`: nur die Parzelle
+   * (Grundstück, Pfosten; Beta 6, Paket 1), ohne Bauteile.
+   */
+  quelle: 'bau' | 'excel' | 'parzelle'
   /** Zeitpunkt der Übernahme (ISO). */
   uebernommen: string
   /** Gesperrt: nicht auswählbar, nicht verschiebbar (Standard). Entsperrt: einzeln korrigierbar. */
@@ -190,6 +193,18 @@ export interface SkizzeDaten {
   rasterGroesse?: number
   /** Herkunft und Sperre der Grundlage; fehlt, wenn keine Grundlage übernommen wurde. */
   grundlage?: SkizzeGrundlage
+  /**
+   * Maßstab und Lage der Parzelle auf der Leinwand (Beta 6, Paket 1): `px = ox + Meter · pxProM`. Gesetzt, sobald die Skizze auf
+   * der Parzelle des WEP liegt (Leinwand 600 × 825); fehlt bei Skizzen von vor Beta 6, die weiter wie bisher angezeigt werden.
+   */
+  massstab?: SkizzeMassstab
+}
+
+/** Abbildung Meter → Leinwandpixel der Parzelle (siehe `src/parzelle/lage.ts`). */
+export interface SkizzeMassstab {
+  pxProM: number
+  ox: number
+  oy: number
 }
 
 // ---------------------------------------------------------------------------

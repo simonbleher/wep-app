@@ -57,6 +57,9 @@ export async function spieleTeilenEin(opt: {
         else delete neu.status
         if (datei.rolle !== undefined) neu.rolle = datei.rolle
         else delete neu.rolle
+        // Parzelle (Beta 6, Paket 1): mit den Formalien; die Skizze wird danach auf sie gelegt, falls sie noch nicht passt
+        if (datei.parzelle !== undefined) neu.parzelle = datei.parzelle
+        else delete neu.parzelle
       } else if (teil === 'bau') {
         neu = { ...neu, bau: datei.bau }
         if (datei.grundriss !== undefined) neu.grundriss = datei.grundriss
