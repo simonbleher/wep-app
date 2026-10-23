@@ -29,6 +29,8 @@ interface ElementBasis {
   id: string
   /** Feste Elemente (z. B. Bau-Formen) ändert der Chat-Assistent nie. */
   fest?: boolean
+  /** `grundlage`: gehört zur übernommenen Bau-Skizze (eigene Ebene unter dem Grün, siehe `SkizzeGrundlage`). */
+  ebene?: 'grundlage'
 }
 
 /** Gefülltes Rechteck (z. B. Gebäude, Beet). */
@@ -116,14 +118,56 @@ export interface SkizzeSymbol extends ElementBasis {
   beschriftung?: string
 }
 
+/** Was eine Bauform der Grundlage darstellt (bestimmt Farbe und Ebene im Excel-Blatt). */
+export type BauformArt = 'grundstueck' | 'bauteil' | 'pfosten'
+
+/**
+ * Geschlossene Form der Bau-Skizze (Beta 5, Paket 1): Grundstück, Gebäude, Anbau, Schuppen, Terrasse, Keller,
+ * Pfosten. Rechtecke haben vier Punkte, L-Formen mehr. Gehört in der Regel zur Grundlage (`ebene: 'grundlage'`).
+ */
+export interface SkizzeBauform extends ElementBasis {
+  typ: 'bauform'
+  art: BauformArt
+  /** Eckpunkte in Skizzen-Pixeln (mindestens 3). */
+  punkte: { x: number; y: number }[]
+  /** Beschriftung in der Form (Kürzel, Text aus der Bau-Excel); „\n“ = Zeilenumbruch. */
+  beschriftung?: string
+  /** Gestrichelt ohne Füllung (Keller, Hauswasser). */
+  gestrichelt?: boolean
+}
+
 /** Vereinigungs-Typ aller Skizze-Elemente. */
 export type SkizzeElement =
+  | SkizzeBauform
   | SkizzeSymbol
   | SkizzeRechteck
   | SkizzeLinie
   | SkizzeKreis
   | SkizzeText
   | SkizzeMassangabe
+
+// ---------------------------------------------------------------------------
+// Grundlage (Bau-Skizze unter dem Grün)
+// ---------------------------------------------------------------------------
+
+/**
+ * Angaben zur Grundlage. Die Formen selbst stehen am Anfang von `SkizzeDaten.elemente` (`ebene: 'grundlage'`);
+ * hier steht, woher sie kommen und ob sie gegen versehentliches Verschieben gesperrt sind.
+ */
+export interface SkizzeGrundlage {
+  /** `bau`: Grundriss aus dem Bau-Teil · `excel`: Formen aus dem Blatt „Skizze Bau“ der Bau-Excel. */
+  quelle: 'bau' | 'excel'
+  /** Zeitpunkt der Übernahme (ISO). */
+  uebernommen: string
+  /** Gesperrt: nicht auswählbar, nicht verschiebbar (Standard). Entsperrt: einzeln korrigierbar. */
+  gesperrt: boolean
+  /** Bei `excel`: Name der Bau-Excel. */
+  excelName?: string
+  /** Was nicht übernommen werden konnte (Bilder, Formen ohne Umrechnung …). */
+  hinweise?: string[]
+}
+
+export const istGrundlage = (el: SkizzeElement): boolean => el.ebene === 'grundlage'
 
 // ---------------------------------------------------------------------------
 // Gesamt-Datenstruktur (wird auch in src/model/types.ts referenziert)
@@ -144,6 +188,8 @@ export interface SkizzeDaten {
   raster?: boolean
   /** Rasterabstand in Pixeln (Default 40). */
   rasterGroesse?: number
+  /** Herkunft und Sperre der Grundlage; fehlt, wenn keine Grundlage übernommen wurde. */
+  grundlage?: SkizzeGrundlage
 }
 
 // ---------------------------------------------------------------------------

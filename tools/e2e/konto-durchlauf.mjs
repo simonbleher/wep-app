@@ -330,6 +330,9 @@ try {
   // 10e. Skizze: Werkzeugleiste mit Icons (≥ 48 px), Dialoge im neuen Stil
   await nav.getByRole('button', { name: 'Skizze' }).click()
   await seite.getByRole('toolbar', { name: 'Zeichenwerkzeuge' }).waitFor()
+  // Beta 5, Paket 1: ohne Bau-Daten nur ein Hinweis, kein Sperren, keine Übernehmen-Knöpfe
+  pruefe(await seite.getByTestId('grundlage-hinweis').isVisible(), 'Skizze: ohne Bau-Daten Hinweis „Erst Bau-Skizze übernehmen“')
+  pruefe((await seite.getByRole('button', { name: /übernehmen/ }).count()) === 0, 'Skizze: ohne Bau-Daten keine Übernehmen-Knöpfe')
   const kleinste = await seite.getByRole('toolbar').getByRole('button').evaluateAll((knoepfe) =>
     Math.min(...knoepfe.map((k) => Math.min(k.getBoundingClientRect().width, k.getBoundingClientRect().height))),
   )

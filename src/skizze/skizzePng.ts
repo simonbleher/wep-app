@@ -126,6 +126,34 @@ function zeichneElement(ctx: CanvasRenderingContext2D, el: SkizzeElement): void 
       ctx.strokeRect(el.x, el.y, el.breite, el.hoehe)
       break
 
+    case 'bauform': {
+      if (el.punkte.length < 3) break
+      ctx.beginPath()
+      el.punkte.forEach((q, i) => (i === 0 ? ctx.moveTo(q.x, q.y) : ctx.lineTo(q.x, q.y)))
+      ctx.closePath()
+      const fuellung = el.art === 'grundstueck' ? '#C5E0B4' : el.art === 'pfosten' ? '#ffffff' : el.gestrichelt ? null : '#E7E6E6'
+      if (fuellung) {
+        ctx.fillStyle = fuellung
+        ctx.fill()
+      }
+      ctx.strokeStyle = el.art === 'bauteil' ? '#262626' : '#595959'
+      ctx.lineWidth = el.art === 'pfosten' ? 1 : 1.5
+      if (el.gestrichelt) ctx.setLineDash([6, 4])
+      ctx.stroke()
+      if (el.beschriftung && el.art === 'bauteil') {
+        const xs = el.punkte.map((q) => q.x)
+        const ys = el.punkte.map((q) => q.y)
+        ctx.setLineDash([])
+        ctx.fillStyle = '#000000'
+        ctx.font = '12px sans-serif'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        const zeilen = el.beschriftung.split('\n')
+        zeilen.forEach((z, i) => ctx.fillText(z, (Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2 + (i - (zeilen.length - 1) / 2) * 14))
+      }
+      break
+    }
+
     case 'linie':
       ctx.beginPath()
       ctx.moveTo(el.x1, el.y1)

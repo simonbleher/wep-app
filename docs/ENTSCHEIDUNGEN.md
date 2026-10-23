@@ -160,3 +160,13 @@
 - **Tests:** `tools/pruef-weps/tests` erzeugen erfundene WEPs aus `docs/WEP_Vorlage.xlsx`, lassen LibreOffice die Werte speichern und vergleichen jeden einzelnen Betrag mit der LibreOffice-Rechnung
   derselben Datei mit je einer korrigierten Formel. Der Workflow „Prüfen“ installiert dafür LibreOffice und führt `pytest` aus; ohne LibreOffice werden diese Tests übersprungen. Keine Änderung an `android/`,
   Plugins oder `src-tauri/`, daher keine neue Versionsnummer.
+
+## 2026-10-23 · Beta 5, Paket 1: Grün-Skizze baut auf der Bau-Skizze auf
+
+- **Grundlage als Elemente mit `ebene: 'grundlage'`** am Anfang von `SkizzeDaten.elemente` (neues Element `bauform`: Grundstück, Bauteil, Pfosten als Vieleck), Herkunft und Sperre in `SkizzeDaten.grundlage`. So gelten Zoom, Einrasten, Verschieben und Rückgängig unverändert; alte Skizzen ohne Feld laufen weiter. „Neu übernehmen“ ersetzt nur Elemente dieser Ebene, das Grün bleibt.
+- **Gesperrt = nicht auswählbar** (`waehlbareElemente`), nicht „fest“: Antippen trifft das Grün darüber oder verschiebt den Ausschnitt; die Grundlage bleibt Ziel zum Einrasten. Der Skizzen-Chat sieht sie als feste Bau-Formen. Ohne Bau-Daten nur ein Hinweis, nichts wird gesperrt.
+- **Quellen:** (a) Grundriss des Bau-Teils (Meter → Pixel, Maßstab nach Parzellenfläche, höchstens passend; Pfosten und Grundstück erzeugt), (b) Formen aus „Skizze Bau“ (`bauSkizzeLesen.ts`, Regex wie der übrige Export, nur lesend). Eigene Maßketten und die Massenberechnung des Bau-Exports werden nicht übernommen, Bilder (außer Gras) und angenäherte Formen als Hinweis.
+- **Fläche:** Eine Skizze ohne Grün bekommt 600 × 825 (Seitenverhältnis des Zeichenbereichs B7:G48), dann liegt die Grundlage im Export 1:1 über der Bau-Skizze. Gibt es schon Grün, bleibt die Fläche, die Grundlage wird eingepasst.
+- **Export:** Grundlage nur, wenn das Blatt „Skizze Außenanlage-Aufwuchs“ noch keine fremden Formen hat (sonst läge sie doppelt, Hinweis in der App). Ebenen: Wiese, Gras, Pfosten, Weg, Gebäude, Grün …; Gebäude heißen wie im Skill („L“, „A1“, „K1_HW“). „Skizze Bau“ wird nie angefasst (Rolle „beides“: dort schreibt weiterhin nur der Bau-Export den Grundriss).
+- Keine Änderung an `android/`, Plugins oder `src-tauri/`, daher keine neue Versionsnummer.
+

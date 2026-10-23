@@ -138,6 +138,10 @@ Ohne `teil` Bau oder ohne `wep.bau` bleiben die Bau-Blätter byte-gleich.
 rote Maßketten (`massangabe`) und unten die Massenberechnung (`massenberechnung`). Schreibt über `fuegeSkizzeFormenEin` mit `blatt: 'Skizze Bau'`, `graswiese: false`; fremde Formen bleiben
 (`ExportResult.grundriss.fremdeFormen`), eigene eines früheren Exports werden ersetzt. Bei Teil `gruen` oder ohne Option bleibt das Blatt byte-gleich. Sichtprüfung: `npm run beta4-paket3:export-bild`.
 
+## Grundlage der Grün-Skizze (Beta 5, Paket 1)
+
+`skizzeDatenZuFormen(skizze, zeichenbereich, { grundlage: !hatFormen })` schreibt die Bau-Skizze (Elemente mit `ebene: 'grundlage'`, Typ `bauform`) als Formen `Grundstück` (Wiese #C5E0B4, bestimmt die Fläche des Grases), `Pfosten_n`, Gebäude (`L`, `A1`, `K1_HW` …, Keller gestrichelt) ins Blatt „Skizze Außenanlage-Aufwuchs“; steht dort schon etwas Fremdes (`hatFormen`), entfällt die Grundlage. `bauSkizzeLesen.ts` liest die Formen aus „Skizze Bau“ einer Bau-Excel (nur lesend); Umrechnung in `src/skizze/grundlage.ts`. „Skizze Bau“ bleibt byte-gleich. Sichtprüfung: `npm run beta5-paket1:export-bild`.
+
 ## Regeln
 
 - **Bau-Blätter werden nur vom Bau-Export (Teil `bau`/`beides` mit Bau-Daten oder Grundriss am WEP) verändert, sonst nie.**

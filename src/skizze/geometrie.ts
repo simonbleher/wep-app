@@ -33,6 +33,26 @@ export function abstandPunktZuStrecke(p: Punkt, p1: Punkt, p2: Punkt): number {
   return abstand(p, { x: p1.x + t * dx, y: p1.y + t * dy })
 }
 
+/** Umgebender Kasten einer Punktliste. */
+export function kastenVonPunkten(punkte: ReadonlyArray<Punkt>): { x: number; y: number; breite: number; hoehe: number } {
+  const xs = punkte.map((p) => p.x)
+  const ys = punkte.map((p) => p.y)
+  const x = Math.min(...xs)
+  const y = Math.min(...ys)
+  return { x, y, breite: Math.max(...xs) - x, hoehe: Math.max(...ys) - y }
+}
+
+/** Liegt der Punkt im Vieleck (Strahlverfahren)? */
+export function imVieleck(p: Punkt, punkte: ReadonlyArray<Punkt>): boolean {
+  let innen = false
+  for (let i = 0, j = punkte.length - 1; i < punkte.length; j = i++) {
+    const a = punkte[i]
+    const b = punkte[j]
+    if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) innen = !innen
+  }
+  return innen
+}
+
 /** Trefferradius in Skizzen-Einheiten (Standard, ohne Zoom-Umrechnung). */
 const TREFFERRADIUS = 8
 /** Kleiner Rand um Symbole im Standard (ohne Zoom-Umrechnung). */
@@ -54,6 +74,10 @@ export function trifftElement(element: SkizzeElement, p: Punkt, toleranz?: numbe
         p.y >= element.y - rand &&
         p.y <= element.y + element.hoehe + rand
       )
+    }
+    case 'bauform': {
+      if (imVieleck(p, element.punkte)) return true
+      return element.punkte.some((a, i) => abstandPunktZuStrecke(p, a, element.punkte[(i + 1) % element.punkte.length]) <= t)
     }
     case 'rechteck': {
       const { x, y, breite, hoehe } = element
@@ -97,6 +121,10 @@ export function elementFlaeche(element: SkizzeElement): number {
       return element.breite * element.hoehe
     case 'kreis':
       return (2 * element.radius) ** 2
+    case 'bauform': {
+      const k = kastenVonPunkten(element.punkte)
+      return k.breite * k.hoehe
+    }
     case 'linie':
     case 'massangabe':
       return 0
@@ -149,6 +177,8 @@ export function elementVerschieben(element: SkizzeElement, dx: number, dy: numbe
       }
     case 'kreis':
       return { ...element, cx: element.cx + dx, cy: element.cy + dy }
+    case 'bauform':
+      return { ...element, punkte: element.punkte.map((q) => ({ x: q.x + dx, y: q.y + dy })) }
     case 'text':
       return { ...element, x: element.x + dx, y: element.y + dy }
     case 'massangabe':

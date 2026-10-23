@@ -12,7 +12,8 @@ import { useCallback, useEffect, useId, useReducer, useRef, useState } from 'rea
 import { Circle, Grid3x3, Magnet, Maximize, MousePointer2, Redo2, Ruler, Slash, Square, Trash2, TreePine, Type, Undo2, ZoomIn, ZoomOut, type LucideIcon } from 'lucide-react'
 import { Dialog, ICON } from '@/app/ui'
 import type { SkizzeDaten, SkizzeElement, SkizzeWerkzeug, SymbolArt } from './types.js'
-import { SYMBOL_ARTEN, leereSkizze, neueId } from './types.js'
+import { SYMBOL_ARTEN, istGrundlage, leereSkizze, neueId } from './types.js'
+import { waehlbareElemente } from './grundlage.js'
 import { primsZuSvg, symbolPrims } from './symbole.js'
 import { STANDARD_GROESSE } from './szene.js'
 import { alleTreffer, elementVerschieben, naechsterTreffer, type Punkt } from './geometrie.js'
@@ -190,6 +191,7 @@ const WERKZEUGE: { id: SkizzeWerkzeug; name: string; titel: string; icon: Lucide
 /** Lesbare Namen der Elementarten für die Auswahlzeile. */
 const TYP_NAMEN: Record<SkizzeElement['typ'], string> = {
   rechteck: 'Rechteck',
+  bauform: 'Bau-Form',
   linie: 'Linie',
   kreis: 'Kreis',
   text: 'Text',
@@ -229,6 +231,8 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
   const breite = daten.breite ?? 800
   const hoehe = daten.hoehe ?? 600
   const rasterGroesse = daten.rasterGroesse ?? 40
+  const grundlageGesperrt = daten.grundlage?.gesperrt === true
+  const gesperrtGrundlage = daten.grundlage
 
   const [zustand, dispatch] = useReducer(editorReducer, {
     elemente: daten.elemente,
@@ -417,7 +421,9 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
       const { x, y } = roh
 
       if (aktivesWerkzeug === 'auswahl') {
-        const treffer = alleTreffer(zustand.elemente, roh, greifRadius(e))
+        // Gesperrte Grundlage (Bau-Skizze) ist nicht auswählbar; sie bleibt aber Ziel zum Einrasten
+        const waehlbar = waehlbareElemente({ elemente: zustand.elemente, grundlage: gesperrtGrundlage })
+        const treffer = alleTreffer(waehlbar, roh, greifRadius(e))
         const warAusgewaehlt = treffer.some((t) => t.id === zustand.ausgewaehlt)
         // Ist die gewählte Form hier getroffen, bleibt sie (zum Ziehen); sonst die kleinste Form an dieser Stelle
         const gewaehlt = warAusgewaehlt ? treffer.find((t) => t.id === zustand.ausgewaehlt)! : (treffer[0] ?? null)
@@ -481,7 +487,7 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
       zeichnenRef.current = { aktiv: true, startX: start.punkt.x, startY: start.punkt.y, vorschau: null, ziele }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [aktivesWerkzeug, zustand.elemente, zustand.ausgewaehlt, symbolArt, breite, hoehe, einrasten],
+    [aktivesWerkzeug, zustand.elemente, zustand.ausgewaehlt, symbolArt, breite, hoehe, einrasten, grundlageGesperrt],
   )
 
   const handlePointerMove = useCallback(
@@ -792,6 +798,32 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
           </g>
         )
       }
+      case 'bauform': {
+        const xs = el.punkte.map((q) => q.x)
+        const ys = el.punkte.map((q) => q.y)
+        const mx = (Math.min(...xs) + Math.max(...xs)) / 2
+        const my = (Math.min(...ys) + Math.max(...ys)) / 2
+        const zeilen = (el.beschriftung ?? '').split('\n').filter(Boolean)
+        const fuellung = el.art === 'grundstueck' ? '#C5E0B4' : el.art === 'pfosten' ? '#fff' : el.gestrichelt ? 'none' : '#E7E6E6'
+        return (
+          <g key={el.id} data-grundlage={istGrundlage(el) ? '' : undefined} data-art={el.art}>
+            <polygon
+              points={el.punkte.map((q) => `${q.x},${q.y}`).join(' ')}
+              fill={fuellung}
+              stroke={istAusgewaehlt ? 'blue' : el.art === 'bauteil' ? '#262626' : '#595959'}
+              strokeWidth={istAusgewaehlt ? 2.5 : el.art === 'pfosten' ? 1 : 1.5}
+              strokeDasharray={el.gestrichelt ? '6 4' : undefined}
+              pointerEvents={el.gestrichelt ? 'all' : undefined}
+            />
+            {el.art === 'bauteil' &&
+              zeilen.map((z, i) => (
+                <text key={i} x={mx} y={my + (i - (zeilen.length - 1) / 2) * 14} textAnchor="middle" dominantBaseline="middle" fontSize={12} fill="#000" pointerEvents="none">
+                  {z}
+                </text>
+              ))}
+          </g>
+        )
+      }
       case 'rechteck':
         return (
           <rect
@@ -1021,7 +1053,9 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
       <p className="skizze-auswahl" aria-live="polite">
         {ausgewaehltesEl ? (
           <>
-            {ausgewaehltesEl.fest
+            {istGrundlage(ausgewaehltesEl)
+              ? `Ausgewählt: ${auswahlName} der Grundlage – ziehen zum Verschieben`
+              : ausgewaehltesEl.fest
               ? `Ausgewählt: ${auswahlName} (fest)`
               : `Ausgewählt: ${auswahlName} – ziehen zum Verschieben`}
             {stapel && stapel.anzahl > 1 && ` · ${stapel.index + 1} von ${stapel.anzahl} hier – nochmal tippen`}

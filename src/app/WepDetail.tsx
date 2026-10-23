@@ -65,6 +65,7 @@ import { lokalesProfil } from '@/profil'
 import { skizzeAlsPng } from '@/skizze/skizzePng'
 import { skizzeDatenZuFormen, type Kasten } from '@/export/skizzeFormen'
 import { grundrissZuFormen } from '@/export/grundrissFormen'
+import { hatGrundlage } from '@/skizze/grundlage'
 import { svgZuPngBrowser } from '@/export/svgRaster'
 import { exportWep, type ExportResult } from '@/export'
 import { exportFotosNachOneDrive, exportNachOneDrive, ladeBauExcelAusOneDrive, ladeFotoAusOneDrive } from '@/sync'
@@ -982,7 +983,9 @@ function ExportTab({
       const skizzeFormen =
         hatSkizze && skizze
           ? {
-              elemente: ({ zeichenbereich }: { zeichenbereich: Kasten }) => skizzeDatenZuFormen(skizze, zeichenbereich),
+              // Die Grundlage (Bau-Skizze) kommt nur auf ein Blatt ohne eigene Bau-Formen, sonst läge sie doppelt
+              elemente: ({ zeichenbereich, hatFormen }: { zeichenbereich: Kasten; hatFormen: boolean }) =>
+                skizzeDatenZuFormen(skizze, zeichenbereich, { grundlage: !hatFormen }),
               rasterisiere: svgZuPngBrowser,
             }
           : undefined
@@ -1131,6 +1134,14 @@ function ExportTab({
             </p>
           )}
 
+          {ergebnis.result.skizzeFormen && hatGrundlage(wep.skizze) &&
+            (ergebnis.result.skizzeFormen.fremdeFormen > 0 ? (
+              <Meldung>
+                Im Blatt „Skizze Außenanlage-Aufwuchs“ standen schon Formen. Die Grundlage (Bau-Skizze) wurde deshalb nicht noch einmal geschrieben; das Grün liegt darüber.
+              </Meldung>
+            ) : (
+              <p className="neben">Grundlage (Bau-Skizze) und Wiese im Blatt „Skizze Außenanlage-Aufwuchs“ eingefügt; „Skizze Bau“ bleibt unverändert.</p>
+            ))}
           {ergebnis.result.grundriss && (
             <p className="neben">Grundriss ins Blatt „Skizze Bau“ eingefügt (bearbeitbare Excel-Formen mit Maßketten und Massenberechnung).</p>
           )}

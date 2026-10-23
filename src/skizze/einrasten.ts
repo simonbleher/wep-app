@@ -39,6 +39,8 @@ export function schluesselPunkte(el: SkizzeElement): Punkt[] {
         { x: el.x + el.breite, y: el.y + el.hoehe },
         { x: el.x + el.breite / 2, y: el.y + el.hoehe / 2 },
       ]
+    case 'bauform':
+      return el.punkte.map((q) => ({ x: q.x, y: q.y }))
     case 'linie':
     case 'massangabe':
       return [
