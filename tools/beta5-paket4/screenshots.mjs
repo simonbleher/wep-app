@@ -170,7 +170,7 @@ try {
       await seite.getByRole('heading', { name: 'Export als PDF' }).waitFor()
     }
     const erzeuge = async (datei) => {
-      const [download] = await Promise.all([seite.waitForEvent('download', { timeout: 60000 }), seite.getByRole('button', { name: 'PDF exportieren' }).click()])
+      const [download] = await Promise.all([seite.waitForEvent('download', { timeout: 60000 }), seite.getByRole('button', { name: 'PDF wie Vorlage' }).click()])
       await seite.getByText(/PDF erstellt:/).waitFor({ timeout: 60000 })
       await download.saveAs(datei)
       return download.suggestedFilename()
@@ -188,7 +188,7 @@ try {
 
     // 1. Rolle „beides“: PDF-Bereich, ohne Fotos und Unterschrift
     await oeffneExport('Parzelle 41')
-    pruefe(await seite.getByText(/Das PDF sieht aus wie die Blätter der BV-Vorlage/).isVisible(), 'Export-Reiter: Abschnitt „Export als PDF“ mit Erklärung')
+    pruefe(await seite.getByText(/Das PDF entsteht hier auf dem Gerät/).isVisible(), 'Export-Reiter: Abschnitt „Export als PDF“ mit Erklärung')
     await seite.getByRole('heading', { name: 'Export als PDF' }).scrollIntoViewIfNeeded()
     await bild('1-pdf-bereich')
     const d1 = `/tmp/wep-pdf-${groesse}-1.pdf`

@@ -25,6 +25,7 @@ import {
   patchCells,
   type CellPatch,
 } from './xmlPatcher'
+import { schreibeDeckblattText } from './deckblatt'
 import { blattPfadNachName, formalienBlattPfad, sharedStrings, vergleichsWert, zellenWert } from './bauExcelLesen'
 import { fuegeSkizzeEin, skizzeBlattHatFormen } from './skizzeBild'
 import { schreibeBau, BAULICHKEITEN_BLATT, MAENGEL_BLATT, BESEITIGUNG_BLATT, TABELLE1_BLATT, type BauExportErgebnis } from './exportBau'
@@ -34,6 +35,8 @@ export { skizzeBlattHatFormen } from './skizzeBild'
 export { grundrissZuFormen } from './grundrissFormen'
 export { VORLAGEN_KORREKTUREN, type BauExportErgebnis, type VorlagenKorrektur } from './exportBau'
 export * from './skizzeFormen'
+export { DECKBLATT_ABSAETZE, absatzText, type DeckblattAbsatz, type TextLauf } from './deckblattText'
+export { mitLeerenBauDaten } from './ohneBau'
 export { leseBauFormalien, vergleichsWert, type BauFormalien } from './bauExcelLesen'
 
 /** Blatt, dessen Überschrift in der Vorlage fälschlich „Skizze – Baulichkeiten“ lautet. */
@@ -175,6 +178,9 @@ export async function exportWep(
 
   // 1. Formalien-Blatt patchen (Bau: ohne E13, das ist eine Grün-Zelle)
   await patchFormalien(zip, wep, konflikte, optionen.formalienAbgeglichen === true, nurBau)
+
+  // 1a. Deckblatt: Text A31–A40 (alle Teile; `deckblattText.ts`)
+  await schreibeDeckblattText(zip)
 
   // 1b. Überschrift des Skizzen-Blatts Außenanlage-Aufwuchs (Vorlage: „Skizze – Baulichkeiten“)
   const skizzeUeberschriftGeaendert = nurBau ? false : await korrigiereSkizzeUeberschrift(zip)

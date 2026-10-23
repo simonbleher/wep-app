@@ -36,7 +36,7 @@ function kuerze(text: string, breite: number, mess: (t: string) => number): stri
 }
 
 /** Hängt die Fotoseiten an. Gibt die Zahl der Seiten und Hinweise (nicht lesbare Bilder) zurück. */
-export async function fotoSeiten(lib: Lib, dok: PDFDocument, schriften: Schriften, fotos: PdfFoto[], kopf?: string): Promise<{ seiten: number; hinweise: string[] }> {
+export async function fotoSeiten(lib: Lib, dok: PDFDocument, schriften: Schriften, fotos: PdfFoto[], kopf?: string, mitSeitenzahl = true): Promise<{ seiten: number; hinweise: string[] }> {
   const hinweise: string[] = []
   const sortiert = [...fotos].sort((a, b) => a.nr - b.nr)
   const proSeite = SPALTEN * ZEILEN
@@ -53,7 +53,7 @@ export async function fotoSeiten(lib: Lib, dok: PDFDocument, schriften: Schrifte
     seite.drawText(kodierbar('Fotoanhang'), { x: RAND, y: A4[1] - RAND - 14, size: 14, font: schriften.fett, color: schwarz })
     if (kopf) seite.drawText(kodierbar(kopf), { x: RAND, y: A4[1] - RAND - 29, size: 9, font: schriften.normal, color: grau })
     const nummer = `Seite ${sn + 1} von ${seitenZahl}`
-    seite.drawText(nummer, { x: A4[0] - RAND - schriften.normal.widthOfTextAtSize(nummer, 8), y: RAND - 18, size: 8, font: schriften.normal, color: grau })
+    if (mitSeitenzahl) seite.drawText(nummer, { x: A4[0] - RAND - schriften.normal.widthOfTextAtSize(nummer, 8), y: RAND - 18, size: 8, font: schriften.normal, color: grau })
 
     const teil = sortiert.slice(sn * proSeite, (sn + 1) * proSeite)
     for (const [i, foto] of teil.entries()) {

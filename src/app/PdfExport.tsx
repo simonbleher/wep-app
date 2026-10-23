@@ -1,14 +1,15 @@
-// Export als PDF (Beta 5, Paket 4): sieht aus wie die Blätter der BV-Vorlage, wird offline im Browser erzeugt.
+// Export als PDF (Beta 5, Paket 4): „PDF wie Vorlage“ sieht aus wie die Blätter der BV-Vorlage; „PDF übersichtlich“ ist ein
+// schlichtes, gut lesbares Protokoll mit denselben Zahlen. Beide werden offline im Browser erzeugt.
 // Die PDF-Bibliothek lädt erst beim Erzeugen nach (src/pdf). Speichern über „Speichern unter…“ bzw. Download
 // (dateiSpeichern.ts), mit Konto zusätzlich nach OneDrive (Exporte/).
 import { useEffect, useId, useState } from 'react'
-import { Check, FileText, Share2 } from 'lucide-react'
+import { Check, FileText, FileType, Share2 } from 'lucide-react'
 import { hatBauTeil, type Rolle, type Wep } from '@/model'
 import { dbAblage } from '@/fotos/ablage'
 import { lageVon, skizzeMitParzelle } from '@/parzelle'
 import { leererGrundriss } from '@/skizze/grundriss'
 import { sammlePdfFotos } from '@/pdf/fotosSammeln'
-import { PDF_TYP, erzeugeWepPdf, type WepPdfAusgabe } from '@/pdf'
+import { PDF_TYP, erzeugeWepPdf, erzeugeWepUebersichtPdf } from '@/pdf'
 import { exportNachOneDrive, ladeFotoAusOneDrive } from '@/sync'
 import { unterschriftAlsPng } from '@/unterschrift'
 import { Capacitor } from '@capacitor/core'
@@ -19,9 +20,12 @@ import { ICON, Meldung } from './ui'
 
 type Zustand =
   | { typ: 'idle' }
-  | { typ: 'laedt'; schritt: string }
-  | { typ: 'fertig'; ausgabe: WepPdfAusgabe; blob: Blob; datei?: string; oneDrive?: string; hinweise: string[] }
+  | { typ: 'laedt'; schritt: string; stil: PdfStil }
+  | { typ: 'fertig'; name: string; seiten: number; blob: Blob; datei?: string; oneDrive?: string; hinweise: string[] }
   | { typ: 'fehler'; meldung: string }
+
+/** `uebersichtlich`: schlichtes Protokoll; `vorlage`: Blätter der BV-Vorlage. */
+type PdfStil = 'uebersichtlich' | 'vorlage'
 
 const mb = (bytes: number) => `${(bytes / (1024 * 1024)).toLocaleString('de-DE', { maximumFractionDigits: 1 })} MB`
 
@@ -52,9 +56,9 @@ export function PdfBereich({ wep, rolle, profilIndex }: { wep: Wep; rolle: Rolle
     setTeilenMeldung(undefined)
   }, [wep.id, rolle])
 
-  async function erzeugen() {
+  async function erzeugen(stil: PdfStil) {
     setTeilenMeldung(undefined)
-    setZustand({ typ: 'laedt', schritt: 'Bereite die Daten vor …' })
+    setZustand({ typ: 'laedt', schritt: 'Bereite die Daten vor …', stil })
     try {
       const quelle = await ladeExportQuelle(wep, nurBau)
       const wepFuerExport = hatBauTeil(rolle) ? bauFuerExport(wep, profilIndex) : wep
@@ -62,18 +66,19 @@ export function PdfBereich({ wep, rolle, profilIndex }: { wep: Wep; rolle: Rolle
       let fotos
       let fehlendeFotos = 0
       if (mitFotos && anzahlFotos) {
-        setZustand({ typ: 'laedt', schritt: 'Hole die Fotos …' })
+        setZustand({ typ: 'laedt', schritt: 'Hole die Fotos …', stil })
         const g = await sammlePdfFotos(wep, async (fotoId) => (await dbAblage.ladeDatei(wep.id, fotoId)) ?? (await ladeFotoAusOneDrive(wep.id, fotoId).catch(() => undefined)))
         fotos = g.fotos
         fehlendeFotos = g.fehlen
       }
 
-      setZustand({ typ: 'laedt', schritt: 'Erzeuge das PDF …' })
+      setZustand({ typ: 'laedt', schritt: 'Erzeuge das PDF …', stil })
       const f = wep.formalien
       // Parzelle (Beta 6, Paket 1): beide Skizzen zeigen sie gleich; die Grün-Skizze entsteht bei Bedarf aus der Parzelle
       const parzellenLage = lageVon(wepFuerExport)
       const skizzeFuerExport = skizzeMitParzelle(wepFuerExport)
-      const ausgabe = await erzeugeWepPdf(
+      const erzeuge = stil === 'uebersichtlich' ? erzeugeWepUebersichtPdf : erzeugeWepPdf
+      const ausgabe = await erzeuge(
         {
           wep: wepFuerExport,
           quelle: quelle.buffer,
@@ -115,7 +120,7 @@ export function PdfBereich({ wep, rolle, profilIndex }: { wep: Wep; rolle: Rolle
       } catch (e) {
         oneDrive = `OneDrive: ${e instanceof Error ? e.message : String(e)}`
       }
-      setZustand({ typ: 'fertig', ausgabe, blob, datei, oneDrive, hinweise })
+      setZustand({ typ: 'fertig', name: ausgabe.name, seiten: ausgabe.pdf.seitenZahl, blob, datei, oneDrive, hinweise })
     } catch (e) {
       setZustand({ typ: 'fehler', meldung: e instanceof Error ? e.message : String(e) })
     }
@@ -144,9 +149,16 @@ export function PdfBereich({ wep, rolle, profilIndex }: { wep: Wep; rolle: Rolle
         Export als PDF
       </h2>
       <p className="neben block">
-        Das PDF sieht aus wie die Blätter der BV-Vorlage (gleiche Seiten, Überschriften, Tabellen und Summen) und entsteht hier auf dem Gerät, auch ohne Netz. Es enthält: {inhaltsText(rolle, wep)} Die Zahlen sind
-        dieselben wie in der Excel-Datei.
+        Das PDF entsteht hier auf dem Gerät, auch ohne Netz. Es enthält: {inhaltsText(rolle, wep)} Die Zahlen sind dieselben wie in der Excel-Datei.
       </p>
+      <ul className="neben block">
+        <li>
+          <strong>PDF übersichtlich:</strong> schlichtes, gut lesbares Protokoll mit Rechenweg je Bauteil, ohne Excel-Gitter.
+        </li>
+        <li>
+          <strong>PDF wie Vorlage:</strong> sieht aus wie die Blätter der BV-Vorlage (gleiche Seiten, Überschriften, Tabellen und Summen).
+        </li>
+      </ul>
 
       {anzahlFotos > 0 && (
         <label className="schalter-zeile">
@@ -168,9 +180,13 @@ export function PdfBereich({ wep, rolle, profilIndex }: { wep: Wep; rolle: Rolle
         <p className="neben">Die Unterschrift steht über dem Namen des Wertermittlers (Bau: Blätter des Bau-Teils, Grün: Blätter des Grün-Teils).</p>
       )}
 
-      <button type="button" className="knopf knopf-primaer knopf-breit" disabled={laedt} onClick={() => void erzeugen()}>
+      <button type="button" className="knopf knopf-primaer knopf-breit" disabled={laedt} onClick={() => void erzeugen('uebersichtlich')}>
         <FileText {...ICON} />
-        {laedt ? zustand.schritt : 'PDF exportieren'}
+        {laedt && zustand.stil === 'uebersichtlich' ? zustand.schritt : 'PDF übersichtlich'}
+      </button>
+      <button type="button" className="knopf knopf-breit" style={{ marginTop: 8 }} disabled={laedt} onClick={() => void erzeugen('vorlage')}>
+        <FileType {...ICON} />
+        {laedt && zustand.stil === 'vorlage' ? zustand.schritt : 'PDF wie Vorlage'}
       </button>
 
       {zustand.typ === 'fehler' && (
@@ -187,7 +203,7 @@ export function PdfBereich({ wep, rolle, profilIndex }: { wep: Wep; rolle: Rolle
           <p className="ok zeile">
             <Check {...ICON} />
             <span>
-              PDF erstellt: {fertig.ausgabe.name} ({fertig.ausgabe.pdf.seitenZahl} Seiten, {mb(fertig.blob.size)})
+              PDF erstellt: {fertig.name} ({fertig.seiten} Seiten, {mb(fertig.blob.size)})
             </span>
           </p>
           {fertig.datei && <p className="neben">{fertig.datei}</p>}
@@ -198,11 +214,11 @@ export function PdfBereich({ wep, rolle, profilIndex }: { wep: Wep; rolle: Rolle
             </Meldung>
           ))}
           <div className="knopf-reihe">
-            <button type="button" className="knopf" onClick={() => void nochmalSpeichern(fertig.blob, fertig.ausgabe.name)}>
+            <button type="button" className="knopf" onClick={() => void nochmalSpeichern(fertig.blob, fertig.name)}>
               Speichern unter …
             </button>
-            {kannTeilen(new File([fertig.blob], fertig.ausgabe.name, { type: PDF_TYP })) && (
-              <button type="button" className="knopf" onClick={() => void teilen(fertig.blob, fertig.ausgabe.name)}>
+            {kannTeilen(new File([fertig.blob], fertig.name, { type: PDF_TYP })) && (
+              <button type="button" className="knopf" onClick={() => void teilen(fertig.blob, fertig.name)}>
                 <Share2 {...ICON} />
                 Teilen
               </button>
