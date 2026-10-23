@@ -330,7 +330,11 @@ Abschnitt 10f) mit Mausrad, Maus-Ziehen und Zwei-Finger-Gesten über CDP-Touch. 
   (enthalten Personendaten, in `.gitignore`), `pruefe_weps.bat` für Windows, README für Laien. Tests (pytest, erfundene Dateien aus der Vorlage, Werte über LibreOffice) im Workflow „Prüfen“.
 
 ## Beta 5 (Plan: docs/PLAN-BETA5.md)
-- B5-1 · Grün-Skizze auf Bau-Basis ⏳ – Branch beta5/paket1
+- B5-1 · Grün-Skizze auf Bau-Basis ✅ PR offen – Branch beta5/paket1. Reiter „Skizze“ (Grün) bekommt die Bau-Skizze als **Grundlage**: aus dem Grundriss des Bau-Teils (Maßstab, Pfosten, Grundstück, Bauteile, Keller gestrichelt) oder aus „Skizze Bau“ der eingelesenen Bau-Excel (DrawingML: Position, Größe, Typ, Text, Linienart; Gruppen, Drehung, Freiform; Bilder/Näherungen als Hinweis).
+  Eigene Ebene (`ebene: 'grundlage'`, ganz unten), standardmäßig gesperrt (nicht auswählbar, bleibt Einrast-Ziel), entsperrbar und einzeln korrigierbar; „Grundlage neu übernehmen“ mit Rückfrage, Grün bleibt. Ohne Bau-Daten nur ein Hinweis (nie gesperrt, freies Zeichnen geht).
+  Export ins Blatt „Skizze Außenanlage-Aufwuchs“ wie im Skill (Modus Außenanlage): Wiese #C5E0B4, Gras, Pfosten, Gebäude #E7E6E6, Keller gestrichelt, darüber Grün; „Skizze Bau“ bleibt byte-gleich (Test). Hat das Blatt schon eigene Formen, wird die Grundlage nicht doppelt geschrieben (Hinweis).
+  Code: `src/skizze/grundlage.ts`, `src/export/bauSkizzeLesen.ts`, `src/app/SkizzeTab.tsx`; Test-Bau-Excel mit handgezeichneten Formen: `src/bauexcel/testBauExcel.ts` (`skizzeBau`), `docs/beta5-paket1/Test-Bau-Excel.xlsx`.
+  Tests: `src/export/__tests__/grundlage.test.ts`; e2e/Durchlauf `npm run beta5-paket1:screenshots`, Excel-Render `npm run beta5-paket1:export-bild`. Screenshots: `docs/beta5-paket1/`. Keine Änderung an `android/`, Plugins oder `src-tauri/`, daher keine neue Versionsnummer.
 - B5-2 · Teilen als .wep-Datei ⏳ – Branch beta5/paket2
 - B5-3 · Unterschrift im Profil ⏳ – Branch beta5/paket3
 - B5-4 · PDF direkt aus der App ⏳ – Branch beta5/paket4

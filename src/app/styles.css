@@ -1423,6 +1423,32 @@ select.eingabe {
   gap: var(--abstand-4);
 }
 
+/* Grundlage der Grün-Skizze (Beta 5, Paket 1): Leiste über dem Editor */
+.grundlage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--abstand-2);
+  padding: var(--abstand-3) 0;
+  border-top: var(--linie) solid var(--farbe-linie);
+  border-bottom: var(--linie) solid var(--farbe-linie);
+}
+
+.grundlage-kopf {
+  display: flex;
+  align-items: center;
+  gap: var(--abstand-2);
+}
+
+.grundlage-kopf .h2 {
+  margin: 0;
+}
+
+.grundlage-knoepfe {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--abstand-2);
+}
+
 /* ---------------------------------------------------------------------------
    Tablet und Windows (≥ 900 px): Seitenleiste links, Inhalt rechts
    ------------------------------------------------------------------------- */

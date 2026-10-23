@@ -86,3 +86,6 @@ Fertig, wenn: das gerenderte Bild sauber aussieht.
 
 ## Schritt 5: Bericht (kurz, auf Deutsch)
 Liste der gezeichneten Elemente (im Modus Außenanlage getrennt: „aus Skizze Bau kopiert“ / „neu ergänzt“); Hinweis, dass SVG-Bilder nur skalierbar und nicht umfärbbar sind; nicht übernommene oder unklare Teile nennen (z. B. unleserliche Hinweise, nicht deutbare Striche, fehlende Maße, Blattüberschrift in A1 unverändert); Ergänzungen anbieten (z. B. Nordpfeil, Legende, Maßstab).
+
+## Hinweis zur WEP-App (Beta 5, Paket 1)
+Die App setzt Schritt 1b selbst um: Die Grün-Skizze bekommt die Bau-Skizze (aus dem Grundriss des Bau-Teils oder aus „Skizze Bau“ der Bau-Excel) als gesperrte Grundlage; beim Excel-Export entstehen Wiese, Gras, Pfosten, Gebäude und Grün im Blatt „Skizze Außenanlage-Aufwuchs“, „Skizze Bau“ bleibt unangetastet (`docs/ENTSCHEIDUNGEN.md`, 2026-10-23).

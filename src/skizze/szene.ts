@@ -155,6 +155,16 @@ function festAusElement(el: SkizzeElement, bw: number, bh: number): SzenenElemen
   switch (el.typ) {
     case 'symbol':
       return null
+    case 'bauform': {
+      const xs = el.punkte.map((q) => q.x)
+      const ys = el.punkte.map((q) => q.y)
+      const x = Math.min(...xs)
+      const y = Math.min(...ys)
+      return {
+        id: el.id, typ: 'bau', ...px(x, y, Math.max(...xs) - x, Math.max(...ys) - y),
+        beschriftung: (el.beschriftung ?? '').replace(/\n/g, ' '), fest: true,
+      }
+    }
     case 'rechteck':
       return { id: el.id, typ: 'bau', ...px(el.x, el.y, el.breite, el.hoehe), beschriftung: '', fest: true }
     case 'kreis':

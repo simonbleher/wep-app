@@ -87,6 +87,9 @@ export type FormTyp =
   | 'wildling'
   | 'kletterpflanze'
   | 'rasen'
+  // Grundlage der Grün-Skizze (Beta 5, Paket 1): Wiese und Zaunpfosten
+  | 'grundstueck'
+  | 'pfosten'
   // Grundriss „Skizze Bau“ (Beta 4, Paket 3)
   | 'bauteil'
   | 'massenberechnung'
@@ -124,6 +127,8 @@ export interface FormElement {
   punkte?: Punkt[]
   /** bauteil: gestrichelt ohne Füllung (Keller, Hauswasser). */
   gestrichelt?: boolean
+  /** Teil der Grundlage (Bau-Skizze): Linien liegen unter dem Grün, nicht darüber. */
+  grundlage?: boolean
   /** massangabe: Text bei waagerechter Linie unter statt über der Linie (Maßketten unter dem Grundriss). */
   textUnten?: boolean
 }
@@ -295,14 +300,15 @@ const FARBE = {
 const EBENE = {
   wiese: 0,
   gras: 1,
-  weg: 2,
-  gebaeude: 3,
-  gruen: 4,
-  kleinteile: 5,
-  entfernen: 6,
-  beschriftung: 7,
-  hinweis: 8,
-  mass: 9,
+  pfosten: 2,
+  weg: 3,
+  gebaeude: 4,
+  gruen: 5,
+  kleinteile: 6,
+  entfernen: 7,
+  beschriftung: 8,
+  hinweis: 9,
+  mass: 10,
 } as const
 
 // ---------------------------------------------------------------------------
@@ -566,6 +572,16 @@ function formenFuer(el: FormElement, mitSvg: boolean): Form[] {
         ? [{ art: 'pic', name: n, ebene: EBENE.gras, kasten: k, svg: grasSvg(k.w / PT, k.h / PT) }]
         : []
     }
+
+    case 'grundstueck':
+      return k
+        ? [{ art: 'sp', name: n, ebene: EBENE.wiese, kasten: k, prst: 'rect', fuellung: FARBE.wiese, linie: linie(FARBE.grundstueckLinie) }]
+        : []
+
+    case 'pfosten':
+      return k
+        ? [{ art: 'sp', name: n, ebene: EBENE.pfosten, kasten: k, prst: 'rect', fuellung: FARBE.weiss, linie: linie(FARBE.grundstueckLinie, 0.75) }]
+        : []
 
     case 'weg':
       return k
@@ -1050,7 +1066,15 @@ function picXml(f: PicForm, id: number, geo: BlattGeometrie, pngRel: string, svg
  */
 export function elementeZuFormen(elemente: FormElement[], mitSvg: boolean): Form[] {
   const alle = elemente.flatMap((e, i) =>
-    formenFuer(e, mitSvg).map((f): Form => ({ ...f, elem: i, gruppe: e.gruppe ?? `#${i}`, quelle: e.typ, ename: e.name })),
+    formenFuer(e, mitSvg).map((f): Form => ({
+      ...f,
+      // Linien der Grundlage (Bau-Skizze) liegen mit den Gebäuden unter dem Grün
+      ...(e.grundlage && f.art === 'cxn' ? { ebene: Math.min(f.ebene, EBENE.gebaeude) } : {}),
+      elem: i,
+      gruppe: e.gruppe ?? `#${i}`,
+      quelle: e.typ,
+      ename: e.name,
+    })),
   )
   // stabil nach Ebene sortieren (Array.sort ist stabil)
   return alle.sort((a, b) => a.ebene - b.ebene)
@@ -1073,7 +1097,7 @@ const identOf = (s: string) =>
  * und passt sie in `bereich` ein (Seitenverhältnis bleibt, zentriert).
  * Ohne Bau-Excel ist `bereich` der Zeichenbereich B7:G48.
  */
-export function skizzeDatenZuFormen(daten: SkizzeDaten, bereich: Kasten): FormElement[] {
+export function skizzeDatenZuFormen(daten: SkizzeDaten, bereich: Kasten, optionen: { grundlage?: boolean } = {}): FormElement[] {
   const breite = daten.breite ?? 800
   const hoehe = daten.hoehe ?? 600
   const p = einpassen(breite, hoehe, bereich.w, bereich.h)
@@ -1082,9 +1106,38 @@ export function skizzeDatenZuFormen(daten: SkizzeDaten, bereich: Kasten): FormEl
   const Y = (y: number) => Math.round(bereich.y + p.y + y * faktor)
   const zaehler: Record<string, number> = {}
   const nummer = (basis: string) => `${basis}_${(zaehler[basis] = (zaehler[basis] ?? -1) + 1)}`
+  // Gebäude der Grundlage heißen wie im Skill einfach „L“, „A1“, „K1_HW“; erst ein zweites gleiches bekommt „_2“
+  const gebaeude = new Map<string, number>()
+  const gebaeudeName = (basis: string) => {
+    const n = (gebaeude.get(basis) ?? 0) + 1
+    gebaeude.set(basis, n)
+    return n === 1 ? basis : `${basis}_${n}`
+  }
   const out: FormElement[] = []
   for (const e of daten.elemente) {
+    // Die Grundlage entfällt, wenn das Blatt schon eine Bau-Skizze enthält (sie läge doppelt)
+    if (e.ebene === 'grundlage' && optionen.grundlage === false) continue
+    const gl = e.ebene === 'grundlage' ? { grundlage: true } : {}
     switch (e.typ) {
+      case 'bauform': {
+        const pts = e.punkte.map((q) => ({ x: X(q.x), y: Y(q.y) }))
+        if (pts.length < 3) break
+        const box = umgebendes(pts)
+        if (e.art === 'grundstueck') out.push({ typ: 'grundstueck', name: 'Grundstück', kasten: box, ...gl })
+        else if (e.art === 'pfosten') out.push({ typ: 'pfosten', name: nummer('Pfosten'), kasten: box, ...gl })
+        else {
+          const kopf = (e.beschriftung ?? '').split('\n')[0]
+          out.push({
+            typ: 'bauteil',
+            name: gebaeudeName(identOf(kopf) || 'Gebäude'),
+            punkte: pts,
+            ...(e.beschriftung ? { text: e.beschriftung } : {}),
+            ...(e.gestrichelt ? { gestrichelt: true } : {}),
+            ...gl,
+          })
+        }
+        break
+      }
       case 'symbol': {
         const text = e.beschriftung ?? ''
         out.push({
@@ -1101,7 +1154,7 @@ export function skizzeDatenZuFormen(daten: SkizzeDaten, bereich: Kasten): FormEl
         out.push({ typ: 'rechteck', name: nummer('Rechteck'), kasten: { x: X(e.x), y: Y(e.y), w: Math.round(e.breite * faktor), h: Math.round(e.hoehe * faktor) } })
         break
       case 'linie':
-        out.push({ typ: 'linie', name: nummer('Linie'), von: { x: X(e.x1), y: Y(e.y1) }, nach: { x: X(e.x2), y: Y(e.y2) } })
+        out.push({ typ: 'linie', name: nummer('Linie'), von: { x: X(e.x1), y: Y(e.y1) }, nach: { x: X(e.x2), y: Y(e.y2) }, ...gl })
         break
       case 'kreis':
         out.push({
@@ -1362,8 +1415,11 @@ export async function fuegeSkizzeFormenEin(
   const graswiese = !hatFormen && optionen.graswiese !== false
   const mitSvg = Boolean(optionen.rasterisiere)
   const formen: Form[] = []
+  // Grundstück der Grundlage (Bau-Skizze): bestimmt die Fläche der Wiese; ohne Wiese zeichnet es sich selbst
+  const grundstueck = elemente.find((e) => e.typ === 'grundstueck')
+  if (graswiese) elemente = elemente.filter((e) => e.typ !== 'grundstueck')
   if (graswiese) {
-    const z = zeichenbereich
+    const z = grundstueck?.kasten ?? zeichenbereich
     formen.push({
       art: 'sp', name: 'Grundstück', ebene: EBENE.wiese, kasten: z, prst: 'rect',
       fuellung: FARBE.wiese, linie: linie(FARBE.grundstueckLinie),
