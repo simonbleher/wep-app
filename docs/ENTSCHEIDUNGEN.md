@@ -170,3 +170,10 @@
 - **Export:** Grundlage nur, wenn das Blatt „Skizze Außenanlage-Aufwuchs“ noch keine fremden Formen hat (sonst läge sie doppelt, Hinweis in der App). Ebenen: Wiese, Gras, Pfosten, Weg, Gebäude, Grün …; Gebäude heißen wie im Skill („L“, „A1“, „K1_HW“). „Skizze Bau“ wird nie angefasst (Rolle „beides“: dort schreibt weiterhin nur der Bau-Export den Grundriss).
 - Keine Änderung an `android/`, Plugins oder `src-tauri/`, daher keine neue Versionsnummer.
 
+
+## 2026-10-23 · Beta 5, Paket 3: Unterschrift im Profil
+
+- **Im Profil statt eigener Datei:** `Profil.unterschrift` (transparentes PNG als Data-URL, `data:image/png;base64,…`) reist mit `daten/profil.json` – Abgleich, Konfliktregel (neuere Änderung gewinnt) und „geaendertAm“ bleiben unverändert, Format `wep-profil/1` bleibt (neues Feld ist optional). Ein 600 × 240-PNG hat meist unter 50 KB; Obergrenze 350 000 Zeichen. Aus der Cloud wird nur ein gültiges, nicht zu großes PNG übernommen, sonst wird das Feld verworfen (kein fremder Inhalt im `<img>`/PDF).
+- **Keine neue Bibliothek:** Glätten (Mittelpunkt-Kurven, Stiftdruck/Tempo → Breite) und Freistellen (Papierhelligkeit je Kachel schätzen, dann Deckkraft aus dem Helligkeitsabstand) sind reine Funktionen auf RGBA-Pixeln (`src/unterschrift/`), im Test mit `@napi-rs/canvas` und selbst erzeugten Bildern geprüft. Das Papier wird lokal geschätzt, damit Schatten und Lichtverlauf auf Handyfotos nicht stören; Zuschnitt per Regler (finger-tauglich) statt Ziehgriffen.
+- **Abruf für Paket 4:** `unterschriftAlsPng()` liefert PNG-Bytes oder `null`; die Unterschrift kommt nur ins PDF, wenn der Wertermittler es beim Erzeugen bestätigt.
+- **Datenschutz:** Die Unterschrift steckt auch in der Sicherung des Profils (wie das übrige Profil) und liegt nie im Repo; Testbilder entstehen im Test bzw. Durchlauf selbst. Keine Änderung an `android/`, Plugins oder `src-tauri/`, daher keine neue Versionsnummer.

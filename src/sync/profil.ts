@@ -2,6 +2,7 @@
 //
 // Ein Profil für alle Geräte, ohne Konflikt-Kopien: Die neuere Änderung gewinnt.
 // Geräte-Einstellungen (z. B. „Upload nur über WLAN“) gehören nicht hierher.
+import { istUnterschriftUrl } from '@/unterschrift'
 import { LEERES_PROFIL, type Profil, type ProfilSpeicher } from '@/profil'
 import { PROFIL_DATEI } from './ordner'
 import type { GraphClient } from './types'
@@ -20,7 +21,10 @@ function entpackeProfil(inhalt: string): ProfilDatei {
   if (d.format !== 'wep-profil/1' || !d.profil || !d.geaendertAm) {
     throw new Error('Unbekanntes Profil-Format')
   }
-  return { ...(d as ProfilDatei), profil: { ...LEERES_PROFIL, ...d.profil } }
+  const profil = { ...LEERES_PROFIL, ...d.profil }
+  // Aus der Cloud kommt nur ein echtes, nicht zu großes PNG ins Profil – alles andere wird verworfen
+  if (profil.unterschrift !== undefined && !istUnterschriftUrl(profil.unterschrift)) delete profil.unterschrift
+  return { ...(d as ProfilDatei), profil }
 }
 
 /** `client` ist der Client für den Ordner daten/. */

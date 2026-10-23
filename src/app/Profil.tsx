@@ -19,6 +19,7 @@ import { EigenePositionen } from './EigenePositionen'
 import { Fehlersuche } from './Fehlersuche'
 import { Sicherung } from './Sicherung'
 import { Synchronisierung } from './Synchronisierung'
+import { Unterschrift } from './Unterschrift'
 import { UpdateHinweis, UpdateStandZeilen } from './UpdateHinweis'
 import { hatSelbstUpdate, ladeUpdateDienst } from './updateModul'
 import { HauptSeitenleiste, ICON, Kopf } from './ui'
@@ -136,6 +137,8 @@ export function Profil({ konto, verfuegbar, onZurueck, onAnmelden, onAbmelden }:
               : 'Ohne Konto bleiben diese Angaben auf diesem Gerät.'}
           </p>
         </section>
+
+        <Unterschrift konto={konto !== null} />
 
         {profil.rolle !== 'gruen' && <BaupreisindexProfil profil={profil} onAendern={setProfil} />}
 

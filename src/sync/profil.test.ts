@@ -92,6 +92,47 @@ describe('Profil-Abgleich (daten/profil.json)', () => {
   })
 })
 
+describe('Unterschrift im Profil-Abgleich', () => {
+  // Winziges, aber gültiges PNG (1 × 1, durchsichtig) – erfunden
+  const PNG_1X1 =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg=='
+  let drive: FakeDrive
+  beforeEach(() => {
+    drive = new FakeDrive()
+  })
+  const abgleich = (sp: ProfilSpeicher, geraet = 'Gerät A') =>
+    synchronisiereProfil({ client: drive.client('daten'), speicher: sp, geraet, jetzt })
+
+  it('kommt mit dem Profil auf das zweite Gerät und verschwindet dort beim Löschen wieder', async () => {
+    const a = speicher()
+    a.stand = aendereProfil({ name: 'Erika Musterfrau', unterschrift: PNG_1X1 }, a, jetzt)
+    await abgleich(a)
+    const b = speicher()
+    expect(await abgleich(b, 'Gerät B')).toBe('geladen')
+    expect(b.stand.profil.unterschrift).toBe(PNG_1X1)
+
+    b.stand = aendereProfil({ unterschrift: undefined }, b, jetzt)
+    expect(await abgleich(b, 'Gerät B')).toBe('hochgeladen')
+    expect(await abgleich(a)).toBe('geladen')
+    expect(a.stand.profil.unterschrift).toBeUndefined()
+    expect(a.stand.profil.name).toBe('Erika Musterfrau')
+  })
+
+  it('verwirft aus der Cloud alles, was kein PNG in vernünftiger Größe ist', async () => {
+    const a = speicher()
+    a.stand = aendereProfil({ name: 'Erika Musterfrau' }, a, jetzt)
+    await abgleich(a)
+    const roh = JSON.parse(drive.dateien.get('daten/profil.json')?.inhalt as string)
+    roh.profil.unterschrift = 'data:text/html;base64,PHNjcmlwdD4='
+    roh.geaendertAm = '2099-01-01T00:00:00.000Z'
+    await drive.client('daten').schreibe('profil.json', JSON.stringify(roh))
+    const b = speicher()
+    await abgleich(b, 'Gerät B')
+    expect(b.stand.profil.name).toBe('Erika Musterfrau')
+    expect(b.stand.profil.unterschrift).toBeUndefined()
+  })
+})
+
 describe('Vorbelegung neuer WEPs aus dem Profil', () => {
   it('übernimmt Name als Wertermittler und die Standard-Anlage', () => {
     const wep = neuerWepMitProfil('2026-001', {
