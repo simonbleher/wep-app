@@ -28,3 +28,14 @@ Zurückgehen besser die zuletzt funktionierende Freigabe erneut freigeben und de
 Cloudflare → Workers & Pages → Projekt **wep-pankow** → Settings → Builds → **Branch control** →
 **Production branch: `release`** → Speichern. Vorschau-Builds für andere Branches bleiben an.
 Umgebungsvariable `VITE_MS_CLIENT_ID` gilt für „Production“ – für Vorschauen nicht nötig.
+
+## Einmalig einrichten (Cloudflare Deploy Hook)
+
+Ein Push durch GitHub Actions startet den Produktions-Build bei Cloudflare nicht zuverlässig. Deshalb ruft
+„Version freigeben“ einen **Deploy Hook** auf:
+
+1. Cloudflare → Workers & Pages → **wep-pankow** → Settings → Builds → **Deploy hooks** → **Add deploy hook**.
+2. Name `freigabe`, Branch **`release`** → Save → die angezeigte URL kopieren (sie ist geheim).
+3. GitHub → Settings → Secrets and variables → Actions → **New repository secret**:
+   `CLOUDFLARE_DEPLOY_HOOK` = die URL.
+4. „Version freigeben“ noch einmal starten.

@@ -54,6 +54,18 @@ jobs:
       - name: Branch release setzen
         run: git push --force origin "${{ steps.stand.outputs.neu }}:refs/heads/release"
 
+      - name: Web-App bei Cloudflare bauen (Deploy Hook)
+        env:
+          HOOK: ${{ secrets.CLOUDFLARE_DEPLOY_HOOK }}
+        run: |
+          # Ein Push mit dem GITHUB_TOKEN löst bei Cloudflare nicht zuverlässig einen Produktions-Build aus;
+          # der Deploy Hook (Branch release) startet ihn ausdrücklich (docs/FREIGABE.md).
+          if [ -z "$HOOK" ]; then
+            echo "::warning title=Web-App nicht neu gebaut::Secret CLOUDFLARE_DEPLOY_HOOK fehlt – die Web-App und die Live-Updates bleiben auf dem alten Stand (docs/FREIGABE.md)."
+          else
+            curl -fsS -X POST "$HOOK" > /dev/null && echo "Cloudflare-Build für release angestoßen."
+          fi
+
       - name: Android Release starten
         env:
           GH_TOKEN: ${{ github.token }}
