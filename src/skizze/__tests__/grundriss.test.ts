@@ -307,3 +307,98 @@ describe('Kleinkram', () => {
     expect(freiesKuerzel({ teile: [teil({ kuerzel: 'A1' }), teil({ kuerzel: 'A2' })] }, 'A1')).toBe('A3')
   })
 })
+
+// Beta 6, Paket 2: weitere Dachformen – Volumen gegen Handrechnung (Rechteck 8 × 6 m, Traufe 2,5 m, First/Spitze 5 m → 2,5 m Dachhöhe)
+describe('Dachformen: Kubatur gegen Handrechnung', () => {
+  const r86 = rechteckPunkte(0, 0, 8, 6)
+  const basis = { punkte: r86, hoehe: 2.5, hoeheOben: 5 }
+
+  it('Satteldach (Vergleich): 48 × 2,5 + 48 × 2,5 ÷ 2 = 180 m³', () => {
+    expect(massenVon({ ...basis, dachform: 'sattel' }).kubaturM3).toBe(180)
+  })
+  it('Walmdach, Firstlänge 2 m: Dachraum 6 × 2,5 ÷ 6 × (16 + 2) = 45 → 165 m³; Walmtiefe 3 m = Satteldach 60 − 6 × 2,5 × 3 ÷ 3', () => {
+    const m = massenVon({ ...basis, dachform: 'walm', firstLaenge: 2 })
+    expect(m.dachraumM3).toBe(45)
+    expect(m.kubaturM3).toBe(165)
+    expect(m.hinweise).toEqual([])
+  })
+  it('Walmdach: Firstlänge = Länge ist ein Satteldach, Firstlänge 0 ist ein Zeltdach', () => {
+    expect(massenVon({ ...basis, dachform: 'walm', firstLaenge: 8 }).kubaturM3).toBe(180)
+    expect(massenVon({ ...basis, dachform: 'walm', firstLaenge: 0 }).kubaturM3).toBe(massenVon({ ...basis, dachform: 'zelt' }).kubaturM3)
+  })
+  it('Zeltdach/Pyramide: 48 × 2,5 ÷ 3 = 40 → 160 m³; Quadrat 5 × 5, Traufe 2, Spitze 5 → 25 × 2 + 25 × 3 ÷ 3 = 75 m³', () => {
+    expect(massenVon({ ...basis, dachform: 'zelt' }).kubaturM3).toBe(160)
+    expect(massenVon({ punkte: rechteckPunkte(0, 0, 5, 5), hoehe: 2, hoeheOben: 5, dachform: 'zelt' }).kubaturM3).toBe(75)
+  })
+  it('Zeltdach gilt für jeden Grundriss ohne Näherungshinweis (L-Form 18 m²)', () => {
+    const m = massenVon({ punkte: lForm, hoehe: 2, hoeheOben: 5, dachform: 'zelt' })
+    expect(m.kubaturM3).toBe(flaecheVon(lForm) * 2 + (flaecheVon(lForm) * 3) / 3)
+    expect(m.hinweise).toEqual([])
+  })
+  it('Krüppelwalmdach, Walmhöhe 1 m, Walmtiefe 1 m: Satteldach 60 − 2 × 0,4 = 59,2 → 179,2 m³', () => {
+    const m = massenVon({ ...basis, dachform: 'krueppelwalm', walmHoehe: 1, walmTiefe: 1 })
+    expect(m.dachraumM3).toBe(59.2)
+    expect(m.kubaturM3).toBe(179.2)
+  })
+  it('Krüppelwalmdach mit Walmhöhe = Dachhöhe ist ein Walmdach gleicher Tiefe', () => {
+    const k = massenVon({ ...basis, dachform: 'krueppelwalm', walmHoehe: 2.5, walmTiefe: 3 })
+    expect(k.kubaturM3).toBe(massenVon({ ...basis, dachform: 'walm', firstLaenge: 2 }).kubaturM3)
+  })
+  it('Mansarddach, Knick 4 m hoch, 1,5 m eingezogen: 8 × (1,5 × 4,5 + ½ × 3 × 1) = 66 → 186 m³', () => {
+    const m = massenVon({ ...basis, dachform: 'mansard', knickHoehe: 4, knickBreite: 1.5 })
+    expect(m.dachraumM3).toBe(66)
+    expect(m.kubaturM3).toBe(186)
+  })
+  it('Mansarddach mit Knick auf der Satteldach-Geraden (Knick 3,75 m, Einzug 1,5 m) = Satteldach', () => {
+    expect(massenVon({ ...basis, dachform: 'mansard', knickHoehe: 3.75, knickBreite: 1.5 }).kubaturM3).toBe(180)
+  })
+  it('gedrehtes Rechteck rechnet gleich (längere Seite = Länge)', () => {
+    const g = rechteckPunkte(0, 0, 6, 8)
+    expect(massenVon({ punkte: g, hoehe: 2.5, hoeheOben: 5, dachform: 'walm', firstLaenge: 2 }).kubaturM3).toBe(165)
+    expect(massenVon({ punkte: g, hoehe: 2.5, hoeheOben: 5, dachform: 'mansard', knickHoehe: 4, knickBreite: 1.5 }).kubaturM3).toBe(186)
+  })
+
+  it('fehlendes Zusatzmaß: wie Satteldach, mit Hinweis', () => {
+    for (const [dachform, extra, text] of [
+      ['walm', {}, /Firstlänge fehlt/],
+      ['krueppelwalm', { walmHoehe: 1 }, /Walmtiefe fehlt/],
+      ['krueppelwalm', { walmTiefe: 1 }, /Walmhöhe fehlt/],
+      ['mansard', { knickHoehe: 4 }, /Knick-Einzug fehlt/],
+      ['mansard', { knickBreite: 1 }, /Knickhöhe fehlt/],
+    ] as const) {
+      const m = massenVon({ ...basis, dachform, ...extra })
+      expect(m.kubaturM3).toBe(180)
+      expect(m.hinweise.join(' ')).toMatch(text)
+      expect(m.hinweise.join(' ')).toMatch(/wie beim Satteldach/)
+    }
+  })
+  it('unplausible Maße: Hinweis und begrenzt, nie gesperrt', () => {
+    expect(massenVon({ ...basis, dachform: 'walm', firstLaenge: 9 }).hinweise.join(' ')).toMatch(/länger als das Haus/)
+    expect(massenVon({ ...basis, dachform: 'krueppelwalm', walmHoehe: 3, walmTiefe: 1 }).hinweise.join(' ')).toMatch(/Walmhöhe .* größer/)
+    expect(massenVon({ ...basis, dachform: 'krueppelwalm', walmHoehe: 1, walmTiefe: 5 }).hinweise.join(' ')).toMatch(/Walmtiefe .* größer/)
+    expect(massenVon({ ...basis, dachform: 'mansard', knickHoehe: 6, knickBreite: 1 }).hinweise.join(' ')).toMatch(/nicht zwischen Traufe/)
+    expect(massenVon({ ...basis, dachform: 'mansard', knickHoehe: 4, knickBreite: 3 }).hinweise.join(' ')).toMatch(/halbe Breite/)
+    expect(massenVon({ ...basis, hoeheOben: 2, dachform: 'zelt' }).hinweise.join(' ')).toMatch(/Spitze/)
+  })
+  it('fehlende Spitzenhöhe heißt „Höhe der Spitze“', () => {
+    expect(massenVon({ punkte: r86, hoehe: 2.5, dachform: 'zelt' }).hinweise[0]).toBe('Höhe der Spitze fehlt – gerechnet wie Flachdach.')
+  })
+  it('kein Rechteck: Näherung über das umgebende Rechteck, mit Hinweis (L-Form 6 × 5, Fläche 18 m²)', () => {
+    const m = massenVon({ punkte: lForm, hoehe: 2, hoeheOben: 4, dachform: 'walm', firstLaenge: 2 })
+    const rechteckRoh = ((5 * 2) / 6) * (2 * 6 + 2) // Dachraum des umgebenden Rechtecks 6 × 5
+    expect(m.dachraumM3).toBeCloseTo((18 / 30) * rechteckRoh, 2)
+    expect(m.hinweise.join(' ')).toMatch(/Näherung/)
+  })
+
+  it('Zeilentext der Massenberechnung nennt Form und Zusatzmaße', () => {
+    const z = (t: Partial<GrundrissTeil>) => massenZeileText(massenberechnung({ teile: [teil({ punkte: r86, hoehe: 2.5, hoeheOben: 5, ...t })] }).zeilen[0])
+    expect(z({ dachform: 'walm', firstLaenge: 2 })).toBe('L · 8 × 6 m = 48,00 m² · Walmdach Traufe 2,5 / First 5 m, Firstlänge 2 m · 165,00 m³')
+    expect(z({ dachform: 'zelt' })).toBe('L · 8 × 6 m = 48,00 m² · Zeltdach Traufe 2,5 / Spitze 5 m · 160,00 m³')
+    expect(z({ dachform: 'krueppelwalm', walmHoehe: 1, walmTiefe: 1 })).toContain('Krüppelwalmdach Traufe 2,5 / First 5 m, Walmhöhe 1 m, Walmtiefe 1 m · 179,20 m³')
+    expect(z({ dachform: 'mansard', knickHoehe: 4, knickBreite: 1.5 })).toContain('Mansarddach Traufe 2,5 / First 5 m, Knick 4 m, Einzug 1,5 m · 186,00 m³')
+  })
+  it('bestehende Daten ohne Zusatzmaße bleiben unverändert', () => {
+    expect(massenVon({ punkte: rechteckPunkte(0, 0, 6, 4), hoehe: 2.2, hoeheOben: 3.1, dachform: 'sattel' }).kubaturM3).toBe(63.6)
+    expect(massenVon({ punkte: rechteckPunkte(0, 0, 6, 4), hoehe: 2.2, dachform: 'pult', hoeheOben: 3 }).hinweise).toEqual([])
+  })
+})

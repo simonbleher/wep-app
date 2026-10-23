@@ -27,7 +27,8 @@ import {
   type TeilflaecheArt,
 } from '@/bau'
 import type { Dachform } from '@/skizze/grundriss'
-import { DACHFORMEN } from '@/skizze/grundriss'
+import { DACHFORMEN, hoehenTexte } from '@/skizze/grundriss'
+import { DachFelder } from '@/skizze/DachFelder'
 import { zahlDe } from '@/gruen/format'
 import { AuswahlFeld, Schalter, TextFeld, ZahlFeld } from './BauKomponenten'
 import { aendereBauTeil, artText, ersetzeBauteil } from './bauHelfer'
@@ -230,9 +231,7 @@ function KubaturRechner({
   const set = (p: Partial<KubaturEingabe>) => setE((k) => ({ ...k, ...p }))
   const m = rechneKubatur(e)
   const flaeche = kubaturFlaeche(e)
-  const dach = DACHFORMEN.find((d) => d.id === e.dachform)!
-  const untenText = e.dachform === 'flach' ? 'Höhe' : e.dachform === 'pult' ? 'Niedrige Wand' : 'Traufhöhe'
-  const obenText = e.dachform === 'pult' ? 'Hohe Wand' : 'Firsthöhe'
+  const untenText = hoehenTexte(e.dachform).unten
   const gwh = ziel?.art === 'gewaechshaus'
 
   return (
@@ -242,7 +241,7 @@ function KubaturRechner({
         <button
           type="button"
           className="textknopf"
-          onClick={() => setE((k) => ({ ...k, flaeche: ziel.flaeche > 0 ? ziel.flaeche : undefined, laenge: ziel.laenge, breite: ziel.breite, hoehe: ziel.hoehe, hoeheOben: undefined }))}
+          onClick={() => setE((k) => ({ ...k, flaeche: ziel.flaeche > 0 ? ziel.flaeche : undefined, laenge: ziel.laenge, breite: ziel.breite, hoehe: ziel.hoehe, hoeheOben: undefined, firstLaenge: undefined, walmTiefe: undefined, walmHoehe: undefined, knickHoehe: undefined, knickBreite: undefined }))}
         >
           Maße von {ziel.kuerzel} laden
         </button>
@@ -258,25 +257,24 @@ function KubaturRechner({
         onChange={(v) => set({ flaeche: v })}
         hilfe="Für unregelmäßige Grundrisse (z. B. aus dem Flächenrechner). Leer = Länge × Breite."
       />
-      <div className="segmente segmente-3" role="group" aria-label="Dachform">
+      <div className="segmente segmente-dach" role="group" aria-label="Dachform">
         {DACHFORMEN.map((d) => (
           <button key={d.id} type="button" className="segment" aria-pressed={e.dachform === d.id} onClick={() => set({ dachform: d.id as Dachform })}>
             {d.text}
           </button>
         ))}
       </div>
-      <p className="neben">{dach.hilfe}</p>
       <div className="feld-reihe">
         <ZahlFeld label={untenText} einheit="m" wert={e.hoehe} onChange={(v) => set({ hoehe: v })} />
-        {e.dachform !== 'flach' && <ZahlFeld label={obenText} einheit="m" wert={e.hoeheOben} onChange={(v) => set({ hoeheOben: v })} />}
       </div>
+      <DachFelder dachform={e.dachform} hoeheOben={e.hoeheOben} dach={e} onAendern={(p) => set(p)} />
 
       {m?.hinweise.map((h, i) => <Meldung key={i}>{h}</Meldung>)}
       {m && m.kubaturM3 !== undefined && (
         <dl className="werte rechenweg" aria-label="Rechenweg Kubatur">
           <div><dt>Grundfläche</dt><dd className="zahl">{m2(m.flaeche)}</dd></div>
-          <div><dt>Raum bis zur {e.dachform === 'pult' ? 'niedrigen Wand' : e.dachform === 'sattel' ? 'Traufe' : 'Oberkante'} (Fläche × {zahlDe(m.hoehe ?? 0)} m)</dt><dd className="zahl">{zahlDe(m.raumM3 ?? 0)} m³</dd></div>
-          {e.dachform !== 'flach' && <div><dt>Dachraum (Fläche × Höhenunterschied ÷ 2)</dt><dd className="zahl">{zahlDe(m.dachraumM3 ?? 0)} m³</dd></div>}
+          <div><dt>Raum bis zur {e.dachform === 'pult' ? 'niedrigen Wand' : e.dachform === 'flach' ? 'Oberkante' : 'Traufe'} (Fläche × {zahlDe(m.hoehe ?? 0)} m)</dt><dd className="zahl">{zahlDe(m.raumM3 ?? 0)} m³</dd></div>
+          {e.dachform !== 'flach' && <div><dt>Dachraum ({m.dachraumText})</dt><dd className="zahl">{zahlDe(m.dachraumM3 ?? 0)} m³</dd></div>}
           <div><dt>Mittlere Höhe</dt><dd className="zahl">{zahlDe(m.mittlereHoehe ?? 0)} m</dd></div>
           <div className="rechenweg-summe"><dt>Kubatur</dt><dd className="zahl">{zahlDe(m.kubaturM3)} m³</dd></div>
         </dl>

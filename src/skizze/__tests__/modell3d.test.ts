@@ -29,18 +29,112 @@ describe('Rauminhalt aus dem Modell = Kubatur der Massenberechnung', () => {
     ['Flachdach', { dachform: 'flach', hoehe: 2.3 }],
     ['Pultdach', { dachform: 'pult', hoehe: 2, hoeheOben: 2.8 }],
     ['Satteldach', { dachform: 'sattel', hoehe: 2.2, hoeheOben: 3.4 }],
+    ['Walmdach', { dachform: 'walm', hoehe: 2.2, hoeheOben: 3.8, firstLaenge: 2.5 }],
+    ['Walmdach (Firstlänge 0 = Pyramide)', { dachform: 'walm', hoehe: 2.2, hoeheOben: 3.8, firstLaenge: 0 }],
+    ['Zeltdach', { dachform: 'zelt', hoehe: 2.2, hoeheOben: 4 }],
+    ['Krüppelwalmdach', { dachform: 'krueppelwalm', hoehe: 2.2, hoeheOben: 3.8, walmHoehe: 0.7, walmTiefe: 1.1 }],
+    ['Krüppelwalmdach (Walmhöhe = Dachhöhe)', { dachform: 'krueppelwalm', hoehe: 2.2, hoeheOben: 3.8, walmHoehe: 1.6, walmTiefe: 1.5 }],
+    ['Mansarddach', { dachform: 'mansard', hoehe: 2.2, hoeheOben: 4.2, knickHoehe: 3.4, knickBreite: 0.9 }],
   ]
   for (const [name, extra] of faelle) {
     it(name, () => {
       const t = teil(extra)
       const m = baueTeil3D(t, 'laube', 'L', { x: 3, y: 2 })
-      expect(rauminhaltAusDach(m)).toBeCloseTo(massenVon(t).kubaturM3!, 6)
+      expect(rauminhaltAusDach(m)).toBeCloseTo(massenVon(t).kubaturM3!, 2) // Kubatur ist auf 0,01 m³ gerundet
       expect(ohneNaN(m.wand) && ohneNaN(m.dach) && ohneNaN(m.kanten)).toBe(true)
     })
   }
+  it('Walm-, Krüppelwalm-, Mansard- und Zeltdach auch gedreht (längste Kante senkrecht) und gespiegelt', () => {
+    for (const extra of [
+      { dachform: 'walm', hoehe: 2, hoeheOben: 3.6, firstLaenge: 3 },
+      { dachform: 'krueppelwalm', hoehe: 2, hoeheOben: 3.6, walmHoehe: 0.8, walmTiefe: 1 },
+      { dachform: 'mansard', hoehe: 2, hoeheOben: 3.6, knickHoehe: 3, knickBreite: 0.7 },
+      { dachform: 'zelt', hoehe: 2, hoeheOben: 3.6 },
+    ] as const) {
+      const t = teil({ punkte: rechteckPunkte(1, 2, 3, 7), ...extra })
+      expect(rauminhaltAusDach(baueTeil3D(t, 'laube', 'L', { x: 0, y: 0 }))).toBeCloseTo(massenVon(t).kubaturM3!, 2)
+      const spiegel = teil({ punkte: [...rechteckPunkte(1, 2, 3, 7)].reverse(), ...extra })
+      expect(rauminhaltAusDach(baueTeil3D(spiegel, 'laube', 'L', { x: 0, y: 0 }))).toBeCloseTo(massenVon(spiegel).kubaturM3!, 2)
+    }
+  })
+  it('Handrechnung: Walmdach 8 × 6, Traufe 2,5, First 5, Firstlänge 2 → Dachraum 45 m³; Mansard → 66 m³', () => {
+    const walm = baueTeil3D(teil({ punkte: rechteckPunkte(0, 0, 8, 6), dachform: 'walm', hoehe: 2.5, hoeheOben: 5, firstLaenge: 2 }), 'laube', 'L', { x: 4, y: 3 })
+    expect(rauminhaltAusDach(walm)).toBeCloseTo(48 * 2.5 + 45, 6)
+    const mansard = baueTeil3D(teil({ punkte: rechteckPunkte(0, 0, 8, 6), dachform: 'mansard', hoehe: 2.5, hoeheOben: 5, knickHoehe: 4, knickBreite: 1.5 }), 'laube', 'L', { x: 4, y: 3 })
+    expect(rauminhaltAusDach(mansard)).toBeCloseTo(48 * 2.5 + 66, 6)
+  })
   it('Satteldach um 90° gedreht (längste Kante senkrecht) rechnet gleich', () => {
     const t = teil({ punkte: rechteckPunkte(0, 0, 3, 7), dachform: 'sattel', hoehe: 2, hoeheOben: 3 })
     expect(rauminhaltAusDach(baueTeil3D(t, 'laube', 'L', { x: 0, y: 0 }))).toBeCloseTo(massenVon(t).kubaturM3!, 6)
+  })
+})
+
+describe('Form der neuen Dächer', () => {
+  const kantenAufHoehe = (k: number[], y: number): number => {
+    let n = 0
+    for (let i = 0; i < k.length; i += 6) if (Math.abs(k[i + 1] - y) < 1e-9 && Math.abs(k[i + 4] - y) < 1e-9 && (k[i] !== k[i + 3] || k[i + 2] !== k[i + 5])) n++
+    return n
+  }
+  it('Walmdach: First nur über der Firstlänge (2 m), vier Dachflächen, Wände rundum nur bis zur Traufe', () => {
+    const m = baueTeil3D(teil({ punkte: rechteckPunkte(0, 0, 8, 6), dachform: 'walm', hoehe: 2.5, hoeheOben: 5, firstLaenge: 2 }), 'laube', 'L', { x: 4, y: 3 })
+    expect(m.hoechsterPunkt).toBeCloseTo(5, 9)
+    expect(m.dachform).toBe('walm')
+    const k = m.kanten
+    let firstLaenge = 0
+    for (let i = 0; i < k.length; i += 6) {
+      if (Math.abs(k[i + 1] - 5) < 1e-9 && Math.abs(k[i + 4] - 5) < 1e-9) firstLaenge += Math.hypot(k[i + 3] - k[i], k[i + 5] - k[i + 2])
+    }
+    expect(firstLaenge).toBeGreaterThanOrEqual(2 - 1e-9)
+    // alle Wandpunkte liegen höchstens auf Traufhöhe
+    for (let i = 1; i < m.wand.length; i += 3) expect(m.wand[i]).toBeLessThanOrEqual(2.5 + 1e-9)
+  })
+  it('Zeltdach: eine Spitze über der Mitte, Wände auf Traufhöhe', () => {
+    const m = baueTeil3D(teil({ punkte: rechteckPunkte(0, 0, 6, 4), dachform: 'zelt', hoehe: 2.2, hoeheOben: 4 }), 'laube', 'L', { x: 3, y: 2 })
+    expect(m.hoechsterPunkt).toBeCloseTo(4, 9)
+    const d = m.dach
+    for (let i = 0; i + 8 < d.length; i += 9) {
+      const spitze = [0, 3, 6].filter((o) => Math.abs(d[i + o + 1] - 4) < 1e-9)
+      expect(spitze).toHaveLength(1)
+      expect(d[i + spitze[0]]).toBeCloseTo(0, 9)
+      expect(d[i + spitze[0] + 2]).toBeCloseTo(0, 9)
+    }
+    expect(kantenAufHoehe(m.kanten, 4)).toBe(0) // kein First, nur Grate zur Spitze
+  })
+  it('Krüppelwalmdach: Giebelwand reicht bis Firsthöhe − Walmhöhe, First bleibt ganz auf Firsthöhe', () => {
+    const m = baueTeil3D(teil({ punkte: rechteckPunkte(0, 0, 8, 6), dachform: 'krueppelwalm', hoehe: 2.5, hoeheOben: 5, walmHoehe: 1, walmTiefe: 1 }), 'laube', 'L', { x: 4, y: 3 })
+    const giebel = [] as number[]
+    for (let i = 0; i + 2 < m.wand.length; i += 3) if (Math.abs(m.wand[i] + 4) < 1e-9) giebel.push(m.wand[i + 1])
+    expect(Math.max(...giebel)).toBeCloseTo(5 - 1, 9)
+    expect(m.hoechsterPunkt).toBeCloseTo(5, 9)
+  })
+  it('Mansarddach: Knick auf Knickhöhe, Giebelwand mit Knickpunkten (Sieben­eck), Dach sonst über Traufe', () => {
+    const m = baueTeil3D(teil({ punkte: rechteckPunkte(0, 0, 8, 6), dachform: 'mansard', hoehe: 2.5, hoeheOben: 5, knickHoehe: 4, knickBreite: 1.5 }), 'laube', 'L', { x: 4, y: 3 })
+    const ys = new Set<number>()
+    for (let i = 0; i + 2 < m.wand.length; i += 3) if (Math.abs(m.wand[i] + 4) < 1e-9) ys.add(Math.round(m.wand[i + 1] * 1e6) / 1e6)
+    expect([...ys].sort((a, b) => a - b)).toEqual([0, 2.5, 4, 5])
+    expect(kantenAufHoehe(m.kanten, 4)).toBeGreaterThan(0) // Knicklinie entlang der Längsseite
+  })
+  it('fehlende Zusatzmaße: Satteldach mit Hinweis, nichts bricht', () => {
+    for (const extra of [{ dachform: 'walm' }, { dachform: 'krueppelwalm' }, { dachform: 'mansard' }] as const) {
+      const m = baueTeil3D(teil({ ...extra, hoehe: 2.2, hoeheOben: 3.4 }), 'laube', 'L', { x: 3, y: 2 })
+      expect(m.dachform).toBe('sattel')
+      expect(m.hinweise.join(' ')).toMatch(/Satteldach dargestellt/)
+      expect(rauminhaltAusDach(m)).toBeCloseTo(massenVon(teil({ ...extra, hoehe: 2.2, hoeheOben: 3.4 })).kubaturM3!, 2)
+    }
+  })
+  it('Nicht-Rechteck (L-Form): alle Formen liefern endliche Zahlen, Höhe nie über der Firsthöhe', () => {
+    const l = [{ x: 0, y: 0 }, { x: 6, y: 0 }, { x: 6, y: 2 }, { x: 2, y: 2 }, { x: 2, y: 5 }, { x: 0, y: 5 }]
+    for (const extra of [
+      { dachform: 'walm', firstLaenge: 2 },
+      { dachform: 'zelt' },
+      { dachform: 'krueppelwalm', walmHoehe: 0.8, walmTiefe: 1 },
+      { dachform: 'mansard', knickHoehe: 3, knickBreite: 0.5 },
+    ] as const) {
+      const m = baueTeil3D(teil({ punkte: l, hoehe: 2, hoeheOben: 4, ...extra }), 'laube', 'L', { x: 3, y: 2.5 })
+      expect(ohneNaN(m.wand) && ohneNaN(m.dach) && ohneNaN(m.kanten)).toBe(true)
+      expect(m.hoechsterPunkt).toBeLessThanOrEqual(4 + 1e-9)
+      expect(m.dach.length).toBeGreaterThan(0)
+    }
   })
 })
 

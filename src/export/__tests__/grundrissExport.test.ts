@@ -212,3 +212,34 @@ describe('Grün-Skizze bleibt unverändert', () => {
     expect(await mit.zip.file(DRAWING_AA)!.async('string')).toBe(await ohne.zip.file(DRAWING_AA)!.async('string'))
   })
 })
+
+describe('Weitere Dachformen im Export (Beta 6, Paket 2)', () => {
+  const bereich: Kasten = { x: 100_000, y: 100_000, w: 5_000_000, h: 7_000_000 }
+  const neue: GrundrissDaten = {
+    massketten: false,
+    teile: [
+      { id: 'w1', kuerzel: 'L', punkte: rechteckPunkte(0, 0, 8, 6), hoehe: 2.5, hoeheOben: 5, dachform: 'walm', firstLaenge: 2 },
+      { id: 'z1', kuerzel: 'A1', punkte: rechteckPunkte(10, 0, 3, 3), hoehe: 2.5, hoeheOben: 4, dachform: 'zelt' },
+      { id: 'k1', kuerzel: 'S', punkte: rechteckPunkte(0, 8, 8, 6), hoehe: 2.5, hoeheOben: 5, dachform: 'krueppelwalm', walmHoehe: 1, walmTiefe: 1 },
+      { id: 'm1', kuerzel: 'GH', punkte: rechteckPunkte(10, 8, 8, 6), hoehe: 2.5, hoeheOben: 5, dachform: 'mansard', knickHoehe: 4, knickBreite: 1.5 },
+    ],
+  }
+
+  it('die Massenberechnung nennt Form, Zusatzmaße und die Kubatur je Form', () => {
+    const tabelle = grundrissZuFormen(neue, bereich).find((f) => f.typ === 'massenberechnung')!
+    expect(tabelle.text).toContain('L · 8 × 6 m = 48,00 m² · Walmdach Traufe 2,5 / First 5 m, Firstlänge 2 m · 165,00 m³')
+    expect(tabelle.text).toContain('A1 · 3 × 3 m = 9,00 m² · Zeltdach Traufe 2,5 / Spitze 4 m · 27,00 m³')
+    expect(tabelle.text).toContain('S · 8 × 6 m = 48,00 m² · Krüppelwalmdach Traufe 2,5 / First 5 m, Walmhöhe 1 m, Walmtiefe 1 m · 179,20 m³')
+    expect(tabelle.text).toContain('GH · 8 × 6 m = 48,00 m² · Mansarddach Traufe 2,5 / First 5 m, Knick 4 m, Einzug 1,5 m · 186,00 m³')
+    expect(tabelle.text).toContain('Summe:')
+  })
+
+  it('landet in der Excel-Datei (Blatt „Skizze Bau“), Grün-Skizze-Blatt bleibt unberührt', async () => {
+    const { zip } = await exportiere(bauWep(), optionen(neue))
+    const xml = await zip.file(DRAWING_BAU)!.async('string')
+    expect(xml).toContain('Walmdach Traufe 2,5 / First 5 m, Firstlänge 2 m · 165,00 m³')
+    expect(xml).toContain('Mansarddach Traufe 2,5 / First 5 m, Knick 4 m, Einzug 1,5 m · 186,00 m³')
+    const orig = await JSZip.loadAsync(vorlage)
+    expect(await zip.file(DRAWING_AA)!.async('string')).toBe(await orig.file(DRAWING_AA)!.async('string'))
+  })
+})

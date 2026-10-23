@@ -14,6 +14,7 @@ import { useCallback, useEffect, useId, useReducer, useRef, useState } from 'rea
 import { Grid3x3, Magnet, Maximize, MousePointer2, Pentagon, Redo2, Ruler, Square, Trash2, Undo2, ZoomIn, ZoomOut, type LucideIcon } from 'lucide-react'
 import { ICON } from '@/app/ui'
 import { AuswahlFeld, Schalter, TextFeld, ZahlFeld } from '@/app/BauKomponenten'
+import { DachFelder } from './DachFelder'
 import { BAUTEIL_ARTEN } from '@/app/bauHelfer'
 import type { Bauteil, BauteilArt } from '@/model'
 import { massstabText, rasterMeter, type ParzellenLage } from '@/parzelle/lage'
@@ -1011,7 +1012,7 @@ function TeilFormular({
       {!verknuepft && <TextFeld label="Kürzel" wert={teil.kuerzel} onChange={(v) => onAendern({ kuerzel: v }, 'kuerzel')} platzhalter="z. B. L, A1, S, Ü1" />}
 
       <div className="feld-reihe">
-        <ZahlFeld label={dach === 'flach' ? 'Höhe' : 'Wandhöhe (Traufe)'} einheit="m" wert={teil.hoehe} onChange={(v) => onAendern({ hoehe: v }, 'hoehe')} />
+        <ZahlFeld label={dach === 'flach' ? 'Höhe' : dach === 'pult' ? 'Niedrige Wand' : 'Wandhöhe (Traufe)'} einheit="m" wert={teil.hoehe} onChange={(v) => onAendern({ hoehe: v }, 'hoehe')} />
         <AuswahlFeld<Dachform>
           label="Dachform"
           wert={dach}
@@ -1019,15 +1020,7 @@ function TeilFormular({
           onChange={(v) => onAendern({ dachform: v === 'flach' ? undefined : (v ?? undefined) })}
         />
       </div>
-      {dach !== 'flach' && (
-        <ZahlFeld
-          label={dach === 'pult' ? 'Hohe Wand' : 'Firsthöhe'}
-          einheit="m"
-          wert={teil.hoeheOben}
-          onChange={(v) => onAendern({ hoeheOben: v }, 'oben')}
-          hilfe={DACHFORMEN.find((d) => d.id === dach)!.hilfe}
-        />
-      )}
+      <DachFelder dachform={dach} hoeheOben={teil.hoeheOben} dach={teil} onAendern={(p, key) => onAendern(p, key)} />
       <Schalter label="Gestrichelt zeichnen (Keller, Hauswasser)" an={Boolean(teil.gestrichelt)} onChange={(v) => onAendern({ gestrichelt: v || undefined })} />
 
       <p className="neben" data-testid="grundriss-massen">

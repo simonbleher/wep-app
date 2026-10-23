@@ -2417,3 +2417,104 @@ input[type='range'] {
 .parzelle-vorschau-ecke {
   fill: var(--farbe-text);
 }
+
+/* Erklär-Skizze zur Dachform (Beta 6, Paket 2) */
+.dach-skizze {
+  margin: 0;
+  max-width: 22rem;
+}
+
+.dach-skizze svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  color: var(--farbe-text);
+}
+
+.dach-skizze .dach-flaeche {
+  fill: var(--farbe-akzent-hell);
+  stroke: currentColor;
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+}
+
+.dach-skizze .dach-linie {
+  stroke: currentColor;
+  stroke-width: 1;
+  stroke-dasharray: 3 2;
+}
+
+.dach-skizze .dach-mass line {
+  stroke: var(--farbe-akzent);
+  stroke-width: 1;
+}
+
+.dach-skizze .dach-buchstabe {
+  fill: var(--farbe-akzent);
+  font-size: 9px;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: var(--farbe-grund);
+  stroke-width: 2.5px;
+}
+
+.dach-skizze .dach-titel {
+  fill: var(--farbe-text-2);
+  font-size: 7.5px;
+}
+
+.dach-skizze .dach-pfeil {
+  stroke: var(--farbe-akzent);
+  stroke-width: 1.4;
+}
+
+.dach-skizze .dach-pfeilkopf {
+  fill: var(--farbe-akzent);
+}
+
+.dach-skizze figcaption {
+  margin: var(--abstand-1) 0 0;
+}
+
+/* Dachformen im Rechner: sieben Formen – Handy zweispaltig, ab Tablet vierspaltig */
+.segmente-dach {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.segmente-dach .segment {
+  border-top: var(--linie) solid var(--farbe-rand);
+  border-left: var(--linie) solid var(--farbe-rand);
+  padding: 0 var(--abstand-2);
+  white-space: normal;
+}
+
+.segmente-dach .segment:nth-child(-n + 2) {
+  border-top: 0;
+}
+
+.segmente-dach .segment:nth-child(odd) {
+  border-left: 0;
+}
+
+@media (min-width: 640px) {
+  .segmente-dach {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .segmente-dach .segment:nth-child(-n + 4) {
+    border-top: 0;
+  }
+
+  .segmente-dach .segment:nth-child(odd) {
+    border-left: var(--linie) solid var(--farbe-rand);
+  }
+
+  .segmente-dach .segment:nth-child(4n + 1) {
+    border-left: 0;
+  }
+}
+
+.dach-felder {
+  display: grid;
+  gap: var(--abstand-2);
+}

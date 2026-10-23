@@ -2,7 +2,7 @@
 // (`berechneBau`) und die Massenberechnung des Grundrisses (`massenVon`) – nichts wird doppelt gerechnet. Erfundene Daten.
 import { describe, expect, it } from 'vitest'
 import { neuerWep, neueBauDaten, type Bauteil, type Wep } from '../../model'
-import { massenVon, rechteckPunkte } from '../../skizze/grundriss'
+import { massenVon, rechteckPunkte, type DachMasse, type Dachform } from '../../skizze/grundriss'
 import {
   altersRechnung,
   berechneBau,
@@ -57,14 +57,20 @@ describe('Flächenrechner', () => {
 })
 
 describe('Kubatur wie die Massenberechnung des Grundrisses', () => {
-  const faelle: [string, 'flach' | 'pult' | 'sattel', number, number | undefined][] = [
-    ['Flachdach', 'flach', 2.4, undefined],
-    ['Pultdach', 'pult', 2.2, 3],
-    ['Satteldach', 'sattel', 2.3, 3.4],
+  const faelle: [string, Dachform, number, number | undefined, DachMasse][] = [
+    ['Flachdach', 'flach', 2.4, undefined, {}],
+    ['Pultdach', 'pult', 2.2, 3, {}],
+    ['Satteldach', 'sattel', 2.3, 3.4, {}],
+    ['Walmdach', 'walm', 2.3, 3.6, { firstLaenge: 1.5 }],
+    ['Zeltdach', 'zelt', 2.3, 3.6, {}],
+    ['Krüppelwalmdach', 'krueppelwalm', 2.3, 3.6, { walmHoehe: 0.6, walmTiefe: 0.8 }],
+    ['Mansarddach', 'mansard', 2.3, 3.8, { knickHoehe: 3.1, knickBreite: 0.7 }],
+    ['Walmdach ohne Firstlänge', 'walm', 2.3, 3.6, {}],
   ]
-  it.each(faelle)('%s: gleiches Ergebnis wie massenVon', (_n, dachform, hoehe, hoeheOben) => {
-    const r = rechneKubatur({ laenge: 5, breite: 4, dachform, hoehe, hoeheOben })!
-    const g = massenVon({ punkte: rechteckPunkte(0, 0, 5, 4), dachform, hoehe, hoeheOben })
+  it.each(faelle)('%s: gleiches Ergebnis wie massenVon', (_n, dachform, hoehe, hoeheOben, extra) => {
+    const r = rechneKubatur({ laenge: 5, breite: 4, dachform, hoehe, hoeheOben, ...extra })!
+    const g = massenVon({ punkte: rechteckPunkte(0, 0, 5, 4), dachform, hoehe, hoeheOben, ...extra })
+    expect(r.dachraumText).toBe(g.dachraumText)
     expect(r.kubaturM3).toBe(g.kubaturM3)
     expect(r.mittlereHoehe).toBe(g.mittlereHoehe)
     expect(r.hinweise).toEqual(g.hinweise)
@@ -78,6 +84,21 @@ describe('Kubatur wie die Massenberechnung des Grundrisses', () => {
     const m = rechneKubatur({ laenge: 2, breite: 3, dachform: 'flach' })!
     expect(m.kubaturM3).toBeUndefined()
     expect(m.hinweise[0]).toMatch(/Höhe fehlt/)
+  })
+  it('Handrechnung 8 × 6 m, Traufe 2,5, First 5: Walm (Firstlänge 2) 165, Zelt 160, Krüppelwalm (1/1) 179,2, Mansard (4/1,5) 186 m³', () => {
+    const b = { laenge: 8, breite: 6, hoehe: 2.5, hoeheOben: 5 }
+    expect(rechneKubatur({ ...b, dachform: 'walm', firstLaenge: 2 })!.kubaturM3).toBe(165)
+    expect(rechneKubatur({ ...b, dachform: 'zelt' })!.kubaturM3).toBe(160)
+    expect(rechneKubatur({ ...b, dachform: 'krueppelwalm', walmHoehe: 1, walmTiefe: 1 })!.kubaturM3).toBe(179.2)
+    expect(rechneKubatur({ ...b, dachform: 'mansard', knickHoehe: 4, knickBreite: 1.5 })!.kubaturM3).toBe(186)
+  })
+  it('eingegebene Fläche + Länge/Breite: Walmdach als Näherung mit Hinweis; ohne Länge/Breite wie Satteldach', () => {
+    const n = rechneKubatur({ flaeche: 44, laenge: 8, breite: 6, dachform: 'walm', firstLaenge: 2, hoehe: 2.5, hoeheOben: 5 })!
+    expect(n.dachraumM3).toBeCloseTo((44 / 48) * 45, 2)
+    expect(n.hinweise.join(' ')).toMatch(/Näherung/)
+    const o = rechneKubatur({ flaeche: 44, dachform: 'walm', firstLaenge: 2, hoehe: 2.5, hoeheOben: 5 })!
+    expect(o.dachraumM3).toBe(55)
+    expect(o.hinweise.join(' ')).toMatch(/Länge und Breite fehlen/)
   })
   it('Fläche ohne Rechteck bei geneigtem Dach: Näherungshinweis', () => {
     expect(rechneKubatur({ flaeche: 20, dachform: 'sattel', hoehe: 2.3, hoeheOben: 3.4 })!.hinweise.join(' ')).toMatch(/Näherung/)

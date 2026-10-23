@@ -14,18 +14,82 @@ export interface GPunkt {
   y: number
 }
 
-export type Dachform = 'flach' | 'pult' | 'sattel'
+export type Dachform = 'flach' | 'pult' | 'sattel' | 'walm' | 'zelt' | 'krueppelwalm' | 'mansard'
+
+/** Zusatzmaße, die nur einzelne Dachformen brauchen (alle optional; fehlt etwas, rechnet die App wie Satteldach und sagt es). */
+export interface DachMasse {
+  /** Walmdach: Länge des Firsts in m (Rest der Länge = Walmflächen an beiden Enden). */
+  firstLaenge?: number
+  /** Krüppelwalmdach: waagerechte Tiefe des Krüppelwalms je Giebelseite in m. */
+  walmTiefe?: number
+  /** Krüppelwalmdach: Höhe des Krüppelwalms (vom First nach unten) in m. */
+  walmHoehe?: number
+  /** Mansarddach: Höhe des Knicks über dem Fußboden in m. */
+  knickHoehe?: number
+  /** Mansarddach: waagerechter Abstand des Knicks von der Traufwand in m (je Seite). */
+  knickBreite?: number
+}
+
+export const DACH_MASS_SCHLUESSEL = ['firstLaenge', 'walmTiefe', 'walmHoehe', 'knickHoehe', 'knickBreite'] as const satisfies readonly (keyof DachMasse)[]
 
 export const DACHFORMEN: { id: Dachform; text: string; hilfe: string }[] = [
   { id: 'flach', text: 'Flachdach', hilfe: 'Eine Höhe überall; Kubatur = Fläche × Höhe.' },
   { id: 'pult', text: 'Pultdach', hilfe: 'Niedrige und hohe Wand; Kubatur = Fläche × Mittel der beiden Höhen.' },
   { id: 'sattel', text: 'Satteldach', hilfe: 'Traufhöhe und Firsthöhe; Kubatur = Fläche × Traufhöhe + Dachraum (Fläche × Firsthöhe über der Traufe ÷ 2).' },
+  {
+    id: 'walm',
+    text: 'Walmdach',
+    hilfe: 'Alle vier Seiten geneigt, der First ist kürzer als das Haus. Dachraum = Breite × Höhe über der Traufe ÷ 6 × (2 × Länge + Firstlänge).',
+  },
+  { id: 'zelt', text: 'Zeltdach / Pyramide', hilfe: 'Vier Flächen laufen in einer Spitze zusammen. Dachraum = Fläche × Höhe über der Traufe ÷ 3.' },
+  {
+    id: 'krueppelwalm',
+    text: 'Krüppelwalmdach',
+    hilfe: 'Satteldach, dessen Giebel oben ein kleines Walmstück hat. Dachraum = Satteldach − 2 Walmstücke (Breite × Walmhöhe² × Walmtiefe ÷ (6 × Höhe über der Traufe) je Seite).',
+  },
+  {
+    id: 'mansard',
+    text: 'Mansarddach',
+    hilfe: 'Satteldach mit Knick: unten steil, oben flacher, Giebel senkrecht. Dachraum = Länge × (untere Trapezfläche + obere Dreieckfläche).',
+  },
 ]
+
+/** Beschriftung der beiden Höhenfelder je Dachform. */
+export function hoehenTexte(d: Dachform | undefined): { unten: string; oben: string } {
+  switch (d ?? 'flach') {
+    case 'flach':
+      return { unten: 'Höhe', oben: '' }
+    case 'pult':
+      return { unten: 'Niedrige Wand', oben: 'Hohe Wand' }
+    case 'zelt':
+      return { unten: 'Traufhöhe', oben: 'Höhe der Spitze' }
+    default:
+      return { unten: 'Traufhöhe', oben: 'Firsthöhe' }
+  }
+}
+
+/** Zusatzfelder je Dachform (Beschriftung, Hilfe) – Editor und Rechner zeigen dieselben. */
+export const DACH_FELDER: Record<Dachform, { key: keyof DachMasse; label: string; hilfe: string }[]> = {
+  flach: [],
+  pult: [],
+  sattel: [],
+  zelt: [],
+  walm: [{ key: 'firstLaenge', label: 'Firstlänge', hilfe: 'Länge des Firsts (oberste Kante). Leer = unbekannt.' }],
+  krueppelwalm: [
+    { key: 'walmHoehe', label: 'Walmhöhe', hilfe: 'Wie hoch das Walmstück am Giebel ist (vom First nach unten).' },
+    { key: 'walmTiefe', label: 'Walmtiefe', hilfe: 'Wie weit das Walmstück waagerecht vom Giebel nach innen reicht (je Seite).' },
+  ],
+  mansard: [
+    { key: 'knickHoehe', label: 'Knickhöhe', hilfe: 'Höhe des Knicks über dem Fußboden (zwischen Traufe und First).' },
+    { key: 'knickBreite', label: 'Knick-Einzug', hilfe: 'Wie weit der Knick waagerecht von der Außenwand nach innen liegt (je Seite).' },
+  ],
+}
 
 export const dachformText = (d: Dachform | undefined): string => DACHFORMEN.find((x) => x.id === (d ?? 'flach'))!.text
 
 /** Ein Teil des Grundrisses, meist ein Bauteil (L, A1, S, Ü1 …). */
-export interface GrundrissTeil {
+/** Zusatzmaße für Walm-, Krüppelwalm- und Mansarddach (`DachMasse`, Beta 6, Paket 2) stehen direkt am Teil. */
+export interface GrundrissTeil extends DachMasse {
   id: string
   /** Kürzel auf der Skizze. Ist das Teil mit einem Bauteil verknüpft, gilt dessen Kürzel (`kuerzelVon`). */
   kuerzel: string
@@ -36,7 +100,7 @@ export interface GrundrissTeil {
   /** Wandhöhe in m (Traufhöhe; beim Pultdach die niedrige Wand). */
   hoehe?: number
   dachform?: Dachform
-  /** Pultdach: hohe Wand, Satteldach: Firsthöhe – jeweils in m über dem Fußboden. */
+  /** Pultdach: hohe Wand, Zeltdach: Spitze, sonst Firsthöhe – jeweils in m über dem Fußboden. */
   hoeheOben?: number
   /** Gestrichelt zeichnen (Keller, Hauswasser). */
   gestrichelt?: boolean
@@ -311,8 +375,10 @@ export interface Massen {
   mittlereHoehe?: number
   /** Kubatur bis zur Traufe (Fläche × Wandhöhe) in m³. */
   raumM3?: number
-  /** Dachraum über der Traufe in m³ (Pultdach: Keil, Satteldach: Prisma). */
+  /** Dachraum über der Traufe in m³ (Pultdach: Keil, Satteldach: Prisma, weitere Formen siehe `DACHFORMEN`). */
   dachraumM3?: number
+  /** Wie der Dachraum gerechnet wurde (für den Rechenweg im Rechner), z. B. „Fläche × Höhe über der Traufe ÷ 3“. */
+  dachraumText?: string
   /** Umbauter Raum insgesamt in m³; fehlt, solange die Höhe fehlt. */
   kubaturM3?: number
   /** Hinweise (nur Warnungen, nichts wird gesperrt). */
@@ -322,29 +388,57 @@ export interface Massen {
 const rund2 = (n: number) => Math.round(n * 100) / 100
 
 /**
- * Fläche und Kubatur eines Teils.
+ * Fläche und Kubatur eines Teils (Formeln und Quellen: docs/ENTSCHEIDUNGEN.md, „Beta 6, Paket 2“).
  *
  * - Flachdach: Fläche × Höhe.
  * - Pultdach: Fläche × (niedrige + hohe Wand) ÷ 2.
  * - Satteldach: Fläche × Traufhöhe + Fläche × (Firsthöhe − Traufhöhe) ÷ 2.
+ * - Walmdach: Fläche × Traufhöhe + Breite × Höhe über der Traufe ÷ 6 × (2 × Länge + Firstlänge).
+ * - Zeltdach/Pyramide: Fläche × Traufhöhe + Fläche × Höhe über der Traufe ÷ 3 (gilt für jeden Grundriss).
+ * - Krüppelwalmdach: Satteldach − 2 Walmstücke, je Breite × Walmhöhe² × Walmtiefe ÷ (6 × Höhe über der Traufe).
+ * - Mansarddach (Giebel senkrecht): Fläche × Traufhöhe + Länge × (Trapez unten + Dreieck oben).
  *
- * Pult- und Satteldach gelten exakt für ein Rechteck mit durchgehender Dachneigung; bei anderen Grundrissen
- * ist es eine Näherung (der Hinweis steht in `hinweise`). Fehlt `hoeheOben`, gilt das Dach als flach.
+ * Satteldach, Pultdach und Zeltdach gelten für jeden Grundriss gleich (Pult/Sattel mit durchgehender Neigung);
+ * Walm, Krüppelwalm und Mansard gelten exakt für ein Rechteck. Bei anderen Grundrissen ist es eine Näherung
+ * (der Hinweis steht in `hinweise`). Fehlt `hoeheOben`, gilt das Dach als flach; fehlt ein Zusatzmaß, wird wie
+ * Satteldach gerechnet.
  */
-export function massenVon(teil: Pick<GrundrissTeil, 'punkte' | 'hoehe' | 'dachform' | 'hoeheOben'>): Massen {
+export function massenVon(teil: Pick<GrundrissTeil, 'punkte' | 'hoehe' | 'dachform' | 'hoeheOben'> & DachMasse): Massen {
+  const rm = rechteckMasse(teil.punkte)
+  const box = umgebendesRechteck(teil.punkte)
+  const bx = box.x2 - box.x1
+  const by = box.y2 - box.y1
   return massenAusFlaeche(
     rund2(flaecheVon(teil.punkte)),
     rund2(umfangVon(teil.punkte)),
     teil.dachform,
     teil.hoehe,
     teil.hoeheOben,
-    Boolean(rechteckMasse(teil.punkte)),
+    Boolean(rm),
+    {
+      ...dachMasseVon(teil),
+      laenge: rm?.laenge ?? Math.max(bx, by),
+      breite: rm?.breite ?? Math.min(bx, by),
+    },
   )
 }
+
+/** Nur die Zusatzmaße der Dachform aus einem Objekt herausholen. */
+export function dachMasseVon(quelle: DachMasse): DachMasse {
+  const aus: DachMasse = {}
+  for (const k of DACH_MASS_SCHLUESSEL) if (quelle[k] !== undefined) aus[k] = quelle[k]
+  return aus
+}
+
+/** Maße, die die Dachraum-Rechnung zusätzlich braucht: Länge (längere Seite) und Breite des Rechtecks bzw. des umgebenden Rechtecks. */
+export type DachRechnung = DachMasse & { laenge?: number; breite?: number }
+
+const positiv = (n: number | undefined): number | undefined => (n !== undefined && Number.isFinite(n) && n > 0 ? n : undefined)
 
 /**
  * Die Rechnung hinter `massenVon`, ohne Polygon: auch der Kubatur-Rechner im Reiter „Rechner“ (Beta 4, Paket 4)
  * benutzt sie, damit Grundriss und Rechner nie verschieden rechnen. `rechteck`: false = Näherung mit Hinweis.
+ * `dach`: Länge/Breite (längere/kürzere Seite) und die Zusatzmaße der Dachform.
  */
 export function massenAusFlaeche(
   flaeche: number,
@@ -353,6 +447,7 @@ export function massenAusFlaeche(
   hoehe: number | undefined,
   hoeheOben: number | undefined,
   rechteck: boolean,
+  dach: DachRechnung = {},
 ): Massen {
   const dachform = dachformWahl ?? 'flach'
   const hinweise: string[] = []
@@ -364,22 +459,113 @@ export function massenAusFlaeche(
     return m
   }
   m.hoehe = h
+  const obenName = hoehenTexte(dachform).oben
   const oben = dachform === 'flach' ? h : (o ?? h)
   if (dachform !== 'flach' && o === undefined) {
-    hinweise.push(`${dachform === 'pult' ? 'Hohe Wand' : 'Firsthöhe'} fehlt – gerechnet wie Flachdach.`)
+    hinweise.push(`${obenName} fehlt – gerechnet wie Flachdach.`)
   }
   if (oben < h) {
-    hinweise.push(`${dachform === 'pult' ? 'Die hohe Wand' : 'Die Firsthöhe'} (${meterText(oben)}) ist niedriger als die Wandhöhe (${meterText(h)}) – bitte prüfen.`)
-  }
-  if (dachform !== 'flach' && !rechteck) {
-    hinweise.push('Kein Rechteck: Dachraum als Näherung (Fläche × Höhenunterschied ÷ 2).')
+    hinweise.push(`${dachform === 'pult' ? 'Die hohe Wand' : dachform === 'zelt' ? 'Die Spitze' : 'Die Firsthöhe'} (${meterText(oben)}) ist niedriger als die Wandhöhe (${meterText(h)}) – bitte prüfen.`)
   }
   m.hoeheOben = oben
   m.raumM3 = rund2(flaeche * h)
-  m.dachraumM3 = rund2(flaeche * Math.max(0, oben - h) * 0.5)
+  const dr = dachraumVon(dachform, flaeche, rechteck, h, oben, dach, hinweise)
+  m.dachraumM3 = rund2(dr.m3)
+  m.dachraumText = dr.text
   m.kubaturM3 = rund2(m.raumM3 + m.dachraumM3)
   m.mittlereHoehe = flaeche > 0 ? rund2(m.kubaturM3 / flaeche) : h
   return m
+}
+
+const SATTEL_TEXT = 'Fläche × Höhenunterschied ÷ 2'
+
+/** Geprüfte Maße einer Dachform (Walm/Krüppelwalm/Mansard) – oder Satteldach als Ersatz, wenn etwas fehlt. Gemeinsam für Kubatur und 3D. */
+export type DachParameter =
+  | { art: 'sattel'; grund?: string }
+  | { art: 'walm'; /** Walmtiefe je Seite in m = (Länge − Firstlänge) ÷ 2 */ tiefe: number }
+  | { art: 'krueppelwalm'; hoehe: number; tiefe: number }
+  | { art: 'mansard'; knickHoehe: number; einzug: number }
+
+/**
+ * Prüft die Zusatzmaße (`L` längere, `B` kürzere Seite des Rechtecks bzw. umgebenden Rechtecks, `h` Traufe, `oben` First).
+ * Ungültiges oder Fehlendes → `{ art: 'sattel', grund }` (dann gilt Satteldach); unplausible Werte werden begrenzt und als Hinweis gemeldet.
+ */
+export function pruefeDach(
+  form: Dachform,
+  L: number,
+  B: number,
+  h: number,
+  oben: number,
+  dach: DachMasse,
+  hinweise: string[],
+): DachParameter {
+  const r = Math.max(0, oben - h)
+  if (form === 'walm') {
+    const f = dach.firstLaenge
+    if (f === undefined || !Number.isFinite(f) || f < 0) return { art: 'sattel', grund: 'Firstlänge fehlt' }
+    if (f > L + 0.005) hinweise.push(`Die Firstlänge (${meterText(f)}) ist länger als das Haus (${meterText(L)}) – bitte prüfen.`)
+    return { art: 'walm', tiefe: (L - Math.min(f, L)) / 2 }
+  }
+  if (form === 'krueppelwalm') {
+    const d0 = positiv(dach.walmHoehe)
+    const t0 = positiv(dach.walmTiefe)
+    if (!d0 || !t0) return { art: 'sattel', grund: `${!d0 ? 'Walmhöhe' : 'Walmtiefe'} fehlt` }
+    if (r <= 0) return { art: 'sattel', grund: 'Die Firsthöhe liegt nicht über der Traufe' }
+    if (d0 > r + 0.005) hinweise.push(`Die Walmhöhe (${meterText(d0)}) ist größer als der Höhenunterschied von Traufe zu First (${meterText(r)}) – bitte prüfen.`)
+    if (t0 > L / 2 + 0.005) hinweise.push(`Die Walmtiefe (${meterText(t0)}) ist größer als die halbe Länge (${meterText(L / 2)}) – bitte prüfen.`)
+    return { art: 'krueppelwalm', hoehe: Math.min(d0, r), tiefe: Math.min(t0, L / 2) }
+  }
+  if (form === 'mansard') {
+    const k = positiv(dach.knickHoehe)
+    const e = positiv(dach.knickBreite)
+    if (!k || !e) return { art: 'sattel', grund: `${!k ? 'Knickhöhe' : 'Knick-Einzug'} fehlt` }
+    if (k <= h || k >= oben) return { art: 'sattel', grund: `Die Knickhöhe (${meterText(k)}) liegt nicht zwischen Traufe (${meterText(h)}) und First (${meterText(oben)})` }
+    if (e >= B / 2) return { art: 'sattel', grund: `Der Knick-Einzug (${meterText(e)}) ist mindestens die halbe Breite (${meterText(B / 2)})` }
+    return { art: 'mansard', knickHoehe: k, einzug: e }
+  }
+  return { art: 'sattel' }
+}
+
+/** Dachraum über der Traufe in m³ samt Rechenweg; Hinweise werden an `hinweise` gehängt. */
+function dachraumVon(
+  form: Dachform,
+  flaeche: number,
+  rechteck: boolean,
+  h: number,
+  oben: number,
+  dach: DachRechnung,
+  hinweise: string[],
+): { m3: number; text: string } {
+  const r = Math.max(0, oben - h)
+  const sattel = (grund?: string) => {
+    if (grund) hinweise.push(`${grund} – Dachraum wie beim Satteldach gerechnet.`)
+    if (!rechteck && form !== 'flach') hinweise.push('Kein Rechteck: Dachraum als Näherung (Fläche × Höhenunterschied ÷ 2).')
+    return { m3: flaeche * r * 0.5, text: grund ? `${SATTEL_TEXT} (wie Satteldach)` : SATTEL_TEXT }
+  }
+  if (form === 'flach') return { m3: 0, text: '' }
+  if (form === 'pult' || form === 'sattel') return sattel()
+  if (form === 'zelt') return { m3: (flaeche * r) / 3, text: 'Fläche × Höhe über der Traufe ÷ 3' }
+
+  // Walm, Krüppelwalm, Mansard: die Rechenform braucht Länge und Breite (längere/kürzere Seite)
+  let L = positiv(dach.laenge)
+  let B = positiv(dach.breite)
+  if (!L || !B) return sattel('Länge und Breite fehlen')
+  if (B > L) [L, B] = [B, L]
+  const p = pruefeDach(form, L, B, h, oben, dach, hinweise)
+  if (p.art === 'sattel') return sattel(p.grund)
+  if (!rechteck) hinweise.push('Kein Rechteck: Dachraum als Näherung (Dachraum des umgebenden Rechtecks × Fläche ÷ Rechteckfläche).')
+  const q = flaeche / (L * B) // Anteil der Grundfläche am umgebenden Rechteck (1 beim Rechteck)
+  if (p.art === 'walm') {
+    return { m3: q * ((B * r) / 6) * (2 * L + (L - 2 * p.tiefe)), text: 'Breite × Höhe über der Traufe ÷ 6 × (2 × Länge + Firstlänge)' }
+  }
+  if (p.art === 'krueppelwalm') {
+    return {
+      m3: q * ((B * r * L) / 2 - (B * p.hoehe * p.hoehe * p.tiefe) / (3 * r)),
+      text: 'Satteldach − 2 Walmstücke (Breite × Walmhöhe² × Walmtiefe ÷ (6 × Höhe über der Traufe) je Seite)',
+    }
+  }
+  const querschnitt = (p.knickHoehe - h) * (B - p.einzug) + 0.5 * (B - 2 * p.einzug) * (oben - p.knickHoehe)
+  return { m3: q * L * querschnitt, text: 'Länge × (Trapez unten (Knickhöhe − Traufe) × (Breite − Einzug) + Dreieck oben ½ × (Breite − 2 × Einzug) × (First − Knickhöhe))' }
 }
 
 export interface MassenZeile extends Massen {
@@ -421,14 +607,28 @@ export function massenberechnung(daten: GrundrissDaten, bauteile: ReadonlyArray<
 
 /** Eine Zeile der Massenberechnung als Text (Export und Anzeige), z. B. „L · 4 × 6 m = 24,00 m² · Satteldach 2,2 / 3,1 m · 63,60 m³“. */
 export function massenZeileText(z: MassenZeile): string {
+  const t = z.teil
+  const oben = z.hoeheOben !== undefined ? zahlText(z.hoeheOben) : zahlText(z.hoehe ?? 0)
+  const zusatz = (...teile: [string, number | undefined][]) =>
+    teile
+      .filter(([, v]) => v !== undefined)
+      .map(([n, v]) => `, ${n} ${zahlText(v!)} m`)
+      .join('')
   const hoehen =
     z.hoehe === undefined
       ? 'Höhe fehlt'
       : z.dachform === 'flach'
         ? `Flachdach ${zahlText(z.hoehe)} m`
         : z.dachform === 'pult'
-          ? `Pultdach ${zahlText(z.hoehe)} / ${zahlText(z.hoeheOben ?? z.hoehe)} m`
-          : `Satteldach Traufe ${zahlText(z.hoehe)} / First ${zahlText(z.hoeheOben ?? z.hoehe)} m`
+          ? `Pultdach ${zahlText(z.hoehe)} / ${oben} m`
+          : `${dachformText(z.dachform).replace(' / Pyramide', '')} Traufe ${zahlText(z.hoehe)} / ${z.dachform === 'zelt' ? 'Spitze' : 'First'} ${oben} m` +
+            (z.dachform === 'walm'
+              ? zusatz(['Firstlänge', t.firstLaenge])
+              : z.dachform === 'krueppelwalm'
+                ? zusatz(['Walmhöhe', t.walmHoehe], ['Walmtiefe', t.walmTiefe])
+                : z.dachform === 'mansard'
+                  ? zusatz(['Knick', t.knickHoehe], ['Einzug', t.knickBreite])
+                  : '')
   return `${z.kuerzel} · ${z.masseText} = ${zahl2Text(z.flaeche)} m² · ${hoehen}${z.kubaturM3 !== undefined ? ` · ${zahl2Text(z.kubaturM3)} m³` : ''}`
 }
 
