@@ -328,3 +328,9 @@ Abschnitt 10f) mit Mausrad, Maus-Ziehen und Zwei-Finger-Gesten über CDP-Touch. 
   auf die fünf Vorlagenfehler (Baulichkeiten C33, K81, J52, C64; Beseitigungskosten K21) und die Beispielwerte (F104/G104 „nicht beräumt“ als Verdacht, I19/I28/I37 als Hinweis),
   rechnet mit den gespeicherten Werten und eigener Nachrechnung den Euro-Unterschied bis zum Deckblatt (E21/E25/E26/E28). Ausgabe `pruefbericht.html` + `pruefbericht.csv` im geprüften Ordner
   (enthalten Personendaten, in `.gitignore`), `pruefe_weps.bat` für Windows, README für Laien. Tests (pytest, erfundene Dateien aus der Vorlage, Werte über LibreOffice) im Workflow „Prüfen“.
+
+## Beta 5 (Plan: docs/PLAN-BETA5.md)
+- B5-1 · Grün-Skizze auf Bau-Basis ⏳ – Branch beta5/paket1
+- B5-2 · Teilen als .wep-Datei ⏳ – Branch beta5/paket2
+- B5-3 · Unterschrift im Profil ⏳ – Branch beta5/paket3
+- B5-4 · PDF direkt aus der App ⏳ – Branch beta5/paket4
