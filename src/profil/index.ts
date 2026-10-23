@@ -24,6 +24,11 @@ export interface Profil {
    * sie überschreiben die Tabelle der App (src/bau/baupreisindex.ts). Schlüssel = Jahr als Text.
    */
   baupreisindex?: Record<string, number>
+  /**
+   * „Meine Unterschrift“: transparentes PNG als Data-URL (`data:image/png;base64,…`), gezeichnet oder aus einem
+   * Foto freigestellt (src/unterschrift/). Wird mit dem Profil abgeglichen; Paket 4 setzt sie ins PDF.
+   */
+  unterschrift?: string
 }
 
 export const LEERES_PROFIL: Profil = { name: '', rolle: 'gruen', standardAnlage: '' }
