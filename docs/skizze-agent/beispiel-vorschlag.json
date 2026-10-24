@@ -1,135 +1,755 @@
 {
-  "format": "wep-skizze/1",
-  "modus": "ergaenzen",
-  "elemente": [
+ "format": "wep-skizze/2",
+ "modus": "ergaenzen",
+ "elemente": [
+  {
+   "typ": "vieleck",
+   "name": "Wiese",
+   "punkte": [
     {
-      "typ": "vieleck",
-      "punkte": [
-        {
-          "x": 1,
-          "y": 1
-        },
-        {
-          "x": 17,
-          "y": 1
-        },
-        {
-          "x": 17,
-          "y": 8
-        },
-        {
-          "x": 1,
-          "y": 9
-        }
-      ],
-      "stil": "wiese",
-      "beschriftung": "Wiese"
+     "x": 1,
+     "y": 1
     },
     {
-      "typ": "weg",
-      "x": 9,
-      "y": 21,
-      "breite": 1.4,
-      "hoehe": 8,
-      "beschriftung": "Weg"
+     "x": 17,
+     "y": 1
     },
     {
-      "typ": "tor",
-      "x": 9.7,
-      "y": 25.2,
-      "breite": 1.2,
-      "hoehe": 1.2
+     "x": 17,
+     "y": 8
     },
     {
-      "typ": "baum",
-      "x": 14,
-      "y": 5,
-      "bezug": {
-        "liste": "aufwuchs",
-        "id": "p-apfel"
-      }
-    },
-    {
-      "typ": "baum",
-      "x": 16,
-      "y": 12,
-      "bezug": {
-        "liste": "aufwuchs",
-        "id": "p-apfel"
-      }
-    },
-    {
-      "typ": "baum",
-      "x": 15,
-      "y": 18,
-      "bezug": {
-        "liste": "aufwuchs",
-        "id": "p-birne"
-      }
-    },
-    {
-      "typ": "hecke",
-      "x": 17.2,
-      "y": 12,
-      "breite": 0.9,
-      "hoehe": 9,
-      "bezug": {
-        "liste": "aufwuchs",
-        "id": "p-hecke"
-      }
-    },
-    {
-      "typ": "kompost",
-      "x": 2,
-      "y": 22,
-      "breite": 1.6,
-      "hoehe": 1
-    },
-    {
-      "typ": "entfernen",
-      "x": 3,
-      "y": 12,
-      "bezug": {
-        "liste": "aufwuchs",
-        "id": "p-fichte"
-      }
-    },
-    {
-      "typ": "mangelhinweis",
-      "x": 5,
-      "y": 19,
-      "breite": 4,
-      "hoehe": 0.9,
-      "beschriftung": "Rückschnitt nötig",
-      "ziel": {
-        "x": 8,
-        "y": 22
-      }
-    },
-    {
-      "typ": "linie",
-      "von": {
-        "x": 12,
-        "y": 3
-      },
-      "nach": {
-        "x": 13.5,
-        "y": 4.5
-      },
-      "farbe": "#C00000",
-      "pfeil": true
-    },
-    {
-      "typ": "massangabe",
-      "von": {
-        "x": 1,
-        "y": 0.4
-      },
-      "nach": {
-        "x": 17,
-        "y": 0.4
-      },
-      "beschriftung": "16 m"
+     "x": 1,
+     "y": 9
     }
-  ]
+   ],
+   "stil": "wiese",
+   "beschriftung": "Wiese"
+  },
+  {
+   "typ": "vieleck",
+   "name": "Dreieckbeet",
+   "punkte": [
+    {
+     "x": 7,
+     "y": 3
+    },
+    {
+     "x": 10.5,
+     "y": 3
+    },
+    {
+     "x": 7,
+     "y": 6
+    }
+   ],
+   "fuellung": "#EBDDC7",
+   "linie": "#7030A0",
+   "linienbreite": 2
+  },
+  {
+   "typ": "rechteck",
+   "name": "Weg",
+   "x": 9,
+   "y": 21,
+   "breite": 1.4,
+   "hoehe": 8,
+   "fuellung": "#EDE4D3",
+   "linie": "#A6A6A6",
+   "beschriftung": "Weg"
+  },
+  {
+   "typ": "linie",
+   "name": "Tor",
+   "von": {
+    "x": 10.4,
+    "y": 24.6
+   },
+   "nach": {
+    "x": 10.4,
+    "y": 25.8
+   },
+   "farbe": "#262626",
+   "linienbreite": 2
+  },
+  {
+   "typ": "bogen",
+   "name": "Tor_Bogen",
+   "x": 10.4,
+   "y": 25.8,
+   "breite": 2.4,
+   "hoehe": 2.4,
+   "startWinkel": 180,
+   "endWinkel": 270,
+   "linie": "#262626"
+  },
+  {
+   "typ": "rechteck",
+   "name": "baum",
+   "x": 14,
+   "y": 5.53,
+   "breite": 0.23,
+   "hoehe": 0.68,
+   "fuellung": "#7F5A2E",
+   "linie": "#7F5A2E",
+   "linienbreite": 1,
+   "bezug": {
+    "liste": "aufwuchs",
+    "id": "p-apfel"
+   }
+  },
+  {
+   "typ": "ellipse",
+   "name": "baum",
+   "x": 13.66,
+   "y": 4.96,
+   "breite": 0.76,
+   "hoehe": 0.76,
+   "fuellung": "#548235",
+   "linie": "#385723",
+   "linienbreite": 1
+  },
+  {
+   "typ": "ellipse",
+   "name": "baum",
+   "x": 14.34,
+   "y": 4.96,
+   "breite": 0.76,
+   "hoehe": 0.76,
+   "fuellung": "#548235",
+   "linie": "#385723",
+   "linienbreite": 1
+  },
+  {
+   "typ": "ellipse",
+   "name": "baum",
+   "x": 14,
+   "y": 4.58,
+   "breite": 0.98,
+   "hoehe": 0.98,
+   "fuellung": "#548235",
+   "linie": "#385723",
+   "linienbreite": 1
+  },
+  {
+   "typ": "text",
+   "name": "baum",
+   "x": 14,
+   "y": 6.25,
+   "inhalt": "Apfel",
+   "groesse": 9,
+   "farbe": "#000000"
+  },
+  {
+   "typ": "rechteck",
+   "name": "baum",
+   "x": 15.2,
+   "y": 11.53,
+   "breite": 0.23,
+   "hoehe": 0.68,
+   "fuellung": "#7F5A2E",
+   "linie": "#7F5A2E",
+   "linienbreite": 1,
+   "bezug": {
+    "liste": "aufwuchs",
+    "id": "p-apfel"
+   }
+  },
+  {
+   "typ": "ellipse",
+   "name": "baum",
+   "x": 14.86,
+   "y": 10.96,
+   "breite": 0.76,
+   "hoehe": 0.76,
+   "fuellung": "#548235",
+   "linie": "#385723",
+   "linienbreite": 1
+  },
+  {
+   "typ": "ellipse",
+   "name": "baum",
+   "x": 15.54,
+   "y": 10.96,
+   "breite": 0.76,
+   "hoehe": 0.76,
+   "fuellung": "#548235",
+   "linie": "#385723",
+   "linienbreite": 1
+  },
+  {
+   "typ": "ellipse",
+   "name": "baum",
+   "x": 15.2,
+   "y": 10.58,
+   "breite": 0.98,
+   "hoehe": 0.98,
+   "fuellung": "#548235",
+   "linie": "#385723",
+   "linienbreite": 1
+  },
+  {
+   "typ": "text",
+   "name": "baum",
+   "x": 15.2,
+   "y": 12.25,
+   "inhalt": "Apfel",
+   "groesse": 9,
+   "farbe": "#000000"
+  },
+  {
+   "typ": "rechteck",
+   "name": "baum",
+   "x": 15,
+   "y": 18.53,
+   "breite": 0.23,
+   "hoehe": 0.68,
+   "fuellung": "#7F5A2E",
+   "linie": "#7F5A2E",
+   "linienbreite": 1,
+   "bezug": {
+    "liste": "aufwuchs",
+    "id": "p-birne"
+   }
+  },
+  {
+   "typ": "ellipse",
+   "name": "baum",
+   "x": 14.66,
+   "y": 17.96,
+   "breite": 0.76,
+   "hoehe": 0.76,
+   "fuellung": "#548235",
+   "linie": "#385723",
+   "linienbreite": 1
+  },
+  {
+   "typ": "ellipse",
+   "name": "baum",
+   "x": 15.34,
+   "y": 17.96,
+   "breite": 0.76,
+   "hoehe": 0.76,
+   "fuellung": "#548235",
+   "linie": "#385723",
+   "linienbreite": 1
+  },
+  {
+   "typ": "ellipse",
+   "name": "baum",
+   "x": 15,
+   "y": 17.58,
+   "breite": 0.98,
+   "hoehe": 0.98,
+   "fuellung": "#548235",
+   "linie": "#385723",
+   "linienbreite": 1
+  },
+  {
+   "typ": "text",
+   "name": "baum",
+   "x": 15,
+   "y": 19.25,
+   "inhalt": "Birne",
+   "groesse": 9,
+   "farbe": "#000000"
+  },
+  {
+   "typ": "ellipse",
+   "name": "hecke",
+   "x": 17.11,
+   "y": 7.95,
+   "breite": 0.9,
+   "hoehe": 0.9,
+   "fuellung": "#A9D18E",
+   "linie": "#548235",
+   "linienbreite": 1,
+   "bezug": {
+    "liste": "aufwuchs",
+    "id": "p-hecke"
+   }
+  },
+  {
+   "typ": "ellipse",
+   "name": "hecke",
+   "x": 17.29,
+   "y": 8.57,
+   "breite": 0.9,
+   "hoehe": 0.9,
+   "fuellung": "#A9D18E",
+   "linie": "#548235",
+   "linienbreite": 1
+  },
+  {
+   "typ": "ellipse",
+   "name": "hecke",
+   "x": 17.11,
+   "y": 9.2,
+   "breite": 0.9,
+   "hoehe": 0.9,
+   "fuellung": "#A9D18E",
+   "linie": "#548235",
+   "linienbreite": 1
+  },
+  {
+   "typ": "ellipse",
+   "name": "hecke",
+   "x": 17.29,
+   "y": 9.82,
+   "breite": 0.9,
+   "hoehe": 0.9,
+   "fuellung": "#A9D18E",
+   "linie": "#548235",
+   "linienbreite": 1
+  },
+  {
+   "typ": "ellipse",
+   "name": "hecke",
+   "x": 17.11,
+   "y": 10.44,
+   "breite": 0.9,
+   "hoehe": 0.9,
+   "fuellung": "#A9D18E",
+   "linie": "#548235",
+   "linienbreite": 1
+  },
+  {
+   "typ": "ellipse",
+   "name": "hecke",
+   "x": 17.29,
+   "y": 11.07,
+   "breite": 0.9,
+   "hoehe": 0.9,
+   "fuellung": "#A9D18E",
+   "linie": "#548235",
+   "linienbreite": 1
+  },
+  {
+   "typ": "ellipse",
+   "name": "hecke",
+   "x": 17.11,
+   "y": 11.69,
+   "breite": 0.9,
+   "hoehe": 0.9,
+   "fuellung": "#A9D18E",
+   "linie": "#548235",
+   "linienbreite": 1
+  },
+  {
+   "typ": "ellipse",
+   "name": "hecke",
+   "x": 17.29,
+   "y": 12.31,
+   "breite": 0.9,
+   "hoehe": 0.9,
+   "fuellung": "#A9D18E",
+   "linie": "#548235",
+   "linienbreite": 1
+  },
+  {
+   "typ": "ellipse",
+   "name": "hecke",
+   "x": 17.11,
+   "y": 12.93,
+   "breite": 0.9,
+   "hoehe": 0.9,
+   "fuellung": "#A9D18E",
+   "linie": "#548235",
+   "linienbreite": 1
+  },
+  {
+   "typ": "ellipse",
+   "name": "hecke",
+   "x": 17.29,
+   "y": 13.56,
+   "breite": 0.9,
+   "hoehe": 0.9,
+   "fuellung": "#A9D18E",
+   "linie": "#548235",
+   "linienbreite": 1
+  },
+  {
+   "typ": "ellipse",
+   "name": "hecke",
+   "x": 17.11,
+   "y": 14.18,
+   "breite": 0.9,
+   "hoehe": 0.9,
+   "fuellung": "#A9D18E",
+   "linie": "#548235",
+   "linienbreite": 1
+  },
+  {
+   "typ": "ellipse",
+   "name": "hecke",
+   "x": 17.29,
+   "y": 14.8,
+   "breite": 0.9,
+   "hoehe": 0.9,
+   "fuellung": "#A9D18E",
+   "linie": "#548235",
+   "linienbreite": 1
+  },
+  {
+   "typ": "ellipse",
+   "name": "hecke",
+   "x": 17.11,
+   "y": 15.43,
+   "breite": 0.9,
+   "hoehe": 0.9,
+   "fuellung": "#A9D18E",
+   "linie": "#548235",
+   "linienbreite": 1
+  },
+  {
+   "typ": "ellipse",
+   "name": "hecke",
+   "x": 17.29,
+   "y": 16.05,
+   "breite": 0.9,
+   "hoehe": 0.9,
+   "fuellung": "#A9D18E",
+   "linie": "#548235",
+   "linienbreite": 1
+  },
+  {
+   "typ": "text",
+   "name": "hecke",
+   "x": 18.67,
+   "y": 11.99,
+   "inhalt": "Liguster",
+   "groesse": 9,
+   "farbe": "#000000"
+  },
+  {
+   "typ": "rechteck",
+   "name": "kompost",
+   "x": 2,
+   "y": 22,
+   "breite": 1.6,
+   "hoehe": 1,
+   "fuellung": "#D9C3A5",
+   "linie": "#8B5A2B",
+   "linienbreite": 1
+  },
+  {
+   "typ": "linie",
+   "name": "kompost",
+   "von": {
+    "x": 1.6,
+    "y": 21.54
+   },
+   "nach": {
+    "x": 1.6,
+    "y": 22.46
+   },
+   "farbe": "#8B5A2B",
+   "linienbreite": 2.5
+  },
+  {
+   "typ": "linie",
+   "name": "kompost",
+   "von": {
+    "x": 2,
+    "y": 21.54
+   },
+   "nach": {
+    "x": 2,
+    "y": 22.46
+   },
+   "farbe": "#8B5A2B",
+   "linienbreite": 2.5
+  },
+  {
+   "typ": "linie",
+   "name": "kompost",
+   "von": {
+    "x": 2.4,
+    "y": 21.54
+   },
+   "nach": {
+    "x": 2.4,
+    "y": 22.46
+   },
+   "farbe": "#8B5A2B",
+   "linienbreite": 2.5
+  },
+  {
+   "typ": "text",
+   "name": "kompost",
+   "x": 2,
+   "y": 21.27,
+   "inhalt": "Kompost",
+   "groesse": 9,
+   "farbe": "#000000"
+  },
+  {
+   "typ": "vieleck",
+   "name": "entfernen",
+   "punkte": [
+    {
+     "x": 3,
+     "y": 11.33
+    },
+    {
+     "x": 3.1,
+     "y": 11.48
+    },
+    {
+     "x": 3.26,
+     "y": 11.38
+    },
+    {
+     "x": 3.29,
+     "y": 11.56
+    },
+    {
+     "x": 3.48,
+     "y": 11.52
+    },
+    {
+     "x": 3.44,
+     "y": 11.71
+    },
+    {
+     "x": 3.62,
+     "y": 11.74
+    },
+    {
+     "x": 3.52,
+     "y": 11.9
+    },
+    {
+     "x": 3.68,
+     "y": 12
+    },
+    {
+     "x": 3.52,
+     "y": 12.1
+    },
+    {
+     "x": 3.62,
+     "y": 12.26
+    },
+    {
+     "x": 3.44,
+     "y": 12.29
+    },
+    {
+     "x": 3.48,
+     "y": 12.48
+    },
+    {
+     "x": 3.29,
+     "y": 12.44
+    },
+    {
+     "x": 3.26,
+     "y": 12.62
+    },
+    {
+     "x": 3.1,
+     "y": 12.52
+    },
+    {
+     "x": 3,
+     "y": 12.68
+    },
+    {
+     "x": 2.9,
+     "y": 12.52
+    },
+    {
+     "x": 2.74,
+     "y": 12.62
+    },
+    {
+     "x": 2.71,
+     "y": 12.44
+    },
+    {
+     "x": 2.52,
+     "y": 12.48
+    },
+    {
+     "x": 2.56,
+     "y": 12.29
+    },
+    {
+     "x": 2.38,
+     "y": 12.26
+    },
+    {
+     "x": 2.48,
+     "y": 12.1
+    },
+    {
+     "x": 2.33,
+     "y": 12
+    },
+    {
+     "x": 2.48,
+     "y": 11.9
+    },
+    {
+     "x": 2.38,
+     "y": 11.74
+    },
+    {
+     "x": 2.56,
+     "y": 11.71
+    },
+    {
+     "x": 2.52,
+     "y": 11.52
+    },
+    {
+     "x": 2.71,
+     "y": 11.56
+    },
+    {
+     "x": 2.74,
+     "y": 11.38
+    },
+    {
+     "x": 2.9,
+     "y": 11.48
+    }
+   ],
+   "fuellung": "#70AD47",
+   "linie": "#548235",
+   "linienbreite": 1,
+   "bezug": {
+    "liste": "aufwuchs",
+    "id": "p-fichte"
+   }
+  },
+  {
+   "typ": "linie",
+   "name": "entfernen",
+   "von": {
+    "x": 2.6,
+    "y": 11.6
+   },
+   "nach": {
+    "x": 3.41,
+    "y": 12.41
+   },
+   "farbe": "#C00000",
+   "linienbreite": 2
+  },
+  {
+   "typ": "linie",
+   "name": "entfernen",
+   "von": {
+    "x": 3.41,
+    "y": 11.6
+   },
+   "nach": {
+    "x": 2.6,
+    "y": 12.41
+   },
+   "farbe": "#C00000",
+   "linienbreite": 2
+  },
+  {
+   "typ": "rechteck",
+   "name": "entfernen",
+   "x": 3,
+   "y": 10.63,
+   "breite": 4.81,
+   "hoehe": 0.67,
+   "fuellung": "#FFFFFF",
+   "linie": "#C00000",
+   "linienbreite": 1
+  },
+  {
+   "typ": "text",
+   "name": "entfernen",
+   "x": 3,
+   "y": 10.64,
+   "inhalt": "Blaufichte entfernen",
+   "groesse": 9,
+   "farbe": "#C00000"
+  },
+  {
+   "typ": "linie",
+   "name": "entfernen",
+   "von": {
+    "x": 3,
+    "y": 10.97
+   },
+   "nach": {
+    "x": 3,
+    "y": 11.33
+   },
+   "farbe": "#C00000",
+   "linienbreite": 1,
+   "pfeil": true
+  },
+  {
+   "typ": "rechteck",
+   "name": "mangelhinweis",
+   "x": 5,
+   "y": 19,
+   "breite": 4,
+   "hoehe": 0.9,
+   "fuellung": "#FFFFFF",
+   "linie": "#C00000",
+   "linienbreite": 1
+  },
+  {
+   "typ": "text",
+   "name": "mangelhinweis",
+   "x": 5,
+   "y": 18.99,
+   "inhalt": "Rückschnitt nötig",
+   "groesse": 9,
+   "farbe": "#C00000"
+  },
+  {
+   "typ": "linie",
+   "name": "mangelhinweis",
+   "von": {
+    "x": 5.45,
+    "y": 19.45
+   },
+   "nach": {
+    "x": 8,
+    "y": 22
+   },
+   "farbe": "#C00000",
+   "linienbreite": 1,
+   "pfeil": true
+  },
+  {
+   "typ": "linie",
+   "name": "Pfeil",
+   "von": {
+    "x": 12,
+    "y": 3
+   },
+   "nach": {
+    "x": 13.5,
+    "y": 4.5
+   },
+   "farbe": "#C00000",
+   "linienbreite": 1.5,
+   "pfeil": true
+  },
+  {
+   "typ": "massangabe",
+   "name": "Mass_Breite",
+   "von": {
+    "x": 1,
+    "y": 0.4
+   },
+   "nach": {
+    "x": 17,
+    "y": 0.4
+   },
+   "beschriftung": "16 m",
+   "farbe": "#C00000"
+  }
+ ]
 }

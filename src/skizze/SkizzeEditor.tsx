@@ -17,7 +17,7 @@ import { waehlbareElemente } from './grundlage.js'
 import { primsZuSvg, symbolPrims } from './symbole.js'
 import { STANDARD_GROESSE } from './szene.js'
 import { alleTreffer, elementKasten, elementVerschieben, naechsterTreffer, type Punkt } from './geometrie.js'
-import { FUELLFARBEN, LINIENARTEN, LINIENFARBEN, LINIE_STANDARD, STIL_VORGABEN, STRICH_MUSTER, gleicherStil } from './stile.js'
+import { FUELLFARBEN, LINIENARTEN, LINIENFARBEN, LINIE_STANDARD, STIL_VORGABEN, STRICH_MUSTER, gleicherStil, pxProPt } from './stile.js'
 import {
   GANZE_SKIZZE,
   ZOOM_MAX,
@@ -700,7 +700,9 @@ export function SkizzeEditor({ wert, onAenderung, vorschlag, onVorschlagEntschei
 
   const elementZuSvg = (el: SkizzeElement, istAusgewaehlt: boolean) => {
     const hlStil = istAusgewaehlt ? 'blue' : '#1a1a1a'
-    const hlBreite = istAusgewaehlt ? 2.5 : 1.5
+    // Eigene Linienstärke (pt des Blatts, Schnittstelle) statt der Standardstärke; ausgewählt ist immer mindestens 2,5
+    const eigen = 'linienbreite' in el && el.linienbreite ? el.linienbreite * pxProPt(breite) : undefined
+    const hlBreite = istAusgewaehlt ? Math.max(2.5, eigen ?? 0) : (eigen ?? 1.5)
 
     switch (el.typ) {
       case 'symbol': {
@@ -777,15 +779,27 @@ export function SkizzeEditor({ wert, onAenderung, vorschlag, onVorschlagEntschei
         const ys = el.punkte.map((q) => q.y)
         return (
           <g key={el.id} data-skizze-id={el.id} data-typ="vieleck">
-            <polygon
-              points={el.punkte.map((q) => `${q.x},${q.y}`).join(' ')}
-              fill={el.fuellung ?? 'none'}
-              stroke={istAusgewaehlt ? 'blue' : (el.linie ?? '#1a1a1a')}
-              strokeWidth={hlBreite}
-              strokeLinejoin="round"
-              strokeDasharray={el.linienart === 'gestrichelt' ? STRICH_MUSTER.join(' ') : undefined}
-              pointerEvents="all"
-            />
+            {el.offen ? (
+              <polyline
+                points={el.punkte.map((q) => `${q.x},${q.y}`).join(' ')}
+                fill="none"
+                stroke={istAusgewaehlt ? 'blue' : (el.linie ?? '#1a1a1a')}
+                strokeWidth={hlBreite}
+                strokeLinejoin="round"
+                strokeLinecap="round"
+                strokeDasharray={el.linienart === 'gestrichelt' ? STRICH_MUSTER.join(' ') : undefined}
+              />
+            ) : (
+              <polygon
+                points={el.punkte.map((q) => `${q.x},${q.y}`).join(' ')}
+                fill={el.fuellung ?? 'none'}
+                stroke={istAusgewaehlt ? 'blue' : (el.linie ?? '#1a1a1a')}
+                strokeWidth={hlBreite}
+                strokeLinejoin="round"
+                strokeDasharray={el.linienart === 'gestrichelt' ? STRICH_MUSTER.join(' ') : undefined}
+                pointerEvents="all"
+              />
+            )}
             {el.beschriftung && (
               <text x={(Math.min(...xs) + Math.max(...xs)) / 2} y={(Math.min(...ys) + Math.max(...ys)) / 2} textAnchor="middle" dominantBaseline="middle" fontSize={12} fill="#1a1a1a" pointerEvents="none">
                 {el.beschriftung}
@@ -864,7 +878,7 @@ export function SkizzeEditor({ wert, onAenderung, vorschlag, onVorschlagEntschei
             x={el.x}
             y={el.y}
             fontSize={el.schriftgroesse ?? 14}
-            fill={hlStil}
+            fill={istAusgewaehlt ? 'blue' : (el.farbe ?? '#1a1a1a')}
             dominantBaseline="hanging"
           >
             {el.inhalt}
@@ -1410,6 +1424,27 @@ function Linienwahl({ aktuell, onWaehlen }: { aktuell: Linienart | undefined; on
   )
 }
 
+export const LINIENBREITEN = [0.5, 1, 2, 3, 5] as const
+
+function Breitenwahl({ aktuell, onWaehlen }: { aktuell: number | undefined; onWaehlen: (b: number | undefined) => void }) {
+  return (
+    <div role="group" aria-label="Linienstärke" className="farbwahl">
+      {LINIENBREITEN.map((b) => (
+        <button
+          key={b}
+          type="button"
+          className="knopf knopf-klein"
+          aria-label={`Linienstärke: ${b} pt`}
+          aria-pressed={aktuell === b}
+          onClick={() => onWaehlen(aktuell === b ? undefined : b)}
+        >
+          {b.toLocaleString('de-DE')} pt
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export function AussehenPanel({ el, onAendern }: { el: AussehenElement; onAendern: (el: SkizzeElement) => void }) {
   const id = useId()
   if (el.typ === 'linie') {
@@ -1418,6 +1453,7 @@ export function AussehenPanel({ el, onAendern }: { el: AussehenElement; onAender
         <h2 className="h2">Aussehen der Linie</h2>
         <Farbwahl gruppe="Linienfarbe" farben={LINIENFARBEN} aktuell={el.farbe ?? LINIE_STANDARD} onWaehlen={(w) => onAendern(mitFeldern(el, { farbe: w && w !== LINIE_STANDARD ? w : undefined }))} />
         <Linienwahl aktuell={el.linienart} onWaehlen={(a) => onAendern(mitFeldern(el, { linienart: a }))} />
+        <Breitenwahl aktuell={el.linienbreite} onWaehlen={(b) => onAendern(mitFeldern(el, { linienbreite: b }))} />
         <button type="button" className="knopf knopf-klein" aria-label="Pfeilspitze am Ende" aria-pressed={el.pfeil === true} onClick={() => onAendern(mitFeldern(el, { pfeil: el.pfeil ? undefined : true }))}>
           Pfeilspitze am Ende
         </button>
@@ -1454,6 +1490,7 @@ export function AussehenPanel({ el, onAendern }: { el: AussehenElement; onAender
       <Farbwahl gruppe="Füllfarbe" farben={FUELLFARBEN} aktuell={el.fuellung} keine="keine Füllung" onWaehlen={(w) => onAendern(mitFeldern(el, { fuellung: w }))} />
       <Farbwahl gruppe="Linienfarbe" farben={LINIENFARBEN} aktuell={el.linie ?? LINIE_STANDARD} onWaehlen={(w) => onAendern(mitFeldern(el, { linie: w && w !== LINIE_STANDARD ? w : undefined }))} />
       <Linienwahl aktuell={el.linienart} onWaehlen={(a) => onAendern(mitFeldern(el, { linienart: a }))} />
+      <Breitenwahl aktuell={el.linienbreite} onWaehlen={(b) => onAendern(mitFeldern(el, { linienbreite: b }))} />
       <div className="feld">
         <label className="label" htmlFor={`${id}-text`}>
           Beschriftung

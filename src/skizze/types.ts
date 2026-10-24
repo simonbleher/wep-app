@@ -43,6 +43,13 @@ interface ElementBasis {
   ebene?: 'grundlage'
   /** Verweis auf eine Position (z. B. Baum ↔ Aufwuchs-Position); gesetzt vom Skizzen-Vorschlag der Schnittstelle. */
   bezug?: PositionsBezug
+  /** Sprechender Name („Stamm“, „Krone“, „Weg“) – wird zum Formnamen im Excel-Export. */
+  name?: string
+  /**
+   * Frei gezeichnet (Schnittstelle): besteht aus Grundformen, die in der Reihenfolge der Liste übereinanderliegen; der Export legt sie
+   * nicht um und weicht nicht aus. Fehlt das Feld, gilt das bisherige Verhalten.
+   */
+  frei?: boolean
 }
 
 /**
@@ -56,6 +63,8 @@ export interface SkizzeStil {
   linie?: string
   /** Fehlt = durchgezogen. */
   linienart?: Linienart
+  /** Linienstärke in pt des Excel-Blatts (0,25 bis 6); fehlt = bisherige Stärke. */
+  linienbreite?: number
 }
 
 /** Gefülltes Rechteck (z. B. Gebäude, Beet). */
@@ -78,6 +87,8 @@ export interface SkizzeLinie extends ElementBasis {
   farbe?: string
   linienart?: Linienart
   pfeil?: boolean
+  /** Linienstärke in pt des Excel-Blatts; fehlt = bisherige Stärke. */
+  linienbreite?: number
 }
 
 /** Kreis (im Lageplan: Baum-Symbol), optional mit Beschriftung; mit `radiusY` eine Ellipse (`radius` = waagerechter Halbmesser). */
@@ -96,6 +107,8 @@ export interface SkizzeVieleck extends ElementBasis, SkizzeStil {
   typ: 'vieleck'
   punkte: { x: number; y: number }[]
   beschriftung?: string
+  /** Offener Linienzug (Bogen, Zickzack) statt geschlossener Fläche: nie gefüllt. */
+  offen?: boolean
 }
 
 /** Freitext auf der Zeichenfläche. */
@@ -105,6 +118,8 @@ export interface SkizzeText extends ElementBasis {
   y: number
   inhalt: string
   schriftgroesse?: number // Pixel, Standard 14
+  /** Schriftfarbe `#RRGGBB`; fehlt = dunkelgrau. */
+  farbe?: string
 }
 
 /**

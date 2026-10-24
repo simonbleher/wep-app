@@ -210,3 +210,14 @@ describe('Auswahl bei kleinen und überlagerten Formen', () => {
     expect(elementFlaeche(pfosten)).toBe(100)
   })
 })
+
+describe('offener Linienzug (Bogen, Zickzack)', () => {
+  const zug: SkizzeElement = { id: 'z', typ: 'vieleck', offen: true, punkte: [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }] }
+  it('trifft die Linien, aber weder das Innere noch die fehlende Schlusskante', () => {
+    expect(trifftElement(zug, { x: 50, y: 2 }, 8)).toBe(true) // erste Kante
+    expect(trifftElement(zug, { x: 98, y: 50 }, 8)).toBe(true) // zweite Kante
+    expect(trifftElement(zug, { x: 60, y: 30 }, 8)).toBe(false) // Inneres des „Dreiecks“
+    expect(trifftElement(zug, { x: 50, y: 50 }, 8)).toBe(false) // Mitte der Schlusskante (0,0)–(100,100) gibt es nicht
+    expect(trifftElement({ ...zug, offen: false }, { x: 60, y: 30 }, 8)).toBe(true) // geschlossen trifft das Innere
+  })
+})

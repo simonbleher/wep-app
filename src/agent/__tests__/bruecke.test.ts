@@ -6,6 +6,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { baueSchnittstelle, installiereSchnittstelle, meldeSkizzenQuelle, vorschlagSpeicher } from '../bruecke'
 import { BEISPIEL_VORSCHLAG } from './beispiel'
+
+const N = BEISPIEL_VORSCHLAG.elemente.length
 import { testWep } from './testwep'
 
 type Fenster = { wep?: unknown }
@@ -28,7 +30,7 @@ describe('window.wep', () => {
     const api = fenster.wep as ReturnType<typeof baueSchnittstelle>
     expect(api.version).toBe('wep-schnittstelle/1')
     expect(Object.keys(api).sort()).toEqual(['lesen', 'positionen', 'schema', 'skizze', 'version'])
-    expect(Object.keys(api.skizze).sort()).toEqual(['status', 'vorschlagen'])
+    expect(Object.keys(api.skizze).sort()).toEqual(['baustein', 'status', 'vorschlagen'])
     expect(Object.keys(api.positionen).sort()).toEqual(['katalogSuchen', 'status', 'vorschlagen'])
     ab()
     expect(fenster.wep).toBeUndefined()
@@ -74,18 +76,18 @@ describe('skizze.vorschlagen() und skizze.status()', () => {
     const r = api.skizze.vorschlagen(BEISPIEL_VORSCHLAG)
     expect(r.ok).toBe(true)
     expect(r.fehler).toEqual([])
-    expect(r.anzahl).toBe(12)
-    expect(r.zusammenfassung).toMatch(/12 Elemente/)
+    expect(r.anzahl).toBe(N)
+    expect(r.zusammenfassung).toMatch(new RegExp(`${N} Elemente`))
     expect(Object.keys(r).sort()).toEqual(['anzahl', 'fehler', 'hinweise', 'ok', 'zusammenfassung'])
     expect(zeige).toHaveBeenCalledTimes(1)
-    expect(api.skizze.status()).toMatchObject({ offen: true, zustand: 'offen', nr: 1, anzahl: 12, modus: 'ergaenzen', entschiedenAm: null })
-    expect(vorschlagSpeicher.schaue().anzeige?.elemente).toHaveLength(12)
+    expect(api.skizze.status()).toMatchObject({ offen: true, zustand: 'offen', nr: 1, anzahl: N, modus: 'ergaenzen', entschiedenAm: null })
+    expect(vorschlagSpeicher.schaue().anzeige?.elemente).toHaveLength(N)
   })
 
   it('ungültiger Vorschlag: Fehler mit Pfad, nichts wird angezeigt, ein offener Vorschlag bleibt', () => {
     const zeige = vi.fn()
     const api = baueSchnittstelle({ holeWep: testWep, zeigeSkizze: zeige, zeigeListe: () => {} })
-    const r = api.skizze.vorschlagen({ format: 'wep-skizze/1', elemente: [{ typ: 'baum', y: 1 }] })
+    const r = api.skizze.vorschlagen({ format: 'wep-skizze/2', elemente: [{ typ: 'ellipse', y: 1, breite: 1, hoehe: 1 }] })
     expect(r.ok).toBe(false)
     expect(r.fehler[0].pfad).toBe('elemente[0].x')
     expect(zeige).not.toHaveBeenCalled()
@@ -98,7 +100,7 @@ describe('skizze.vorschlagen() und skizze.status()', () => {
   it('ein neuer Vorschlag ersetzt den offenen (laufende Nummer steigt)', () => {
     const api = baueSchnittstelle({ holeWep: testWep, zeigeSkizze: () => {}, zeigeListe: () => {} })
     api.skizze.vorschlagen(BEISPIEL_VORSCHLAG)
-    api.skizze.vorschlagen({ format: 'wep-skizze/1', modus: 'gruen-ersetzen', elemente: [{ typ: 'baum', x: 5, y: 5 }] })
+    api.skizze.vorschlagen({ format: 'wep-skizze/2', modus: 'gruen-ersetzen', elemente: [{ typ: 'ellipse', x: 5, y: 5, breite: 1, hoehe: 1 }] })
     expect(api.skizze.status()).toMatchObject({ offen: true, nr: 2, anzahl: 1, modus: 'gruen-ersetzen' })
   })
 
@@ -107,7 +109,7 @@ describe('skizze.vorschlagen() und skizze.status()', () => {
     api.skizze.vorschlagen(BEISPIEL_VORSCHLAG)
     vorschlagSpeicher.entscheide('uebernommen')
     const s = api.skizze.status()
-    expect(s).toMatchObject({ offen: false, zustand: 'uebernommen', nr: 1, anzahl: 12 })
+    expect(s).toMatchObject({ offen: false, zustand: 'uebernommen', nr: 1, anzahl: N })
     expect(s.entschiedenAm).toMatch(/^\d{4}-\d\d-\d\dT/)
     expect(vorschlagSpeicher.schaue().anzeige).toBeNull()
     api.skizze.vorschlagen(BEISPIEL_VORSCHLAG)

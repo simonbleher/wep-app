@@ -6,6 +6,8 @@ import { describe, expect, it } from 'vitest'
 import { AussehenPanel, SkizzeEditor } from '../../skizze/SkizzeEditor'
 import { pruefeVorschlag } from '../vorschlag'
 import { BEISPIEL_VORSCHLAG } from './beispiel'
+
+const N = BEISPIEL_VORSCHLAG.elemente.length
 import { testWep } from './testwep'
 
 const wep = testWep()
@@ -19,7 +21,7 @@ describe('Vorschlagsbalken', () => {
   it('zeigt „Vorschlag: N Elemente“ mit Übernehmen und Verwerfen als beschriftete Knöpfe in einer benannten Region', () => {
     const h = html(true)
     expect(h).toMatch(/<div role="region" aria-label="Vorschlag für die Skizze"[^>]*>/)
-    expect(h).toContain('Vorschlag: 12 Elemente')
+    expect(h).toContain(`Vorschlag: ${N} Elemente`)
     expect(h).toMatch(/aria-label="Vorschlag übernehmen"/)
     expect(h).toMatch(/aria-label="Vorschlag verwerfen"/)
     expect(h).toContain('role="status"')
@@ -27,7 +29,7 @@ describe('Vorschlagsbalken', () => {
 
   it('hebt die Formen des Vorschlags hervor (orange gestrichelter Rahmen je Element), ohne sie zur Skizze zu zählen', () => {
     const h = html(true)
-    expect(h.match(/skizze-vorschlag-rahmen/g)).toHaveLength(12)
+    expect(h.match(/skizze-vorschlag-rahmen/g)).toHaveLength(N)
     expect(h).toContain('data-testid="skizze-vorschlag-formen"')
     // die Zeichenfläche zählt nur gespeicherte Elemente (1 vorhandener Strauch)
     expect(h).toContain('aria-label="Zeichenfläche der Skizze, 1 Elemente"')
@@ -66,6 +68,7 @@ describe('Beschriftungen und Rollen', () => {
     expect(h).toContain('Beschriftung')
     // Vorgaben: Wiese erkennt man am Namen
     expect(h).toContain('>Wiese<')
+    expect(h).toContain('aria-label="Linienstärke: 2 pt"')
   })
 
   it('Aussehen-Auswahl für Linien: Farbe, Linienart, Pfeilspitze', () => {

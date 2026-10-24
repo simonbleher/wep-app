@@ -266,3 +266,13 @@
 - **Nichts sperren:** Regelverstöße (invasiv, Problempflanze, Preis über Höchstwert, doppelte Zeile, Faktor ohne Begründung) sind Hinweise im Ergebnis und im Balken, keine Fehler.
 - Code: `src/agent/positionen.ts`, `src/app/PositionenVorschlag.tsx`, Speicher in `bruecke.ts`; Schema `positionenVorschlag`, `positionenErgebnis`, `positionenStatus`, `katalogTreffer`. Keine Änderung an `android/`, Plugins oder `src-tauri/`.
 
+## 2026-10-24 · Skizzen-Vorschlag nur aus Grundformen (`wep-skizze/2`)
+
+- **Der Vorschlag kennt keine fertigen Symbole mehr.** Der Agent zeichnet – wie im Skill `parzellen-skizze` für Excel – alles aus Rechtecken, Ellipsen, Vielecken (Dreieck, Stern, Fläche), Bögen, Linien, Maßlinien und Text. Grund: volle Kontrolle (Füllung, Linienfarbe, -stärke, -art je Form), gleiche Arbeitsweise wie im Excel-Skill, keine versteckte Logik der App. Symbole (`typ: baum` …) sind im Vorschlag ein Fehler, der auf Grundformen und `baustein()` verweist. Das Format hat deshalb die Version 2 (Version 1 war ein Tag alt, im Einsatz nur im eigenen Testlauf; kein Zwischenstand nötig).
+- **Füllung und Linie unabhängig:** `fuellung` (Fläche) und `linie` (Rand; bei Linien/Maß/Text `farbe`) sind getrennt; neu `linienbreite` (pt des Excel-Blatts, 0,25–6), `linienart`, `name` (wird Formname im Excel), Text `farbe`/`groesse` (pt), Vieleck `offen` (Linienzug ohne Füllung) und der Primitiv-Typ `bogen` (Kreis-/Ellipsenbogen, intern ein offener Linienzug). Im Editor: Linienstärke im Dialog „Aussehen“.
+- **Frei gezeichnet (`frei: true`):** Alle Formen eines Vorschlags liegen im Excel auf einer Ebene in Listenreihenfolge (was später kommt, liegt oben), werden nicht verschoben oder verkleinert, Texte weichen nicht aus. Ohne das Feld bleibt alles wie bisher (Test: Zeichnungs-XML alter Skizzen byte-gleich).
+- **`window.wep.skizze.baustein(name, {x, y, …})`** liefert fertige Grundformen für Baum, Hecke, Weg, Tor, Kompost, Entfernen-Stern, Mängelhinweis … Sie entstehen aus denselben Zeichenbefehlen wie die Symbole des Nutzers (`symbolPrims`), sehen also gleich aus wie im Skill; Rechnerei (Kronenkreise, Heckenreihe, Stern, Viertelbogen) muss der Agent so nicht selbst machen.
+- **`bezug` nur am Hauptelement:** Ein Gegenstand besteht jetzt aus mehreren Formen; der Verweis auf die Position gehört an eine davon, sonst würde die Stückzahl überzählt (die App meldet es als Hinweis).
+- **Symbole des Nutzers** (Symbol-Werkzeug) bleiben unverändert; `lesen()` liefert sie als `typ: "symbol"` nur lesend, `gruen-ersetzen` ersetzt sie (mit Hinweis).
+- Bugfix nebenbei: Treffertest offener Linienzüge (keine Schlusskante, kein Inneres).
+

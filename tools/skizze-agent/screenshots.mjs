@@ -18,6 +18,7 @@ const GROESSEN = [
   ['tablet', { width: 1180, height: 820 }],
 ]
 const BEISPIEL = JSON.parse(readFileSync(`${ZIEL}/beispiel-vorschlag.json`, 'utf8'))
+const N = BEISPIEL.elemente.length // Grundformen des Beispiels
 
 function chromiumPfad() {
   const basis = process.env.PLAYWRIGHT_BROWSERS_PATH ?? '/opt/pw-browsers'
@@ -195,7 +196,7 @@ try {
 
     // 5. lesen()
     const gelesen = await seite.evaluate(() => window.wep.lesen())
-    pruefe(gelesen.schemaVersion === 'wep-schnittstelle/1' && gelesen.skizzeFormat === 'wep-skizze/1', 'lesen(): Versionen der Schnittstelle und des Skizzenformats')
+    pruefe(gelesen.schemaVersion === 'wep-schnittstelle/1' && gelesen.skizzeFormat === 'wep-skizze/2', 'lesen(): Versionen der Schnittstelle und des Skizzenformats')
     pruefe(gelesen.formalien.parzelle === 'Parzelle 77' && gelesen.rolle === 'beides', 'lesen(): Formalien und Rolle')
     pruefe(gelesen.parzelle.vorhanden && gelesen.parzelle.breiteM === 18 && gelesen.parzelle.hoeheM === 26 && gelesen.parzelle.vertragsflaecheM2 === 470, 'lesen(): Parzelle 18 × 26 m, Vertragsfläche 470 m²')
     pruefe(gelesen.parzelle.flaechenHinweis === null, 'lesen(): 468 m² gegen 470 m² Vertrag ist keine auffällige Abweichung')
@@ -207,56 +208,57 @@ try {
 
     // 6. Vorschlag: der Reiter „Skizze Grün“ wird geöffnet, die Formen sind hervorgehoben, nichts ist gespeichert
     const antwort = await vorschlag(BEISPIEL)
-    pruefe(antwort.ok === true && antwort.fehler.length === 0 && antwort.anzahl === 12, `vorschlagen(): ok, 12 Elemente – ${antwort.zusammenfassung.slice(0, 60)} …`)
+    pruefe(antwort.ok === true && antwort.fehler.length === 0 && antwort.anzahl === N, `vorschlagen(): ok, ${N} Grundformen – ${antwort.zusammenfassung.slice(0, 60)} …`)
     pruefe(antwort.hinweise.some((h) => /Götterbaum/.test(h)), 'vorschlagen(): Hinweis, dass der Götterbaum noch kein Element hat')
     await balken().waitFor()
     pruefe(await seite.getByRole('heading', { name: 'Skizze', exact: true }).isVisible(), 'Der Reiter „Skizze“ wurde für den Nutzer geöffnet')
-    pruefe(/Vorschlag: 12 Elemente/.test(await balken().innerText()), 'Balken: „Vorschlag: 12 Elemente“')
+    pruefe(new RegExp(`Vorschlag: ${N} Elemente`).test(await balken().innerText()), `Balken: „Vorschlag: ${N} Elemente“`)
     pruefe((await balken().getByRole('button', { name: 'Vorschlag übernehmen' }).count()) === 1 && (await balken().getByRole('button', { name: 'Vorschlag verwerfen' }).count()) === 1, 'Balken: Übernehmen und Verwerfen')
-    pruefe((await flaeche.locator('.skizze-vorschlag-rahmen').count()) === 12, 'Die 12 Formen des Vorschlags sind hervorgehoben (oranger gestrichelter Rahmen)')
-    pruefe((await status()).offen === true && (await status()).zustand === 'offen' && (await status()).anzahl === 12, 'status(): offen, 12 Elemente')
+    pruefe((await flaeche.locator('.skizze-vorschlag-rahmen').count()) === N, 'Alle Formen des Vorschlags sind hervorgehoben (oranger gestrichelter Rahmen)')
+    pruefe((await status()).offen === true && (await status()).zustand === 'offen' && (await status()).anzahl === N, 'status(): offen, alle Elemente')
     pruefe((await gruenGespeichert()).length === 0, 'Ohne Bestätigung ist nichts gespeichert')
     await zurFlaeche()
     await bild('1-vorschlag')
 
     // 7. Fehler: ein fehlerhafter Vorschlag verändert nichts und sagt, wo der Fehler liegt
-    const kaputt = await vorschlag({ format: 'wep-skizze/1', elemente: [{ typ: 'baum', x: 3, y: 4, bezug: { liste: 'aufwuchs', id: 'gibt-es-nicht' } }, { typ: 'palme', x: 1, y: 1 }] })
+    const kaputt = await vorschlag({ format: 'wep-skizze/2', elemente: [{ typ: 'ellipse', x: 3, y: 4, breite: 1, hoehe: 1, bezug: { liste: 'aufwuchs', id: 'gibt-es-nicht' } }, { typ: 'baum', x: 1, y: 1 }] })
     pruefe(kaputt.ok === false && kaputt.fehler.length === 2 && kaputt.fehler[0].pfad === 'elemente[0].bezug.id' && kaputt.fehler[1].pfad === 'elemente[1].typ', 'Fehler mit Pfad: elemente[0].bezug.id und elemente[1].typ')
-    pruefe((await status()).offen === true && (await status()).anzahl === 12 && /Vorschlag: 12 Elemente/.test(await balken().innerText()), 'Der offene Vorschlag bleibt trotz fehlerhaftem neuen Vorschlag')
+    pruefe((await status()).offen === true && (await status()).anzahl === N && new RegExp(`Vorschlag: ${N} Elemente`).test(await balken().innerText()), 'Der offene Vorschlag bleibt trotz fehlerhaftem neuen Vorschlag')
 
     // 8. Übernehmen
     await balken().getByRole('button', { name: 'Vorschlag übernehmen' }).click()
     await balken().waitFor({ state: 'detached' })
     pruefe((await status()).zustand === 'uebernommen' && (await status()).offen === false, 'status(): übernommen')
-    pruefe((await gruenAnzahl()) === 12, 'Die 12 Elemente sind Teil der Skizze')
+    pruefe((await gruenAnzahl()) === N, 'Die Elemente sind Teil der Skizze')
     const gesp = await gruenGespeichert()
-    pruefe(gesp.length === 12, 'Nach „Übernehmen“ sind 12 Elemente gespeichert')
-    const baeume = gesp.filter((e) => e.art === 'baum')
-    pruefe(baeume.map((b) => b.beschriftung).join() === 'Apfel,Apfel,Birne' && baeume[0].bezug.id === 'p-apfel', 'Bäume tragen Art und Verweis auf ihre Aufwuchs-Position (Apfel, Apfel, Birne)')
+    pruefe(gesp.length === N && gesp.every((e) => e.frei === true && e.typ !== 'symbol'), 'Nach „Übernehmen“ sind alle Grundformen gespeichert (keine Symbole)')
+    pruefe(gesp.filter((e) => e.bezug).map((e) => e.bezug.id).join() === 'p-apfel,p-apfel,p-birne,p-hecke,p-fichte', 'Je Gegenstand ein Verweis auf seine Aufwuchs-Position (Apfel, Apfel, Birne, Hecke, Fichte)')
+    const dreieck = gesp.find((e) => e.name === 'Dreieckbeet')
+    pruefe(dreieck.typ === 'vieleck' && dreieck.punkte.length === 3 && dreieck.fuellung === '#EBDDC7' && dreieck.linie === '#7030A0' && dreieck.linienbreite === 2, 'Dreieck mit eigener Füllung, Linienfarbe und Linienstärke gespeichert')
     const grundlageVorher = await grundlageGespeichert()
     pruefe(grundlageVorher.length > 100, 'Die Grundlage ist weiter gespeichert (Parzelle und Bauteile)')
     const nachher = await seite.evaluate(() => window.wep.lesen())
-    pruefe(nachher.skizzeGruen.elemente.length === 12 && nachher.skizzeGruen.elemente.some((e) => e.typ === 'vieleck' && e.fuellung === '#C5E0B4'), 'lesen() zeigt die übernommenen Elemente (Wiese als Füllung #C5E0B4)')
+    pruefe(nachher.skizzeGruen.elemente.length === N && nachher.skizzeGruen.elemente.some((e) => e.typ === 'vieleck' && e.fuellung === '#C5E0B4'), 'lesen() zeigt die übernommenen Elemente (Wiese als Füllung #C5E0B4)')
     await zurFlaeche()
     await bild('2-uebernommen')
 
     // 9. Rückgängig: ein Schritt nimmt den ganzen Vorschlag zurück; Wiederholen bringt ihn wieder
     await seite.getByRole('button', { name: 'Rückgängig', exact: true }).click()
-    pruefe((await gruenAnzahl()) === 0, 'Rückgängig: ein Schritt nimmt alle 12 Elemente zurück')
+    pruefe((await gruenAnzahl()) === 0, 'Rückgängig: ein Schritt nimmt alle Elemente zurück')
     pruefe((await gruenGespeichert()).length === 0, 'Rückgängig ist auch gespeichert')
     await seite.getByRole('button', { name: 'Wiederholen', exact: true }).click()
-    pruefe((await gruenAnzahl()) === 12, 'Wiederholen bringt sie zurück')
+    pruefe((await gruenAnzahl()) === N, 'Wiederholen bringt sie zurück')
     await seite.waitForTimeout(800)
 
     // 10. Verwerfen: nichts ändert sich
-    pruefe((await vorschlag({ format: 'wep-skizze/1', elemente: [{ typ: 'brunnen', x: 3, y: 17 }] })).ok, 'Zweiter Vorschlag: Brunnen')
+    pruefe((await vorschlag({ format: 'wep-skizze/2', elemente: [{ typ: 'ellipse', x: 3, y: 17, breite: 1, hoehe: 1, fuellung: '#DDEBF7', linie: '#2E75B6' }] })).ok, 'Zweiter Vorschlag: Brunnen aus einer Ellipse')
     await balken().waitFor()
     await balken().getByRole('button', { name: 'Vorschlag verwerfen' }).click()
     await balken().waitFor({ state: 'detached' })
-    pruefe((await status()).zustand === 'verworfen' && (await gruenAnzahl()) === 12 && (await gruenGespeichert()).length === 12, 'Verwerfen: status verworfen, Skizze und Speicher unverändert')
+    pruefe((await status()).zustand === 'verworfen' && (await gruenAnzahl()) === N && (await gruenGespeichert()).length === N, 'Verwerfen: status verworfen, Skizze und Speicher unverändert')
 
     // 11. Modus „gruen-ersetzen“: bisheriges Grün weg, Grundlage bleibt unangetastet; rückgängig machbar
-    pruefe((await vorschlag({ format: 'wep-skizze/1', modus: 'gruen-ersetzen', elemente: [{ typ: 'baum', x: 14, y: 6, bezug: { liste: 'aufwuchs', id: 'p-birne' } }] })).ok, 'Vorschlag im Modus „gruen-ersetzen“')
+    pruefe((await vorschlag({ format: 'wep-skizze/2', modus: 'gruen-ersetzen', elemente: [{ typ: 'ellipse', x: 14, y: 6, breite: 1.5, hoehe: 1.5, fuellung: '#548235', linie: '#385723', bezug: { liste: 'aufwuchs', id: 'p-birne' } }] })).ok, 'Vorschlag im Modus „gruen-ersetzen“')
     await balken().waitFor()
     pruefe(/ersetzt dein Grün/.test(await balken().innerText()), 'Balken weist darauf hin, dass das Grün ersetzt wird')
     await balken().getByRole('button', { name: 'Vorschlag übernehmen' }).click()
@@ -264,32 +266,32 @@ try {
     pruefe((await gruenAnzahl()) === 1 && (await gruenGespeichert()).length === 1, 'Ersetzen: nur das neue Element ist übrig')
     pruefe((await grundlageGespeichert()) === grundlageVorher, 'Die Grundlage ist byte-gleich geblieben (Ergänzen und Ersetzen)')
     await seite.getByRole('button', { name: 'Rückgängig', exact: true }).click()
-    pruefe((await gruenAnzahl()) === 12, 'Rückgängig stellt das ersetzte Grün wieder her')
+    pruefe((await gruenAnzahl()) === N, 'Rückgängig stellt das ersetzte Grün wieder her')
     await seite.waitForTimeout(800)
 
-    // 12. Aussehen: Füllung, Linie, Linienart an einer gewählten Form (für den Nutzer)
+    // 12. Aussehen: Füllung, Linienfarbe, Linienart und Linienstärke an einer gewählten Form (für den Nutzer) – hier der Weg
     await seite.getByRole('button', { name: 'Auswählen', exact: true }).click()
-    const wiese = flaeche.locator('g[data-typ="vieleck"] polygon').first()
-    const wk = await wiese.boundingBox()
+    const weg = flaeche.locator('g[data-typ="rechteck"] rect').first()
     await zurFlaeche()
-    const wk2 = await wiese.boundingBox()
-    void wk
-    await seite.mouse.click(wk2.x + wk2.width / 2, wk2.y + wk2.height * 0.2)
+    const wk = await weg.boundingBox()
+    await seite.mouse.click(wk.x + wk.width / 2, wk.y + wk.height * 0.8)
     await seite.getByRole('button', { name: 'Aussehen ändern' }).click()
-    await seite.getByRole('group', { name: 'Aussehen: Vieleck' }).waitFor()
-    pruefe(await seite.getByRole('button', { name: 'Füllfarbe: Wiese' }).getAttribute('aria-pressed') === 'true', 'Aussehen: gewählte Wiese zeigt „Füllfarbe: Wiese“')
+    await seite.getByRole('group', { name: 'Aussehen: Rechteck' }).waitFor()
+    pruefe(await seite.getByRole('button', { name: 'Füllfarbe: Weg' }).getAttribute('aria-pressed') === 'true', 'Aussehen: der Weg zeigt „Füllfarbe: Weg“')
     await seite.getByRole('button', { name: 'Füllfarbe: Wasser' }).click()
+    await seite.getByRole('button', { name: 'Linienfarbe: Hinweis rot' }).click()
     await seite.getByRole('button', { name: 'Linienart: gestrichelt' }).click()
-    pruefe((await wiese.getAttribute('fill')) === '#DDEBF7' && (await wiese.getAttribute('stroke-dasharray')) !== null, 'Aussehen: Füllung und Linienart wirken sofort in der Skizze')
+    await seite.getByRole('button', { name: 'Linienstärke: 3 pt' }).click()
+    pruefe((await weg.getAttribute('fill')) === '#DDEBF7' && (await weg.getAttribute('stroke-dasharray')) !== null, 'Aussehen: Füllung und Linienart wirken sofort in der Skizze')
+    const wegDaten = (await seite.evaluate(() => window.wep.lesen())).skizzeGruen.elemente.find((e) => e.name === 'Weg')
+    pruefe(wegDaten.fuellung === '#DDEBF7' && wegDaten.linie === '#C00000' && wegDaten.linienart === 'gestrichelt' && wegDaten.linienbreite === 3, 'lesen() zeigt Füllung, unabhängige Linienfarbe, Linienart und Linienstärke (3 pt) des Wegs')
     await seite.getByRole('button', { name: 'Füllfarbe: keine Füllung' }).click()
-    pruefe((await wiese.getAttribute('fill')) === 'none', 'Aussehen: „keine Füllung“')
-    await seite.getByRole('button', { name: 'Füllfarbe: Wiese' }).click()
-    await seite.getByRole('button', { name: 'Linienart: durchgezogen' }).click()
+    pruefe((await weg.getAttribute('fill')) === 'none', 'Aussehen: „keine Füllung“')
     await bild('3-aussehen')
     await seite.getByRole('button', { name: 'Fertig', exact: true }).click()
-    // Zurück auf den Stand nach dem Vorschlag: fünf Änderungen (Wasser, gestrichelt, keine, Wiese, durchgezogen) rückgängig
+    // Zurück auf den Stand nach dem Vorschlag: fünf Änderungen rückgängig
     for (let i = 0; i < 5; i++) await seite.getByRole('button', { name: 'Rückgängig', exact: true }).click()
-    pruefe((await wiese.getAttribute('fill')) === '#C5E0B4' && (await wiese.getAttribute('stroke-dasharray')) === null, 'Aussehen: Rückgängig stellt die Wiese wieder her')
+    pruefe((await weg.getAttribute('fill')) === '#EDE4D3' && (await weg.getAttribute('stroke-dasharray')) === null, 'Aussehen: Rückgängig stellt den Weg wieder her')
     await seite.waitForTimeout(800)
 
     // 12b. Positionen aus Text: Katalogsuche, Vorschlag (Liste wird gezeigt), Übernehmen, Rückgängig, Verwerfen
@@ -345,12 +347,13 @@ try {
     const zip = await JSZip.loadAsync(readFileSync(await download.path()))
     const xml = await zip.file('xl/drawings/drawing9.xml').async('string')
     const form = (name) => new RegExp(`<xdr:(sp|cxnSp)\\b(?:(?!</xdr:\\1>)[\\s\\S])*?name="${name}"[\\s\\S]*?</xdr:\\1>`).exec(xml)?.[0] ?? ''
-    pruefe(/val="C5E0B4"/.test(form('Vieleck_0')) && /custGeom/.test(form('Vieleck_0')), 'Excel: Wiese als Freiform mit Füllung C5E0B4')
+    pruefe(/<a:ln w="25400">/.test(form('Dreieckbeet_0')) && /val="7030A0"/.test(form('Dreieckbeet_0')) && /val="EBDDC7"/.test(form('Dreieckbeet_0')), 'Excel: Dreieck mit Füllung EBDDC7, Linie 7030A0 und 2 pt Stärke')
+    pruefe(/val="C5E0B4"/.test(form('Wiese_0')) && /custGeom/.test(form('Wiese_0')), 'Excel: Wiese als Freiform mit Füllung C5E0B4')
     pruefe(/tailEnd type="triangle"/.test(form('Pfeil_0')) && /val="C00000"/.test(form('Pfeil_0')), 'Excel: roter Pfeil mit Pfeilspitze')
-    pruefe(/tailEnd type="triangle"/.test(form('Rückschnitt_nötig_0_Pfeil')) || /Pfeil/.test(xml), 'Excel: Mängelhinweis mit Pfeil')
-    pruefe(/name="Maß_0_Text"/.test(xml) && />16 m</.test(xml), 'Excel: Maßlinie mit Text „16 m“')
-    pruefe(/name="Kompost_0"/.test(xml) && /name="Weg_0"/.test(xml) && /name="Tor_0"/.test(xml), 'Excel: Kompost, Weg und Tor sind da')
-    pruefe((xml.match(/name="Apfel_/g) ?? []).length >= 2, 'Excel: Bäume heißen nach der Position („Apfel_…“)')
+    pruefe(/tailEnd type="triangle"/.test(form('mangelhinweis_0')) || (xml.match(/tailEnd type="triangle"/g) ?? []).length >= 3, 'Excel: Mängelhinweis mit Pfeil')
+    pruefe(/name="Mass_Breite_0_Text"/.test(xml) && />16 m</.test(xml), 'Excel: Maßlinie mit Text „16 m“')
+    pruefe(/name="kompost_0"/.test(xml) && /name="Weg_0"/.test(xml) && /name="Tor_0"/.test(xml) && /name="Tor_Bogen_0"/.test(xml), 'Excel: Kompost, Weg und Tor (Linie + Viertelbogen) sind da')
+    pruefe((xml.match(/name="baum_/g) ?? []).length >= 12, 'Excel: Bäume bestehen aus Grundformen (Stamm und Kronenkreise, „baum_…“)')
     pruefe(/name="L" descr="wep-app"/.test(xml), 'Excel: Grundlage (Laube) unverändert dabei')
 
     pruefe(fremd.length === 0, `Keine Netzwerkzugriffe außer auf die App selbst (${fremd.length})`)

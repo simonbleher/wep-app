@@ -7,10 +7,9 @@ import { findeProblempflanze, istInvasiv } from '../katalog'
 import { wepRolle, type Position, type Wep } from '../model/types'
 import { flaecheUndVergleich, lageVon } from '../parzelle'
 import { flaecheVon, kuerzelVon } from '../skizze/grundriss'
-import { TYP_BESCHREIBUNG } from '../skizze/szene'
 import { FUELLFARBEN, LINIENARTEN, LINIENFARBEN, STIL_VORGABEN } from '../skizze/stile'
 import type { SkizzeDaten } from '../skizze/types'
-import { SYMBOL_ARTEN, istGrundlage } from '../skizze/types'
+import { istGrundlage } from '../skizze/types'
 import {
   BEZUGS_LISTEN,
   FORM_TYPEN,
@@ -26,7 +25,8 @@ import {
   type PositionInfo,
   type StilVorgabeInfo,
 } from './format'
-import { abbildungFuer, gruenZuFormat, pxZuM, r2, standardgroesseM } from './umrechnung'
+import { bausteinInfos } from './bausteine'
+import { abbildungFuer, gruenZuFormat, pxZuM, r2 } from './umrechnung'
 
 /** Kurzname einer Bezeichnung: „Apfel, Halbstamm, 5–30 J.“ → „Apfel“; „Liguster-Hecke (Laub)“ → „Liguster-Hecke“. */
 export function kurzname(bezeichnung: string): string {
@@ -59,16 +59,16 @@ function positionInfo(p: Position, nr: number): PositionInfo {
 }
 
 export function elementtypen(): ElementtypInfo[] {
-  const symbole = SYMBOL_ARTEN.map((art): ElementtypInfo => ({ typ: art, beschreibung: TYP_BESCHREIBUNG[art], standardgroesseM: standardgroesseM(art) }))
   const formen: Record<(typeof FORM_TYPEN)[number], string> = {
     rechteck: 'Rechteck, wahlweise gefüllt (Mittelpunkt x/y, breite, hoehe)',
     ellipse: 'Ellipse oder Kreis (Mittelpunkt x/y, breite = Durchmesser waagerecht, hoehe = senkrecht), wahlweise gefüllt',
-    vieleck: 'Geschlossenes Vieleck aus mindestens 3 Eckpunkten (punkte), wahlweise gefüllt',
+    vieleck: 'Vieleck aus mindestens 3 Eckpunkten (punkte; Dreieck = 3), wahlweise gefüllt; mit offen: true ein Linienzug aus mindestens 2 Punkten ohne Füllung',
+    bogen: 'Kreis- oder Ellipsenbogen (Mittelpunkt x/y, breite/hoehe = Durchmesser, startWinkel/endWinkel in Grad, 0° = rechts, im Uhrzeigersinn), nur Linie',
     linie: 'Linie von „von“ nach „nach“, wahlweise farbig, gestrichelt oder mit Pfeilspitze am Ende',
     massangabe: 'Maßlinie mit Endstrichen und Text (beschriftung, sonst die berechnete Länge)',
     text: 'Freier Text (inhalt) um den Mittelpunkt x/y',
   }
-  return [...symbole, ...FORM_TYPEN.map((typ): ElementtypInfo => ({ typ, beschreibung: formen[typ], standardgroesseM: null }))]
+  return [...FORM_TYPEN.map((typ): ElementtypInfo => ({ typ, beschreibung: formen[typ], standardgroesseM: null }))]
 }
 
 export function stileInfo(): LesenErgebnis['stile'] {
@@ -77,6 +77,7 @@ export function stileInfo(): LesenErgebnis['stile'] {
   )
   return {
     elementtypen: elementtypen(),
+    bausteine: bausteinInfos(),
     vorgaben,
     fuellfarben: FUELLFARBEN.map((f) => ({ ...f })),
     linienfarben: LINIENFARBEN.map((f) => ({ ...f })),

@@ -100,6 +100,8 @@ export interface FormStil {
   fuellung?: string
   linie?: string
   gestrichelt?: boolean
+  /** Linienstärke in pt. */
+  breite?: number
 }
 
 /**
@@ -149,6 +151,12 @@ export interface FormElement {
   stil?: FormStil
   /** linie: Pfeilspitze am Ende (`nach`). */
   pfeil?: boolean
+  /** vieleck: offener Linienzug (keine Fläche, nie gefüllt). */
+  offen?: boolean
+  /** text: Schriftfarbe `RRGGBB`. */
+  schriftFarbe?: string
+  /** Frei aus Grundformen gezeichnet (Schnittstelle): Reihenfolge der Liste zählt, kein Versetzen/Ausweichen. */
+  frei?: boolean
 }
 
 /** Wandelt SVG in PNG (Fallback für Excel-Versionen ohne SVG). Im Browser: `svgZuPngBrowser`. */
@@ -352,6 +360,8 @@ interface SpForm {
   quelle?: FormTyp
   /** Name des Elements (Meldungen) */
   ename?: string
+  /** Frei gezeichnet: wird nie verschoben oder verkleinert. */
+  frei?: boolean
   kasten: Kasten
   prst: string
   fuellung?: string
@@ -363,6 +373,8 @@ interface SpForm {
   textfeld?: boolean
   /** Text umbrechen (Standard: nein) */
   umbruch?: boolean
+  /** Freiform ist ein offener Linienzug (nicht geschlossen, ohne Füllung). */
+  pfadOffen?: boolean
   /** Freiform statt `prst`: Eckpunkte in EMU ab Blattecke (Grundriss mit schrägen Kanten, L-Form …). */
   pfad?: Punkt[]
   /** Textfläche der Freiform (EMU ab Blattecke); Standard: umgebendes Rechteck. */
@@ -381,6 +393,8 @@ interface CxnForm {
   quelle?: FormTyp
   /** Name des Elements (Meldungen) */
   ename?: string
+  /** Frei gezeichnet: wird nie verschoben oder verkleinert. */
+  frei?: boolean
   von: Punkt
   nach: Punkt
   linie: Linienstil
@@ -397,6 +411,8 @@ interface PicForm {
   quelle?: FormTyp
   /** Name des Elements (Meldungen) */
   ename?: string
+  /** Frei gezeichnet: wird nie verschoben oder verkleinert. */
+  frei?: boolean
   kasten: Kasten
   svg: string
 }
@@ -407,7 +423,7 @@ const linie = (farbe: string, pt = 1, gestrichelt = false): Linienstil => ({ far
 
 /** Linie einer Form: gewählte Farbe/Strichart, sonst Standard. */
 const linieMit = (stil: FormStil | undefined, standard: string, pt = 1, gestrichelt = false): Linienstil =>
-  linie(stil?.linie ?? standard, pt, stil?.gestrichelt ?? gestrichelt)
+  linie(stil?.linie ?? standard, stil?.breite ?? pt, stil?.gestrichelt ?? gestrichelt)
 
 // ---------------------------------------------------------------------------
 // SVG-Piktogramme
@@ -550,10 +566,10 @@ function formenFuer(el: FormElement, mitSvg: boolean): Form[] {
           ...(gefuellt ? { fuellung: el.stil!.fuellung } : {}),
           linie: linieMit(el.stil, FARBE.linieDunkel),
           // Mit Füllung steht die Beschriftung in der Fläche, sonst darunter
-          ...(gefuellt && text ? { text, schriftPt: pt, schriftFarbe: FARBE.schwarz } : {}),
+          ...((gefuellt || el.frei) && text ? { text, schriftPt: pt, schriftFarbe: FARBE.schwarz } : {}),
         },
       ]
-      if (!gefuellt && text) f.push(beschriftung(`${n}_Text`, text, mitte(k).x, k.y + k.h + 2 * PT, pt))
+      if (!gefuellt && !el.frei && text) f.push(beschriftung(`${n}_Text`, text, mitte(k).x, k.y + k.h + 2 * PT, pt))
       return f
     }
 
@@ -561,7 +577,7 @@ function formenFuer(el: FormElement, mitSvg: boolean): Form[] {
       const pts = el.punkte
       if (!pts || pts.length < 3) return []
       const box = umgebendes(pts)
-      const gefuellt = Boolean(el.stil?.fuellung)
+      const gefuellt = Boolean(el.stil?.fuellung) && !el.offen
       return [
         {
           art: 'sp',
@@ -570,9 +586,10 @@ function formenFuer(el: FormElement, mitSvg: boolean): Form[] {
           kasten: box,
           prst: 'rect',
           pfad: pts,
+          ...(el.offen ? { pfadOffen: true } : {}),
           ...(gefuellt ? { fuellung: el.stil!.fuellung } : {}),
           linie: linieMit(el.stil, FARBE.linieDunkel),
-          ...(text ? { text, schriftPt: pt, schriftFarbe: FARBE.schwarz, textKasten: textFlaeche(pts, box, text, pt) } : {}),
+          ...(text && !el.offen ? { text, schriftPt: pt, schriftFarbe: FARBE.schwarz, textKasten: textFlaeche(pts, box, text, pt) } : {}),
         },
       ]
     }
@@ -593,7 +610,7 @@ function formenFuer(el: FormElement, mitSvg: boolean): Form[] {
         : []
 
     case 'text':
-      return k && text ? [{ ...beschriftung(n, text, mitte(k).x, k.y, pt, k.w), kasten: k }] : []
+      return k && text ? [{ ...beschriftung(n, text, mitte(k).x, k.y, pt, k.w), kasten: k, ...(el.schriftFarbe ? { schriftFarbe: el.schriftFarbe } : {}) }] : []
 
     case 'massangabe': {
       if (!el.von || !el.nach) return []
@@ -1079,13 +1096,13 @@ export function ankerAuf(geo: BlattGeometrie, k: Kasten, inhalt: string): string
 }
 
 /** Freiform (custGeom) aus Eckpunkten; Pfadkoordinaten relativ zur Form `k`. Der Text sitzt über die Innenränder (`bodyPr`). */
-function freiform(pfad: Punkt[], k: Kasten): string {
+function freiform(pfad: Punkt[], k: Kasten, offen = false): string {
   const pt = (p: Punkt) => `<a:pt x="${Math.max(0, r(p.x - k.x))}" y="${Math.max(0, r(p.y - k.y))}"/>`
   return (
     '<a:custGeom><a:avLst/><a:gdLst/><a:ahLst/><a:cxnLst/><a:rect l="l" t="t" r="r" b="b"/>' +
     `<a:pathLst><a:path w="${k.w}" h="${k.h}"><a:moveTo>${pt(pfad[0])}</a:moveTo>` +
     pfad.slice(1).map((p) => `<a:lnTo>${pt(p)}</a:lnTo>`).join('') +
-    '<a:close/></a:path></a:pathLst></a:custGeom>'
+    `${offen ? '' : '<a:close/>'}</a:path></a:pathLst></a:custGeom>`
   )
 }
 
@@ -1121,7 +1138,7 @@ function spXml(f: SpForm, id: number, geo: BlattGeometrie): string {
     `<xdr:sp macro="" textlink=""><xdr:nvSpPr><xdr:cNvPr id="${id}" name="${esc(f.name)}" descr="${WEP_APP_MARKER}"/>` +
       `<xdr:cNvSpPr${f.textfeld ? ' txBox="1"' : ''}/></xdr:nvSpPr>` +
       `<xdr:spPr><a:xfrm><a:off x="${k.x}" y="${k.y}"/><a:ext cx="${k.w}" cy="${k.h}"/></a:xfrm>` +
-      `${f.pfad ? freiform(f.pfad, k) : `<a:prstGeom prst="${f.prst}"><a:avLst/></a:prstGeom>`}${fill}${lnXml(f.linie)}</xdr:spPr>${body}</xdr:sp>`,
+      `${f.pfad ? freiform(f.pfad, k, f.pfadOffen) : `<a:prstGeom prst="${f.prst}"><a:avLst/></a:prstGeom>`}${fill}${lnXml(f.linie)}</xdr:spPr>${body}</xdr:sp>`,
   )
 }
 
@@ -1170,10 +1187,12 @@ export function elementeZuFormen(elemente: FormElement[], mitSvg: boolean): Form
       ...f,
       // Linien der Grundlage (Bau-Skizze) liegen mit den Gebäuden unter dem Grün
       ...(e.grundlage && f.art === 'cxn' ? { ebene: Math.min(f.ebene, EBENE.gebaeude) } : {}),
+      // Frei gezeichnete Grundformen liegen alle auf einer Ebene: die Reihenfolge der Liste entscheidet, was oben liegt
+      ...(e.frei ? { ebene: EBENE.gruen, frei: true } : {}),
       elem: i,
       gruppe: e.gruppe ?? `#${i}`,
       // Gefüllte Flächen (Wiese, Weg …) sind kein bewegliches Kleinteil und weichen Beschriftungen nicht aus
-      quelle: e.stil?.fuellung && (e.typ === 'rechteck' || e.typ === 'kreis') ? 'vieleck' : e.typ,
+      quelle: e.frei || (e.stil?.fuellung && (e.typ === 'rechteck' || e.typ === 'kreis')) ? 'vieleck' : e.typ,
       ename: e.name,
     })),
   )
@@ -1204,8 +1223,9 @@ export function leinwandAbbildung(
 const ohneRaute = (f: string | undefined): string | undefined => (f ? f.replace(/^#/, '').toUpperCase() : undefined)
 
 /** Aussehen aus den Angaben eines Skizzenelements; `undefined`, wenn nichts gewählt wurde. */
-function formStil(fuellung?: string, linieFarbe?: string, gestrichelt?: boolean): FormStil | undefined {
+function formStil(fuellung?: string, linieFarbe?: string, gestrichelt?: boolean, breitePt?: number): FormStil | undefined {
   const st: FormStil = {
+    ...(breitePt ? { breite: breitePt } : {}),
     ...(fuellung ? { fuellung: ohneRaute(fuellung) } : {}),
     ...(linieFarbe ? { linie: ohneRaute(linieFarbe) } : {}),
     ...(gestrichelt ? { gestrichelt: true } : {}),
@@ -1242,7 +1262,9 @@ export function skizzeDatenZuFormen(daten: SkizzeDaten, bereich: Kasten, optione
   for (const e of daten.elemente) {
     // Die Grundlage entfällt, wenn das Blatt schon eine Bau-Skizze enthält (sie läge doppelt)
     if (e.ebene === 'grundlage' && optionen.grundlage === false) continue
-    const gl = e.ebene === 'grundlage' ? { grundlage: true } : {}
+    const gl = { ...(e.ebene === 'grundlage' ? { grundlage: true } : {}), ...(e.frei ? { frei: true } : {}) }
+    // Eigener Name (Schnittstelle: „Stamm“, „Krone“) wird zum Formnamen, sonst der Standardname
+    const eigenerName = (standard: string) => nummer(identOf(e.name ?? '') || standard)
     switch (e.typ) {
       case 'bauform': {
         const pts = e.punkte.map((q) => ({ x: X(q.x), y: Y(q.y) }))
@@ -1279,10 +1301,10 @@ export function skizzeDatenZuFormen(daten: SkizzeDaten, bereich: Kasten, optione
         break
       }
       case 'rechteck': {
-        const st = formStil(e.fuellung, e.linie, e.linienart === 'gestrichelt')
+        const st = formStil(e.fuellung, e.linie, e.linienart === 'gestrichelt', e.linienbreite)
         out.push({
           typ: 'rechteck',
-          name: nummer('Rechteck'),
+          name: eigenerName('Rechteck'),
           kasten: { x: X(e.x), y: Y(e.y), w: Math.round(e.breite * faktor), h: Math.round(e.hoehe * faktor) },
           ...(e.beschriftung ? { text: e.beschriftung } : {}),
           ...(st ? { stil: st } : {}),
@@ -1292,11 +1314,12 @@ export function skizzeDatenZuFormen(daten: SkizzeDaten, bereich: Kasten, optione
       }
       case 'vieleck': {
         const pts = e.punkte.map((q) => ({ x: X(q.x), y: Y(q.y) }))
-        if (pts.length < 3) break
-        const st = formStil(e.fuellung, e.linie, e.linienart === 'gestrichelt')
+        if (pts.length < (e.offen ? 2 : 3)) break
+        const st = formStil(e.offen ? undefined : e.fuellung, e.linie, e.linienart === 'gestrichelt', e.linienbreite)
         out.push({
           typ: 'vieleck',
-          name: nummer('Vieleck'),
+          name: eigenerName(e.offen ? 'Linienzug' : 'Vieleck'),
+          ...(e.offen ? { offen: true } : {}),
           punkte: pts,
           ...(e.beschriftung ? { text: e.beschriftung } : {}),
           ...(st ? { stil: st } : {}),
@@ -1305,10 +1328,10 @@ export function skizzeDatenZuFormen(daten: SkizzeDaten, bereich: Kasten, optione
         break
       }
       case 'linie': {
-        const st = formStil(undefined, e.farbe, e.linienart === 'gestrichelt')
+        const st = formStil(undefined, e.farbe, e.linienart === 'gestrichelt', e.linienbreite)
         out.push({
           typ: 'linie',
-          name: nummer(e.pfeil ? 'Pfeil' : 'Linie'),
+          name: eigenerName(e.pfeil ? 'Pfeil' : 'Linie'),
           von: { x: X(e.x1), y: Y(e.y1) },
           nach: { x: X(e.x2), y: Y(e.y2) },
           ...(e.pfeil ? { pfeil: true } : {}),
@@ -1319,10 +1342,10 @@ export function skizzeDatenZuFormen(daten: SkizzeDaten, bereich: Kasten, optione
       }
       case 'kreis': {
         const ry = e.radiusY ?? e.radius
-        const st = formStil(e.fuellung, e.linie, e.linienart === 'gestrichelt')
+        const st = formStil(e.fuellung, e.linie, e.linienart === 'gestrichelt', e.linienbreite)
         out.push({
           typ: 'kreis',
-          name: nummer(e.radiusY !== undefined ? 'Ellipse' : 'Kreis'),
+          name: eigenerName(e.radiusY !== undefined ? 'Ellipse' : 'Kreis'),
           kasten: { x: X(e.cx - e.radius), y: Y(e.cy - ry), w: Math.round(2 * e.radius * faktor), h: Math.round(2 * ry * faktor) },
           text: e.beschriftung,
           ...(st ? { stil: st } : {}),
@@ -1331,9 +1354,19 @@ export function skizzeDatenZuFormen(daten: SkizzeDaten, bereich: Kasten, optione
         break
       }
       case 'text': {
-        const pt = Math.min(14, Math.max(8, Math.round(((e.schriftgroesse ?? 14) * faktor) / PT)))
+        // Frei gezeichneter Text darf von 5 bis 28 pt groß sein, sonst gilt wie bisher 8 bis 14 pt
+        const roh = Math.round(((e.schriftgroesse ?? 14) * faktor) / PT)
+        const pt = e.frei ? Math.min(28, Math.max(5, roh)) : Math.min(14, Math.max(8, roh))
         const w = textBreite(e.inhalt, pt)
-        out.push({ typ: 'text', name: nummer('Text'), kasten: { x: X(e.x), y: Y(e.y), w, h: Math.round((pt + 6) * PT) }, text: e.inhalt, schriftPt: pt })
+        out.push({
+          typ: 'text',
+          name: eigenerName('Text'),
+          kasten: { x: X(e.x), y: Y(e.y), w, h: Math.round((pt + 6) * PT) },
+          text: e.inhalt,
+          schriftPt: pt,
+          ...(e.farbe ? { schriftFarbe: ohneRaute(e.farbe) } : {}),
+          ...gl,
+        })
         break
       }
       case 'massangabe': {
@@ -1344,12 +1377,13 @@ export function skizzeDatenZuFormen(daten: SkizzeDaten, bereich: Kasten, optione
             : {}
         out.push({
           typ: 'massangabe',
-          name: nummer('Maß'),
+          name: eigenerName('Maß'),
           von: { x: X(e.x1), y: Y(e.y1) },
           nach: { x: X(e.x2), y: Y(e.y2) },
           text: e.beschriftung,
           ...(e.farbe ? { stil: { linie: ohneRaute(e.farbe) } } : {}),
           ...seitenmass,
+          ...gl,
         })
         break
       }
@@ -1420,7 +1454,7 @@ export function weicheBeschriftungenAus(formen: Form[], fremd: Kasten[]): string
   // Gefüllte Flächen (Wiese, Vieleck …) tragen Beschriftungen und sind keine Hindernisse für sie
   const koerper = formen.filter((f) => !(f.art === 'sp' && f.textfeld) && f.ebene > EBENE.gras && f.art !== 'cxn' && f.quelle !== 'vieleck').map(kastenVon)
   for (const f of formen) {
-    if (f.art !== 'sp' || !f.textfeld) continue
+    if (f.art !== 'sp' || !f.textfeld || f.frei) continue // frei gezeichneter Text steht genau dort, wo er gezeichnet wurde
     const hindernisse = [...fremd, ...koerper, ...gesetzt]
     const frei = (k: Kasten) => k.x >= 0 && k.y >= 0 && !hindernisse.some((h) => ueberlappt(k, h))
     if (!frei(f.kasten)) {

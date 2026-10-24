@@ -72,6 +72,9 @@ export function normalisiereFarbe(f: unknown): string | undefined {
   return m ? `#${m[1].toUpperCase()}` : undefined
 }
 
+/** Skizzenpixel je pt des Excel-Blatts (Breite der Zeichenfläche : 452 pt) – Linienstärken und Schriftgrößen der Schnittstelle sind in pt. */
+export const pxProPt = (breite: number): number => breite / 452
+
 /** Strichmuster in Skizzenpixeln für gestrichelte Linien (Editor, PNG/PDF). */
 export const STRICH_MUSTER: [number, number] = [6, 4]
 
