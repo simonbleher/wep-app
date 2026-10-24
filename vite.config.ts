@@ -70,7 +70,14 @@ const BACKGROUND_COLOR = '#ffffff'
 
 // https://vite.dev/config/
 export default defineConfig({
-  define: { __APP_VERSION__: JSON.stringify(version) },
+  define: {
+    __APP_VERSION__: JSON.stringify(version),
+    // Wodurch sich zwei Freigaben unterscheiden: Commit (kurz) und Bauzeit – die Nummer in package.json bleibt gleich
+    __APP_BUILD__: JSON.stringify({
+      commit: (process.env.CF_PAGES_COMMIT_SHA || process.env.GITHUB_SHA || '').slice(0, 7),
+      gebautAm: new Date().toISOString(),
+    }),
+  },
   plugins: [
     react(),
     versionJson(),
