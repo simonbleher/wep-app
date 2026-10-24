@@ -812,6 +812,8 @@ try {
   // 11f2. Profil: eigene Positionen ändern und löschen
   await seite.getByRole('button', { name: 'Profil und Einstellungen' }).click()
   await seite.getByRole('heading', { name: 'Eigene Positionen' }).waitFor()
+  pruefe(!(await seite.getByText(/Aufwuchs · Stück · 40,00/).isVisible()), 'Profil: eigene Positionen sind zugeklappt')
+  await seite.locator('summary', { hasText: /^Aufwuchs \(\d+\)$/ }).click()
   pruefe(await seite.getByText(/Aufwuchs · Stück · 40,00/).isVisible(), 'Profil listet die gemerkte Position mit Abschnitt, Einheit und Preis')
   pruefe((await seite.getByText('Einmalpflanze').count()) === 0, 'Profil: nicht gemerkte Position fehlt')
   await seite.getByRole('button', { name: 'Zaubernuss ändern' }).click()
@@ -823,6 +825,7 @@ try {
   await seite.reload()
   await seite.getByRole('heading', { name: 'Protokolle' }).waitFor()
   await seite.getByRole('button', { name: 'Profil und Einstellungen' }).click()
+  await seite.locator('summary', { hasText: /^Aufwuchs \(\d+\)$/ }).click()
   pruefe(await seite.getByRole('button', { name: 'Zaubernuss, jung ändern' }).isVisible(), 'Eigene Positionen bleiben nach Neuladen erhalten')
   await seite.getByRole('button', { name: 'Zaubernuss, jung löschen' }).click()
   await seite.getByRole('alertdialog').getByRole('button', { name: 'Abbrechen' }).click()
@@ -921,7 +924,8 @@ try {
   pruefe((await seite.getByLabel('Parzelle', { exact: true }).inputValue()) === 'Parzelle 42', 'Neues WEP aus Bau-Excel: Parzelle aus der Datei')
   pruefe((await seite.getByLabel(/^Weg/).inputValue()) === 'Rosenweg', 'Neues WEP aus Bau-Excel: Weg aus der Datei')
   pruefe(await seite.getByText(/WEP Bau Testgarten\.xlsx/).first().isVisible(), 'Neues WEP aus Bau-Excel: Datei bleibt am WEP')
-  pruefe(await seite.getByText(/Angaben für die Formalien, die noch nicht abgeglichen sind/).isVisible(), 'Neues WEP aus Bau-Excel: Abweichung zum Profil wird zum Abgleich angeboten')
+  // Die Bau-Excel wird nach dem Öffnen gelesen: auf die Meldung warten statt sofort zu prüfen
+  pruefe(await seite.getByText(/Angaben für die Formalien, die noch nicht abgeglichen sind/).waitFor({ timeout: 10000 }).then(() => true, () => false), 'Neues WEP aus Bau-Excel: Abweichung zum Profil wird zum Abgleich angeboten')
 
   // Papierkorb nimmt die Bau-Excel mit; endgültig löschen entfernt sie von diesem Gerät
   pruefe((await idbLies('bauExcel')).length === 1 && (await idbLies('bauExcel'))[0].hatDatei === true, 'Bau-Excel: Datei liegt lokal (IndexedDB)')

@@ -21,6 +21,13 @@ const sortiert = (eintraege: EigenePosition[]) =>
     (a, b) => a.abschnitt.localeCompare(b.abschnitt) || a.bezeichnung.localeCompare(b.bezeichnung, 'de'),
   )
 
+/** Einträge je Abschnitt (in der sortierten Reihenfolge). */
+function gruppen(liste: EigenePosition[]): [EigenerAbschnitt, EigenePosition[]][] {
+  const m = new Map<EigenerAbschnitt, EigenePosition[]>()
+  for (const e of liste) m.set(e.abschnitt, [...(m.get(e.abschnitt) ?? []), e])
+  return [...m]
+}
+
 export function EigenePositionen({ id, konto }: { id: string; konto: boolean }) {
   const [liste, setListe] = useState(() => sortiert(lokaleEigene.lade().eintraege))
   const [aendern, setAendern] = useState<EigenePosition | null>(null)
@@ -36,35 +43,43 @@ export function EigenePositionen({ id, konto }: { id: string; konto: boolean }) 
           Noch keine. Beim Hinzufügen einer Freitext-Position kannst du sie als eigene Position merken.
         </p>
       ) : (
-        <ul className="liste">
-          {liste.map((e) => (
-            <li key={e.id} className="zeile">
-              <span className="zeile-text">
-                <span className="zeile-titel">{e.bezeichnung}</span>
-                <span className="neben">
-                  {ABSCHNITT_TITEL[e.abschnitt]} · {e.einheit}
-                  {e.einzelpreis !== undefined ? ` · ${euroFormat(e.einzelpreis)}` : ''}
-                </span>
-              </span>
-              <button
-                type="button"
-                className="symbolknopf"
-                aria-label={`${e.bezeichnung} ändern`}
-                onClick={() => setAendern(e)}
-              >
-                <Pencil {...ICON} />
-              </button>
-              <button
-                type="button"
-                className="symbolknopf"
-                aria-label={`${e.bezeichnung} löschen`}
-                onClick={() => setLoeschen(e)}
-              >
-                <Trash2 {...ICON} />
-              </button>
-            </li>
-          ))}
-        </ul>
+        // Je Abschnitt auf- und zuklappbar (zugeklappt), sonst wird die Liste bei vielen Einträgen zu lang
+        gruppen(liste).map(([abschnitt, eintraege]) => (
+          <details key={abschnitt} className="details eigene-gruppe">
+            <summary>
+              {ABSCHNITT_TITEL[abschnitt]} ({eintraege.length})
+            </summary>
+            <ul className="liste" aria-label={`Eigene Positionen ${ABSCHNITT_TITEL[abschnitt]}`}>
+              {eintraege.map((e) => (
+                <li key={e.id} className="zeile">
+                  <span className="zeile-text">
+                    <span className="zeile-titel">{e.bezeichnung}</span>
+                    <span className="neben">
+                      {ABSCHNITT_TITEL[e.abschnitt]} · {e.einheit}
+                      {e.einzelpreis !== undefined ? ` · ${euroFormat(e.einzelpreis)}` : ''}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    className="symbolknopf"
+                    aria-label={`${e.bezeichnung} ändern`}
+                    onClick={() => setAendern(e)}
+                  >
+                    <Pencil {...ICON} />
+                  </button>
+                  <button
+                    type="button"
+                    className="symbolknopf"
+                    aria-label={`${e.bezeichnung} löschen`}
+                    onClick={() => setLoeschen(e)}
+                  >
+                    <Trash2 {...ICON} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </details>
+        ))
       )}
       <p className="neben">
         {konto
