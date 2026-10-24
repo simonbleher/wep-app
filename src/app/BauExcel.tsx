@@ -3,7 +3,7 @@
 // hier nur Oberfläche und Zustand.
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { CloudDownload, FileSpreadsheet, RefreshCw, Trash2, Upload } from 'lucide-react'
-import type { BauExcel, Formalien, Wep } from '@/model'
+import { hatBauTeil, hatGruenTeil, wepRolle, type BauExcel, type Formalien, type Wep } from '@/model'
 import type { WepAendern } from '@/fotos'
 import {
   beiBauExcelAenderung,
@@ -11,7 +11,7 @@ import {
   entferneBauExcel,
   ladeBauExcelNach,
   leseHinterlegteFormalien,
-  leseHinterlegtesGruen,
+  leseHinterlegtenInhalt,
   setzeBauExcel,
 } from '@/bauexcel'
 import {
@@ -21,16 +21,9 @@ import {
   type FormalienAbgleich,
   type FormalienFeld,
 } from '@/bauexcel/abgleich'
-import {
-  fuelleLeereListen,
-  offeneZeilen,
-  pruefeGruen,
-  uebernimmGruen,
-  type GruenListe,
-  type GruenListenAbgleich,
-} from '@/bauexcel/gruenAbgleich'
+import { offeneZeilen, pruefeAlles, uebernimmAlles, type BauExcelInhalt, type Liste, type ListenAbgleich } from '@/bauexcel/uebernahme'
 import type { BauExcelRecord } from '@/bauexcel/types'
-import type { BauFormalien, BauGruen } from '@/export/bauExcelLesen'
+import type { BauFormalien } from '@/export/bauExcelLesen'
 import { parzelleAusBauExcel, setzeParzelle } from '@/parzelle'
 import { fotoNetzStatus, ladeBauExcelAusOneDrive, type FotoNetz } from '@/sync'
 import { Dialog, ICON, Meldung, Rueckfrage } from './ui'
@@ -45,8 +38,8 @@ export interface BauStand {
   record?: BauExcelRecord
   /** Ausgefüllte Formalien der hinterlegten Datei; undefined, solange sie nicht auf diesem Gerät liegt. */
   formalien?: BauFormalien
-  /** Außenanlagen, Aufwuchs und Beseitigung der hinterlegten Datei. */
-  gruen?: BauGruen
+  /** Bau- und Grün-Teil der hinterlegten Datei (alles außer den Formalien). */
+  inhalt?: BauExcelInhalt
 }
 
 /** Eintrag der Bau-Excel dieses Geräts und ihre gelesenen Formalien; lädt neu, sobald sich etwas ändert. */
@@ -68,13 +61,13 @@ export function useBauStand(wep: Wep | null): BauStand {
         formalien = undefined
       }
       setStand({ record, formalien })
-      // Positionen danach: die Formalien erscheinen so ohne Verzögerung
+      // Übriger Inhalt danach: die Formalien erscheinen so ohne Verzögerung
       if (!formalien) return
       try {
-        const gruen = await leseHinterlegtesGruen(wep)
-        setStand((alt) => (alt.record === record ? { ...alt, gruen } : alt))
+        const inhalt = await leseHinterlegtenInhalt(wep)
+        setStand((alt) => (alt.record === record ? { ...alt, inhalt } : alt))
       } catch {
-        // Zugabe: ohne lesbare Grün-Blätter gibt es nichts anzubieten
+        // Zugabe: ohne lesbaren Inhalt gibt es nichts anzubieten
       }
     })()
     // Nur bei anderer Datei/anderem WEP; nicht bei jeder Änderung an den Formalien
@@ -160,14 +153,14 @@ export interface BauExcelKarteProps {
   nachladen: BauNachladeStand
   /** Anzahl Angaben der Bau-Excel, die noch nicht abgeglichen sind (leere Felder und Unterschiede). */
   offeneAngaben: number
-  /** Zeilen der Bau-Excel (Außenanlagen, Aufwuchs, Beseitigung), die im WEP noch fehlen. */
-  offenePositionen?: number
+  /** Einträge der Bau-Excel (Baulichkeiten, Außenanlagen, Aufwuchs …), die im WEP noch fehlen. */
+  offeneEintraege?: number
   beschaeftigt?: boolean
   onWaehlen: () => void
   onAustauschen: () => void
   onEntfernen: () => void
   onAbgleichen: () => void
-  onPositionen?: () => void
+  onInhalt?: () => void
 }
 
 export function BauExcelKarte(p: BauExcelKarteProps) {
@@ -176,7 +169,7 @@ export function BauExcelKarte(p: BauExcelKarteProps) {
       <>
         <p className="neben">
           Falls der Bau-Wertermittler seine Excel-Datei schon ausgefüllt hat: hier wählen. Sie bleibt am WEP (auch auf deinen
-          anderen Geräten), die Formalien sowie schon eingetragene Außenanlagen, Aufwuchs und Beseitigungen werden daraus übernommen und der Export nimmt sie automatisch. Ohne Datei wird die
+          anderen Geräten), die Formalien werden daraus vorbefüllt und der Export nimmt sie automatisch. Ohne Datei wird die
           leere Vorlage verwendet.
         </p>
         <button type="button" className="knopf knopf-breit" disabled={p.beschaeftigt} onClick={p.onWaehlen}>
@@ -225,14 +218,14 @@ export function BauExcelKarte(p: BauExcelKarteProps) {
           </button>
         </Meldung>
       )}
-      {p.stand.gruen && (p.offenePositionen ?? 0) > 0 && p.onPositionen && (
+      {p.stand.inhalt && (p.offeneEintraege ?? 0) > 0 && p.onInhalt && (
         <Meldung>
           <p>
-            In der Bau-Excel stehen noch {p.offenePositionen} Zeile{p.offenePositionen === 1 ? '' : 'n'} bei Außenanlagen, Aufwuchs oder
-            Beseitigung, die im WEP fehlen.
+            Die Bau-Excel enthält {p.offeneEintraege} Eintr{p.offeneEintraege === 1 ? 'ag' : 'äge'} (Baulichkeiten, Mängel, Abwasser,
+            Außenanlagen, Aufwuchs, Beseitigung …), die im WEP noch fehlen.
           </p>
-          <button type="button" className="textknopf" onClick={p.onPositionen}>
-            Positionen übernehmen
+          <button type="button" className="textknopf" onClick={p.onInhalt}>
+            Inhalt übernehmen
           </button>
         </Meldung>
       )}
@@ -330,24 +323,27 @@ export function AbgleichDialog({
 }
 
 // ---------------------------------------------------------------------------
-// Positionen (Außenanlagen, Aufwuchs, Beseitigung) übernehmen
+// Bau-Teil (Baulichkeiten, Mängel, Beseitigung) übernehmen
 // ---------------------------------------------------------------------------
 
-export function PositionenUebernehmenDialog({
+export function InhaltUebernehmenDialog({
   abgleich,
   dateiName,
+  wirdBeides,
   onUebernehmen,
   onSpaeter,
 }: {
-  abgleich: readonly GruenListenAbgleich[]
+  abgleich: readonly ListenAbgleich[]
   dateiName: string
-  onUebernehmen: (listen: ReadonlySet<GruenListe>) => void
+  /** Das WEP hat bisher nur einen Teil (Grün oder Bau): mit der Übernahme bekommt es beide. */
+  wirdBeides: boolean
+  onUebernehmen: (listen: ReadonlySet<Liste>) => void
   onSpaeter: () => void
 }) {
   const mitNeuem = abgleich.filter((l) => l.neu.length > 0)
-  const [abgewaehlt, setAbgewaehlt] = useState<ReadonlySet<GruenListe>>(new Set())
+  const [abgewaehlt, setAbgewaehlt] = useState<ReadonlySet<Liste>>(new Set())
   const gewaehlt = new Set(mitNeuem.map((l) => l.liste).filter((l) => !abgewaehlt.has(l)))
-  const umschalten = (l: GruenListe) =>
+  const umschalten = (l: Liste) =>
     setAbgewaehlt((alt) => {
       const neu = new Set(alt)
       if (neu.has(l)) neu.delete(l)
@@ -355,19 +351,20 @@ export function PositionenUebernehmenDialog({
       return neu
     })
   return (
-    <Dialog titel="Positionen aus der Bau-Excel übernehmen" onSchliessen={onSpaeter}>
+    <Dialog titel="Inhalt der Bau-Excel übernehmen" onSchliessen={onSpaeter}>
       <p className="neben">
-        In der Bau-Excel „{dateiName}“ stehen Zeilen, die im WEP noch fehlen. Sie werden hinzugefügt; was im WEP schon steht, bleibt
-        unverändert. Preise stammen aus der Bau-Excel und lassen sich danach ändern.
+        In „{dateiName}“ stehen schon Angaben (Baulichkeiten, Mängel, Abwasser, Außenanlagen, Aufwuchs, Beseitigung …). Sie können ins
+        WEP übernommen werden, damit Excel und PDF alles enthalten. Was im WEP schon steht, bleibt unverändert.
+        {wirdBeides && ' Das WEP bekommt dazu die fehlenden Reiter (Bau bzw. Grün).'}
       </p>
-      <ul className="abgleich-liste" aria-label="Positionen der Bau-Excel">
+      <ul className="abgleich-liste" aria-label="Inhalt der Bau-Excel">
         {mitNeuem.map((l) => (
           <li key={l.liste} className="abgleich-feld">
             <label className="abgleich-wahl">
               <input type="checkbox" checked={gewaehlt.has(l.liste)} onChange={() => umschalten(l.liste)} />
               <span>
                 <strong>
-                  {l.name}: {l.neu.length} Zeile{l.neu.length === 1 ? '' : 'n'} hinzufügen
+                  {l.name}: {l.neu.length} Eintr{l.neu.length === 1 ? 'ag' : 'äge'} übernehmen
                 </strong>
                 {l.gleich > 0 && <span className="neben"> ({l.gleich} schon im WEP)</span>}
               </span>
@@ -375,7 +372,8 @@ export function PositionenUebernehmenDialog({
             <ul className="neben">
               {l.neu.map((z, i) => (
                 <li key={`${z.text}-${i}`}>
-                  {z.text} – {z.detail}
+                  {z.text}
+                  {z.detail ? ` – ${z.detail}` : ''}
                 </li>
               ))}
             </ul>
@@ -421,11 +419,21 @@ export function BauExcelBereich({
   const [fehler, setFehler] = useState<string>()
   const [info, setInfo] = useState<string>()
   const [dialog, setDialog] = useState<{ bau: BauFormalien; abgleich: FormalienAbgleich; name: string }>()
-  const [posDialog, setPosDialog] = useState<{ gruen: BauGruen; abgleich: GruenListenAbgleich[]; name: string }>()
+  const [bauDialog, setBauDialog] = useState<{ inhalt: BauExcelInhalt; abgleich: ListenAbgleich[]; name: string }>()
 
   const abgleich = stand.formalien ? pruefeFormalien(wep.formalien, stand.formalien) : undefined
   const offeneAngaben = abgleich ? abgleich.neu.length + abgleich.unterschiede.length : 0
-  const offenePositionen = stand.gruen ? offeneZeilen(pruefeGruen(wep, stand.gruen)) : 0
+  const offeneBau = stand.inhalt ? offeneZeilen(pruefeAlles(wep, stand.inhalt)) : 0
+
+  // Beim ersten Öffnen mit einer neuen Bau-Excel (auch „Neues WEP aus Bau-Excel“) einmal fragen, ob ihr Inhalt übernommen werden soll
+  const bauExcel = wep.bauExcel
+  useEffect(() => {
+    if (!bauExcel || bauExcel.bauTeilGefragt || !stand.inhalt || offeneBau === 0) return
+    setBauDialog({ inhalt: stand.inhalt, abgleich: pruefeAlles(leseWep() ?? wep, stand.inhalt), name: bauExcel.name })
+    void aendere((w) => (w.bauExcel ? { ...w, bauExcel: { ...w.bauExcel, bauTeilGefragt: true } } : w))
+    // Nur wenn der Inhalt der Datei geladen ist
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stand.inhalt, bauExcel?.version, bauExcel?.bauTeilGefragt])
 
   async function waehle(datei: File) {
     setFehler(undefined)
@@ -438,7 +446,6 @@ export function BauExcelBereich({
         return
       }
       await gleicheAb(erg.bau, datei.name, erg.ersetzt)
-      await uebernehmePositionen(erg.gruen, datei.name)
       await uebernehmeParzelleAusExcel(datei)
     } catch (e) {
       setFehler(e instanceof Error ? e.message : String(e))
@@ -481,45 +488,31 @@ export function BauExcelBereich({
     }
   }
 
-  /** Leere Listen (Außenanlagen, Aufwuchs, Beseitigung) füllen; bei vorhandenen Einträgen fragt der Dialog, was hinzukommt. */
-  async function uebernehmePositionen(gruen: BauGruen, name: string) {
-    const vorher = pruefeGruen(leseWep() ?? wep, gruen)
-    const leer = vorher.filter((l) => l.wepLeer && l.neu.length > 0)
-    if (leer.length) {
-      await aendere((w) => fuelleLeereListen(w, gruen))
-      const n = leer.reduce((s, l) => s + l.neu.length, 0)
-      setInfo((alt) => [alt, `${n} Zeile${n === 1 ? '' : 'n'} (${leer.map((l) => l.name).join(', ')}) aus der Bau-Excel übernommen.`].filter(Boolean).join(' '))
-    }
-    // Listen, die schon Einträge hatten: fehlende Zeilen nur auf Wunsch hinzufügen
-    const rest = pruefeGruen(leseWep() ?? wep, gruen).filter((l) => !leer.some((x) => x.liste === l.liste))
-    if (offeneZeilen(rest) > 0) setPosDialog({ gruen, abgleich: rest, name })
-  }
-
-  async function zeigePositionen() {
+  async function zeigeInhalt() {
     setFehler(undefined)
     setInfo(undefined)
     try {
       const aktuell = leseWep() ?? wep
-      const gruen = stand.gruen ?? (await leseHinterlegtesGruen(aktuell))
-      if (!gruen) {
+      const inhalt = stand.inhalt ?? (await leseHinterlegtenInhalt(aktuell))
+      if (!inhalt) {
         setFehler('Die Bau-Excel liegt noch nicht auf diesem Gerät.')
         return
       }
-      const ab = pruefeGruen(aktuell, gruen)
-      if (offeneZeilen(ab) === 0) setInfo('Alle Zeilen der Bau-Excel (Außenanlagen, Aufwuchs, Beseitigung) stehen schon im WEP.')
-      else setPosDialog({ gruen, abgleich: ab, name: aktuell.bauExcel?.name ?? 'Bau-Excel' })
+      const ab = pruefeAlles(aktuell, inhalt)
+      if (offeneZeilen(ab) === 0) setInfo('Der Inhalt der Bau-Excel steht schon im WEP.')
+      else setBauDialog({ inhalt, abgleich: ab, name: aktuell.bauExcel?.name ?? 'Bau-Excel' })
     } catch (e) {
       setFehler(e instanceof Error ? e.message : String(e))
     }
   }
 
-  async function uebernehmeGewaehlte(listen: ReadonlySet<GruenListe>) {
-    const d = posDialog
-    setPosDialog(undefined)
+  async function uebernehmeInhalt(listen: ReadonlySet<Liste>) {
+    const d = bauDialog
+    setBauDialog(undefined)
     if (!d) return
-    await aendere((w) => uebernimmGruen(w, d.gruen, listen))
+    await aendere((w) => uebernimmAlles(w, d.inhalt, listen))
     const n = d.abgleich.filter((l) => listen.has(l.liste)).reduce((s, l) => s + l.neu.length, 0)
-    setInfo(`${n} Zeile${n === 1 ? '' : 'n'} aus der Bau-Excel übernommen. Was im WEP schon stand, ist unverändert.`)
+    setInfo(`${n} Eintr${n === 1 ? 'ag' : 'äge'} aus der Bau-Excel übernommen. Was im WEP schon stand, ist unverändert.`)
   }
 
   async function vergleicheNochmal() {
@@ -594,13 +587,13 @@ export function BauExcelBereich({
         stand={stand}
         nachladen={nachladen}
         offeneAngaben={offeneAngaben}
-        offenePositionen={offenePositionen}
+        offeneEintraege={offeneBau}
         beschaeftigt={beschaeftigt}
         onWaehlen={oeffneAuswahl}
         onAustauschen={() => setFrage('austauschen')}
         onEntfernen={() => setFrage('entfernen')}
         onAbgleichen={() => void vergleicheNochmal()}
-        onPositionen={() => void zeigePositionen()}
+        onInhalt={() => void zeigeInhalt()}
       />
       {fehler && (
         <Meldung alarm>
@@ -631,12 +624,13 @@ export function BauExcelBereich({
           onBestaetigen={() => void entferne()}
         />
       )}
-      {posDialog && (
-        <PositionenUebernehmenDialog
-          abgleich={posDialog.abgleich}
-          dateiName={posDialog.name}
-          onUebernehmen={(l) => void uebernehmeGewaehlte(l)}
-          onSpaeter={() => setPosDialog(undefined)}
+      {bauDialog && (
+        <InhaltUebernehmenDialog
+          abgleich={bauDialog.abgleich}
+          dateiName={bauDialog.name}
+          wirdBeides={!(hatBauTeil(wepRolle(leseWep() ?? wep)) && hatGruenTeil(wepRolle(leseWep() ?? wep)))}
+          onUebernehmen={(l) => void uebernehmeInhalt(l)}
+          onSpaeter={() => setBauDialog(undefined)}
         />
       )}
       {dialog && (

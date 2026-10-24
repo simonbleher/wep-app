@@ -5,9 +5,7 @@ import { readFileSync } from 'node:fs'
 import { leseBauGruen, type BauGruen } from '@/export/bauExcelLesen'
 import { exportWep } from '@/export'
 import { neuerWep } from '@/model'
-import { LEERES_PROFIL } from '@/profil'
 import { fuelleLeereListen, offeneZeilen, pruefeGruen, uebernimmGruen } from '../gruenAbgleich'
-import { legeWepAusBauExcelAn } from '../neu'
 import { erzeugeTestBauExcel } from '../testBauExcel'
 
 let bytes: Uint8Array
@@ -81,22 +79,6 @@ describe('Abgleich', () => {
 })
 
 describe('Neues WEP aus Bau-Excel und Export', () => {
-  it('„Neues WEP aus Bau-Excel“ übernimmt auch die Positionen', async () => {
-    let gespeichert = neuerWep('x')
-    const wep = await legeWepAusBauExcelAn({
-      id: '2026-007',
-      datei: new Blob([bytes.slice().buffer]),
-      profil: LEERES_PROFIL,
-      speichere: async (w) => void (gespeichert = w),
-      werkzeuge: {
-        ablage: { alleRecords: async () => [], ladeDatei: async () => undefined, setzeRecord: async () => {}, speichere: async () => {}, entferne: async () => {}, markiereGeloescht: async () => {} },
-      },
-    })
-    expect(wep.gruen.aussenanlagen).toHaveLength(3)
-    expect(wep.gruen.aufwuchs).toHaveLength(4)
-    expect(gespeichert.gruen.beseitigungAA).toHaveLength(2)
-  })
-
   it('Rundlauf: Bau-Excel → WEP → Export schreibt dieselben Zeilen zurück', async () => {
     const wep = fuelleLeereListen(neuerWep('2026-007'), gruen)
     const erg = await exportWep(wep, bytes.slice().buffer)

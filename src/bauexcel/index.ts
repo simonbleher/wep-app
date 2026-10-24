@@ -12,7 +12,10 @@ import {
   setzeBauExcelRecord,
   speichereBauExcel,
 } from '@/app/db'
-import { leseBauFormalien, leseBauGruen, type BauFormalien, type BauGruen } from '@/export/bauExcelLesen'
+import { leseBauFormalien, leseBauGruen, type BauFormalien } from '@/export/bauExcelLesen'
+import type { BauGruen } from '@/export/bauExcelLesen'
+import { leseBauTeil, leererBauTeil } from '@/export/bauTeilLesen'
+import type { BauExcelInhalt } from './uebernahme'
 import type { Wep } from '@/model'
 import type { WepAendern } from '@/fotos'
 import { inhaltsKennung } from './kennung'
@@ -25,15 +28,6 @@ export const dbBauAblage: BauExcelSpeicher = {
   speichere: speichereBauExcel,
   entferne: entferneBauExcelLokal,
   markiereGeloescht: markiereBauExcelGeloescht,
-}
-
-/** Die Grün-Blätter sind eine Zugabe: ein unlesbares Blatt verhindert nicht das Hinterlegen der Bau-Excel. */
-export async function leseGruenOderLeer(bytes: Uint8Array | ArrayBuffer): Promise<BauGruen> {
-  try {
-    return await leseBauGruen(bytes)
-  } catch {
-    return { aussenanlagen: [], aufwuchs: [], beseitigungAA: [] }
-  }
 }
 
 export interface BauWerkzeuge {
@@ -56,8 +50,6 @@ export function meldeBauExcelAenderung(): void {
 export interface GewaehltErgebnis {
   /** Formalien, die in der Bau-Excel ausgefüllt sind. */
   bau: BauFormalien
-  /** Außenanlagen, Aufwuchs und Beseitigung der Bau-Excel (leer, wenn die Blätter nicht lesbar sind). */
-  gruen: BauGruen
   /** Dieselbe Datei war schon hinterlegt: nichts geändert. */
   unveraendert: boolean
   /** Es gab schon eine andere Bau-Excel (sie wurde ersetzt). */
@@ -90,19 +82,18 @@ export async function setzeBauExcel(opt: {
         : 'Diese Datei lässt sich nicht als Excel-Datei (.xlsx) lesen. Bitte die WEP-Datei des Bau-Wertermittlers wählen.',
     )
   }
-  const gruen = await leseGruenOderLeer(bytes)
   const version = await inhaltsKennung(bytes)
   const zeit = w.jetzt()
   if (opt.aktuell?.version === version) {
     // Dieselbe Datei: nichts ändern – außer sie liegt (noch) nicht auf diesem Gerät
     const rec = (await w.ablage.alleRecords()).find((r) => r.wepId === opt.wepId)
-    if (rec?.hatDatei && !rec.geloescht && rec.version === version) return { bau, gruen, unveraendert: true, ersetzt: false }
+    if (rec?.hatDatei && !rec.geloescht && rec.version === version) return { bau, unveraendert: true, ersetzt: false }
     await w.ablage.speichere(
       { wepId: opt.wepId, version, hatDatei: true, hochgeladen: false, erstelltAm: zeit },
       new Blob([bytes.slice().buffer], { type: XLSX_MIME }),
     )
     meldeBauExcelAenderung()
-    return { bau, gruen, unveraendert: true, ersetzt: false }
+    return { bau, unveraendert: true, ersetzt: false }
   }
   await w.ablage.speichere(
     { wepId: opt.wepId, version, hatDatei: true, hochgeladen: false, erstelltAm: zeit },
@@ -118,7 +109,7 @@ export async function setzeBauExcel(opt: {
     },
   }))
   meldeBauExcelAenderung()
-  return { bau, gruen, unveraendert: false, ersetzt: Boolean(opt.aktuell) }
+  return { bau, unveraendert: false, ersetzt: Boolean(opt.aktuell) }
 }
 
 /**
@@ -218,8 +209,15 @@ export async function leseHinterlegteFormalien(wep: Wep, werkzeuge?: Partial<Bau
   return bytes ? leseBauFormalien(bytes) : undefined
 }
 
-/** Außenanlagen, Aufwuchs und Beseitigung der hinterlegten Bau-Excel (undefined = Datei liegt nicht auf diesem Gerät). */
-export async function leseHinterlegtesGruen(wep: Wep, werkzeuge?: Partial<BauWerkzeuge>): Promise<BauGruen | undefined> {
+/** Bau- und Grün-Teil der Bau-Excel sind eine Zugabe: ein unlesbares Blatt verhindert nicht das Hinterlegen. */
+export async function leseInhaltOderLeer(bytes: Uint8Array | ArrayBuffer): Promise<BauExcelInhalt> {
+  const teil = await leseBauTeil(bytes).catch(() => leererBauTeil())
+  const gruen = await leseBauGruen(bytes).catch((): BauGruen => ({ aussenanlagen: [], aufwuchs: [], beseitigungAA: [] }))
+  return { teil, gruen }
+}
+
+/** Alles außer den Formalien aus der hinterlegten Bau-Excel (undefined = Datei liegt nicht auf diesem Gerät). */
+export async function leseHinterlegtenInhalt(wep: Wep, werkzeuge?: Partial<BauWerkzeuge>): Promise<BauExcelInhalt | undefined> {
   const bytes = await ladeLokaleBauExcel(wep, werkzeuge)
-  return bytes ? leseGruenOderLeer(bytes) : undefined
+  return bytes ? leseInhaltOderLeer(bytes) : undefined
 }

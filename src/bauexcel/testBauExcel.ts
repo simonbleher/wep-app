@@ -31,6 +31,8 @@ export interface TestBauExcelOptionen {
   skizzeBau?: boolean
   /** Erfundene Außenanlagen, Aufwuchs I/II und Beseitigung (Abschnitt 2) in die Blätter schreiben (`TEST_GRUEN`). */
   gruen?: boolean
+  /** Erfundene Baulichkeiten, Mängel, Baubeschreibung und Beseitigung (Bau) in die Blätter schreiben (`TEST_BAU`). */
+  bau?: boolean
   /** Zusätzliche Formen in „Skizze Bau“ (nur mit `skizzeBau`). */
   weitereFormen?: TestForm[]
 }
@@ -92,6 +94,26 @@ export const TEST_GRUEN: Record<string, Record<string, string | number>> = {
     B34: 'Blaufichte fällen', F34: 1, G34: 'Stück', H34: 120, J34: 1.2,
     B35: 'Wurzelstock roden', F35: 1, G35: 'Stück', H35: 60, J35: 1,
     F53: 'Fichte am Zaun, schwer erreichbar',
+  },
+}
+
+/** Erfundener Bau-Teil: Blatt-Pfad der Vorlage → Zelle → Wert (Laube L, Anbau A1, Schuppen S; A2 bleibt leer). */
+export const TEST_BAU: Record<string, Record<string, string | number>> = {
+  'xl/worksheets/sheet3.xml': {
+    G12: 'Doppelwand 8,01 - 10,00 cm', C13: 1982, D13: 'lt. Bauschein', I13: 10, A17: 19.43,
+    G21: 'Stein 24,00 - 35,99 cm', C22: 1983, E23: 13, A26: 3.73,
+    B47: 'S1+S2', G47: 'Doppelwand bis 4,00 cm', C48: 2000, D48: 'lt. Angabe', A52: 6.41,
+    B83: 'Laube L: Baujahr 1982', B84: 'Dach: Pultdach mit Bitumenschweißbahn',
+    F104: 3, G104: 100,
+    H7: 181.5, I7: 'für 2026',
+    D41: 160, G40: 5, I40: 8, F44: 9.5, // Gewächshaus
+    F71: 4, E66: 5, H66: 6, B67: 'hochwertig', // angebauter Laubenvorplatz
+    I73: 'GN 12/90', C74: 16, F74: 370, I75: 3, E78: 1999, C79: 1500, // Grube; der Kanal bleibt außen vor
+  },
+  'xl/worksheets/sheet4.xml': { F5: 8, F24: 5 },
+  'xl/worksheets/sheet17.xml': {
+    B14: 'Rückbau Schuppen S1', F14: 3.93, G14: 'm³', H14: 80, J14: 1,
+    B15: 'Rückbau Schuppen S2', F15: 2.08, G15: 'm³', H15: 50, J15: 1.2,
   },
 }
 
@@ -169,6 +191,13 @@ export async function erzeugeTestBauExcel(opt: TestBauExcelOptionen = {}): Promi
   zip.file('xl/sharedStrings.xml', geteilt)
   if (opt.gruen) {
     for (const [pfad, zellen] of Object.entries(TEST_GRUEN)) {
+      let xml = await zip.file(pfad)!.async('string')
+      for (const [zelle, wert] of Object.entries(zellen)) xml = setzeTestZelle(xml, zelle, wert)
+      zip.file(pfad, xml)
+    }
+  }
+  if (opt.bau) {
+    for (const [pfad, zellen] of Object.entries(TEST_BAU)) {
       let xml = await zip.file(pfad)!.async('string')
       for (const [zelle, wert] of Object.entries(zellen)) xml = setzeTestZelle(xml, zelle, wert)
       zip.file(pfad, xml)

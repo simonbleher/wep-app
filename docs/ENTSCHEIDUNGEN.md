@@ -276,9 +276,11 @@
 - **Symbole des Nutzers** (Symbol-Werkzeug) bleiben unverändert; `lesen()` liefert sie als `typ: "symbol"` nur lesend, `gruen-ersetzen` ersetzt sie (mit Hinweis).
 - Bugfix nebenbei: Treffertest offener Linienzüge (keine Schlusskante, kein Inneres).
 
-## 2026-10-24 · Bau-Excel: Grün-Zeilen ins WEP übernehmen
+## 2026-10-24 · Bau-Excel: gesamten Inhalt ins WEP übernehmen
 
-- **Entscheidung:** Außenanlagen (Blatt „Außenanlagen“, Zeilen 15–45), Aufwuchs (I ab Zeile 18, II ab Zeile 10) und Beseitigungskosten Abschnitt 2 (Zeilen 34–44, Begründung F53) werden beim Hinterlegen der Bau-Excel gelesen. Leere Listen im WEP werden sofort gefüllt; bei vorhandenen Einträgen entscheidet der Nutzer je Liste im Dialog.
-- **Grund:** Der Export schreibt die Grün-Blätter aus dem WEP und leert die übrigen Zeilen. Eine Bau-Excel mit ausgefüllten Grün-Zeilen verlor sie sonst beim Export, ohne dass die App sie je angezeigt hatte.
-- **Nichts doppelt, nichts überschrieben:** Gleich = gleiche Bezeichnung (normalisiert), Menge und Einheit; mehrfach vorkommende gleiche Zeilen werden eins zu eins gezählt. Preise aus der Bau-Excel gelten als manuell (`preisManuell`), einen fehlenden Preis nimmt die App als 0 €. Keine Katalogzuordnung (Freitext), damit nichts geraten wird.
-- **Nicht übernommen:** Baulichkeiten, Mängelliste und Beseitigung Abschnitt 1 – sie gehören zum Bau-Teil, der im Export aus der Bau-Excel erhalten bleibt, solange das WEP keine Bau-Daten hat.
+- **Entscheidung:** Aus der Bau-Excel liest die App neben Formalien und „Skizze Bau“ alles Ausgefüllte: Bau-Teil (Baulichkeiten, Mängelliste, Baubeschreibung, Gewächshaus, Laubenvorplatz, Abwasser, Beseitigung Abschnitt 1, „Laube nicht beräumt“, Baupreisindex) und Grün-Teil (Außenanlagen, Aufwuchs I/II, Beseitigung Abschnitt 2). Nach Rückfrage, je Gruppe wählbar. Der Grün-Import aus der ersten Fassung (PR 78) bleibt, der kurze Zwischenstand „nur Bau“ ist damit überholt.
+- **Grund:** Einfachste Regel für die Nutzer: Was in der Bau-Excel steht, steht danach im WEP – egal ob Bau oder Grün, egal welche Rolle. Excel und PDF enthalten dann alles.
+- **Nichts doppelt, nichts überschrieben:** Gleich = gleiche Bezeichnung/Kürzel (normalisiert), Menge und Einheit; Mehrfachzeilen werden eins zu eins gezählt. Preise aus der Bau-Excel gelten als manuell; ein fehlender Preis ist 0 €. Grün-Zeilen sind Freitext (keine geratene Katalogzuordnung).
+- **Rolle:** Fehlt dem WEP der Teil (reines Grün-WEP bekommt Bau-Daten oder umgekehrt), wird es zum WEP „beides“.
+- **Beispielwerte der Vorlage zählen nicht als ausgefüllt:** Typ „fehlt“, 5 m³ × 50 € (nicht beräumt), Fäkalien-Zeile im Wortlaut der Vorlage, „Nicht fertiggestellt“ 0,05 in der Mängelliste, Index 179,2 „für 2025“, Menge 1/Faktor 1 in den Grün-Beseitigungszeilen.
+- **Mängel:** Maßgeblich ist der Gesamtabzug der Bau-Excel. Passen die Gruppen der Mängelliste nicht zu ihm (Laube) oder fehlen sie (Anbau, Schuppen), steht er als ein eigener Posten im WEP. Ein Baujahr außerhalb 1800–2100 (Tippfehler) und ein nicht lesbares Genehmigungsdatum werden nicht übernommen. Alter (Grube, Gewächshaus, Vorplatz) wird mit dem Jahr aus „für JJJJ“ (I7) in ein Baujahr zurückgerechnet.

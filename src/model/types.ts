@@ -96,6 +96,8 @@ export interface BauExcel {
   hinzugefuegtAm: string
   /** Die Formalien wurden mit dieser Fassung abgeglichen (übernommen oder bewusst behalten). */
   abgeglichen?: boolean
+  /** Der Bau-Teil (Baulichkeiten, Mängel, Beseitigung) dieser Fassung wurde dem Nutzer schon zur Übernahme angeboten. */
+  bauTeilGefragt?: boolean
 }
 
 /** Angaben zu einem Foto am WEP. */

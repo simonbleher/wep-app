@@ -77,7 +77,7 @@ export function zellenWert(blattXml: string, zelle: string, geteilt: string[]): 
 }
 
 /** „20.10.2026“ oder „2026-10-20“ → ISO; sonst null. */
-function datumAlsIso(text: string): string | null {
+export function datumAlsIso(text: string): string | null {
   const t = text.trim()
   const de = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(t)
   if (de) return `${de[3]}-${de[2].padStart(2, '0')}-${de[1].padStart(2, '0')}`
