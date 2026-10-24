@@ -37,6 +37,22 @@ function chromiumPfad() {
 }
 
 /** Wartet (bis 5 s), bis die Liste genau n Einträge hat – sie lädt asynchron aus IndexedDB. */
+/** Kleingartenanlage ist eine Auswahl (Liste des Bezirksverbands) mit „Andere …“ für eine eigene Eingabe. */
+async function waehleKga(seite, bezeichnung, text) {
+  const sel = seite.getByLabel(bezeichnung).first()
+  const optionen = await sel.locator('option').allTextContents()
+  if (optionen.includes(text)) await sel.selectOption({ label: text })
+  else {
+    await sel.selectOption({ label: 'Andere …' })
+    await seite.getByLabel('Name der Kleingartenanlage').first().fill(text)
+  }
+}
+async function leseKga(seite, bezeichnung) {
+  const sel = seite.getByLabel(bezeichnung).first()
+  const wert = await sel.inputValue()
+  return wert === '__andere__' ? await seite.getByLabel('Name der Kleingartenanlage').first().inputValue() : wert
+}
+
 async function anzahlEintraege(ort, n) {
   for (let i = 0; i < 50; i++) {
     if ((await ort.getByRole('listitem').count()) === n) return true
@@ -89,7 +105,7 @@ try {
   await seite.getByRole('button', { name: 'Profil und Einstellungen' }).click()
   await seite.getByRole('heading', { name: 'Profil und Einstellungen' }).waitFor()
   await seite.getByLabel(/^Name/).fill('Erika Musterfrau')
-  await seite.getByLabel(/Standard-Kleingartenanlage/).fill('KGA Musterwiese')
+  await waehleKga(seite, /Standard-Kleingartenanlage/, 'KGA Musterwiese')
   await seite.getByLabel('Rolle').selectOption('gruen')
   pruefe(await seite.getByLabel('Upload nur über WLAN').isChecked(), 'Upload nur über WLAN ist standardmäßig an')
   pruefe(await seite.getByText(/Gilt für Fotos und den Hintergrund-Upload der Android-App/).isVisible(), 'Hinweis zu „nur WLAN“ nennt Fotos und die Android-App')
@@ -101,7 +117,7 @@ try {
   // 5. WEP anlegen: Name und Anlage aus dem Profil sind vorbelegt
   await seite.getByRole('button', { name: 'Neues WEP', exact: true }).click()
   await seite.getByLabel(/Kleingartenanlage/).first().waitFor()
-  pruefe((await seite.getByLabel(/Kleingartenanlage/).first().inputValue()) === 'KGA Musterwiese', 'Anlage aus dem Profil vorbelegt')
+  pruefe((await leseKga(seite, /Kleingartenanlage/)) === 'KGA Musterwiese', 'Anlage aus dem Profil vorbelegt')
   pruefe((await seite.locator('input[value="Erika Musterfrau"]').count()) > 0, 'Wertermittler aus dem Profil vorbelegt')
 
   // 6. Aufwuchs: Position über die Suche hinzufügen – die Variante steht direkt im Treffer
@@ -267,7 +283,7 @@ try {
   await abgleichDialog.getByRole('button', { name: 'Übernehmen' }).click()
   await seite.getByText(/1 Feld aus der Bau-Excel übernommen/).waitFor()
   pruefe((await seite.getByLabel('Parzellenfläche (m²)').inputValue()) === '380', 'Bau-Excel: gewählte Fläche übernommen (350 → 380)')
-  pruefe((await seite.getByLabel(/Kleingartenanlage/).first().inputValue()) === 'KGA Musterwiese', 'Bau-Excel: nicht gewähltes Feld bleibt im WEP')
+  pruefe((await leseKga(seite, /Kleingartenanlage/)) === 'KGA Musterwiese', 'Bau-Excel: nicht gewähltes Feld bleibt im WEP')
   pruefe((await seite.getByLabel(/^Weg/).inputValue()) === 'Rosenweg', 'Bau-Excel: leeres Feld „Weg“ wurde aus der Bau-Excel ergänzt')
   pruefe(await seite.getByText(/WEP Bau Testgarten\.xlsx/).first().isVisible(), 'Bau-Excel: Name und Stand am WEP sichtbar')
   // Neustart: die Bau-Excel bleibt am WEP
@@ -949,7 +965,7 @@ try {
   async function neuesWep6(anlage, parzelle, paechter) {
     await seite.getByRole('button', { name: 'Neues WEP', exact: true }).click()
     await seite.getByLabel(/Kleingartenanlage/).first().waitFor()
-    await seite.getByLabel(/Kleingartenanlage/).first().fill(anlage)
+    await waehleKga(seite, /Kleingartenanlage/, anlage)
     await seite.getByLabel('Parzelle', { exact: true }).fill(parzelle)
     await seite.getByLabel('Unterpächter', { exact: true }).fill(paechter)
     await seite.waitForTimeout(700) // Speichern ist entprellt, beim Verlassen sofort

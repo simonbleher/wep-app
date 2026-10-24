@@ -47,6 +47,7 @@ import { installiereSchnittstelle } from '@/agent/bruecke'
 import { PositionenVorschlag } from './PositionenVorschlag'
 import { SkizzeBauTab } from './SkizzeBauTab'
 import { FELD_NAMEN } from '@/bauexcel/abgleich'
+import { KgaAuswahl } from './KgaAuswahl'
 import { BauExcelBereich, useBauNachladen, useBauStand, type BauNachladeStand, type BauStand } from './BauExcel'
 import { ladeExportQuelle } from './exportQuelle'
 import { PdfBereich } from './PdfExport'
@@ -776,7 +777,7 @@ function FormalienTab({
           Anlage und Parzelle
         </h2>
         <div className="formular">
-          <Eingabe label="Kleingartenanlage" wert={f.kleingartenanlage} onChange={(v) => setFeld('kleingartenanlage', v)} />
+          <KgaAuswahl label="Kleingartenanlage" wert={f.kleingartenanlage} onChange={(v) => setFeld('kleingartenanlage', v)} />
           <div className="feld-reihe">
             <Eingabe label="Parzelle" wert={f.parzelle} onChange={(v) => setFeld('parzelle', v)} />
             <Eingabe label="Weg (optional)" wert={f.weg ?? ''} onChange={(v) => setFeld('weg', v)} />
