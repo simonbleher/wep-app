@@ -120,6 +120,11 @@ export interface SkizzeText extends ElementBasis {
   schriftgroesse?: number // Pixel, Standard 14
   /** Schriftfarbe `#RRGGBB`; fehlt = dunkelgrau. */
   farbe?: string
+  /**
+   * Drehung in Grad im Uhrzeigersinn um die Mitte des Textes (aus der Bau-Excel: z. B. 270 = senkrecht, von unten nach
+   * oben lesbar); fehlt = waagerecht.
+   */
+  drehung?: number
 }
 
 /**

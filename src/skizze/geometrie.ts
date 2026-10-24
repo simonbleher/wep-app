@@ -102,9 +102,14 @@ export function trifftElement(element: SkizzeElement, p: Punkt, toleranz?: numbe
       const d = abstand(p, { x: element.cx, y: element.cy })
       return Math.abs(d - element.radius) <= t || d <= element.radius + t
     }
-    case 'text':
+    case 'text': {
+      if (element.drehung) {
+        const k = elementKasten(element)
+        return p.x >= k.x - t && p.x <= k.x + k.breite + t && p.y >= k.y - t && p.y <= k.y + k.hoehe + t
+      }
       // Trefferbereich: kleines Rechteck um den Ankerpunkt
       return p.x >= element.x - t && p.x <= element.x + 120 && p.y >= element.y - 20 && p.y <= element.y + t
+    }
   }
 }
 
@@ -232,7 +237,16 @@ export function elementKasten(element: SkizzeElement): { x: number; y: number; b
       ])
     case 'text': {
       const gr = element.schriftgroesse ?? 14
-      return { x: element.x, y: element.y, breite: element.inhalt.length * gr * 0.55, hoehe: gr + 4 }
+      const breite = element.inhalt.length * gr * 0.55
+      const hoehe = gr + 4
+      // Um 90° oder 270° gedreht (senkrechte Maße aus der Bau-Excel): Breite und Höhe tauschen, Mitte bleibt
+      const d = (((element.drehung ?? 0) % 180) + 180) % 180
+      if (d > 45 && d < 135) {
+        const mx = element.x + breite / 2
+        const my = element.y + hoehe / 2
+        return { x: mx - hoehe / 2, y: my - breite / 2, breite: hoehe, hoehe: breite }
+      }
+      return { x: element.x, y: element.y, breite, hoehe }
     }
   }
 }

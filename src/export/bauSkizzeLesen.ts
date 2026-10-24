@@ -53,6 +53,8 @@ export interface BauSkizzeForm {
   linieFarbe?: string
   /** linie: Pfeilspitze am Ende `nach` (Anfang und Ende sind dafür ggf. vertauscht). */
   pfeil?: boolean
+  /** text: Drehung in Grad im Uhrzeigersinn (0 < d < 360), fehlt = waagerecht. */
+  drehung?: number
 }
 
 export interface BauSkizzeLesen {
@@ -225,6 +227,19 @@ function hatPfeilspitze(lnInhalt: string, ende: 'headEnd' | 'tailEnd'): boolean 
 const LINIEN_PRST = /^(line|straightConnector1|bentConnector\d|curvedConnector\d)$/
 const RECHTECK_PRST = /^(rect|roundRect|round1Rect|round2SameRect|snip\w*|flowChartProcess|flowChartAlternateProcess|plaque|frame)$/
 
+/**
+ * Drehung eines Textfelds in Grad (Uhrzeigersinn): Drehung der Form (`xfrm rot`) plus Textrichtung des Textkörpers
+ * (`bodyPr rot` und `vert`, z. B. „vert270“ = von unten nach oben). 0 = waagerecht.
+ */
+export function textDrehung(xml: string, formGrad: number): number {
+  const body = /<a:bodyPr\b([^>]*)>/.exec(xml)?.[1] ?? ''
+  const bodyGrad = (zahl(body, 'rot') / 60000) % 360
+  const vert = xmlAttr(body, 'vert')
+  const vertGrad = vert === 'vert' || vert === 'eaVert' ? 90 : vert === 'vert270' ? 270 : 0
+  const summe = (((formGrad + bodyGrad + vertGrad) % 360) + 360) % 360
+  return Math.round(summe * 10) / 10
+}
+
 /** Eine Roh-Form → Bau-Form (null = leer/ohne Bedeutung). */
 function wertAus(roh: RohForm): BauSkizzeForm | null {
   const { xml, kasten } = roh
@@ -278,7 +293,8 @@ function wertAus(roh: RohForm): BauSkizzeForm | null {
 
   // Textfeld (oder Form ohne Füllung und Rahmen): nur der Text zählt
   if (istTextfeld || (!gefuellt && !rahmen)) {
-    return text ? { ...grund, art: 'text', text, gefuellt: false, rahmen: false } : null
+    const drehung = textDrehung(xml, grad)
+    return text ? { ...grund, art: 'text', text, gefuellt: false, rahmen: false, ...(drehung ? { drehung } : {}) } : null
   }
 
   const gemeinsam = { ...grund, text, gestrichelt, gefuellt, rahmen, ...farben }

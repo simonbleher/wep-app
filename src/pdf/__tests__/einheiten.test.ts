@@ -1,4 +1,5 @@
 // Bausteine des PDF-Exports einzeln: XML-Leser, Formeln, Zahlenformate, Farben, Seitenaufteilung, Zeichenkontext.
+import { inflateSync } from 'node:zlib'
 import JSZip from 'jszip'
 import { describe, expect, it } from 'vitest'
 import { PDFDocument, StandardFonts } from 'pdf-lib'
@@ -276,5 +277,36 @@ describe('Zeichenkontext (Skizze als Vektor)', () => {
     expect(ctx.measureText('Apfel').width).toBeGreaterThan(10)
     const bytes = await dok.save()
     expect(bytes.length).toBeGreaterThan(500)
+  })
+
+  it('gedrehter Text (senkrechte Maße der Bau-Skizze): translate/rotate drehen nur den Text, im Uhrzeigersinn', async () => {
+    const dok = await PDFDocument.create()
+    const schriften = await ladeSchriften(dok, StandardFonts)
+    const seite = dok.addPage([200, 200])
+    const ctx = new PdfKontext(lib, seite, schriften, 0, 0, 1)
+    ctx.font = '10px Arial'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.save()
+    ctx.translate(100, 100)
+    ctx.rotate((270 * Math.PI) / 180) // Canvas: im Uhrzeigersinn → Text liest sich von unten nach oben
+    ctx.fillText('2,45', 0, 0)
+    ctx.restore()
+    ctx.fillText('waagerecht', 50, 20) // nach restore() wieder ohne Drehung
+    const roh = Buffer.from(await dok.save({ useObjectStreams: false }))
+    // Der Seiteninhalt ist mit Flate gepackt: alle Streams entpacken, die sich entpacken lassen
+    const inhalt = [...roh.toString('latin1').matchAll(/stream\r?\n([\s\S]*?)\r?\nendstream/g)]
+      .map((m) => {
+        try {
+          return inflateSync(Buffer.from(m[1], 'latin1')).toString('latin1')
+        } catch {
+          return ''
+        }
+      })
+      .join('\n')
+    const tm = [...inhalt.matchAll(/(-?[\d.e-]+) (-?[\d.e-]+) (-?[\d.e-]+) (-?[\d.e-]+) (-?[\d.e-]+) (-?[\d.e-]+) Tm/g)].map((m) => m.slice(1, 5).map((v) => Math.round(Number(v) * 1000) / 1000 + 0))
+    expect(tm).toHaveLength(2)
+    expect(tm[0]).toEqual([0, 1, -1, 0]) // 90° gegen den Uhrzeigersinn im PDF = 270° im Uhrzeigersinn auf dem Bildschirm
+    expect(tm[1]).toEqual([1, 0, 0, 1])
   })
 })
