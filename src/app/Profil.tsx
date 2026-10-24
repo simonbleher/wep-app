@@ -22,6 +22,7 @@ import { Synchronisierung } from './Synchronisierung'
 import { Unterschrift } from './Unterschrift'
 import { UpdateHinweis, UpdateStandZeilen } from './UpdateHinweis'
 import { hatSelbstUpdate, ladeUpdateDienst } from './updateModul'
+import { ladeWebAppNeu, versionText } from './versionText'
 import { HauptSeitenleiste, ICON, Kopf } from './ui'
 
 interface Props {
@@ -234,7 +235,7 @@ export function Profil({ konto, verfuegbar, onZurueck, onAnmelden, onAbmelden }:
               onContextMenu={(e) => nativ && e.preventDefault()}
             >
               <dt>Version</dt>
-              <dd>{__APP_VERSION__}</dd>
+              <dd>{versionText()}</dd>
             </div>
             {mitUpdate && <UpdateStandZeilen />}
             <div>
@@ -245,6 +246,13 @@ export function Profil({ konto, verfuegbar, onZurueck, onAnmelden, onAbmelden }:
               </dd>
             </div>
           </dl>
+          {!mitUpdate && !nativ && (
+            <div className="knopf-reihe">
+              <button type="button" className="knopf" onClick={() => void ladeWebAppNeu()}>
+                Neueste Version laden
+              </button>
+            </div>
+          )}
           {mitUpdate && (
             <>
               <UpdateHinweis />
