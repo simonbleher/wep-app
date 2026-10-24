@@ -8,7 +8,8 @@ import type { BauTeil, BauTeilBauteil } from '@/export/bauTeilLesen'
 import { normalisiere } from '@/katalog/util'
 import { neueBauDaten, type BauDaten, type Bauteil, type BeseitigungsPosition, type Wep } from '@/model'
 
-export type BauListe = 'bauteile' | 'beschreibung' | 'beseitigung' | 'nichtBeraeumt'
+export type BauListe = 'bauteile' | 'beschreibung' | 'beseitigung' | 'nichtBeraeumt' | 'abwasser' | 'index'
+export const BAU_LISTEN: readonly BauListe[] = ['bauteile', 'beschreibung', 'beseitigung', 'nichtBeraeumt', 'abwasser', 'index']
 
 export interface BauListenAbgleich {
   liste: BauListe
@@ -79,8 +80,26 @@ export function pruefeBau(wep: Wep, teil: BauTeil): BauListenAbgleich[] {
       neu: teil.nichtBeraeumt && !wep.bau?.nichtBeraeumt.aktiv ? [{ text: 'Entsorgung des Inventars', detail: `${zahlText(teil.nichtBeraeumt.m3)} m³ · ${zahlText(teil.nichtBeraeumt.preis)} €/m³` }] : [],
       gleich: teil.nichtBeraeumt && wep.bau?.nichtBeraeumt.aktiv ? 1 : 0,
     },
+    {
+      liste: 'abwasser',
+      name: 'Abwasser',
+      neu: teil.abwasser && (wep.bau?.abwasser.art ?? 'keine') === 'keine' ? [abwasserZeile(teil.abwasser)] : [],
+      gleich: teil.abwasser && (wep.bau?.abwasser.art ?? 'keine') !== 'keine' ? 1 : 0,
+    },
+    {
+      liste: 'index',
+      name: 'Baupreisindex',
+      neu: teil.index && !wep.bau?.index ? [{ text: `${zahlText(teil.index.wert)} für ${teil.index.jahr}`, detail: 'laut Bau-Excel' }] : [],
+      gleich: teil.index && wep.bau?.index ? 1 : 0,
+    },
   ]
   return liste
+}
+
+function abwasserZeile(a: NonNullable<BauTeil['abwasser']>): { text: string; detail: string } {
+  if (a.art === 'kanal') return { text: 'Kanalisationsanschluss', detail: [a.kanal.baujahr ? `Baujahr ${a.kanal.baujahr}` : '', a.kanal.kosten ? `${zahlText(a.kanal.kosten)} €` : ''].filter(Boolean).join(' · ') }
+  const g = a.grube
+  return { text: 'Abwassersammelgrube', detail: [g.inhaltM3 ? `${zahlText(g.inhaltM3)} m³` : '', g.baujahr ? `Baujahr ${g.baujahr}` : '', g.genehmigungNr ?? ''].filter(Boolean).join(' · ') }
 }
 
 export const offeneBauZeilen = (ab: readonly BauListenAbgleich[]): number => ab.reduce((s, l) => s + l.neu.length, 0)
@@ -95,8 +114,11 @@ function neuesBauteil(b: BauTeilBauteil, bisher: readonly Bauteil[]): Bauteil {
     kuerzel: kuerzelVon(b, bisher),
     flaeche: b.flaeche,
     ...(b.flaeche > 0 ? { flaecheManuell: true } : {}),
-    typ: b.typ,
-    typManuell: true, // der Typ stammt aus der Bau-Excel, nicht aus dem Assistenten
+    ...(b.typ ? { typ: b.typ, typManuell: true } : {}), // der Typ stammt aus der Bau-Excel, nicht aus dem Assistenten
+    ...(b.minderungProJahr ? { minderungProJahr: b.minderungProJahr } : {}),
+    ...(b.nhk ? { nhk: b.nhk } : {}),
+    ...(b.vorplatzLage ? { vorplatzLage: b.vorplatzLage } : {}),
+    ...(b.vorplatzGuete ? { vorplatzGuete: b.vorplatzGuete } : {}),
     ...(b.baujahr ? { baujahr: b.baujahr } : {}),
     ...(b.baujahrQuelle ? { baujahrQuelle: b.baujahrQuelle } : {}),
     ...(b.restnutzungsjahre !== undefined ? { restnutzungsjahre: b.restnutzungsjahre, rnManuell: true } : {}),
@@ -113,7 +135,7 @@ function neuesBauteil(b: BauTeilBauteil, bisher: readonly Bauteil[]): Bauteil {
 export function uebernimmBau(wep: Wep, teil: BauTeil, listen: ReadonlySet<BauListe>): Wep {
   const ab = new Map(pruefeBau(wep, teil).map((l) => [l.liste, l]))
   const neu = (l: BauListe) => listen.has(l) && (ab.get(l)?.neu.length ?? 0) > 0
-  if (!(['bauteile', 'beschreibung', 'beseitigung', 'nichtBeraeumt'] as const).some(neu)) return wep
+  if (!BAU_LISTEN.some(neu)) return wep
   const bau: BauDaten = wep.bau ?? neueBauDaten()
   let bauteile = bau.bauteile
   if (neu('bauteile')) for (const b of fehlendeBauteile(wep, teil)) bauteile = [...bauteile, neuesBauteil(b, bauteile)]
@@ -127,6 +149,8 @@ export function uebernimmBau(wep: Wep, teil: BauTeil, listen: ReadonlySet<BauLis
       bauteile,
       beseitigung,
       ...(neu('beschreibung') ? { beschreibung: teil.beschreibung, beschreibungManuell: true } : {}),
+      ...(neu('abwasser') && teil.abwasser ? { abwasser: teil.abwasser } : {}),
+      ...(neu('index') && teil.index ? { index: { jahr: teil.index.jahr, wert: teil.index.wert, quelle: 'Bau-Excel', manuell: true } } : {}),
       ...(neu('nichtBeraeumt') && teil.nichtBeraeumt ? { nichtBeraeumt: { aktiv: true, m3: teil.nichtBeraeumt.m3, preis: teil.nichtBeraeumt.preis } } : {}),
     },
   }

@@ -12,8 +12,10 @@ import {
   setzeBauExcelRecord,
   speichereBauExcel,
 } from '@/app/db'
-import { leseBauFormalien, type BauFormalien } from '@/export/bauExcelLesen'
-import { leseBauTeil, leererBauTeil, type BauTeil } from '@/export/bauTeilLesen'
+import { leseBauFormalien, leseBauGruen, type BauFormalien } from '@/export/bauExcelLesen'
+import type { BauGruen } from '@/export/bauExcelLesen'
+import { leseBauTeil, leererBauTeil } from '@/export/bauTeilLesen'
+import type { BauExcelInhalt } from './uebernahme'
 import type { Wep } from '@/model'
 import type { WepAendern } from '@/fotos'
 import { inhaltsKennung } from './kennung'
@@ -207,17 +209,15 @@ export async function leseHinterlegteFormalien(wep: Wep, werkzeuge?: Partial<Bau
   return bytes ? leseBauFormalien(bytes) : undefined
 }
 
-/** Der Bau-Teil der Bau-Excel ist eine Zugabe: ein unlesbares Blatt verhindert nicht das Hinterlegen. */
-export async function leseBauTeilOderLeer(bytes: Uint8Array | ArrayBuffer): Promise<BauTeil> {
-  try {
-    return await leseBauTeil(bytes)
-  } catch {
-    return leererBauTeil()
-  }
+/** Bau- und Grün-Teil der Bau-Excel sind eine Zugabe: ein unlesbares Blatt verhindert nicht das Hinterlegen. */
+export async function leseInhaltOderLeer(bytes: Uint8Array | ArrayBuffer): Promise<BauExcelInhalt> {
+  const teil = await leseBauTeil(bytes).catch(() => leererBauTeil())
+  const gruen = await leseBauGruen(bytes).catch((): BauGruen => ({ aussenanlagen: [], aufwuchs: [], beseitigungAA: [] }))
+  return { teil, gruen }
 }
 
-/** Baulichkeiten, Mängel und Beseitigung der hinterlegten Bau-Excel (undefined = Datei liegt nicht auf diesem Gerät). */
-export async function leseHinterlegtenBauTeil(wep: Wep, werkzeuge?: Partial<BauWerkzeuge>): Promise<BauTeil | undefined> {
+/** Alles außer den Formalien aus der hinterlegten Bau-Excel (undefined = Datei liegt nicht auf diesem Gerät). */
+export async function leseHinterlegtenInhalt(wep: Wep, werkzeuge?: Partial<BauWerkzeuge>): Promise<BauExcelInhalt | undefined> {
   const bytes = await ladeLokaleBauExcel(wep, werkzeuge)
-  return bytes ? leseBauTeilOderLeer(bytes) : undefined
+  return bytes ? leseInhaltOderLeer(bytes) : undefined
 }

@@ -7,10 +7,11 @@
  * gelten nicht als ausgefüllt.
  */
 import JSZip from 'jszip'
-import { MANGEL_EIGEN, MAENGEL_GRUPPEN, TYP_FEHLT } from '../bau'
-import type { BauteilArt } from '../model'
+import { GRUBEN_TYPEN, MANGEL_EIGEN, MAENGEL_GRUPPEN, TYP_FEHLT } from '../bau'
+import type { Abwasser, BauteilArt } from '../model'
+import { excelSerialToIso } from './cellMapper'
 import { BAULICHKEITEN_BLATT, BESEITIGUNG_BAU_ZEILEN, BESEITIGUNG_BLATT, BESCHREIBUNG_ERSTE_ZEILE, BESCHREIBUNG_ZEILEN, MAENGEL_BLATT } from './exportBau'
-import { blattPfadNachName, sharedStrings, zellenWert } from './bauExcelLesen'
+import { blattPfadNachName, datumAlsIso, sharedStrings, zellenWert } from './bauExcelLesen'
 
 export interface BauTeilBauteil {
   art: BauteilArt
@@ -22,6 +23,11 @@ export interface BauTeilBauteil {
   flaeche: number
   /** Mängelabzug in % je Gruppe der Mängeltabelle (nur Laube) bzw. gesamt (`eigen`). */
   maengel: { gruppe: string; abzug: number }[]
+  /** Gewächshaus und Vorplatz */
+  minderungProJahr?: number
+  nhk?: number
+  vorplatzLage?: 'integriert' | 'angebaut'
+  vorplatzGuete?: 'hochwertig' | 'minderwertig' | 'ohne'
 }
 
 export interface BauTeilBeseitigung {
@@ -36,6 +42,10 @@ export interface BauTeil {
   bauteile: BauTeilBauteil[]
   beschreibung: string
   nichtBeraeumt?: { m3: number; preis: number }
+  /** Abwasser (Grube oder Kanal), wenn die Bau-Excel es ausgefüllt hat. */
+  abwasser?: Abwasser
+  /** Baupreisindex der Bau-Excel (ohne den Beispielwert der Vorlage). */
+  index?: { jahr: number; wert: number }
   beseitigung: BauTeilBeseitigung[]
 }
 
@@ -112,6 +122,88 @@ export async function leseBauTeil(excel: ArrayBuffer | Uint8Array): Promise<BauT
     const zeilen: string[] = []
     for (let i = 0; i < BESCHREIBUNG_ZEILEN; i++) zeilen.push(zellenWert(bl, `B${BESCHREIBUNG_ERSTE_ZEILE + i}`, geteilt)?.replace(/\s+$/, '') ?? '')
     teil.beschreibung = zeilen.join('\n').replace(/\n+$/, '')
+    const wertjahr = /(\d{4})/.exec(zellenWert(bl, 'I7', geteilt) ?? '')?.[1]
+    const jahr = wertjahr ? Number(wertjahr) : undefined
+    const wert = zahl(zellenWert(bl, 'H7', geteilt))
+    // 179,2 „für 2025“ steht in der Vorlage vor
+    if (jahr && wert && wert > 0 && !(wert === 179.2 && jahr === 2025)) teil.index = { jahr, wert }
+    const vor = (alter: number | undefined) => (jahr && alter !== undefined && alter >= 0 ? jahr - alter : undefined)
+    const datum = (z: string) => {
+      const roh = zellenWert(bl, z, geteilt)
+      if (roh === null) return undefined
+      const n = Number(roh)
+      return (Number.isFinite(n) && n > 0 ? excelSerialToIso(n) : datumAlsIso(roh)) ?? undefined // Text wie „01.09.21982“ bleibt draußen
+    }
+
+    // Gewächshaus (2.1): ausgefüllt, wenn eine Fläche in F44 steht
+    const ghFlaeche = zahl(zellenWert(bl, 'F44', geteilt))
+    if (ghFlaeche && ghFlaeche > 0) {
+      const mp = zahl(zellenWert(bl, 'F41', geteilt))
+      const alter = zahl(zellenWert(bl, 'I40', geteilt))
+      const minderung = zahl(zellenWert(bl, 'G40', geteilt))
+      const nhk = zahl(zellenWert(bl, 'D41', geteilt))
+      teil.bauteile.push({
+        art: 'gewaechshaus',
+        kuerzel: text(zellenWert(bl, 'D40', geteilt)) ?? '',
+        typ: '',
+        flaeche: ghFlaeche,
+        ...(vor(alter) ? { baujahr: vor(alter) } : {}),
+        ...(minderung ? { minderungProJahr: minderung } : {}),
+        ...(nhk ? { nhk } : {}),
+        maengel: mp && mp > 0 ? [{ gruppe: MANGEL_EIGEN, abzug: Math.round(mp * 10000) / 100 }] : [],
+      })
+    }
+    // Überdachter Laubenvorplatz (2.3): ausgefüllt, wenn eine Fläche in F71 steht
+    const vpFlaeche = zahl(zellenWert(bl, 'F71', geteilt))
+    if (vpFlaeche && vpFlaeche > 0) {
+      const integriert = (zahl(zellenWert(bl, 'E63', geteilt)) ?? 0) > 0
+      const guete = text(zellenWert(bl, 'B67', geteilt))
+      const mp = zahl(zellenWert(bl, 'G67', geteilt))
+      const minderung = zahl(zellenWert(bl, 'E66', geteilt))
+      const alter = zahl(zellenWert(bl, 'H66', geteilt))
+      teil.bauteile.push({
+        art: 'vorplatz',
+        kuerzel: text(zellenWert(bl, 'F62', geteilt)) ?? '',
+        typ: '',
+        flaeche: vpFlaeche,
+        vorplatzLage: integriert ? 'integriert' : 'angebaut',
+        ...(guete === 'hochwertig' || guete === 'minderwertig' || guete === 'ohne' ? { vorplatzGuete: guete } : {}),
+        ...(!integriert && minderung ? { minderungProJahr: minderung } : {}),
+        ...(!integriert && vor(alter) ? { baujahr: vor(alter) } : {}),
+        maengel: !integriert && mp && mp > 0 ? [{ gruppe: MANGEL_EIGEN, abzug: Math.round(mp * 10000) / 100 }] : [],
+      })
+    }
+
+    // Abwasser (3): Kanal, wenn Baujahr oder Kosten stehen; Grube, wenn Inhalt, Alter oder Genehmigung stehen
+    const grubeInhalt = zahl(zellenWert(bl, 'I75', geteilt))
+    const grubeAlter = zahl(zellenWert(bl, 'C74', geteilt))
+    const genehmigtAm = datum('F73')
+    const genehmigungNr = text(zellenWert(bl, 'I73', geteilt))
+    const kanalBaujahr = zahl(zellenWert(bl, 'E78', geteilt))
+    const kanalKosten = zahl(zellenWert(bl, 'C79', geteilt))
+    if (grubeInhalt || grubeAlter || genehmigtAm || genehmigungNr) {
+      const grundwert = zahl(zellenWert(bl, 'F74', geteilt))
+      const typ = GRUBEN_TYPEN.find((t) => t.grundwert === grundwert && grundwert !== 470)?.id
+      const dicht = datum('D76')
+      teil.abwasser = {
+        art: 'grube',
+        grube: {
+          ...(genehmigtAm ? { genehmigtAm } : {}),
+          ...(genehmigungNr ? { genehmigungNr } : {}),
+          ...(typ ? { typ } : {}),
+          ...(grundwert && grundwert > 0 ? { grundwert } : {}),
+          ...(grubeInhalt ? { inhaltM3: grubeInhalt } : {}),
+          ...(vor(grubeAlter) ? { baujahr: vor(grubeAlter) } : {}),
+          ...(dicht ? { dichtheitAm: dicht } : {}),
+          ...(text(zellenWert(bl, 'E76', geteilt)) === 'fehlt' ? { dichtheitFehlt: true } : {}),
+          ...((zahl(zellenWert(bl, 'K77', geteilt)) ?? 0) !== 0 ? { nichtGeleert: true } : {}),
+        },
+        kanal: {},
+      }
+    } else if (kanalBaujahr || kanalKosten) {
+      teil.abwasser = { art: 'kanal', grube: {}, kanal: { ...(kanalBaujahr ? { baujahr: kanalBaujahr } : {}), ...(kanalKosten ? { kosten: kanalKosten } : {}) } }
+    }
+
     const m3 = zahl(zellenWert(bl, 'F104', geteilt))
     const preis = zahl(zellenWert(bl, 'G104', geteilt))
     // 5 m³ × 50 € sind die Beispielwerte der Vorlage

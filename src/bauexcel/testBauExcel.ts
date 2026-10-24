@@ -29,6 +29,8 @@ export interface TestBauExcelOptionen {
   vorlagePfad?: string
   /** Handgezeichnete Formen (erfunden: Laube, Anbauten, Schuppen, Terrasse, Keller …) ins Blatt „Skizze Bau“ legen. */
   skizzeBau?: boolean
+  /** Erfundene Außenanlagen, Aufwuchs I/II und Beseitigung (Abschnitt 2) in die Blätter schreiben (`TEST_GRUEN`). */
+  gruen?: boolean
   /** Erfundene Baulichkeiten, Mängel, Baubeschreibung und Beseitigung (Bau) in die Blätter schreiben (`TEST_BAU`). */
   bau?: boolean
   /** Zusätzliche Formen in „Skizze Bau“ (nur mit `skizzeBau`). */
@@ -73,6 +75,28 @@ export const TEST_SKIZZE_BAU: TestForm[] = [
   { name: 'Textfeld 26', art: 'textfeld', x: 200, y: 135, w: 60, h: 20, text: '4 m' },
 ]
 
+/** Erfundene Grün-Zeilen: Blatt-Pfad der Vorlage → Zelle → Wert. */
+export const TEST_GRUEN: Record<string, Record<string, string | number>> = {
+  'xl/worksheets/sheet5.xml': {
+    A15: 12, B15: 'm', C15: 'Maschendrahtzaun', K15: 4,
+    A16: 2, B16: 'Stück', C16: 'Regenwassertonne', K16: 15,
+    A17: 1, B17: 'Stück', C17: 'Kompostbehälter', K17: 20,
+  },
+  'xl/worksheets/sheet6.xml': {
+    A18: 1, B18: 'Stück', C18: 'Apfel, Halbstamm', K18: 40,
+    A19: 8, B19: 'm', C19: 'Hecke Liguster', K19: 5,
+    A20: 5, B20: 'Stück', C20: 'Rosen', // ohne Preis
+  },
+  'xl/worksheets/sheet7.xml': {
+    A10: 1, B10: 'Stück', C10: 'Hochbeet', K10: 6,
+  },
+  'xl/worksheets/sheet17.xml': {
+    B34: 'Blaufichte fällen', F34: 1, G34: 'Stück', H34: 120, J34: 1.2,
+    B35: 'Wurzelstock roden', F35: 1, G35: 'Stück', H35: 60, J35: 1,
+    F53: 'Fichte am Zaun, schwer erreichbar',
+  },
+}
+
 /** Erfundener Bau-Teil: Blatt-Pfad der Vorlage → Zelle → Wert (Laube L, Anbau A1, Schuppen S; A2 bleibt leer). */
 export const TEST_BAU: Record<string, Record<string, string | number>> = {
   'xl/worksheets/sheet3.xml': {
@@ -81,6 +105,10 @@ export const TEST_BAU: Record<string, Record<string, string | number>> = {
     B47: 'S1+S2', G47: 'Doppelwand bis 4,00 cm', C48: 2000, D48: 'lt. Angabe', A52: 6.41,
     B83: 'Laube L: Baujahr 1982', B84: 'Dach: Pultdach mit Bitumenschweißbahn',
     F104: 3, G104: 100,
+    H7: 181.5, I7: 'für 2026',
+    D41: 160, G40: 5, I40: 8, F44: 9.5, // Gewächshaus
+    F71: 4, E66: 5, H66: 6, B67: 'hochwertig', // angebauter Laubenvorplatz
+    I73: 'GN 12/90', C74: 16, F74: 370, I75: 3, E78: 1999, C79: 1500, // Grube; der Kanal bleibt außen vor
   },
   'xl/worksheets/sheet4.xml': { F5: 8, F24: 5 },
   'xl/worksheets/sheet17.xml': {
@@ -161,6 +189,13 @@ export async function erzeugeTestBauExcel(opt: TestBauExcelOptionen = {}): Promi
   geteilt = geteilt.replace(/uniqueCount="\d+"/, `uniqueCount="${anzahl}"`).replace(/ count="(\d+)"/, (_m, n: string) => ` count="${Number(n) + 100}"`)
   zip.file('xl/worksheets/sheet1.xml', blatt)
   zip.file('xl/sharedStrings.xml', geteilt)
+  if (opt.gruen) {
+    for (const [pfad, zellen] of Object.entries(TEST_GRUEN)) {
+      let xml = await zip.file(pfad)!.async('string')
+      for (const [zelle, wert] of Object.entries(zellen)) xml = setzeTestZelle(xml, zelle, wert)
+      zip.file(pfad, xml)
+    }
+  }
   if (opt.bau) {
     for (const [pfad, zellen] of Object.entries(TEST_BAU)) {
       let xml = await zip.file(pfad)!.async('string')
