@@ -34,6 +34,16 @@ export function hinweiseBauteil(b: Bauteil, erg: BauErgebnis): BauHinweis[] {
     )
     return h
   }
+  if (b.id === erg.schuppen?.bauteil.id && erg.schuppen.nichtBewertetWegenLaube) {
+    h.push(
+      info(
+        `${n} wird nicht bewertet: Schuppen und Unterstände zählen nicht, solange es eine Laube gibt. Ist er in Wahrheit die Laube, bitte als Laube eintragen. Zu entfernende Teile gehören in die Beseitigungskosten.`,
+        'Richtlinie',
+        id,
+      ),
+    )
+    return h
+  }
   if (!(b.flaeche > 0) && b.art !== 'vorplatz') h.push(warn(`${n}: Fläche fehlt – ohne Fläche kein Wert.`, 'Richtlinie S. 3 Nr. 2', id))
   if (!b.baujahr) h.push(warn(`${n}: Baujahr fehlt. Das Jahr der Errichtung weist der scheidende Unterpächter nach, sonst schätzt es der Wertermittler (Quelle vermerken).`, 'Richtlinie S. 9', id))
   else if (b.baujahr > wj) h.push(warn(`${n}: Baujahr liegt nach dem Jahr der Wertermittlung.`, 'Richtlinie S. 8', id))

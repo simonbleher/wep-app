@@ -285,6 +285,11 @@
 - **Beispielwerte der Vorlage zählen nicht als ausgefüllt:** Typ „fehlt“, 5 m³ × 50 € (nicht beräumt), Fäkalien-Zeile im Wortlaut der Vorlage, „Nicht fertiggestellt“ 0,05 in der Mängelliste, Index 179,2 „für 2025“, Menge 1/Faktor 1 in den Grün-Beseitigungszeilen.
 - **Mängel:** Maßgeblich ist der Gesamtabzug der Bau-Excel. Passen die Gruppen der Mängelliste nicht zu ihm (Laube) oder fehlen sie (Anbau, Schuppen), steht er als ein eigener Posten im WEP. Ein Baujahr außerhalb 1800–2100 (Tippfehler) und ein nicht lesbares Genehmigungsdatum werden nicht übernommen. Alter (Grube, Gewächshaus, Vorplatz) wird mit dem Jahr aus „für JJJJ“ (I7) in ein Baujahr zurückgerechnet.
 
+## 2026-10-24 · Schuppen/Unterstände neben einer Laube nicht bewerten
+
+- **Entscheidung:** Schuppen und Unterstände (Bauteil-Art „Schuppen“) werden nicht bewertet, solange es eine Laube gibt (Fläche und Wert 0, nicht in Summe und bewerteter Fläche; der Hinweis am Bauteil sagt es). Gibt es keine Laube, ist der Schuppen die einzige Anlage – er ist dann in Wahrheit die Laube und wird bewertet.
+- **Grund:** Vorgabe des Auftraggebers (Rückmeldung nach Prüfung eines echten WEP). Bisher rechnete die App den Schuppen immer mit; in der Bau-Excel stand er nur mit 0 € (100 % Altersabzug), die Regel war dort nicht ausgedrückt.
+- **Ausnahmen:** Keller (teilen sich den Platz „S oder U“) und Gewächshaus zählen weiter nach eigenen Regeln. Der Export schreibt den Schuppen-Block ohne Fläche, damit die Vorlage 0 € rechnet.
 ## 2026-10-24 · Bau-Excel-Import: Alter, Restnutzung, Baubeschreibung
 
 - **Alter → Baujahr:** Die Bau-Excel enthält das Alter (C74 Grube, I40 Gewächshaus, H66 Vorplatz), die App rechnet `Wertjahr − Baujahr + 1`. Beim Übernehmen wird das Baujahr daraus mit dem Wertjahr des WEP (nicht dem Index-Jahr „für 2025“) und demselben „+1“ zurückgerechnet, damit die App dasselbe Alter wie die Excel ergibt.

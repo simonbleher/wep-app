@@ -116,6 +116,8 @@ export interface HauptErgebnis {
   wert: number
   /** Restnutzungsjahre 0 bzw. Abzug 100 %: wirtschaftlich abgeschrieben. */
   abgeschrieben: boolean
+  /** Schuppen/Unterstand: wird nicht bewertet (Fläche 0), weil es eine Laube gibt. */
+  nichtBewertetWegenLaube?: boolean
 }
 
 export interface GewaechshausErgebnis {
@@ -479,7 +481,15 @@ export function berechneBau(wep: Pick<Wep, 'bau' | 'formalien'>, optionen: BauOp
   const laube = plaetze.laube ? rechneHaupt(plaetze.laube, get(plaetze.laube).bewertet, get(plaetze.laube).nichtBerechnet, indexFaktor, wertjahr, undefined) : undefined
   const laubeRn = laube?.restnutzungsjahre
   const anbauten = plaetze.anbauten.map((b) => rechneHaupt(b, get(b).bewertet, get(b).nichtBerechnet, indexFaktor, wertjahr, laubeRn))
-  const schuppen = plaetze.schuppen ? rechneHaupt(plaetze.schuppen, flaecheVon(plaetze.schuppen), 0, indexFaktor, wertjahr, laubeRn) : undefined
+  // Schuppen und Unterstände werden nicht bewertet, solange es eine Laube gibt; ist der Schuppen die einzige Anlage, ist er
+  // in Wahrheit die Laube (nur falsch eingetragen) und wird bewertet. Keller zählen nicht dazu (eigene Regel).
+  const schuppenZaehltNicht = Boolean(plaetze.laube && plaetze.schuppen?.art === 'schuppen')
+  const schuppen = plaetze.schuppen
+    ? {
+        ...rechneHaupt(plaetze.schuppen, schuppenZaehltNicht ? 0 : flaecheVon(plaetze.schuppen), 0, indexFaktor, wertjahr, laubeRn),
+        ...(schuppenZaehltNicht ? { nichtBewertetWegenLaube: true } : {}),
+      }
+    : undefined
   const gewaechshaus = plaetze.gewaechshaus ? rechneGewaechshaus(plaetze.gewaechshaus, indexFaktor, wertjahr) : undefined
   const vorplatz = plaetze.vorplatz ? rechneVorplatz(plaetze.vorplatz, get(plaetze.vorplatz).bewertet, laube, indexFaktor, wertjahr) : undefined
   const grube = bau.abwasser.art === 'grube' ? rechneGrube(bau, wertjahr) : undefined
