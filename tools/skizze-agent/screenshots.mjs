@@ -292,6 +292,51 @@ try {
     pruefe((await wiese.getAttribute('fill')) === '#C5E0B4' && (await wiese.getAttribute('stroke-dasharray')) === null, 'Aussehen: Rückgängig stellt die Wiese wieder her')
     await seite.waitForTimeout(800)
 
+    // 12b. Positionen aus Text: Katalogsuche, Vorschlag (Liste wird gezeigt), Übernehmen, Rückgängig, Verwerfen
+    const posVorschlag = (v) => seite.evaluate((v) => window.wep.positionen.vorschlagen(v), v)
+    const posStatus = () => seite.evaluate(() => window.wep.positionen.status())
+    const posBalken = () => seite.getByRole('region', { name: 'Vorschlag für die Positionen' })
+    const anzahlGespeichert = async (liste) => {
+      await seite.waitForTimeout(500)
+      return (await ladeGespeichert(seite, WEP.id)).gruen[liste].length
+    }
+    await reiter('Formalien')
+    const treffer = await seite.evaluate(() => window.wep.positionen.katalogSuchen('Apfel', 'aufwuchs'))
+    pruefe(treffer.length > 0 && treffer[0].varianten.some((v) => /Halbstamm/.test(v.merkmale) && v.hoechstwert === 85), 'katalogSuchen(): Apfel mit Preisvarianten und Höchstwerten')
+    const unklar = await posVorschlag({ format: 'wep-positionen/1', liste: 'aufwuchs', positionen: [{ suche: 'Liguster Hecke', anzahl: 9 }] })
+    pruefe(unklar.ok === false && /mehrere Preisvarianten/.test(unklar.fehler[0].meldung), 'Mehrdeutige Variante: Fehler nennt die Auswahl mit Höchstwerten')
+    const pv = await posVorschlag({
+      format: 'wep-positionen/1',
+      liste: 'aufwuchs',
+      positionen: [
+        { suche: 'Apfel', variante: 'Halbstamm 5–30', anzahl: 2, zustand: 'gut' },
+        { suche: 'Liguster Hecke', variante: 0, anzahl: 12, zustand: 'mittel' },
+        { bezeichnung: 'Götterbaum', einheit: 'Stück', anzahl: 1, zustand: 'schlecht' },
+      ],
+    })
+    pruefe(pv.ok === true && pv.anzahl === 3 && pv.vorschau[0].einzelpreis === 63.75 && pv.vorschau[1].einzelpreis === 2.5, 'positionen.vorschlagen(): 3 Positionen, Preise aus Höchstwert × Zustand (63,75 € und 2,50 €)')
+    pruefe(pv.hinweise.some((h) => /Götterbaum/.test(h) && /Unionsliste/.test(h)), 'Hinweis: Götterbaum steht auf der Unionsliste')
+    await balken().waitFor({ state: 'detached' }).catch(() => {})
+    await posBalken().waitFor()
+    pruefe(await seite.getByRole('heading', { name: 'Aufwuchs', exact: true }).isVisible(), 'Der Reiter „Aufwuchs“ wurde für den Nutzer geöffnet')
+    pruefe(/Vorschlag: 3 Positionen für Aufwuchs/.test(await posBalken().innerText()), 'Balken: „Vorschlag: 3 Positionen für Aufwuchs“')
+    pruefe((await posStatus()).offen === true && (await anzahlGespeichert('aufwuchs')) === 5, 'status(): offen; ohne Bestätigung unverändert gespeichert (5 Positionen)')
+    await bild('4-positionen-vorschlag')
+    await posBalken().getByRole('button', { name: 'Vorschlag übernehmen' }).click()
+    await seite.getByTestId('positionen-uebernommen').waitFor()
+    pruefe((await posStatus()).zustand === 'uebernommen' && (await anzahlGespeichert('aufwuchs')) === 8, 'Übernehmen: 8 Positionen gespeichert')
+    const gespeichert = (await ladeGespeichert(seite, WEP.id)).gruen.aufwuchs
+    pruefe(gespeichert[5].bezeichnung === 'Apfel, Halbstamm, 5–30 J.' && gespeichert[5].einzelpreis === 63.75 && gespeichert[7].hinweise.some((h) => h.schwere === 'warnung'), 'Positionen haben Bezeichnung, Preis und Regelhinweise wie bei Eingabe im Formular')
+    pruefe(await seite.getByText('Apfel, Halbstamm, 5–30 J.').first().isVisible(), 'Die neuen Positionen stehen in der Liste')
+    await bild('5-positionen-uebernommen')
+    await seite.getByRole('button', { name: 'Übernahme rückgängig machen' }).click()
+    pruefe((await posStatus()).zustand === 'zurueckgenommen' && (await anzahlGespeichert('aufwuchs')) === 5, 'Rückgängig: wieder 5 Positionen')
+    pruefe((await posVorschlag({ format: 'wep-positionen/1', liste: 'beseitigung', positionen: [{ gegenstand: 'Blaufichte entfernen', menge: 1, einheit: 'Stück', einzelpreis: 80 }] })).ok, 'Beseitigung vorgeschlagen')
+    await posBalken().waitFor()
+    pruefe(await seite.getByRole('heading', { name: 'Beseitigung', exact: true }).first().isVisible(), 'Der Reiter „Beseitigung“ wurde geöffnet')
+    await posBalken().getByRole('button', { name: 'Vorschlag verwerfen' }).click()
+    pruefe((await posStatus()).zustand === 'verworfen' && (await anzahlGespeichert('beseitigungAA')) === 0, 'Verwerfen: nichts gespeichert')
+
     // 13. Export: Füllung, Farben, Pfeile und Maßlinie stehen in den Excel-Formen
     await (handy ? seite.getByRole('button', { name: 'Export', exact: true }) : seite.getByRole('button', { name: 'Export als Excel' })).click()
     await seite.getByRole('heading', { name: 'Export als Excel' }).waitFor()
