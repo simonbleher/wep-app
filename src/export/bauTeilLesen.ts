@@ -10,8 +10,8 @@ import JSZip from 'jszip'
 import { GRUBEN_TYPEN, MANGEL_EIGEN, MAENGEL_GRUPPEN, TYP_FEHLT } from '../bau'
 import type { Abwasser, BauteilArt } from '../model'
 import { excelSerialToIso } from './cellMapper'
-import { BAULICHKEITEN_BLATT, BESEITIGUNG_BAU_ZEILEN, BESEITIGUNG_BLATT, BESCHREIBUNG_ERSTE_ZEILE, BESCHREIBUNG_ZEILEN, MAENGEL_BLATT } from './exportBau'
-import { blattPfadNachName, datumAlsIso, sharedStrings, zellenWert } from './bauExcelLesen'
+import { BAULICHKEITEN_BLATT, BESEITIGUNG_BAU_ZEILEN, BESEITIGUNG_BLATT, MAENGEL_BLATT } from './exportBau'
+import { blattPfadNachName, datumAlsIso, leseBeschreibung, sharedStrings, zellenWert } from './bauExcelLesen'
 
 export interface BauTeilBauteil {
   art: BauteilArt
@@ -24,6 +24,8 @@ export interface BauTeilBauteil {
   /** Mängelabzug in % je Gruppe der Mängeltabelle (nur Laube) bzw. gesamt (`eigen`). */
   maengel: { gruppe: string; abzug: number }[]
   /** Gewächshaus und Vorplatz */
+  /** Alter in Jahren laut Bau-Excel (Gewächshaus, Vorplatz): erst beim Übernehmen mit dem Wertjahr des WEP in ein Baujahr umgerechnet. */
+  alter?: number
   minderungProJahr?: number
   nhk?: number
   vorplatzLage?: 'integriert' | 'angebaut'
@@ -44,6 +46,8 @@ export interface BauTeil {
   nichtBeraeumt?: { m3: number; preis: number }
   /** Abwasser (Grube oder Kanal), wenn die Bau-Excel es ausgefüllt hat. */
   abwasser?: Abwasser
+  /** Alter der Grube in Jahren laut Bau-Excel (C74), erst beim Übernehmen in ein Baujahr umgerechnet. */
+  grubeAlter?: number
   /** Baupreisindex der Bau-Excel (ohne den Beispielwert der Vorlage). */
   index?: { jahr: number; wert: number }
   beseitigung: BauTeilBeseitigung[]
@@ -114,20 +118,18 @@ export async function leseBauTeil(excel: ArrayBuffer | Uint8Array): Promise<BauT
         // Tippfehler wie „18982“ nicht als Baujahr übernehmen
         ...(baujahr !== undefined && baujahr >= 1800 && baujahr <= 2100 ? { baujahr } : {}),
         ...(text(zellenWert(bl, b.quelle, geteilt)) ? { baujahrQuelle: text(zellenWert(bl, b.quelle, geteilt)) } : {}),
-        ...(rn !== undefined && rn >= 0 ? { restnutzungsjahre: rn } : {}),
+        // Leere Restnutzung heißt in der Bau-Excel 100 % Altersabzug: nicht von der App schätzen lassen
+        restnutzungsjahre: rn !== undefined && rn >= 0 ? rn : 0,
         flaeche: Math.max(0, zahl(zellenWert(bl, b.flaeche, geteilt)) ?? 0),
         maengel,
       })
     }
-    const zeilen: string[] = []
-    for (let i = 0; i < BESCHREIBUNG_ZEILEN; i++) zeilen.push(zellenWert(bl, `B${BESCHREIBUNG_ERSTE_ZEILE + i}`, geteilt)?.replace(/\s+$/, '') ?? '')
-    teil.beschreibung = zeilen.join('\n').replace(/\n+$/, '')
+    teil.beschreibung = leseBeschreibung(bl, geteilt)
     const wertjahr = /(\d{4})/.exec(zellenWert(bl, 'I7', geteilt) ?? '')?.[1]
     const jahr = wertjahr ? Number(wertjahr) : undefined
     const wert = zahl(zellenWert(bl, 'H7', geteilt))
     // 179,2 „für 2025“ steht in der Vorlage vor
     if (jahr && wert && wert > 0 && !(wert === 179.2 && jahr === 2025)) teil.index = { jahr, wert }
-    const vor = (alter: number | undefined) => (jahr && alter !== undefined && alter >= 0 ? jahr - alter : undefined)
     const datum = (z: string) => {
       const roh = zellenWert(bl, z, geteilt)
       if (roh === null) return undefined
@@ -147,7 +149,7 @@ export async function leseBauTeil(excel: ArrayBuffer | Uint8Array): Promise<BauT
         kuerzel: text(zellenWert(bl, 'D40', geteilt)) ?? '',
         typ: '',
         flaeche: ghFlaeche,
-        ...(vor(alter) ? { baujahr: vor(alter) } : {}),
+        ...(alter !== undefined && alter > 0 ? { alter } : {}),
         ...(minderung ? { minderungProJahr: minderung } : {}),
         ...(nhk ? { nhk } : {}),
         maengel: mp && mp > 0 ? [{ gruppe: MANGEL_EIGEN, abzug: Math.round(mp * 10000) / 100 }] : [],
@@ -169,7 +171,7 @@ export async function leseBauTeil(excel: ArrayBuffer | Uint8Array): Promise<BauT
         vorplatzLage: integriert ? 'integriert' : 'angebaut',
         ...(guete === 'hochwertig' || guete === 'minderwertig' || guete === 'ohne' ? { vorplatzGuete: guete } : {}),
         ...(!integriert && minderung ? { minderungProJahr: minderung } : {}),
-        ...(!integriert && vor(alter) ? { baujahr: vor(alter) } : {}),
+        ...(!integriert && alter !== undefined && alter > 0 ? { alter } : {}),
         maengel: !integriert && mp && mp > 0 ? [{ gruppe: MANGEL_EIGEN, abzug: Math.round(mp * 10000) / 100 }] : [],
       })
     }
@@ -193,13 +195,13 @@ export async function leseBauTeil(excel: ArrayBuffer | Uint8Array): Promise<BauT
           ...(typ ? { typ } : {}),
           ...(grundwert && grundwert > 0 ? { grundwert } : {}),
           ...(grubeInhalt ? { inhaltM3: grubeInhalt } : {}),
-          ...(vor(grubeAlter) ? { baujahr: vor(grubeAlter) } : {}),
           ...(dicht ? { dichtheitAm: dicht } : {}),
           ...(text(zellenWert(bl, 'E76', geteilt)) === 'fehlt' ? { dichtheitFehlt: true } : {}),
           ...((zahl(zellenWert(bl, 'K77', geteilt)) ?? 0) !== 0 ? { nichtGeleert: true } : {}),
         },
         kanal: {},
       }
+      if (grubeAlter !== undefined && grubeAlter > 0) teil.grubeAlter = grubeAlter
     } else if (kanalBaujahr || kanalKosten) {
       teil.abwasser = { art: 'kanal', grube: {}, kanal: { ...(kanalBaujahr ? { baujahr: kanalBaujahr } : {}), ...(kanalKosten ? { kosten: kanalKosten } : {}) } }
     }

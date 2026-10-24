@@ -17,6 +17,7 @@ import {
   AUFWUCHS_II,
   BESEITIGUNG_AA,
   formalienWertAlsString,
+  formatDatumDe,
   isoDateToExcelSerial,
   type PositionsBereich,
 } from './cellMapper'
@@ -318,7 +319,7 @@ async function patchFormalien(
           konflikte.push({
             feld: key,
             zelle: def.cell,
-            bauExcelWert: vorhandenerWert,
+            bauExcelWert: def.typ === 'datum' ? formatDatumDe(vergleichsWert(key, vorhandenerWert)) : vorhandenerWert,
             appWert,
           })
         }

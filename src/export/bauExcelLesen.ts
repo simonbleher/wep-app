@@ -121,7 +121,11 @@ export function vergleichsWert(feld: keyof Formalien, wert: string | number | un
     return Number.isFinite(n) && n > 0 ? String(n) : ''
   }
   const text = String(wert).replace(/\s+/g, ' ').trim()
-  if (typ === 'datum') return datumAlsIso(text) ?? text
+  if (typ === 'datum') {
+    // Aus der Zelle kommt ein Datum als Seriennummer („46314“)
+    const serie = /^\d+(\.\d+)?$/.test(text) ? excelSerialToIso(Number(text)) : null
+    return serie ?? datumAlsIso(text) ?? text
+  }
   return text
 }
 
@@ -218,4 +222,19 @@ export async function leseBauGruen(excel: ArrayBuffer | Uint8Array): Promise<Bau
     beseitigungAA,
     ...(begruendung ? { beseitigungBegruendung: begruendung } : {}),
   }
+}
+
+/**
+ * Baubeschreibung im Blatt „Baulichkeiten“ (Zeilen 83–99): Eine Zeile steht oft in zwei Teilen (links in B, rechts in E
+ * oder F, z. B. „Typ: …“, „Entwässerung: …“, „WC: …“). Die Teile einer Zeile werden mit Abstand verbunden; die Spalten L
+ * und rechts davon sind die Ausfüllhilfe der Vorlage und gehören nicht dazu.
+ */
+export function leseBeschreibung(blattXml: string, geteilt: string[]): string {
+  const spalten = ['B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K']
+  const zeilen: string[] = []
+  for (let zeile = 83; zeile <= 99; zeile++) {
+    const teile = spalten.map((s) => zellenWert(blattXml, `${s}${zeile}`, geteilt)?.replace(/\s+/g, ' ').trim()).filter((t): t is string => !!t)
+    zeilen.push(teile.join('   '))
+  }
+  return zeilen.join('\n').replace(/\n+$/, '')
 }

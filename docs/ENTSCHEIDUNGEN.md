@@ -284,3 +284,9 @@
 - **Rolle:** Fehlt dem WEP der Teil (reines Grün-WEP bekommt Bau-Daten oder umgekehrt), wird es zum WEP „beides“.
 - **Beispielwerte der Vorlage zählen nicht als ausgefüllt:** Typ „fehlt“, 5 m³ × 50 € (nicht beräumt), Fäkalien-Zeile im Wortlaut der Vorlage, „Nicht fertiggestellt“ 0,05 in der Mängelliste, Index 179,2 „für 2025“, Menge 1/Faktor 1 in den Grün-Beseitigungszeilen.
 - **Mängel:** Maßgeblich ist der Gesamtabzug der Bau-Excel. Passen die Gruppen der Mängelliste nicht zu ihm (Laube) oder fehlen sie (Anbau, Schuppen), steht er als ein eigener Posten im WEP. Ein Baujahr außerhalb 1800–2100 (Tippfehler) und ein nicht lesbares Genehmigungsdatum werden nicht übernommen. Alter (Grube, Gewächshaus, Vorplatz) wird mit dem Jahr aus „für JJJJ“ (I7) in ein Baujahr zurückgerechnet.
+
+## 2026-10-24 · Bau-Excel-Import: Alter, Restnutzung, Baubeschreibung
+
+- **Alter → Baujahr:** Die Bau-Excel enthält das Alter (C74 Grube, I40 Gewächshaus, H66 Vorplatz), die App rechnet `Wertjahr − Baujahr + 1`. Beim Übernehmen wird das Baujahr daraus mit dem Wertjahr des WEP (nicht dem Index-Jahr „für 2025“) und demselben „+1“ zurückgerechnet, damit die App dasselbe Alter wie die Excel ergibt.
+- **Leere Restnutzung = 0:** In der Bau-Excel heißt eine leere Restnutzung 100 % Altersabzug. Der Import setzt 0 (manuell), die App schätzt nicht aus dem Baujahr.
+- **Baubeschreibung:** Eine Zeile steht in der Bau-Excel in mehreren Spalten (B links, E/F rechts). Der Import verbindet die Teile einer Zeile. Weil die App den Text nur in Spalte B ausgibt und dort Zeilen umbricht, schreibt der Export die Beschreibung nur, wenn sie sich gegenüber der Bau-Excel geändert hat (dann werden auch die rechten Teile entfernt); sonst bleiben die Zeilen der Bau-Excel unverändert.
