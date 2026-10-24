@@ -107,7 +107,7 @@ export const TEST_BAU: Record<string, Record<string, string | number>> = {
     G12: 'Doppelwand 8,01 - 10,00 cm', C13: 1982, D13: 'lt. Bauschein', I13: 10, A17: 19.43,
     G21: 'Stein 24,00 - 35,99 cm', C22: 1983, E23: 13, A26: 3.73,
     B47: 'S1+S2', G47: 'Doppelwand bis 4,00 cm', C48: 2000, D48: 'lt. Angabe', A52: 6.41,
-    B83: 'Laube L: Baujahr 1982', B84: 'Dach: Pultdach mit Bitumenschweißbahn',
+    B83: 'Laube L: Baujahr 1982', E83: 'Typ: Fertigteil-Bungalow', B84: 'Dach: Pultdach mit Bitumenschweißbahn',
     F104: 3, G104: 100,
     H7: 181.5, I7: 'für 2026',
     D41: 160, G40: 5, I40: 8, F44: 9.5, // Gewächshaus

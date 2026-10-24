@@ -2,6 +2,7 @@
 // nichts überschrieben, Rundlauf in den Export.
 import { beforeAll, describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
+import { berechneBau } from '@/bau'
 import { exportWep } from '@/export'
 import { leseBauTeil, type BauTeil } from '@/export/bauTeilLesen'
 import { neuerWep } from '@/model'
@@ -22,21 +23,19 @@ describe('leseBauTeil', () => {
       ['laube', 'L', 'Doppelwand 8,01 - 10,00 cm', 1982, 19.43],
       ['anbau', 'A1', 'Stein 24,00 - 35,99 cm', 1983, 3.73],
       ['schuppen', 'S1+S2', 'Doppelwand bis 4,00 cm', 2000, 6.41],
-      ['gewaechshaus', 'GWH', '', 2018, 9.5], // Alter 8 Jahre im Wertjahr 2026
-      ['vorplatz', 'Ü1', '', 2020, 4],
+      ['gewaechshaus', 'GWH', '', undefined, 9.5], // Alter 8 Jahre: Baujahr erst beim Übernehmen
+      ['vorplatz', 'Ü1', '', undefined, 4],
     ])
-    expect(teil.bauteile[3]).toMatchObject({ nhk: 160, minderungProJahr: 5 })
+    expect(teil.bauteile[3]).toMatchObject({ nhk: 160, minderungProJahr: 5, alter: 8 })
     expect(teil.bauteile[4]).toMatchObject({ vorplatzLage: 'angebaut', vorplatzGuete: 'hochwertig', minderungProJahr: 5 })
     expect(teil.index).toEqual({ jahr: 2026, wert: 181.5 })
-    expect(teil.abwasser).toEqual({
-      art: 'grube',
-      grube: { genehmigungNr: 'GN 12/90', grundwert: 370, typ: 'saniert', inhaltM3: 3, baujahr: 2010 },
-      kanal: {},
-    })
+    expect(teil.abwasser).toEqual({ art: 'grube', grube: { genehmigungNr: 'GN 12/90', grundwert: 370, typ: 'saniert', inhaltM3: 3 }, kanal: {} })
+    expect(teil.grubeAlter).toBe(16)
+    expect(teil.bauteile[2].restnutzungsjahre).toBe(0) // Schuppen ohne Restnutzung: wie in der Excel 100 % Altersabzug
     expect(teil.bauteile[0]).toMatchObject({ baujahrQuelle: 'lt. Bauschein', restnutzungsjahre: 10 })
     expect(teil.bauteile[0].maengel).toEqual([{ gruppe: 'dach', abzug: 8 }, { gruppe: 'fundament', abzug: 5 }])
     expect(teil.bauteile[1].maengel).toEqual([{ gruppe: 'eigen', abzug: 13 }]) // nur Gesamtabzug
-    expect(teil.beschreibung).toBe('Laube L: Baujahr 1982\nDach: Pultdach mit Bitumenschweißbahn')
+    expect(teil.beschreibung).toBe('Laube L: Baujahr 1982   Typ: Fertigteil-Bungalow\nDach: Pultdach mit Bitumenschweißbahn')
     expect(teil.nichtBeraeumt).toEqual({ m3: 3, preis: 100 })
     expect(teil.beseitigung).toEqual([
       { gegenstand: 'Rückbau Schuppen S1', menge: 3.93, einheit: 'm³', einzelpreis: 80, faktor: 1 },
@@ -77,6 +76,19 @@ describe('Abgleich', () => {
   })
 })
 
+describe('Rechnen wie die Bau-Excel', () => {
+  it('Alter wird mit dem Wertjahr des WEP zurückgerechnet: dasselbe Alter wie in der Bau-Excel', () => {
+    const w = neuerWep('2026-007')
+    w.formalien = { ...w.formalien, wertermittlungAm: '2026-10-19' }
+    const neu = uebernimmBau(w, teil, alle)
+    const e = berechneBau(neu)!
+    expect(e.grube?.wirksamesAlter).toBe(16) // C74
+    expect(neu.bau?.abwasser.grube.baujahr).toBe(2011)
+    expect(e.gewaechshaus?.alter).toBe(8) // I40
+    expect(e.schuppen?.altersabzugProzent).toBe(100) // ohne Restnutzung wie in der Excel
+  })
+})
+
 describe('Export', () => {
   it('Rundlauf: Bau-Excel → WEP → Export schreibt den Bau-Teil in dieselben Zellen zurück', async () => {
     const wep = uebernimmBau(neuerWep('2026-007'), teil, alle)
@@ -89,5 +101,13 @@ describe('Export', () => {
     expect(nachher.abwasser?.grube.inhaltM3).toBe(3)
     expect(nachher.beseitigung).toEqual(teil.beseitigung)
     expect(nachher.beschreibung).toBe(teil.beschreibung)
+    expect(erg.bau?.beschreibungGekuerzt).toBe(0)
+  })
+
+  it('unveränderte Baubeschreibung: Zeilen der Bau-Excel (auch rechte Spalten) bleiben; geänderte wird geschrieben', async () => {
+    const wep = uebernimmBau(neuerWep('2026-007'), teil, alle)
+    const geaendert = { ...wep, bau: { ...wep.bau!, beschreibung: 'Ganz neuer Text' } }
+    const erg = await exportWep(geaendert, bytes.slice().buffer, { teil: 'beides' })
+    expect((await leseBauTeil(await erg.blob.arrayBuffer())).beschreibung).toBe('Ganz neuer Text')
   })
 })

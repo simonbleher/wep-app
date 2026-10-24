@@ -3,7 +3,7 @@
 //
 // Regeln: nichts wird überschrieben und nichts doppelt angelegt. Was im WEP schon steht (Bauteil mit gleichem Kürzel,
 // Beschreibung, Beseitigungszeile mit gleichem Gegenstand/Menge/Einheit), bleibt; der Nutzer wählt, welche Gruppen dazukommen.
-import { MANGEL_EIGEN, kuerzelFuer } from '@/bau'
+import { MANGEL_EIGEN, kuerzelFuer, wertjahrVon } from '@/bau'
 import type { BauTeil, BauTeilBauteil } from '@/export/bauTeilLesen'
 import { normalisiere } from '@/katalog/util'
 import { neueBauDaten, type BauDaten, type Bauteil, type BeseitigungsPosition, type Wep } from '@/model'
@@ -107,7 +107,10 @@ export const offeneBauZeilen = (ab: readonly BauListenAbgleich[]): number => ab.
 let zaehler = 0
 const neueId = (vorsatz: string) => `${vorsatz}-${Date.now()}-${(zaehler++).toString(36)}${Math.random().toString(36).slice(2, 6)}`
 
-function neuesBauteil(b: BauTeilBauteil, bisher: readonly Bauteil[]): Bauteil {
+/** Baujahr aus dem Alter laut Bau-Excel – wie die App das Alter rechnet (Wertjahr − Baujahr + 1). */
+const baujahrAusAlter = (alter: number | undefined, wertjahr: number): number | undefined => (alter && alter > 0 ? wertjahr - alter + 1 : undefined)
+
+function neuesBauteil(b: BauTeilBauteil, bisher: readonly Bauteil[], wertjahr: number): Bauteil {
   return {
     id: neueId('bt'),
     art: b.art,
@@ -119,7 +122,7 @@ function neuesBauteil(b: BauTeilBauteil, bisher: readonly Bauteil[]): Bauteil {
     ...(b.nhk ? { nhk: b.nhk } : {}),
     ...(b.vorplatzLage ? { vorplatzLage: b.vorplatzLage } : {}),
     ...(b.vorplatzGuete ? { vorplatzGuete: b.vorplatzGuete } : {}),
-    ...(b.baujahr ? { baujahr: b.baujahr } : {}),
+    ...(b.baujahr || baujahrAusAlter(b.alter, wertjahr) ? { baujahr: b.baujahr ?? baujahrAusAlter(b.alter, wertjahr) } : {}),
     ...(b.baujahrQuelle ? { baujahrQuelle: b.baujahrQuelle } : {}),
     ...(b.restnutzungsjahre !== undefined ? { restnutzungsjahre: b.restnutzungsjahre, rnManuell: true } : {}),
     maengel: b.maengel.map((m) => ({
@@ -137,8 +140,9 @@ export function uebernimmBau(wep: Wep, teil: BauTeil, listen: ReadonlySet<BauLis
   const neu = (l: BauListe) => listen.has(l) && (ab.get(l)?.neu.length ?? 0) > 0
   if (!BAU_LISTEN.some(neu)) return wep
   const bau: BauDaten = wep.bau ?? neueBauDaten()
+  const wertjahr = wertjahrVon(wep)
   let bauteile = bau.bauteile
-  if (neu('bauteile')) for (const b of fehlendeBauteile(wep, teil)) bauteile = [...bauteile, neuesBauteil(b, bauteile)]
+  if (neu('bauteile')) for (const b of fehlendeBauteile(wep, teil)) bauteile = [...bauteile, neuesBauteil(b, bauteile, wertjahr)]
   const beseitigung: BeseitigungsPosition[] = neu('beseitigung')
     ? [...bau.beseitigung, ...fehlendeBeseitigung(wep, teil).map((b): BeseitigungsPosition => ({ id: neueId('bes'), ...b }))]
     : bau.beseitigung
@@ -149,9 +153,14 @@ export function uebernimmBau(wep: Wep, teil: BauTeil, listen: ReadonlySet<BauLis
       bauteile,
       beseitigung,
       ...(neu('beschreibung') ? { beschreibung: teil.beschreibung, beschreibungManuell: true } : {}),
-      ...(neu('abwasser') && teil.abwasser ? { abwasser: teil.abwasser } : {}),
+      ...(neu('abwasser') && teil.abwasser ? { abwasser: abwasserMitBaujahr(teil.abwasser, teil.grubeAlter, wertjahr) } : {}),
       ...(neu('index') && teil.index ? { index: { jahr: teil.index.jahr, wert: teil.index.wert, quelle: 'Bau-Excel', manuell: true } } : {}),
       ...(neu('nichtBeraeumt') && teil.nichtBeraeumt ? { nichtBeraeumt: { aktiv: true, m3: teil.nichtBeraeumt.m3, preis: teil.nichtBeraeumt.preis } } : {}),
     },
   }
+}
+
+function abwasserMitBaujahr(a: NonNullable<BauTeil['abwasser']>, alter: number | undefined, wertjahr: number): NonNullable<BauTeil['abwasser']> {
+  const baujahr = a.art === 'grube' ? baujahrAusAlter(alter, wertjahr) : undefined
+  return baujahr ? { ...a, grube: { ...a.grube, baujahr } } : a
 }

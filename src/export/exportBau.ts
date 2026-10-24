@@ -24,7 +24,7 @@ import {
   type BauOptionen,
 } from '../bau'
 import { isoDateToExcelSerial } from './cellMapper'
-import { blattPfadNachName } from './bauExcelLesen'
+import { blattPfadNachName, leseBeschreibung, sharedStrings, zellenWert } from './bauExcelLesen'
 import { patchCells, patchFormel, type CellPatch } from './xmlPatcher'
 
 export const BAULICHKEITEN_BLATT = 'Baulichkeiten'
@@ -285,7 +285,23 @@ export async function schreibeBau(zip: JSZip, wep: Wep, optionen: BauExportOptio
     return f.async('string')
   }
 
-  let xmlB = patchCells(await lies(pfadB), patches)
+  const xmlBasis = await lies(pfadB)
+  // Die Baubeschreibung der Bau-Excel steht in mehreren Spalten (links B, rechts E/F). Hat der Nutzer sie nicht geändert,
+  // bleiben diese Zeilen unangetastet – sonst gingen die rechten Teile verloren oder die Zeilen würden gekürzt.
+  const gleichBeschreibung = norm(leseBeschreibung(xmlBasis, await sharedStrings(zip))) === norm(bau.beschreibung ?? '')
+  let zuSchreiben = gleichBeschreibung ? patches.filter((p) => !beschreibungsZelle(p.cell)) : patches
+  if (!gleichBeschreibung) {
+    // Neuer Text: auch die rechten Teile der alten Zeilen (E, F … in Zeile 83–99) entfernen, sonst stehen sie neben dem neuen Text
+    const geteilt = await sharedStrings(zip)
+    const rest: CellPatch[] = []
+    for (let zeile = BESCHREIBUNG_ERSTE_ZEILE; zeile < BESCHREIBUNG_ERSTE_ZEILE + BESCHREIBUNG_ZEILEN; zeile++) {
+      for (const spalte of ['C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K']) {
+        if (zellenWert(xmlBasis, `${spalte}${zeile}`, geteilt) !== null) rest.push({ cell: `${spalte}${zeile}`, value: null })
+      }
+    }
+    zuSchreiben = [...patches, ...rest]
+  }
+  let xmlB = patchCells(xmlBasis, zuSchreiben)
   let xmlM = patchCells(await lies(pfadM), maengelPatches(wep))
   const k = beseitigungBauPatches(bau)
   let xmlK = patchCells(await lies(pfadK), k.patches)
@@ -314,10 +330,16 @@ export async function schreibeBau(zip: JSZip, wep: Wep, optionen: BauExportOptio
   return {
     korrekturen,
     nichtExportiert: ergebnis!.ueberzaehlig,
-    beschreibungGekuerzt: gekuerzt,
+    beschreibungGekuerzt: gleichBeschreibung ? 0 : gekuerzt,
     beseitigungGekuerzt: k.gekuerzt,
     index: ergebnis!.index ? { jahr: ergebnis!.index.jahr, wert: ergebnis!.index.wert, quelle: ergebnis!.index.quelle } : null,
   }
+}
+
+const norm = (t: string) => t.replace(/\s+/g, ' ').trim()
+const beschreibungsZelle = (zelle: string) => {
+  const m = /^B(\d+)$/.exec(zelle)
+  return !!m && Number(m[1]) >= BESCHREIBUNG_ERSTE_ZEILE && Number(m[1]) < BESCHREIBUNG_ERSTE_ZEILE + BESCHREIBUNG_ZEILEN
 }
 
 /** Formelinhalt einer Zelle als Text („$H$23“), `''` bei leerer Zelle ohne Formel, sonst der gemeinsame `<f>`-Text. */
