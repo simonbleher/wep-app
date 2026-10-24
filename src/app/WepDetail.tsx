@@ -44,6 +44,7 @@ import { KonfliktHinweis } from './KonfliktHinweis'
 import { ladeWep, speichereWep } from './db'
 import { SkizzeTab } from './SkizzeTab'
 import { installiereSchnittstelle } from '@/agent/bruecke'
+import { PositionenVorschlag } from './PositionenVorschlag'
 import { SkizzeBauTab } from './SkizzeBauTab'
 import { BauExcelBereich, useBauNachladen, useBauStand, type BauNachladeStand, type BauStand } from './BauExcel'
 import { ladeExportQuelle } from './exportQuelle'
@@ -212,7 +213,7 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
   const geladen = wep !== null
   useEffect(() => {
     if (!geladen) return
-    return installiereSchnittstelle({ holeWep: () => wepRef.current!, zeigeSkizze: () => wechsle('skizze') })
+    return installiereSchnittstelle({ holeWep: () => wepRef.current!, zeigeSkizze: () => wechsle('skizze'), zeigeListe: (liste) => wechsle(liste === 'beseitigung' ? 'beseitigung' : liste) })
   }, [wepId, geladen, wechsle])
 
   const oeffneMaske = useCallback((m: Maske) => {
@@ -512,6 +513,7 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
                 onTeil={setzeTeil}
               />
             )}
+            {(tab === 'aussenanlagen' || tab === 'aufwuchs' || tab === 'beseitigung') && <PositionenVorschlag liste={tab} aendere={aendere} />}
             {(tab === 'aussenanlagen' || tab === 'aufwuchs') && (
               <PositionenAbschnitt
                 key={tab}

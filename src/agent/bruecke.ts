@@ -17,12 +17,23 @@ import { SCHNITTSTELLE_VERSION } from './format'
 import { leseWep } from './lesen'
 import { schema } from './schema'
 import { pruefeVorschlag } from './vorschlag'
+import {
+  katalogSuchen,
+  pruefePositionen,
+  type KatalogTrefferInfo,
+  type PositionenErgebnis,
+  type PositionenListe,
+  type VorschauZeile,
+} from './positionen'
+import type { BeseitigungsPosition, Position } from '../model/types'
 
 interface Quellen {
   /** Das geöffnete WEP (immer der aktuelle Stand). */
   holeWep: () => Wep
   /** Zeigt dem Nutzer die Grün-Skizze (Reiter „Skizze“). */
   zeigeSkizze: () => void
+  /** Zeigt dem Nutzer die Liste (Reiter Außenanlagen, Aufwuchs bzw. Beseitigung Grün). */
+  zeigeListe: (liste: PositionenListe) => void
 }
 
 // ---------------------------------------------------------------------------
@@ -76,6 +87,78 @@ export function useVorschlag(): VorschlagAnzeige | null {
 }
 
 // ---------------------------------------------------------------------------
+// Positions-Vorschlag-Speicher
+// ---------------------------------------------------------------------------
+
+export type PositionenZustand = 'kein-vorschlag' | 'offen' | 'uebernommen' | 'verworfen' | 'zurueckgenommen'
+
+/** Ein offener Positions-Vorschlag, wie ihn der Balken in der App zeigt. */
+export interface PositionenAnzeige {
+  liste: PositionenListe
+  positionen: Position[]
+  beseitigung: BeseitigungsPosition[]
+  vorschau: VorschauZeile[]
+  summe: number
+  hinweise: string[]
+}
+
+interface PositionenStand {
+  nr: number
+  zustand: PositionenZustand
+  anzeige: PositionenAnzeige | null
+  /** Zuletzt übernommener Vorschlag (für „Rückgängig“). */
+  uebernommen: PositionenAnzeige | null
+  liste: PositionenListe | null
+  anzahl: number | null
+  entschiedenAm: string | null
+}
+
+const POS_START: PositionenStand = { nr: 0, zustand: 'kein-vorschlag', anzeige: null, uebernommen: null, liste: null, anzahl: null, entschiedenAm: null }
+
+class PositionenSpeicher {
+  private stand: PositionenStand = POS_START
+  private hoerer = new Set<() => void>()
+  schaue = (): PositionenStand => this.stand
+  abonniere = (f: () => void): (() => void) => {
+    this.hoerer.add(f)
+    return () => this.hoerer.delete(f)
+  }
+  private setze(neu: PositionenStand) {
+    this.stand = neu
+    this.hoerer.forEach((f) => f())
+  }
+  zeige(anzeige: PositionenAnzeige): number {
+    const nr = this.stand.nr + 1
+    this.setze({ nr, zustand: 'offen', anzeige, uebernommen: null, liste: anzeige.liste, anzahl: anzeige.vorschau.length, entschiedenAm: null })
+    return nr
+  }
+  entscheide(zustand: 'uebernommen' | 'verworfen'): void {
+    const a = this.stand.anzeige
+    if (this.stand.zustand !== 'offen' || !a) return
+    this.setze({ ...this.stand, zustand, anzeige: null, uebernommen: zustand === 'uebernommen' ? a : null, entschiedenAm: new Date().toISOString() })
+  }
+  /** Der Nutzer hat die Übernahme zurückgenommen. */
+  zurueckgenommen(): void {
+    if (this.stand.zustand !== 'uebernommen') return
+    this.setze({ ...this.stand, zustand: 'zurueckgenommen', uebernommen: null, entschiedenAm: new Date().toISOString() })
+  }
+  /** „Rückgängig“ wird nach dem Verlassen der Liste oder neuem Vorschlag nicht mehr angeboten. */
+  vergiss(): void {
+    if (this.stand.uebernommen) this.setze({ ...this.stand, uebernommen: null })
+  }
+  zuruecksetzen(): void {
+    this.setze(POS_START)
+  }
+}
+
+export const positionenSpeicher = new PositionenSpeicher()
+
+/** Offener bzw. zuletzt übernommener Positions-Vorschlag für die Oberfläche. */
+export function usePositionenStand(): PositionenStand {
+  return useSyncExternalStore(positionenSpeicher.abonniere, positionenSpeicher.schaue, () => POS_START)
+}
+
+// ---------------------------------------------------------------------------
 // Skizze, auf die sich ein Vorschlag bezieht
 // ---------------------------------------------------------------------------
 
@@ -104,6 +187,20 @@ export interface WepSchnittstelle {
     vorschlagen: (vorschlag: unknown) => VorschlagErgebnis
     status: () => StatusErgebnis
   }
+  positionen: {
+    katalogSuchen: (begriff: string, liste?: 'aufwuchs' | 'aussenanlagen') => KatalogTrefferInfo[]
+    vorschlagen: (vorschlag: unknown) => PositionenErgebnis
+    status: () => PositionenStatus
+  }
+}
+
+export interface PositionenStatus {
+  offen: boolean
+  zustand: PositionenZustand
+  nr: number
+  liste: PositionenListe | null
+  anzahl: number | null
+  entschiedenAm: string | null
 }
 
 export function baueSchnittstelle(q: Quellen): WepSchnittstelle {
@@ -137,6 +234,24 @@ export function baueSchnittstelle(q: Quellen): WepSchnittstelle {
         }
       },
     }),
+    positionen: Object.freeze({
+      katalogSuchen: (begriff: string, liste: 'aufwuchs' | 'aussenanlagen' = 'aufwuchs'): KatalogTrefferInfo[] =>
+        typeof begriff === 'string' && (liste === 'aufwuchs' || liste === 'aussenanlagen') ? katalogSuchen(begriff, liste) : [],
+      vorschlagen: (vorschlag: unknown): PositionenErgebnis => {
+        const wep = q.holeWep()
+        const g = pruefePositionen(vorschlag, wep)
+        const { liste, positionen, beseitigung, ...ergebnis } = g
+        if (g.ok && liste) {
+          positionenSpeicher.zeige({ liste, positionen, beseitigung, vorschau: g.vorschau, summe: g.summe, hinweise: g.hinweise })
+          q.zeigeListe(liste)
+        }
+        return ergebnis
+      },
+      status: (): PositionenStatus => {
+        const s = positionenSpeicher.schaue()
+        return { offen: s.zustand === 'offen', zustand: s.zustand, nr: s.nr, liste: s.liste, anzahl: s.anzahl, entschiedenAm: s.entschiedenAm }
+      },
+    }),
   })
 }
 
@@ -154,5 +269,6 @@ export function installiereSchnittstelle(q: Quellen): () => void {
   return () => {
     if (window.wep === api) delete window.wep
     vorschlagSpeicher.zuruecksetzen()
+    positionenSpeicher.zuruecksetzen()
   }
 }
