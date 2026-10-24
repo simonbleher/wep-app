@@ -1,7 +1,8 @@
 name: Version freigeben
 
 # Gibt einen Stand von main für alle Geräte frei (docs/FREIGABE.md):
-# - setzt den Branch `release` auf den gewählten Commit (Standard: aktueller main),
+# - setzt den Branch `release` auf den gewählten Commit (Standard: aktueller main) plus einen Commit mit der
+#   hochgezählten Freigabe-Nummer (Datei RELEASE_NR → Version 0.1.<Nummer> in Profil, Web-App und Android-Name),
 # - Cloudflare Pages baut `release` als Produktion (wep-pankow.pages.dev) → Web-App und Live-Updates,
 # - startet „Android Release“ und – nur wenn sich src-tauri/ geändert hat – „Windows Release“.
 # Ein Push mit dem GITHUB_TOKEN löst keine anderen Workflows aus, deshalb werden sie hier ausdrücklich gestartet.
@@ -38,13 +39,24 @@ jobs:
           neu=$(git rev-parse --verify "$ziel^{commit}")
           git merge-base --is-ancestor "$neu" origin/main || { echo "::error::$ziel liegt nicht auf main – nur Stände von main können freigegeben werden."; exit 1; }
           alt=$(git rev-parse --verify origin/release^{commit} 2>/dev/null || echo "")
+          # Der Branch release besteht aus dem freigegebenen Commit von main plus einem Commit mit RELEASE_NR:
+          # verglichen wird mit dem Stand von main darunter
+          if [ -n "$alt" ] && git cat-file -e "$alt:RELEASE_NR" 2>/dev/null; then
+            nr_alt=$(git show "$alt:RELEASE_NR" | tr -dc '0-9')
+            alt=$(git rev-parse "$alt^")
+          else
+            nr_alt=0
+          fi
+          nr=$(( ${nr_alt:-0} + 1 ))
           if [ "$alt" = "$neu" ]; then echo "::notice::Dieser Stand ist schon freigegeben."; fi
           windows=false
           if [ -z "$alt" ] || git diff --name-only "$alt" "$neu" -- src-tauri | grep -q .; then windows=true; fi
           echo "neu=$neu" >> "$GITHUB_OUTPUT"
+          echo "nr=$nr" >> "$GITHUB_OUTPUT"
           echo "windows=$windows" >> "$GITHUB_OUTPUT"
           {
             echo "### Freigabe"
+            echo "- Freigabe-Nummer: $nr"
             echo "- Stand: \`${neu:0:7}\` – $(git log -1 --format=%s "$neu")"
             echo "- Vorher freigegeben: \`${alt:0:7}\`"
             echo "- Windows-Programm neu bauen: $windows"
@@ -52,7 +64,15 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Branch release setzen
-        run: git push --force origin "${{ steps.stand.outputs.neu }}:refs/heads/release"
+        run: |
+          set -euo pipefail
+          # Freigabe-Nummer (Anzeige im Profil, Android-Versionsname): eigener Commit auf dem freigegebenen Stand
+          git checkout --detach "${{ steps.stand.outputs.neu }}"
+          echo "${{ steps.stand.outputs.nr }}" > RELEASE_NR
+          git add RELEASE_NR
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -m "Freigabe ${{ steps.stand.outputs.nr }}"
+          git push --force origin "HEAD:refs/heads/release"
 
       - name: Web-App bei Cloudflare bauen (Deploy Hook)
         env:

@@ -4,8 +4,10 @@ import { VitePWA } from 'vite-plugin-pwa'
 import type { Plugin } from 'vite'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath, URL } from 'node:url'
+import { versionsname } from './tools/versionsname.mjs'
 
-const version = (JSON.parse(readFileSync('./package.json', 'utf-8')) as { version: string }).version
+/** Haupt.Neben aus package.json, letzte Stelle = Freigabe-Nummer aus RELEASE_NR (tools/versionsname.mjs). */
+const version = versionsname()
 
 /** Gehostete Seite; von dort holt die Android-App version.json und das Update-Paket. */
 const HOST_URL = 'https://wep-pankow.pages.dev'

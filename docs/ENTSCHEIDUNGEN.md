@@ -284,3 +284,9 @@
 - **Rolle:** Fehlt dem WEP der Teil (reines Grün-WEP bekommt Bau-Daten oder umgekehrt), wird es zum WEP „beides“.
 - **Beispielwerte der Vorlage zählen nicht als ausgefüllt:** Typ „fehlt“, 5 m³ × 50 € (nicht beräumt), Fäkalien-Zeile im Wortlaut der Vorlage, „Nicht fertiggestellt“ 0,05 in der Mängelliste, Index 179,2 „für 2025“, Menge 1/Faktor 1 in den Grün-Beseitigungszeilen.
 - **Mängel:** Maßgeblich ist der Gesamtabzug der Bau-Excel. Passen die Gruppen der Mängelliste nicht zu ihm (Laube) oder fehlen sie (Anbau, Schuppen), steht er als ein eigener Posten im WEP. Ein Baujahr außerhalb 1800–2100 (Tippfehler) und ein nicht lesbares Genehmigungsdatum werden nicht übernommen. Alter (Grube, Gewächshaus, Vorplatz) wird mit dem Jahr aus „für JJJJ“ (I7) in ein Baujahr zurückgerechnet.
+
+## 2026-10-24 · Versionsnummer zählt mit jeder Freigabe hoch
+
+- **Entscheidung:** Die letzte Stelle der Version ist eine Freigabe-Nummer (`0.1.<n>`), die der Workflow „Version freigeben“ in die Datei `RELEASE_NR` auf dem Branch `release` schreibt (eigener Commit auf dem freigegebenen Stand). Anzeige im Profil zusammen mit Stand und Commit.
+- **Grund:** Die Zahl in `package.json` wurde nie erhöht; Cloudflare baut `release` ohne Möglichkeit, eine Nummer mitzugeben (Deploy Hook, flacher Klon, keine Commit-Zählung). Eine Datei im Branch wird von Cloudflare, Android- und Windows-Build gleich gelesen. Ein Zähler aus Commits oder Läufen wäre je Build unterschiedlich.
+- **Folge:** `release` liegt einen Commit über `main`; der Workflow vergleicht deshalb mit dem Stand darunter. Die Commit-Kennung in `version.json` ist die des Release-Commits (Web und Android bauen beide von `release`).

@@ -4,7 +4,7 @@ name: Android Release
 # Voraussetzung: vier Secrets (ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORT,
 # ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORT) – erzeugt mit „Android-Schlüssel erzeugen“,
 # siehe docs/ANDROID.md. Ohne sie bricht der Lauf mit einer Meldung ab.
-# Versionsname: package.json, versionCode: Lauf-Nummer.
+# Versionsname: package.json (Haupt.Neben) + Freigabe-Nummer aus RELEASE_NR, versionCode: Lauf-Nummer.
 # Zusätzlich (optional): die signierte APK geht auf ein eigenes Cloudflare-Pages-Projekt
 # (feste URL /wep.apk + apk.json), damit die App sich selbst aktualisieren kann – ohne
 # GitHub-Anmeldung. Dafür die Secrets CLOUDFLARE_API_TOKEN und CLOUDFLARE_ACCOUNT_ID
@@ -71,7 +71,7 @@ jobs:
       - name: Version bestimmen
         id: version
         run: |
-          name=$(node -p "require('./package.json').version")
+          name=$(node tools/versionsname.mjs)
           echo "name=$name" >> "$GITHUB_OUTPUT"
           echo "code=$WEP_VERSION_CODE" >> "$GITHUB_OUTPUT"
           echo "tag=android-v$name-$WEP_VERSION_CODE" >> "$GITHUB_OUTPUT"

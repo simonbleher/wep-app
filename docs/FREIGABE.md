@@ -11,6 +11,14 @@ jedem Merge** ein Update, sondern nur nach einer **Freigabe**.
 - `release` = freigegebener Stand. Nur davon bauen Cloudflare (Produktion `wep-pankow.pages.dev`), „Android
   Release“ und „Windows Release“. Die Geräte holen ihre Updates ausschließlich von dort.
 
+## Versionsnummer
+
+Die Nummer im Profil („Version 0.1.37 · Stand … · Commit“) zählt bei **jeder Freigabe um 1** hoch: Der Workflow
+schreibt sie als Datei `RELEASE_NR` in einen eigenen Commit auf `release` (auf dem freigegebenen Stand von `main`).
+Haupt- und Nebenversion (`0.1`) kommen aus `package.json` und werden nur von Hand geändert (`tools/versionsname.mjs`).
+Dieselbe Nummer trägt der Name der Android-Version. Auf `main` und bei lokalen Builds steht `0.1.0`. Die erste
+Freigabe nach dieser Änderung ist die Nummer 1.
+
 ## Freigeben
 
 GitHub → **Actions → „Version freigeben“ → Run workflow** (Feld leer lassen = aktueller Stand von `main`).
