@@ -48,6 +48,7 @@ import { PositionenVorschlag } from './PositionenVorschlag'
 import { SkizzeBauTab } from './SkizzeBauTab'
 import { FELD_NAMEN } from '@/bauexcel/abgleich'
 import { KgaAuswahl } from './KgaAuswahl'
+import { useOhneExcel } from './ohneExcel'
 import { BauExcelBereich, useBauNachladen, useBauStand, type BauNachladeStand, type BauStand } from './BauExcel'
 import { ladeExportQuelle } from './exportQuelle'
 import { PdfBereich } from './PdfExport'
@@ -160,6 +161,7 @@ function wepTitel(wep: Wep): string {
 // ---------------------------------------------------------------------------
 
 export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
+  const ohneExcel = useOhneExcel()
   const [wep, setWep] = useState<Wep | null>(null)
   const [tab, setTab] = useState<Tab>('formalien')
   const [maske, setMaske] = useState<Maske | null>(null)
@@ -372,7 +374,7 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
           })}
         </nav>
         <nav className="sl-nav sl-trenner">
-          <SlEintrag icon={FileSpreadsheet} text="Export als Excel" aktiv={tab === 'export'} onClick={() => wechsle('export')} />
+          <SlEintrag icon={ohneExcel ? FileText : FileSpreadsheet} text={ohneExcel ? 'Export (PDF)' : 'Export als Excel'} aktiv={tab === 'export'} onClick={() => wechsle('export')} />
         </nav>
       </aside>
 
@@ -761,6 +763,7 @@ function FormalienTab({
 
   const f = wep.formalien
   const id = useId()
+  const ohneExcel = useOhneExcel()
 
   return (
     <>
@@ -768,7 +771,7 @@ function FormalienTab({
         <h1 className="h1">Formalien</h1>
       </header>
 
-      {hatGruenTeil(rolle) && (
+      {!ohneExcel && hatGruenTeil(rolle) && (
         <BauExcelBereich wep={wep} aendere={aendere} leseWep={leseWep} stand={bauStand} nachladen={bauNachladen} />
       )}
 
@@ -996,6 +999,7 @@ function ExportTab({
 }) {
   // Ein Grün-WEP mit Bau-Daten wird mit beiden Teilen exportiert (Excel und PDF), sonst fehlte z. B. die Laube
   const rolle = exportRolle(wep, rolleWep)
+  const ohneExcel = useOhneExcel()
   // Nur Bau: eigener Export mit Bau-Blättern und Formalien, ohne Grün-Teil und ohne Bau-Excel
   const nurBau = rolle === 'bau'
   // Standard: Skizze als bearbeitbare Excel-Formen; Fallback: Bild (PNG)
@@ -1103,6 +1107,18 @@ function ExportTab({
 
   const hatSkizze = !nurBau && Boolean(skizzeMitParzelle(wep)?.elemente.length)
   const ergebnis = exportZustand.typ === 'fertig' ? exportZustand : null
+
+  // Ohne Excel (Standard): nur das PDF
+  if (ohneExcel) {
+    return (
+      <>
+        <header className="seitenkopf">
+          <h1 className="h1">Export</h1>
+        </header>
+        <PdfBereich wep={wep} rolle={rolle} profilIndex={profilIndex} />
+      </>
+    )
+  }
 
   return (
     <>

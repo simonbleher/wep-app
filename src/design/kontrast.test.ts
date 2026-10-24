@@ -87,20 +87,20 @@ describe('Sonnen-Kontrast: Schalter', () => {
   afterEach(() => speicher.clear())
 
   it('Standard: aus; „nur WLAN“ bleibt an', () => {
-    expect(ladeGeraeteEinstellungen()).toEqual({ nurWlan: true, sonnenKontrast: false })
+    expect(ladeGeraeteEinstellungen()).toEqual({ nurWlan: true, sonnenKontrast: false, ohneExcel: true })
   })
 
   it('speichert nur die genannte Einstellung, die andere bleibt', () => {
     speichereGeraeteEinstellungen({ nurWlan: false })
     speichereGeraeteEinstellungen({ sonnenKontrast: true })
-    expect(ladeGeraeteEinstellungen()).toEqual({ nurWlan: false, sonnenKontrast: true })
+    expect(ladeGeraeteEinstellungen()).toEqual({ nurWlan: false, sonnenKontrast: true, ohneExcel: true })
     speichereGeraeteEinstellungen({ nurWlan: true })
-    expect(ladeGeraeteEinstellungen()).toEqual({ nurWlan: true, sonnenKontrast: true })
+    expect(ladeGeraeteEinstellungen()).toEqual({ nurWlan: true, sonnenKontrast: true, ohneExcel: true })
   })
 
   it('übernimmt eine ältere Einstellung ohne Kontrast-Feld', () => {
     speicher.set('wep-geraete-einstellungen', JSON.stringify({ nurWlan: false }))
-    expect(ladeGeraeteEinstellungen()).toEqual({ nurWlan: false, sonnenKontrast: false })
+    expect(ladeGeraeteEinstellungen()).toEqual({ nurWlan: false, sonnenKontrast: false, ohneExcel: true })
   })
 
   it('setzt und entfernt data-kontrast am Dokument', () => {

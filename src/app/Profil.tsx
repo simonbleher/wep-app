@@ -39,6 +39,7 @@ export function Profil({ konto, verfuegbar, onZurueck, onAnmelden, onAbmelden }:
   const [profil, setProfil] = useState<ProfilDaten>(() => lokalesProfil.lade().profil)
   const [nurWlan, setNurWlan] = useState(() => ladeGeraeteEinstellungen().nurWlan)
   const [sonne, setSonne] = useState(() => ladeGeraeteEinstellungen().sonnenKontrast)
+  const [ohneExcel, setOhneExcel] = useState(() => ladeGeraeteEinstellungen().ohneExcel)
   const nativ = Capacitor.isNativePlatform()
   // Android-App oder Windows-Programm: Selbst-Update (Anzeige, Knopf „Nach Update suchen“)
   const mitUpdate = hatSelbstUpdate()
@@ -182,6 +183,26 @@ export function Profil({ konto, verfuegbar, onZurueck, onAnmelden, onAbmelden }:
             </label>
           </div>
           <p className="neben">Kräftigere Linien und Texte und größere Schrift, damit alles im Freien bei Sonne lesbar bleibt. Gilt nur für dieses Gerät.</p>
+          <div>
+            <label className="schalter-zeile" htmlFor={`${id}-ohne-excel`}>
+              <span>Ohne Excel arbeiten</span>
+              <input
+                id={`${id}-ohne-excel`}
+                type="checkbox"
+                role="switch"
+                className="schalter"
+                checked={ohneExcel}
+                onChange={(e) => {
+                  setOhneExcel(e.target.checked)
+                  speichereGeraeteEinstellungen({ ohneExcel: e.target.checked })
+                }}
+              />
+            </label>
+          </div>
+          <p className="neben">
+            An (Standard): Alle Excel-Funktionen sind ausgeblendet – Excel-Export, Bau-Excel hinterlegen und übernehmen, „Neues WEP aus Bau-Excel“.
+            Das PDF bleibt. Bereits gespeicherte Daten und Bau-Excel-Dateien bleiben erhalten. Gilt nur für dieses Gerät.
+          </p>
         </section>
 
         <Sicherung id={`${id}-sicherung`} appVersion={__APP_VERSION__} />

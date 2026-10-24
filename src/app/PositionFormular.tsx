@@ -161,7 +161,7 @@ export function PositionFormular({
 
       <div className="feld">
         <label className="label" htmlFor={`${id}-bez`}>
-          Bezeichnung (steht so in der Excel)
+          Bezeichnung (steht so im Protokoll)
         </label>
         <input
           id={`${id}-bez`}

@@ -108,9 +108,17 @@ export interface GeraeteEinstellungen {
   nurWlan: boolean
   /** Sonnen-Kontrast: kräftigere Linien und Texte, größere Schrift (src/design/tokens.css). */
   sonnenKontrast: boolean
+  /**
+   * Ohne Excel arbeiten (Standard): Alle Excel-Funktionen sind ausgeblendet – Excel-Export, Bau-Excel hinterlegen und
+   * übernehmen, „Neues WEP aus Bau-Excel“, Grundlage „Aus Bau-Excel“. Das PDF bleibt. Ausgeschaltet kommen sie zurück.
+   */
+  ohneExcel: boolean
 }
 
-const STANDARD_GERAET: GeraeteEinstellungen = { nurWlan: true, sonnenKontrast: false }
+const STANDARD_GERAET: GeraeteEinstellungen = { nurWlan: true, sonnenKontrast: false, ohneExcel: true }
+
+/** Ereignis, mit dem sich offene Ansichten nach einer Änderung der Geräte-Einstellungen aktualisieren. */
+export const GERAET_GEAENDERT = 'wep-geraete-geaendert'
 
 const GERAET_KEY = 'wep-geraete-einstellungen'
 
@@ -131,6 +139,7 @@ export function speichereGeraeteEinstellungen(teil: Partial<GeraeteEinstellungen
   } catch {
     /* nur Komfort */
   }
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(GERAET_GEAENDERT))
 }
 
 /**

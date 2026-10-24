@@ -12,6 +12,7 @@ import { SkizzeChat } from '@/skizze/SkizzeChat'
 import { leereSkizze, istGrundlage } from '@/skizze/types'
 import { grundrissHatTeile, hatGrundlage, setzeGrundlageGesperrt, uebernehmeGrundlage, type GrundlageQuelle } from '@/skizze/grundlage'
 import { lageVon, massstabText, setzeParzelle, skizzeLage, skizzeMitParzelle, type Parzelle } from '@/parzelle'
+import { useOhneExcel } from './ohneExcel'
 import { bauExcelFuerExport } from '@/bauexcel'
 import { leseBauSkizze } from '@/export/bauSkizzeLesen'
 import { ladeBauExcelAusOneDrive } from '@/sync'
@@ -118,7 +119,9 @@ export function SkizzeTab({
   // Parzelle da, aber Grün liegt noch nach altem Maßstab (z. B. Parzelle auf einem anderen Gerät angelegt): erst nach Rückfrage umlegen
   const umlegenNoetig = skizzeLage({ parzelle: wep.parzelle, skizze: stand }) === 'umlegen'
   const bauVorhanden = grundrissHatTeile(wep.grundriss)
-  const excelVorhanden = Boolean(wep.bauExcel)
+  const ohneExcel = useOhneExcel()
+  // Ohne Excel (Standard) gibt es die Grundlage „Aus Bau-Excel“ nicht
+  const excelVorhanden = !ohneExcel && Boolean(wep.bauExcel)
   const grundlage = hatGrundlage(stand) ? stand.grundlage : undefined
   const grundlageAnzahl = stand.elemente.filter(istGrundlage).length
 
@@ -207,8 +210,9 @@ export function SkizzeTab({
         </Dialog>
       )}
       <p className="neben">
-        Rechteck, Linie, Kreis, Text, Maßangabe und Symbole (Baum, Beet, Hecke …){KI_AKTIV && ' – oder per Beschreibung im Chat darunter'}. Grundlage und Grün werden beim
-        Excel-Export ins Blatt „Skizze Außenanlage-Aufwuchs“ eingefügt; „Skizze Bau“ bleibt unverändert.
+        Rechteck, Linie, Kreis, Text, Maßangabe und Symbole (Baum, Beet, Hecke …){KI_AKTIV && ' – oder per Beschreibung im Chat darunter'}. {ohneExcel
+          ? ' Grundlage und Grün kommen ins PDF.'
+          : ' Grundlage und Grün werden beim Excel-Export ins Blatt „Skizze Außenanlage-Aufwuchs“ eingefügt; „Skizze Bau“ bleibt unverändert.'}
         {anzahl > 0 && ` · ${anzahl} ${anzahl === 1 ? 'Element' : 'Elemente'} gespeichert`}
       </p>
       {stand.massstab && parzellenLage && (
@@ -277,7 +281,8 @@ export function SkizzeTab({
         ) : (
           <>
             <p data-testid="grundlage-hinweis">
-              <strong>Erst Bau-Skizze übernehmen</strong> (Bau-Teil oder Bau-Excel): Zeichne im Bau-Teil den Grundriss oder hinterlege unter „Formalien“ die Bau-Excel.
+              <strong>Erst Bau-Skizze übernehmen</strong>
+              {ohneExcel ? ': Zeichne im Bau-Teil den Grundriss.' : ' (Bau-Teil oder Bau-Excel): Zeichne im Bau-Teil den Grundriss oder hinterlege unter „Formalien“ die Bau-Excel.'}
             </p>
             <p className="neben">Freies Zeichnen geht trotzdem; die Grundlage lässt sich später darunterlegen, dein Grün bleibt erhalten.</p>
           </>

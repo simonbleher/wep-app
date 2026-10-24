@@ -112,6 +112,12 @@ try {
   pruefe(await seite.getByText('Version', { exact: true }).isVisible(), 'App-Version wird angezeigt')
   pruefe(await seite.getByText(/Nicht angemeldet/).isVisible(), 'Konto: nicht angemeldet, Anmelden möglich')
   await seite.screenshot({ path: 'dist-e2e/profil.png' })
+  // Standard: ohne Excel – keine Excel-Knöpfe auf der Startseite; für die Excel-Durchläufe unten wird es ausgeschaltet
+  pruefe(await seite.getByLabel('Ohne Excel arbeiten').isChecked(), 'Ohne Excel arbeiten ist standardmäßig an')
+  await seite.getByRole('button', { name: 'Protokolle' }).click()
+  pruefe((await seite.getByRole('button', { name: /Neues WEP aus Bau-Excel/ }).count()) === 0, 'Ohne Excel: kein „Neues WEP aus Bau-Excel“ auf der Startseite')
+  await seite.getByRole('button', { name: 'Profil und Einstellungen' }).filter({ visible: true }).first().click()
+  await seite.getByLabel('Ohne Excel arbeiten').uncheck()
   await seite.getByRole('button', { name: 'Protokolle' }).click()
 
   // 5. WEP anlegen: Name und Anlage aus dem Profil sind vorbelegt
@@ -1175,6 +1181,16 @@ try {
   await seite.getByRole('button', { name: 'Protokolle' }).click()
   await seite.getByRole('button', { name: 'Profil und Einstellungen' }).click()
   await seite.getByLabel('Rolle').selectOption('gruen')
+
+  // 11z. Ohne Excel (Standard) wieder an: kein Excel-Export, keine Bau-Excel in den Formalien, PDF bleibt
+  await seite.getByLabel('Ohne Excel arbeiten').check()
+  await seite.getByRole('button', { name: 'Protokolle' }).click()
+  await seite.getByRole('list', { name: 'Protokolle' }).getByRole('button').first().click()
+  await seite.getByLabel(/Kleingartenanlage/).first().waitFor()
+  pruefe((await seite.getByText(/Bau-Excel auswählen/).count()) === 0 && (await seite.getByText(/Formalien abgleichen/).count()) === 0, 'Ohne Excel: Formalien ohne Bau-Excel-Bereich')
+  await seite.getByRole('button', { name: 'Export', exact: true }).click()
+  await seite.getByRole('heading', { name: 'Export als PDF' }).waitFor()
+  pruefe((await seite.getByRole('button', { name: 'Excel exportieren' }).count()) === 0, 'Ohne Excel: kein „Excel exportieren“, das PDF bleibt')
 
   // 12. Keine Skriptfehler
   pruefe(fehler.length === 0, `keine Skriptfehler im Browser ${fehler.join('; ')}`)

@@ -22,6 +22,7 @@ import {
 } from '@/sicherung'
 import { ICON, Meldung, zeitDe } from './ui'
 import { speichereDatei } from './dateiSpeichern'
+import { useOhneExcel } from './ohneExcel'
 
 const LETZTE_KEY = 'wep-letzte-sicherung'
 
@@ -78,6 +79,7 @@ export function inhaltText(z: SicherungsZaehlung): string {
 export function Sicherung({ id, appVersion }: { id: string; appVersion: string }) {
   const [mitFotos, setMitFotos] = useState(false)
   const [mitBau, setMitBau] = useState(false)
+  const ohneExcel = useOhneExcel()
   const [laeuft, setLaeuft] = useState(false)
   const [meldung, setMeldung] = useState<{ text: string; alarm?: boolean }>()
   const [letzte, setLetzte] = useState(ladeLetzteSicherung)
@@ -156,10 +158,12 @@ export function Sicherung({ id, appVersion }: { id: string; appVersion: string }
               <span>Fotos einschließen (große Datei)</span>
               <input id={`${id}-fotos`} type="checkbox" role="switch" className="schalter" checked={mitFotos} onChange={(e) => setMitFotos(e.target.checked)} />
             </label>
+            {!ohneExcel && (
             <label className="schalter-zeile" htmlFor={`${id}-bau`}>
               <span>Bau-Excel-Dateien einschließen</span>
               <input id={`${id}-bau`} type="checkbox" role="switch" className="schalter" checked={mitBau} onChange={(e) => setMitBau(e.target.checked)} />
             </label>
+            )}
           </div>
           <div className="knopf-reihe">
             <button type="button" className="knopf" disabled={laeuft} onClick={() => void erstellen()}>
