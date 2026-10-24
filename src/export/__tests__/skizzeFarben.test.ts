@@ -122,6 +122,63 @@ describe('Farben im Excel-Export', () => {
   })
 })
 
+describe('Frei aus Grundformen gezeichnet: Linienstärke, Linienzug, Name, Textfarbe, Reihenfolge', () => {
+  const frei: SkizzeDaten = {
+    breite: 800,
+    hoehe: 600,
+    elemente: [
+      { id: 'f1', typ: 'rechteck', frei: true, name: 'Stamm', x: 300, y: 300, breite: 10, hoehe: 40, fuellung: '#7F5A2E', linie: '#7F5A2E', linienbreite: 3 },
+      { id: 'f2', typ: 'kreis', frei: true, name: 'Krone', cx: 305, cy: 290, radius: 30, fuellung: '#548235', linie: '#385723' },
+      { id: 'f3', typ: 'vieleck', frei: true, name: 'Bogen', offen: true, punkte: [{ x: 100, y: 100 }, { x: 120, y: 90 }, { x: 150, y: 100 }], linie: '#262626', linienbreite: 2 },
+      { id: 'f4', typ: 'vieleck', frei: true, name: 'Dreieck', punkte: [{ x: 400, y: 400 }, { x: 460, y: 400 }, { x: 400, y: 460 }], fuellung: '#EBDDC7', linie: '#7030A0' },
+      { id: 'f5', typ: 'text', frei: true, name: 'Beschriftung', x: 500, y: 500, inhalt: 'Apfel', farbe: '#C00000', schriftgroesse: 12 },
+      { id: 'f6', typ: 'linie', frei: true, name: 'Latte', x1: 10, y1: 10, x2: 60, y2: 10, farbe: '#8B5A2B', linienbreite: 2.5 },
+    ],
+  }
+
+  it('Namen, Linienstärke (pt), offener Linienzug, Textfarbe', async () => {
+    const xml = await exportiereDrawingXml(frei)
+    expect(xml).toContain('name="Stamm_0"')
+    expect(form(xml, 'Stamm_0')).toContain('<a:ln w="38100">') // 3 pt
+    expect(form(xml, 'Latte_0')).toContain('<a:ln w="31750">') // 2,5 pt
+    const bogen = form(xml, 'Bogen_0')
+    expect(bogen).toContain('<a:custGeom>')
+    expect(bogen).not.toContain('<a:close/>')
+    expect(bogen).toContain('<a:noFill/>')
+    expect(form(xml, 'Dreieck_0')).toContain('<a:close/>')
+    expect(form(xml, 'Beschriftung_0')).toContain('<a:srgbClr val="C00000"/>')
+  })
+
+  it('alle frei gezeichneten Formen liegen in der Reihenfolge der Liste (Stamm vor Krone, Krone vor Dreieck)', async () => {
+    const xml = await exportiereDrawingXml(frei)
+    const pos = (n: string) => xml.indexOf(`name="${n}"`)
+    expect(pos('Stamm_0')).toBeLessThan(pos('Krone_0'))
+    expect(pos('Krone_0')).toBeLessThan(pos('Bogen_0'))
+    expect(pos('Bogen_0')).toBeLessThan(pos('Dreieck_0'))
+    expect(pos('Dreieck_0')).toBeLessThan(pos('Beschriftung_0'))
+    expect(pos('Beschriftung_0')).toBeLessThan(pos('Latte_0'))
+  })
+
+  it('Zeichnung: Linienstärke skaliert mit der Leinwand, Linienzug bleibt offen und ungefüllt', () => {
+    const aufrufe: { m: string; w: number; fill: string }[] = []
+    const roh = { fillStyle: '', strokeStyle: '', lineWidth: 0, font: '', textAlign: '', textBaseline: '', lineCap: '', lineJoin: '' }
+    const ctx = new Proxy(roh, {
+      get: (t, k: string) => (k in t ? (t as Record<string, unknown>)[k] : (..._a: unknown[]) => void aufrufe.push({ m: k, w: t.lineWidth, fill: t.fillStyle })),
+      set: (t, k: string, v) => {
+        ;(t as Record<string, unknown>)[k] = v
+        return true
+      },
+    })
+    skizzeAufContext(ctx as unknown as CanvasRenderingContext2D, frei, 800, 600, { transparent: true })
+    const pxPt = 800 / 452
+    expect(aufrufe.some((a) => a.m === 'stroke' && Math.abs(a.w - 3 * pxPt) < 0.01)).toBe(true)
+    expect(aufrufe.some((a) => a.m === 'stroke' && Math.abs(a.w - 2.5 * pxPt) < 0.01)).toBe(true)
+    // Dreieck wird geschlossen, der Linienzug nicht: genau ein closePath unter den Vielecken (Rechteck/Kreis nutzen rect/arc)
+    expect(aufrufe.filter((a) => a.m === 'closePath')).toHaveLength(1)
+    expect(aufrufe.some((a) => a.m === 'fillText' && a.fill === '#C00000')).toBe(true)
+  })
+})
+
 describe('PNG/PDF-Zeichnung gestalteter Formen', () => {
   it('Füllung, Linienfarbe, Strichmuster und Pfeil kommen beim Zeichnen vor', () => {
     const aufrufe: { m: string; fill: string; stroke: string }[] = []

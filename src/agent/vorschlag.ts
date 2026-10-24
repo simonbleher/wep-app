@@ -8,9 +8,9 @@
 import { wepRolle, type Wep } from '../model/types'
 import { lageVon } from '../parzelle'
 import { punktImPolygon } from '../parzelle/polygon'
-import { imVieleck } from '../skizze/geometrie'
+import { elementKasten } from '../skizze/geometrie'
 import { normalisiereFarbe, vorgabe } from '../skizze/stile'
-import type { Linienart, PositionsBezug, SkizzeBauform, SkizzeDaten, SkizzeElement, SymbolArt } from '../skizze/types'
+import type { Linienart, PositionsBezug, SkizzeDaten, SkizzeElement } from '../skizze/types'
 import { SYMBOL_ARTEN, istGrundlage, neueId } from '../skizze/types'
 import {
   BEZUGS_LISTEN,
@@ -24,7 +24,7 @@ import {
   type VorschlagErgebnis,
 } from './format'
 import { kurzname } from './lesen'
-import { abbildungFuer, mZuPx, r1, standardgroesseM } from './umrechnung'
+import { abbildungFuer, mZuPx, r1 } from './umrechnung'
 
 /** Obergrenzen, damit ein fehlerhafter Vorschlag die Skizze nicht sprengt. */
 export const MAX_ELEMENTE = 400
@@ -37,17 +37,19 @@ type Rohobjekt = Record<string, unknown>
 const istObjekt = (v: unknown): v is Rohobjekt => typeof v === 'object' && v !== null && !Array.isArray(v)
 const istZahl = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
 
-const STIL_FELDER = ['stil', 'fuellung', 'linie', 'linienart', 'beschriftung', 'bezug'] as const
-const ALLGEMEIN = ['typ', 'id'] as const
+const STIL_FELDER = ['stil', 'fuellung', 'linie', 'linienart', 'linienbreite', 'beschriftung'] as const
+const ALLGEMEIN = ['typ', 'id', 'name', 'bezug'] as const
 const FELDER: Record<string, readonly string[]> = {
-  symbol: [...ALLGEMEIN, 'x', 'y', 'breite', 'hoehe', 'beschriftung', 'bezug', 'ziel'],
   rechteck: [...ALLGEMEIN, 'x', 'y', 'breite', 'hoehe', ...STIL_FELDER],
   ellipse: [...ALLGEMEIN, 'x', 'y', 'breite', 'hoehe', ...STIL_FELDER],
-  vieleck: [...ALLGEMEIN, 'punkte', ...STIL_FELDER],
-  linie: [...ALLGEMEIN, 'von', 'nach', 'farbe', 'linienart', 'pfeil'],
+  vieleck: [...ALLGEMEIN, 'punkte', 'offen', ...STIL_FELDER],
+  bogen: [...ALLGEMEIN, 'x', 'y', 'breite', 'hoehe', 'startWinkel', 'endWinkel', 'linie', 'linienart', 'linienbreite', 'stil'],
+  linie: [...ALLGEMEIN, 'von', 'nach', 'farbe', 'linienart', 'linienbreite', 'pfeil'],
   massangabe: [...ALLGEMEIN, 'von', 'nach', 'beschriftung', 'farbe'],
-  text: [...ALLGEMEIN, 'x', 'y', 'inhalt'],
+  text: [...ALLGEMEIN, 'x', 'y', 'inhalt', 'farbe', 'groesse'],
 }
+const MIN_LINIENBREITE = 0.25
+const MAX_LINIENBREITE = 6
 
 export interface GeprueftVorschlag extends VorschlagErgebnis {
   modus: Modus | null
@@ -174,7 +176,7 @@ function linienartFeld(k: Kontext, v: unknown, pfad: string): Linienart | undefi
 }
 
 /** Stilangaben (Vorgabe, Füllung, Linie, Linienart) einer gefüllten Form. */
-function stilFelder(k: Kontext, o: Rohobjekt, pfad: string): { fuellung?: string; linie?: string; linienart?: Linienart } {
+function stilFelder(k: Kontext, o: Rohobjekt, pfad: string): { fuellung?: string; linie?: string; linienart?: Linienart; linienbreite?: number } {
   let fuellung: string | undefined
   let linie: string | undefined
   let linienart: Linienart | undefined
@@ -193,39 +195,72 @@ function stilFelder(k: Kontext, o: Rohobjekt, pfad: string): { fuellung?: string
   }
   if (o.linie !== undefined) linie = farbFeld(k, o.linie, `${pfad}.linie`, 'linie') ?? linie
   if (o.linienart !== undefined) linienart = linienartFeld(k, o.linienart, `${pfad}.linienart`) ?? linienart
+  const breite = linienbreiteFeld(k, o, pfad)
   // Standardfarbe der Linie weglassen (bestehende Skizzen sehen so unverändert aus)
   return {
+    ...(breite ? { linienbreite: breite } : {}),
     ...(fuellung ? { fuellung } : {}),
     ...(linie && linie.toUpperCase() !== '#1A1A1A' ? { linie } : {}),
     ...(linienart === 'gestrichelt' ? { linienart } : {}),
   }
 }
 
+/** Linienstärke in pt (0,25 bis 6) – optional. */
+function linienbreiteFeld(k: Kontext, o: Rohobjekt, pfad: string): number | undefined {
+  if (o.linienbreite === undefined) return undefined
+  const v = o.linienbreite
+  if (!istZahl(v) || v < MIN_LINIENBREITE || v > MAX_LINIENBREITE) {
+    fehlt(k, `${pfad}.linienbreite`, `linienbreite ist die Linienstärke in pt (${MIN_LINIENBREITE} bis ${MAX_LINIENBREITE}, z. B. 1 oder 2), nicht ${JSON.stringify(v)}.`)
+    return undefined
+  }
+  return v
+}
+
+/** Optionaler Name des Elements (wird zum Formnamen im Excel). */
+function nameFeld(k: Kontext, o: Rohobjekt, pfad: string): string | undefined {
+  if (o.name === undefined) return undefined
+  if (typeof o.name !== 'string' || !o.name.trim() || o.name.trim().length > 60) {
+    fehlt(k, `${pfad}.name`, 'name ist ein kurzer Text (höchstens 60 Zeichen), z. B. „Stamm“ oder „Krone“.')
+    return undefined
+  }
+  return o.name.trim()
+}
+
 const fmt = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 2 })
 
+const GRUNDFORMEN_TEXT = FORM_TYPEN.join(', ')
+
 /** Ein Element prüfen und in ein Skizzenelement umrechnen; `null` bei Fehlern (sie stehen in `k.fehler`). */
-function pruefeElement(k: Kontext, e: unknown, i: number, a: ReturnType<typeof abbildungFuer>['abb']): SkizzeElement | null {
+function pruefeElement(k: Kontext, e: unknown, i: number, a: ReturnType<typeof abbildungFuer>['abb'], pxPt: number): SkizzeElement | null {
   const pfad = `elemente[${i}]`
   if (!istObjekt(e)) {
-    fehlt(k, pfad, 'Ein Element ist ein Objekt mit „typ“, z. B. { "typ": "baum", "x": 3, "y": 4 }.')
+    fehlt(k, pfad, 'Ein Element ist ein Objekt mit „typ“, z. B. { "typ": "ellipse", "x": 3, "y": 4, "breite": 1.5, "hoehe": 1.5, "fuellung": "#548235" }.')
     return null
   }
   const typ = e.typ
   if (typeof typ !== 'string') {
-    fehlt(k, `${pfad}.typ`, '„typ“ fehlt. Erlaubt: ' + [...SYMBOL_ARTEN, ...FORM_TYPEN].join(', ') + '.')
+    fehlt(k, `${pfad}.typ`, `„typ“ fehlt. Erlaubt (Grundformen): ${GRUNDFORMEN_TEXT}.`)
     return null
   }
-  const istSymbol = (SYMBOL_ARTEN as readonly string[]).includes(typ)
-  const istForm = (FORM_TYPEN as readonly string[]).includes(typ)
-  if (!istSymbol && !istForm) {
-    fehlt(k, `${pfad}.typ`, `Unbekannter Typ „${typ}“. Erlaubt: ${[...SYMBOL_ARTEN, ...FORM_TYPEN].join(', ')}.`)
+  if (!(FORM_TYPEN as readonly string[]).includes(typ)) {
+    const bekannt = (SYMBOL_ARTEN as readonly string[]).includes(typ) || typ === 'symbol'
+    fehlt(
+      k,
+      `${pfad}.typ`,
+      bekannt
+        ? `„${typ}“ ist keine Grundform – der Vorschlag besteht nur aus Grundformen (${GRUNDFORMEN_TEXT}). Zeichne es aus Kreisen, Linien, Vierecken, Dreiecken … oder hole dir fertige Grundformen mit window.wep.skizze.baustein('${typ}', { x, y }).`
+        : `Unbekannter Typ „${typ}“. Erlaubt (Grundformen): ${GRUNDFORMEN_TEXT}.`,
+    )
     return null
   }
-  const erlaubt = FELDER[istSymbol ? 'symbol' : typ]
   const anfang = k.fehler.length
+  const erlaubt = FELDER[typ]
   for (const f of Object.keys(e)) {
     if (!erlaubt.includes(f)) fehlt(k, `${pfad}.${f}`, `Unbekanntes Feld „${f}“ bei Typ „${typ}“. Erlaubt: ${erlaubt.join(', ')}.`)
   }
+  const name = nameFeld(k, e, pfad)
+  const bz = bezugPruefen(k, e.bezug, `${pfad}.bezug`)
+  const gemeinsam = { id: neueId(), frei: true as const, ...(name ? { name } : {}), ...(bz ? { bezug: bz.bezug } : {}) }
 
   switch (typ) {
     case 'rechteck':
@@ -235,13 +270,12 @@ function pruefeElement(k: Kontext, e: unknown, i: number, a: ReturnType<typeof a
       const b = zahlFeld(k, e, 'breite', pfad, { pflicht: true, groesser0: true, max: MAX_GROESSE_M })
       const h = zahlFeld(k, e, 'hoehe', pfad, { pflicht: true, groesser0: true, max: MAX_GROESSE_M })
       const stil = stilFelder(k, e, pfad)
-      const bz = bezugPruefen(k, e.bezug, `${pfad}.bezug`)
-      const text = textFeld(k, e.beschriftung, `${pfad}.beschriftung`) ?? bz?.name
+      const text = textFeld(k, e.beschriftung, `${pfad}.beschriftung`)
       if (k.fehler.length > anfang || x === undefined || y === undefined || b === undefined || h === undefined) return null
       const mitte = mZuPx(a, { x, y })
       const pb = b * a.pxProM
       const ph = h * a.pxProM
-      const basis = { id: neueId(), ...stil, ...(text ? { beschriftung: text } : {}), ...(bz ? { bezug: bz.bezug } : {}) }
+      const basis = { ...gemeinsam, ...stil, ...(text ? { beschriftung: text } : {}) }
       if (typ === 'rechteck') return { ...basis, typ: 'rechteck', x: r1(mitte.x - pb / 2), y: r1(mitte.y - ph / 2), breite: r1(pb), hoehe: r1(ph) }
       return {
         ...basis,
@@ -254,31 +288,56 @@ function pruefeElement(k: Kontext, e: unknown, i: number, a: ReturnType<typeof a
     }
     case 'vieleck': {
       const roh = e.punkte
+      const offen = e.offen === true
+      if (e.offen !== undefined && typeof e.offen !== 'boolean') fehlt(k, `${pfad}.offen`, 'offen ist true (offener Linienzug) oder false (geschlossene Fläche).')
+      const min = offen ? 2 : 3
       let punkte: MPunkt[] | undefined
-      if (!Array.isArray(roh)) fehlt(k, `${pfad}.punkte`, '„punkte“ fehlt: Liste von mindestens 3 Eckpunkten [{ "x": 1, "y": 2 }, …] in Metern.')
-      else if (roh.length < 3) fehlt(k, `${pfad}.punkte`, `Ein Vieleck braucht mindestens 3 Eckpunkte (angegeben: ${roh.length}).`)
-      else if (roh.length > MAX_PUNKTE) fehlt(k, `${pfad}.punkte`, `Zu viele Eckpunkte (${roh.length}, höchstens ${MAX_PUNKTE}).`)
+      if (!Array.isArray(roh)) fehlt(k, `${pfad}.punkte`, `„punkte“ fehlt: Liste von mindestens ${min} Punkten [{ "x": 1, "y": 2 }, …] in Metern.`)
+      else if (roh.length < min) fehlt(k, `${pfad}.punkte`, `Ein ${offen ? 'Linienzug braucht mindestens 2 Punkte' : 'Vieleck braucht mindestens 3 Eckpunkte (Dreieck = 3)'} (angegeben: ${roh.length}).`)
+      else if (roh.length > MAX_PUNKTE) fehlt(k, `${pfad}.punkte`, `Zu viele Punkte (${roh.length}, höchstens ${MAX_PUNKTE}).`)
       else {
         const liste = roh.map((p, j) => punktFeld(k, p, `${pfad}.punkte[${j}]`))
         if (liste.every((p): p is MPunkt => p !== undefined)) punkte = liste
       }
       const stil = stilFelder(k, e, pfad)
-      const bz = bezugPruefen(k, e.bezug, `${pfad}.bezug`)
-      const text = textFeld(k, e.beschriftung, `${pfad}.beschriftung`) ?? bz?.name
+      const text = textFeld(k, e.beschriftung, `${pfad}.beschriftung`)
       if (k.fehler.length > anfang || !punkte) return null
-      return { id: neueId(), typ: 'vieleck', punkte: punkte.map((p) => mZuPx(a, p)), ...stil, ...(text ? { beschriftung: text } : {}), ...(bz ? { bezug: bz.bezug } : {}) }
+      // Ein offener Linienzug hat keine Füllung
+      const { fuellung: _f, ...ohneFuellung } = stil
+      return { ...gemeinsam, typ: 'vieleck', punkte: punkte.map((p) => mZuPx(a, p)), ...(offen ? { offen: true, ...ohneFuellung } : stil), ...(text && !offen ? { beschriftung: text } : {}) }
+    }
+    case 'bogen': {
+      const x = zahlFeld(k, e, 'x', pfad, { pflicht: true })
+      const y = zahlFeld(k, e, 'y', pfad, { pflicht: true })
+      const b = zahlFeld(k, e, 'breite', pfad, { pflicht: true, groesser0: true, max: MAX_GROESSE_M })
+      const h = zahlFeld(k, e, 'hoehe', pfad, { pflicht: true, groesser0: true, max: MAX_GROESSE_M })
+      const von = zahlFeld(k, e, 'startWinkel', pfad, { pflicht: true, min: -720, max: 720 })
+      const bis = zahlFeld(k, e, 'endWinkel', pfad, { pflicht: true, min: -720, max: 720 })
+      const stil = stilFelder(k, e, pfad)
+      if (von !== undefined && bis !== undefined && (Math.abs(bis - von) < 1 || Math.abs(bis - von) > 360)) {
+        fehlt(k, `${pfad}.endWinkel`, `Der Bogen muss zwischen 1° und 360° umfassen (startWinkel ${von}, endWinkel ${bis}). 0° = rechts, 90° = unten, im Uhrzeigersinn.`)
+      }
+      if (k.fehler.length > anfang || x === undefined || y === undefined || b === undefined || h === undefined || von === undefined || bis === undefined) return null
+      const n = Math.max(8, Math.ceil(Math.abs(bis - von) / 8))
+      const punkte = Array.from({ length: n + 1 }, (_, j) => {
+        const w = ((von + ((bis - von) * j) / n) * Math.PI) / 180
+        return mZuPx(a, { x: x + (b / 2) * Math.cos(w), y: y + (h / 2) * Math.sin(w) })
+      })
+      const { fuellung: _f, ...ohneFuellung } = stil
+      return { ...gemeinsam, typ: 'vieleck', offen: true, punkte, ...ohneFuellung }
     }
     case 'linie': {
       const von = punktFeld(k, e.von, `${pfad}.von`)
       const nach = punktFeld(k, e.nach, `${pfad}.nach`)
       const farbe = e.farbe !== undefined ? farbFeld(k, e.farbe, `${pfad}.farbe`, 'linie') : undefined
       const art = linienartFeld(k, e.linienart, `${pfad}.linienart`)
+      const breite = linienbreiteFeld(k, e, pfad)
       if (e.pfeil !== undefined && typeof e.pfeil !== 'boolean') fehlt(k, `${pfad}.pfeil`, 'pfeil ist true oder false.')
       if (k.fehler.length > anfang || !von || !nach) return null
       const p1 = mZuPx(a, von)
       const p2 = mZuPx(a, nach)
       return {
-        id: neueId(),
+        ...gemeinsam,
         typ: 'linie',
         x1: p1.x,
         y1: p1.y,
@@ -286,6 +345,7 @@ function pruefeElement(k: Kontext, e: unknown, i: number, a: ReturnType<typeof a
         y2: p2.y,
         ...(farbe && farbe.toUpperCase() !== '#1A1A1A' ? { farbe } : {}),
         ...(art === 'gestrichelt' ? { linienart: art } : {}),
+        ...(breite ? { linienbreite: breite } : {}),
         ...(e.pfeil === true ? { pfeil: true } : {}),
       }
     }
@@ -303,7 +363,7 @@ function pruefeElement(k: Kontext, e: unknown, i: number, a: ReturnType<typeof a
       const p1 = mZuPx(a, von)
       const p2 = mZuPx(a, nach)
       return {
-        id: neueId(),
+        ...gemeinsam,
         typ: 'massangabe',
         x1: p1.x,
         y1: p1.y,
@@ -313,107 +373,49 @@ function pruefeElement(k: Kontext, e: unknown, i: number, a: ReturnType<typeof a
         ...(farbe ? { farbe } : {}),
       }
     }
-    case 'text': {
-      const x = zahlFeld(k, e, 'x', pfad, { pflicht: true })
-      const y = zahlFeld(k, e, 'y', pfad, { pflicht: true })
-      const inhalt = textFeld(k, e.inhalt, `${pfad}.inhalt`)
-      if (inhalt === undefined) fehlt(k, `${pfad}.inhalt`, '„inhalt“ fehlt: der Text.')
-      if (k.fehler.length > anfang || x === undefined || y === undefined || !inhalt) return null
-      const gr = 14
-      const m = mZuPx(a, { x, y })
-      return { id: neueId(), typ: 'text', x: r1(m.x - (inhalt.length * gr * 0.55) / 2), y: r1(m.y - (gr + 4) / 2), inhalt }
-    }
     default: {
-      // Symbole
-      const art = typ as SymbolArt
-      const std = standardgroesseM(art)
+      // text
       const x = zahlFeld(k, e, 'x', pfad, { pflicht: true })
       const y = zahlFeld(k, e, 'y', pfad, { pflicht: true })
-      const b = zahlFeld(k, e, 'breite', pfad, { groesser0: true, max: MAX_GROESSE_M }) ?? std.breite
-      const h = zahlFeld(k, e, 'hoehe', pfad, { groesser0: true, max: MAX_GROESSE_M }) ?? std.hoehe
-      const bz = bezugPruefen(k, e.bezug, `${pfad}.bezug`)
-      let text = textFeld(k, e.beschriftung, `${pfad}.beschriftung`)
-      if (text === undefined && bz) text = art === 'entfernen' ? `${bz.name} entfernen` : bz.name
-      if (art === 'mangelhinweis' && !text) fehlt(k, `${pfad}.beschriftung`, 'Ein Mängelhinweis braucht „beschriftung“ (den Hinweistext).')
-      let ziel: MPunkt | undefined
-      if (e.ziel !== undefined) {
-        if (art !== 'mangelhinweis') fehlt(k, `${pfad}.ziel`, '„ziel“ (Pfeil) gibt es nur beim Mängelhinweis. Für andere Pfeile eine „linie“ mit pfeil: true nehmen.')
-        else ziel = punktFeld(k, e.ziel, `${pfad}.ziel`)
+      let inhalt = textFeld(k, e.inhalt, `${pfad}.inhalt`)
+      if (inhalt === undefined && bz) inhalt = bz.name
+      if (inhalt === undefined) fehlt(k, `${pfad}.inhalt`, '„inhalt“ fehlt: der Text (oder „bezug“ auf eine Position – dann ist es ihr Kurzname).')
+      const farbe = e.farbe !== undefined ? farbFeld(k, e.farbe, `${pfad}.farbe`, 'linie') : undefined
+      let gr: number | undefined
+      if (e.groesse !== undefined) {
+        if (!istZahl(e.groesse) || e.groesse < 5 || e.groesse > 28) fehlt(k, `${pfad}.groesse`, 'groesse ist die Schriftgröße in pt (5 bis 28, üblich 9).')
+        else gr = e.groesse
       }
-      if (k.fehler.length > anfang || x === undefined || y === undefined) return null
+      if (k.fehler.length > anfang || x === undefined || y === undefined || !inhalt) return null
+      const px = (gr ?? 9) * pxPt
       const m = mZuPx(a, { x, y })
-      const pb = b * a.pxProM
-      const ph = h * a.pxProM
-      return {
-        id: neueId(),
-        typ: 'symbol',
-        art,
-        x: r1(m.x - pb / 2),
-        y: r1(m.y - ph / 2),
-        breite: r1(pb),
-        hoehe: r1(ph),
-        ...(text ? { beschriftung: text } : {}),
-        ...(ziel ? { ziel: mZuPx(a, ziel) } : {}),
-        ...(bz ? { bezug: bz.bezug } : {}),
-      }
+      return { ...gemeinsam, typ: 'text', x: r1(m.x - (inhalt.length * px * 0.55) / 2), y: r1(m.y - (px + 4) / 2), inhalt, schriftgroesse: r1(px), ...(farbe ? { farbe } : {}) }
     }
   }
 }
 
-/** Mittelpunkt eines Elements in Pixeln (für die Lageprüfung). */
-function mittelpunkt(el: SkizzeElement): { x: number; y: number } | null {
+/** Anzeigename der Grundform für Zusammenfassung und Hinweise. */
+function formName(el: SkizzeElement): string {
   switch (el.typ) {
-    case 'symbol':
     case 'rechteck':
-      return { x: el.x + el.breite / 2, y: el.y + el.hoehe / 2 }
+      return 'Rechteck'
     case 'kreis':
-      return { x: el.cx, y: el.cy }
-    case 'vieleck': {
-      const xs = el.punkte.map((p) => p.x)
-      const ys = el.punkte.map((p) => p.y)
-      return { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 }
-    }
+      return el.radiusY !== undefined ? 'Ellipse' : 'Kreis'
+    case 'vieleck':
+      return el.offen ? 'Linienzug' : el.punkte.length === 3 ? 'Dreieck' : 'Vieleck'
+    case 'linie':
+      return el.pfeil ? 'Pfeil' : 'Linie'
+    case 'massangabe':
+      return 'Maßlinie'
+    case 'text':
+      return 'Text'
     default:
-      return null
+      return el.typ
   }
 }
 
-/** Symbole, die ein einzelner Gegenstand im Garten sind (nicht auf einem Gebäude zu erwarten). */
-const PUNKTFOERMIG = new Set<string>(['baum', 'strauch', 'wildling', 'kletterpflanze', 'kompost', 'beet', 'hochbeet', 'blumenbeet', 'brunnen', 'schacht', 'holzpferd', 'schaukel', 'gegenstand'])
-
-const KATEGORIE_NAMEN: Record<string, string> = {
-  baum: 'Baum',
-  strauch: 'Strauch',
-  wildling: 'Wildling',
-  kletterpflanze: 'Kletterpflanze',
-  hecke: 'Hecke',
-  beet: 'Beet',
-  hochbeet: 'Hochbeet',
-  blumenbeet: 'Blumenbeet',
-  rasen: 'Rasenfläche',
-  kompost: 'Kompost',
-  brunnen: 'Brunnen',
-  schacht: 'Schacht',
-  weg: 'Weg',
-  tor: 'Tor',
-  holzpferd: 'Holzpferd',
-  schaukel: 'Schaukel',
-  gegenstand: 'Gegenstand',
-  entfernen: 'Entfernen-Markierung',
-  mangelhinweis: 'Mängelhinweis',
-  rechteck: 'Rechteck',
-  ellipse: 'Ellipse',
-  vieleck: 'Vieleck',
-  linie: 'Linie',
-  massangabe: 'Maßlinie',
-  text: 'Text',
-}
-
-function plural(name: string, n: number): string {
-  if (n === 1) return `1 ${name}`
-  const mehrzahl: Record<string, string> = { Baum: 'Bäume', Strauch: 'Sträucher', Hecke: 'Hecken', Weg: 'Wege', Tor: 'Tore', Kompost: 'Kompost', Beet: 'Beete', Hochbeet: 'Hochbeete', Blumenbeet: 'Blumenbeete', Brunnen: 'Brunnen', Schacht: 'Schächte', Rechteck: 'Rechtecke', Ellipse: 'Ellipsen', Vieleck: 'Vielecke', Linie: 'Linien', Text: 'Texte', Wildling: 'Wildlinge', Kletterpflanze: 'Kletterpflanzen', Mängelhinweis: 'Mängelhinweise', Maßlinie: 'Maßlinien', Rasenfläche: 'Rasenflächen', Gegenstand: 'Gegenstände', Holzpferd: 'Holzpferde', Schaukel: 'Schaukeln', 'Entfernen-Markierung': 'Entfernen-Markierungen' }
-  return `${n} ${mehrzahl[name] ?? name}`
-}
+const MEHRZAHL: Record<string, string> = { Rechteck: 'Rechtecke', Kreis: 'Kreise', Ellipse: 'Ellipsen', Dreieck: 'Dreiecke', Vieleck: 'Vielecke', Linienzug: 'Linienzüge', Linie: 'Linien', Pfeil: 'Pfeile', Maßlinie: 'Maßlinien', Text: 'Texte' }
+const plural = (name: string, n: number): string => (n === 1 ? `1 ${name}` : `${n} ${MEHRZAHL[name] ?? name}`)
 
 /**
  * Prüft einen Vorschlag. `skizze` ist die Skizze, auf die er sich bezieht (Editor-Stand bzw. gespeicherte Skizze).
@@ -459,10 +461,11 @@ export function pruefeVorschlag(eingabe: unknown, wep: Wep, skizze: SkizzeDaten 
   if (k.fehler.length) return leer(`Nichts angezeigt: ${k.fehler.length} ${k.fehler.length === 1 ? 'Fehler' : 'Fehler'} im Vorschlag.`)
 
   const { abb, mitParzelle, flaecheM } = abbildungFuer(wep, skizze)
+  const pxPt = (skizze?.breite ?? 800) / 452
   const elemente: SkizzeElement[] = []
   const roh = json.elemente as unknown[]
   roh.forEach((e, i) => {
-    const el = pruefeElement(k, e, i, abb)
+    const el = pruefeElement(k, e, i, abb, pxPt)
     if (el) elemente.push(el)
   })
   if (k.fehler.length) return leer(`Nichts angezeigt: ${k.fehler.length} ${k.fehler.length === 1 ? 'Fehler' : 'Fehler'} im Vorschlag.`)
@@ -472,21 +475,22 @@ export function pruefeVorschlag(eingabe: unknown, wep: Wep, skizze: SkizzeDaten 
     k.hinweise.push(`Es gilt keine Parzelle: Die Meter beziehen sich auf eine Zeichenfläche von ${fmt.format(flaecheM.breite)} × ${fmt.format(flaecheM.hoehe)} m. Mit angelegter Parzelle (Reiter „Skizze“) liegen die Meter auf dem Grundstück.`)
   }
   const lage = lageVon(wep)
-  const bauteile = (skizze?.elemente ?? []).filter((e): e is SkizzeBauform => e.typ === 'bauform' && e.art === 'bauteil' && istGrundlage(e))
-  elemente.forEach((el, i) => {
-    const m = mittelpunkt(el)
-    if (!m) return
-    const mm = { x: (m.x - abb.ox) / abb.pxProM, y: (m.y - abb.oy) / abb.pxProM }
-    const name = `elemente[${i}] (${el.typ === 'symbol' ? KATEGORIE_NAMEN[el.art] : (KATEGORIE_NAMEN[el.typ === 'kreis' ? 'ellipse' : el.typ] ?? el.typ)}${'beschriftung' in el && el.beschriftung ? ` „${el.beschriftung}“` : ''})`
-    if (lage && mitParzelle && !punktImPolygon(mm, lage.punkte, 0.3)) k.hinweise.push(`${name} liegt außerhalb der Parzelle.`)
-    if (el.typ === 'symbol' && PUNKTFOERMIG.has(el.art)) {
-      const auf = bauteile.find((b) => imVieleck(m, b.punkte))
-      if (auf) k.hinweise.push(`${name} liegt auf dem Bauteil „${(auf.beschriftung ?? '').split('\n')[0] || 'Gebäude'}“ der Grundlage.`)
-    }
-  })
-
-  // Aufwuchs-/Außenanlagen-Positionen ohne Skizzenelement; mehr Elemente als Stück
+  if (lage && mitParzelle) {
+    elemente.forEach((el, i) => {
+      const kasten = elementKasten(el)
+      const mm = { x: (kasten.x + kasten.breite / 2 - abb.ox) / abb.pxProM, y: (kasten.y + kasten.hoehe / 2 - abb.oy) / abb.pxProM }
+      if (!punktImPolygon(mm, lage.punkte, 0.3)) {
+        k.hinweise.push(`elemente[${i}] (${formName(el)}${el.name ? ` „${el.name}“` : ''}) liegt mit seiner Mitte außerhalb der Parzelle.`)
+      }
+    })
+  }
   const bestehend = (skizze?.elemente ?? []).filter((e) => !istGrundlage(e))
+  if (json.modus === 'gruen-ersetzen' && bestehend.length) {
+    const symbole = bestehend.filter((e) => e.typ === 'symbol').length
+    k.hinweise.push(`„gruen-ersetzen“ ersetzt ${bestehend.length} vorhandene Grün-Elemente${symbole ? ` (davon ${symbole} Symbole des Nutzers, die als Grundformen nicht wiederkommen)` : ''}.`)
+  }
+
+  // Aufwuchs-Positionen ohne Skizzenelement; mehr Elemente als Stück (Bezug nur am Hauptelement eines Gegenstands setzen)
   const nachModus = (json.modus === 'gruen-ersetzen' ? [] : bestehend).concat(elemente)
   const bezuege = new Map<string, number>()
   for (const el of nachModus) if (el.bezug) bezuege.set(`${el.bezug.liste}:${el.bezug.id}`, (bezuege.get(`${el.bezug.liste}:${el.bezug.id}`) ?? 0) + 1)
@@ -497,16 +501,13 @@ export function pruefeVorschlag(eingabe: unknown, wep: Wep, skizze: SkizzeDaten 
   for (const p of wep.gruen.aufwuchs) {
     const n = bezuege.get(`aufwuchs:${p.id}`) ?? 0
     if (p.einheit === 'Stück' && p.anzahl > 0 && n > p.anzahl) {
-      k.hinweise.push(`Zur Position „${kurzname(p.bezeichnung)}“ gehören ${p.anzahl} Stück, in der Skizze verweisen aber ${n} Elemente darauf.`)
+      k.hinweise.push(`Zur Position „${kurzname(p.bezeichnung)}“ gehören ${p.anzahl} Stück, in der Skizze verweisen aber ${n} Elemente darauf (der Bezug gehört nur an ein Element je Gegenstand).`)
     }
   }
 
   // Zusammenfassung
   const zaehler = new Map<string, number>()
-  for (const el of elemente) {
-    const n = KATEGORIE_NAMEN[el.typ === 'symbol' ? el.art : el.typ === 'kreis' ? 'ellipse' : el.typ] ?? el.typ
-    zaehler.set(n, (zaehler.get(n) ?? 0) + 1)
-  }
+  for (const el of elemente) zaehler.set(formName(el), (zaehler.get(formName(el)) ?? 0) + 1)
   const teile = [...zaehler].map(([n, c]) => plural(n, c))
   const mitBezug = elemente.filter((e) => e.bezug).length
   const modusText = json.modus === 'gruen-ersetzen' ? 'ersetzt das bisherige Grün (die Grundlage bleibt)' : 'ergänzt die Skizze'
@@ -524,4 +525,3 @@ export function pruefeVorschlag(eingabe: unknown, wep: Wep, skizze: SkizzeDaten 
     elemente,
   }
 }
-

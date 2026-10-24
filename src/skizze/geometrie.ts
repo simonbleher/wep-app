@@ -77,8 +77,11 @@ export function trifftElement(element: SkizzeElement, p: Punkt, toleranz?: numbe
     }
     case 'vieleck':
     case 'bauform': {
-      if (imVieleck(p, element.punkte)) return true
-      return element.punkte.some((a, i) => abstandPunktZuStrecke(p, a, element.punkte[(i + 1) % element.punkte.length]) <= t)
+      const offen = element.typ === 'vieleck' && element.offen === true
+      if (!offen && imVieleck(p, element.punkte)) return true
+      const n = element.punkte.length
+      // Ein offener Linienzug hat keine Schlusskante vom letzten zum ersten Punkt
+      return element.punkte.some((a, i) => !(offen && i === n - 1) && abstandPunktZuStrecke(p, a, element.punkte[(i + 1) % n]) <= t)
     }
     case 'rechteck': {
       const { x, y, breite, hoehe } = element

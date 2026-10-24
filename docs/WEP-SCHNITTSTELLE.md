@@ -13,7 +13,7 @@ geöffnet ist**. Für den Nutzer bleibt die Skizze fast unverändert; der Agent 
 1. WEP öffnen lassen (Nutzer), Reiter egal. Prüfen: `typeof window.wep` ist `'object'`.
 2. `window.wep.schema()` einmal lesen (JSON-Schema mit Beschreibung je Feld).
 3. `const d = window.wep.lesen()` – Parzelle, Bau, Grundlage, Aufwuchs/Außenanlagen (mit `id`), vorhandene Skizze, Stile.
-4. Skizze planen **in Metern** (siehe Koordinatensystem), Elemente mit `bezug` auf die `id` der Positionen verknüpfen.
+4. Skizze planen **in Metern** (siehe Koordinatensystem) und aus **Grundformen** zeichnen (Kreise, Linien, Vierecke, Dreiecke …; Hilfe: `window.wep.skizze.baustein('baum', { x, y })`); je Gegenstand ein Element mit `bezug` auf die `id` der Position verknüpfen.
 5. `window.wep.skizze.vorschlagen(vorschlag)` → `{ ok, fehler[], hinweise[], zusammenfassung, anzahl }`.
    Bei `ok: false` wurde **nichts** angezeigt: `fehler[].pfad`/`meldung` lesen, korrigieren, erneut senden.
    Bei `ok: true` öffnet die App den Reiter „Skizze“ und zeigt den Vorschlag orange gestrichelt mit dem Balken
@@ -31,65 +31,83 @@ Modi (`modus`): `ergaenzen` (Standard) fügt zur vorhandenen Skizze hinzu; `grue
 ## Koordinatensystem
 Meter **auf der Parzelle**: Ursprung links oben der Parzelle (bei freier Form: links oben ihres umgebenden Rechtecks), **x nach rechts,
 y nach unten**. `lesen().parzelle` nennt Ecken, Breite und Höhe; `lesen().grundlage.elemente` und `bau.grundriss` liegen im selben System.
-**`x`/`y` sind immer Mittelpunkte** (rechteck, ellipse, Symbole, text); `breite`/`hoehe` sind die vollen Maße. Vieleck, Linie und Maßlinie
+**`x`/`y` sind immer Mittelpunkte** (rechteck, ellipse, bogen, text); `breite`/`hoehe` sind die vollen Maße. Vieleck, Linie und Maßlinie
 nutzen absolute Punkte `{ "x": …, "y": … }`. Ohne Parzelle gilt eine Zeichenfläche von 20 × 15 m (`lesen().parzelle.hinweis` sagt es).
 
-## Format `wep-skizze/1`
+## Format `wep-skizze/2`: alles aus Grundformen
+Der Vorschlag kennt **keine fertigen Symbole** (Baum, Hecke, Weg …). Alles wird – wie im Skill `parzellen-skizze` für Excel – aus **Grundformen**
+gezeichnet: Rechtecke, Ellipsen/Kreise, Vielecke (Dreiecke, Sterne, schräge Flächen), Bögen, Linien, Maßlinien und Text. Jede Form kann **gefüllt** werden
+und hat eine **eigene Linienfarbe, -stärke und -art**, unabhängig von der Füllung. Die Reihenfolge der Liste ist die Zeichenreihenfolge (was später kommt, liegt oben).
+
 ```json
-{ "format": "wep-skizze/1", "modus": "ergaenzen", "elemente": [ … ] }
+{ "format": "wep-skizze/2", "modus": "ergaenzen", "elemente": [ … ] }
 ```
 | typ | Pflichtfelder | weitere Felder |
 |---|---|---|
-| Symbole: `baum`, `strauch`, `wildling`, `kletterpflanze`, `hecke`, `beet`, `hochbeet`, `blumenbeet`, `rasen`, `kompost`, `brunnen`, `schacht`, `weg`, `tor`, `holzpferd`, `schaukel`, `gegenstand`, `entfernen`, `mangelhinweis` | `x`, `y` | `breite`, `hoehe` (sonst Standardgröße, `lesen().stile.elementtypen`), `beschriftung`, `bezug`, `ziel` (nur `mangelhinweis`) |
-| `rechteck`, `ellipse` (Kreis: `breite` = `hoehe`) | `x`, `y`, `breite`, `hoehe` | `stil`, `fuellung`, `linie`, `linienart`, `beschriftung`, `bezug` |
-| `vieleck` | `punkte` (≥ 3) | wie `rechteck` |
-| `linie` | `von`, `nach` | `farbe`, `linienart`, `pfeil` (Spitze bei `nach`) |
+| `rechteck` | `x`, `y`, `breite`, `hoehe` | `stil`, `fuellung`, `linie`, `linienart`, `linienbreite`, `beschriftung` |
+| `ellipse` (Kreis: `breite` = `hoehe`) | `x`, `y`, `breite`, `hoehe` | wie `rechteck` |
+| `vieleck` (Dreieck = 3 Punkte) | `punkte` (≥ 3; mit `offen: true` ≥ 2) | `offen` (Linienzug ohne Füllung), sonst wie `rechteck` |
+| `bogen` (Viertelbogen, Rundung) | `x`, `y`, `breite`, `hoehe`, `startWinkel`, `endWinkel` | `linie`, `linienart`, `linienbreite` – nur Linie |
+| `linie` | `von`, `nach` | `farbe`, `linienart`, `linienbreite`, `pfeil` (Spitze bei `nach`) |
 | `massangabe` | `von`, `nach` | `beschriftung` (sonst berechnete Länge, „4,5 m“), `farbe` |
-| `text` | `x`, `y`, `inhalt` | – |
+| `text` | `x`, `y` und `inhalt` (oder `bezug`) | `farbe`, `groesse` (pt, 5–28, üblich 9) |
 
-- **Farben** `#RRGGBB`. `stil` = Kurzname einer Vorgabe (`wiese` #C5E0B4, `weg` #EDE4D3, `kompost` #D9C3A5/#8B5A2B, `flieder` #B4A7D6/#7030A0,
-  `hecke`, `beet`, `wasser`, `schacht`, `gebaeude`, `hinweis` #C00000, `entfernen`, `rahmen`, `gestrichelt`); `fuellung`/`linie`/`linienart`
-  überschreiben ihn; `"fuellung": null` = keine Füllung. `linienart`: `durchgezogen` | `gestrichelt`.
-- **`bezug`** `{ "liste": "aufwuchs" | "aussenanlagen" | "beseitigung", "id": "<Position.id>" }`: Name/Art folgen der Position
-  (Kurzname vor dem ersten Komma, bei `entfernen` „<Name> entfernen“), falls keine `beschriftung` angegeben ist. Gespeichert wird der Verweis.
-- Reihenfolge = Zeichenreihenfolge (hinten zuerst): Flächen zuerst, Bäume/Hecken danach, Beschriftungen und Hinweise zuletzt.
-- Unbekannte Felder sind Fehler (z. B. `elemente[3].farbe`), ebenso Zahlen als Text, unbekannte Farben, Bezüge ohne Position. Höchstens 400 Elemente.
-- Im Excel-Export gelten die Farben der Skizze; Flächen mit Füllung liegen unter Bäumen und Hecken.
+Für alle Formen: `name` (sprechend, wird zum Formnamen im Excel, z. B. „Stamm“, „Krone“) und `bezug`.
+- **Farben** `#RRGGBB`. `fuellung` = Fläche, `linie` (bei Linien/Maß/Text: `farbe`) = Rand bzw. Strich – beide unabhängig. `"fuellung": null` = keine Füllung.
+  `stil` = Kurzname einer Vorgabe, die Füllung **und** Linie setzt (`wiese` #C5E0B4, `weg` #EDE4D3, `kompost` #D9C3A5/#8B5A2B, `flieder` #B4A7D6/#7030A0, `hecke`, `beet`,
+  `wasser`, `schacht`, `gebaeude`, `hinweis` #C00000, `entfernen`, `rahmen`, `gestrichelt`); Einzelangaben überschreiben ihn.
+- **`linienbreite`** in pt des Excel-Blatts (0,25–6; üblich 1, Maßlinien und Tor 2), **`linienart`** `durchgezogen` | `gestrichelt`.
+- **Bogen:** Mittelpunkt `x`/`y`, `breite`/`hoehe` = Durchmesser des vollen Kreises; Winkel in Grad, 0 = rechts, 90 = unten, 180 = links, 270 = oben (Uhrzeigersinn), 1°–360°.
+  Viertelbogen am Tor: 180 → 270.
+- **`bezug`** `{ "liste": "aufwuchs" | "aussenanlagen" | "beseitigung", "id": "<Position.id>" }` verknüpft die Zeichnung mit einer Position.
+  **Nur an ein Element je Gegenstand setzen** (z. B. den ersten Kronenkreis): die App zählt die Verweise gegen die Stückzahl und meldet Aufwuchs-Positionen ohne Element.
+- Unbekannte Felder, Zahlen als Text, unbekannte Farben, Symbole und Bezüge ohne Position sind Fehler mit Pfad (`elemente[3].fuellung`). Höchstens 400 Elemente, alles oder nichts.
+- Im Excel liegen die Formen in Listenreihenfolge übereinander (eine Ebene), werden nicht verschoben oder verkleinert; Füllung, Linienfarbe/-stärke/-art und Textfarbe gelten.
+
+### Bausteine: fertige Grundformen als Hilfe
+`window.wep.skizze.baustein(name, { x, y, breite?, hoehe?, beschriftung?, ziel? })` → `{ ok, fehler[], elemente[] }` liefert die Grundformen für einen Gegenstand
+(`baum`, `strauch`, `wildling`, `kletterpflanze`, `hecke`, `beet`, `hochbeet`, `blumenbeet`, `kompost`, `brunnen`, `schacht`, `weg`, `tor`, `holzpferd`, `schaukel`,
+`gegenstand`, `entfernen`, `mangelhinweis`). Sie sind genau wie im Skill gebaut (Baum = Stamm #7F5A2E + drei Kronenkreise #548235/#385723; Hecke = Reihe überlappender,
+versetzter Kreise, bei „Flieder“ in der Beschriftung lila; Tor = Linie + Viertelbogen; Entfernen = grüner Stern mit rotem X und Hinweisfeld; Mängelhinweis = Feld mit rotem Pfeil).
+Der Agent hängt die Elemente an seine Liste an (und setzt den `bezug` am ersten), ändert Farben/Größen nach Bedarf oder zeichnet selbst. `lesen().stile.bausteine` nennt Namen und Standardgrößen.
 
 ## Beispiele
-Die vollständige Beispielskizze liegt als `docs/skizze-agent/beispiel-vorschlag.json` (12 Elemente, Bezug zu den Positionen aus dem Test-WEP):
-
+`docs/skizze-agent/beispiel-vorschlag.json` (51 Grundformen, erzeugt mit `tools/skizze-agent/erzeuge-beispiel.ts`) – Excel-Render: `docs/skizze-agent/excel-gruen.png`. Von Hand:
 ```json
-{ "typ": "baum", "x": 14, "y": 5, "bezug": { "liste": "aufwuchs", "id": "p-apfel" } }
+{ "typ": "vieleck", "name": "Dreieckbeet", "punkte": [{ "x": 7, "y": 3 }, { "x": 10.5, "y": 3 }, { "x": 7, "y": 6 }], "fuellung": "#EBDDC7", "linie": "#7030A0", "linienbreite": 2 }
 ```
-*Baum zu Aufwuchs-Position* – beschriftet sich als „Apfel“.
+*Dreieck, gefüllt, mit eigener Linienfarbe und -stärke.*
 ```json
-{ "typ": "hecke", "x": 17.2, "y": 12, "breite": 0.9, "hoehe": 9, "bezug": { "liste": "aufwuchs", "id": "p-hecke" } }
+{ "typ": "rechteck", "name": "Stamm", "x": 14, "y": 5.6, "breite": 0.25, "hoehe": 0.8, "fuellung": "#7F5A2E", "linie": "#7F5A2E", "bezug": { "liste": "aufwuchs", "id": "p-apfel" } },
+{ "typ": "ellipse", "name": "Krone", "x": 14, "y": 4.7, "breite": 1.3, "hoehe": 1.3, "fuellung": "#548235", "linie": "#385723" }
 ```
-*Heckenreihe* – die längere Seite ist die Richtung (hier senkrecht, 9 m).
+*Baum zu Aufwuchs-Position:* Stamm und Krone (weitere Kronenkreise genauso), Bezug nur am Stamm.
 ```json
-{ "typ": "weg", "x": 9, "y": 21, "breite": 1.4, "hoehe": 8, "beschriftung": "Weg" },
-{ "typ": "tor", "x": 9.7, "y": 25.2, "breite": 1.2, "hoehe": 1.2 }
+{ "typ": "ellipse", "name": "Hecke", "x": 17.2, "y": 6.5, "breite": 0.9, "hoehe": 0.9, "fuellung": "#A9D18E", "linie": "#548235" }
+```
+*Heckenreihe:* Kreise entlang der Grenze, jeweils um etwa 0,6 m versetzt (oder `baustein('hecke', …)`).
+```json
+{ "typ": "rechteck", "name": "Weg", "x": 9, "y": 21, "breite": 1.4, "hoehe": 8, "fuellung": "#EDE4D3", "linie": "#A6A6A6", "beschriftung": "Weg" },
+{ "typ": "linie", "name": "Tor", "von": { "x": 10.4, "y": 24.6 }, "nach": { "x": 10.4, "y": 25.8 }, "farbe": "#262626", "linienbreite": 2 },
+{ "typ": "bogen", "name": "Tor_Bogen", "x": 10.4, "y": 25.8, "breite": 2.4, "hoehe": 2.4, "startWinkel": 180, "endWinkel": 270, "linie": "#262626" }
 ```
 *Weg mit Tor.*
 ```json
-{ "typ": "kompost", "x": 2, "y": 22, "breite": 1.6, "hoehe": 1 }
+{ "typ": "rechteck", "name": "Kompost", "x": 2, "y": 22, "breite": 1.6, "hoehe": 1, "stil": "kompost" },
+{ "typ": "linie", "name": "Latte", "von": { "x": 1.8, "y": 21.6 }, "nach": { "x": 1.8, "y": 22.4 }, "farbe": "#8B5A2B", "linienbreite": 2.5 }
 ```
-*Kompost.*
+*Kompost* (weitere Latten bei x = 2,0 und 2,2).
 ```json
-{ "typ": "mangelhinweis", "x": 5, "y": 19, "breite": 4, "hoehe": 0.9, "beschriftung": "Rückschnitt nötig", "ziel": { "x": 8, "y": 22 } }
+{ "typ": "rechteck", "name": "Hinweis", "x": 5, "y": 19, "breite": 4, "hoehe": 0.9, "fuellung": "#FFFFFF", "linie": "#C00000", "beschriftung": "Rückschnitt nötig" },
+{ "typ": "linie", "name": "Hinweis_Pfeil", "von": { "x": 6, "y": 19.5 }, "nach": { "x": 8, "y": 22 }, "farbe": "#C00000", "pfeil": true }
 ```
-*Mängelhinweis mit Pfeil* (roter Pfeil vom Feld zum Ziel). Eigener Pfeil: `{ "typ": "linie", "von": {…}, "nach": {…}, "farbe": "#C00000", "pfeil": true }`.
+*Mängelhinweis mit Pfeil.*
 ```json
-{ "typ": "massangabe", "von": { "x": 1, "y": 0.4 }, "nach": { "x": 17, "y": 0.4 }, "beschriftung": "16 m" }
+{ "typ": "massangabe", "von": { "x": 1, "y": 0.4 }, "nach": { "x": 17, "y": 0.4 }, "beschriftung": "16 m", "farbe": "#C00000" }
 ```
-*Maßlinie.*
+*Maßlinie.* Ein Fehler sieht so aus:
 ```json
-{ "typ": "vieleck", "punkte": [{ "x": 1, "y": 1 }, { "x": 17, "y": 1 }, { "x": 17, "y": 8 }, { "x": 1, "y": 9 }], "stil": "wiese", "beschriftung": "Wiese" }
-```
-*Wiese als Füllung.* Ein Fehler sieht so aus:
-```json
-{ "ok": false, "fehler": [{ "pfad": "elemente[0].bezug.id", "meldung": "Keine Position „x“ in „aufwuchs“. Vorhanden: p-apfel, p-birne …" }],
+{ "ok": false, "fehler": [{ "pfad": "elemente[0].typ", "meldung": "„baum“ ist keine Grundform – der Vorschlag besteht nur aus Grundformen (rechteck, ellipse, …). Zeichne es aus Kreisen, Linien, Vierecken, Dreiecken … oder hole dir fertige Grundformen mit window.wep.skizze.baustein('baum', { x, y })." }],
   "hinweise": [], "zusammenfassung": "Nichts angezeigt: 1 Fehler im Vorschlag.", "anzahl": 0 }
 ```
 
@@ -129,8 +147,9 @@ nichts wird gesperrt (Warnungen, keine Blockaden).
 ## Grenzen
 - Kein Schreiben außer den Vorschlägen (Skizze, Positionen; keine Formalien, Fotos); kein Löschen einzelner vorhandener Elemente (nur `gruen-ersetzen` insgesamt).
 - Die Grundlage und Bau-Formen lassen sich nicht per Schnittstelle ändern; Bauteile kommen aus dem Bau-Teil bzw. der Bau-Excel.
+- Symbole, die der Nutzer mit dem Symbol-Werkzeug gesetzt hat, kommen in `lesen()` als `typ: "symbol"` (nur lesend) vor; sie lassen sich nicht vorschlagen. `gruen-ersetzen` ersetzt sie (der Hinweis nennt es).
+- Der Bogen wird als offener Linienzug gespeichert und kommt in `lesen()` als `vieleck` mit `offen: true` zurück.
 - Ohne Grün-Teil (Rolle „bau“) wird kein Vorschlag angenommen. Ein Vorschlag lebt nur im geöffneten WEP; schließt der Nutzer das WEP, verfällt er.
-- Der Bezug übernimmt den Namen zum Zeitpunkt des Vorschlags; wird die Position später umbenannt, bleibt die Beschriftung stehen.
 - Keine Prüfung der Fachregeln (Hecke > 1,25 m …): das macht der Katalog an den Positionen; `lesen()` liefert deren Hinweise (`invasiv`, `problempflanze`, `hinweise`).
 - Maße aus Fotos sind nur so genau wie der Agent sie liest – deshalb immer vom Nutzer bestätigen lassen.
 

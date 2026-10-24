@@ -8,7 +8,7 @@
 
 import type { SkizzeDaten, SkizzeElement } from './types.js'
 import { symbolPrims, zeichnePrims } from './symbole.js'
-import { LINIE_STANDARD, STRICH_MUSTER } from './stile.js'
+import { LINIE_STANDARD, STRICH_MUSTER, pxProPt } from './stile.js'
 
 /** Optionen für den PNG-Export. */
 export interface PngOptionen {
@@ -67,8 +67,9 @@ export function skizzeAufContext(
   }
 
   // Elemente zeichnen
+  const pt = pxProPt(breite)
   for (const el of daten.elemente) {
-    zeichneElement(ctx, el)
+    zeichneElement(ctx, el, pt)
   }
 }
 
@@ -111,11 +112,11 @@ export async function skizzeAlsPng(
 // Interne Zeichenfunktionen
 // ---------------------------------------------------------------------------
 
-function zeichneElement(ctx: CanvasRenderingContext2D, el: SkizzeElement): void {
+function zeichneElement(ctx: CanvasRenderingContext2D, el: SkizzeElement, pt: number): void {
   ctx.save()
   ctx.strokeStyle = '#1a1a1a'
   ctx.fillStyle = 'transparent'
-  ctx.lineWidth = 2
+  ctx.lineWidth = 'linienbreite' in el && el.linienbreite ? el.linienbreite * pt : 2
   ctx.font = `${14}px sans-serif`
 
   switch (el.typ) {
@@ -124,10 +125,10 @@ function zeichneElement(ctx: CanvasRenderingContext2D, el: SkizzeElement): void 
       break
 
     case 'rechteck':
-      if (el.fuellung || el.linie || el.linienart) {
+      if (el.fuellung || el.linie || el.linienart || el.linienbreite) {
         ctx.beginPath()
         ctx.rect(el.x, el.y, el.breite, el.hoehe)
-        fuelleUndRahmen(ctx, el.fuellung, el.linie, el.linienart)
+        fuelleUndRahmen(ctx, el.fuellung, el.linie, el.linienart, ctx.lineWidth)
       } else {
         ctx.strokeRect(el.x, el.y, el.breite, el.hoehe)
       }
@@ -135,11 +136,17 @@ function zeichneElement(ctx: CanvasRenderingContext2D, el: SkizzeElement): void 
       break
 
     case 'vieleck': {
-      if (el.punkte.length < 3) break
+      if (el.punkte.length < (el.offen ? 2 : 3)) break
       ctx.beginPath()
       el.punkte.forEach((q, i) => (i === 0 ? ctx.moveTo(q.x, q.y) : ctx.lineTo(q.x, q.y)))
+      if (el.offen) {
+        ctx.lineCap = 'round'
+        ctx.lineJoin = 'round'
+        fuelleUndRahmen(ctx, undefined, el.linie, el.linienart, ctx.lineWidth)
+        break
+      }
       ctx.closePath()
-      fuelleUndRahmen(ctx, el.fuellung, el.linie, el.linienart)
+      fuelleUndRahmen(ctx, el.fuellung, el.linie, el.linienart, ctx.lineWidth)
       if (el.beschriftung) {
         const xs = el.punkte.map((q) => q.x)
         const ys = el.punkte.map((q) => q.y)
@@ -205,7 +212,7 @@ function zeichneElement(ctx: CanvasRenderingContext2D, el: SkizzeElement): void 
       ctx.beginPath()
       if (ry === el.radius) ctx.arc(el.cx, el.cy, el.radius, 0, 2 * Math.PI)
       else ctx.ellipse(el.cx, el.cy, Math.max(0.01, el.radius), Math.max(0.01, ry), 0, 0, 2 * Math.PI)
-      if (el.fuellung || el.linie || el.linienart) fuelleUndRahmen(ctx, el.fuellung, el.linie, el.linienart)
+      if (el.fuellung || el.linie || el.linienart || el.linienbreite) fuelleUndRahmen(ctx, el.fuellung, el.linie, el.linienart, ctx.lineWidth)
       else ctx.stroke()
       if (el.beschriftung) {
         ctx.fillStyle = '#1a1a1a'
@@ -219,7 +226,7 @@ function zeichneElement(ctx: CanvasRenderingContext2D, el: SkizzeElement): void 
     case 'text': {
       const groesse = el.schriftgroesse ?? 14
       ctx.font = `${groesse}px sans-serif`
-      ctx.fillStyle = '#1a1a1a'
+      ctx.fillStyle = el.farbe ?? '#1a1a1a'
       ctx.textAlign = 'left'
       ctx.textBaseline = 'top'
       ctx.fillText(el.inhalt, el.x, el.y)
@@ -266,13 +273,13 @@ function zeichneElement(ctx: CanvasRenderingContext2D, el: SkizzeElement): void 
 }
 
 /** Füllung (falls gewählt) und Rahmen des aktuellen Pfads; ohne Angaben das bisherige Aussehen (nur dunkler Rahmen). */
-function fuelleUndRahmen(ctx: CanvasRenderingContext2D, fuellung?: string, linie?: string, linienart?: string): void {
+function fuelleUndRahmen(ctx: CanvasRenderingContext2D, fuellung?: string, linie?: string, linienart?: string, breite = 2): void {
   if (fuellung) {
     ctx.fillStyle = fuellung
     ctx.fill()
   }
   ctx.strokeStyle = linie ?? LINIE_STANDARD
-  ctx.lineWidth = 2
+  ctx.lineWidth = breite
   ctx.setLineDash(linienart === 'gestrichelt' ? STRICH_MUSTER : [])
   ctx.stroke()
   ctx.setLineDash([])

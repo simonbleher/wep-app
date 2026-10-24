@@ -14,6 +14,7 @@ import type { VorschlagAnzeige } from '../skizze/SkizzeEditor'
 import type { SkizzeDaten } from '../skizze/types'
 import type { Modus, StatusErgebnis, VorschlagErgebnis, VorschlagZustand } from './format'
 import { SCHNITTSTELLE_VERSION } from './format'
+import { baustein, type BausteinErgebnis } from './bausteine'
 import { leseWep } from './lesen'
 import { schema } from './schema'
 import { pruefeVorschlag } from './vorschlag'
@@ -186,6 +187,7 @@ export interface WepSchnittstelle {
   skizze: {
     vorschlagen: (vorschlag: unknown) => VorschlagErgebnis
     status: () => StatusErgebnis
+    baustein: (name: string, parameter: unknown) => BausteinErgebnis
   }
   positionen: {
     katalogSuchen: (begriff: string, liste?: 'aufwuchs' | 'aussenanlagen') => KatalogTrefferInfo[]
@@ -222,6 +224,7 @@ export function baueSchnittstelle(q: Quellen): WepSchnittstelle {
         }
         return ergebnis
       },
+      baustein: (name: string, parameter: unknown): BausteinErgebnis => baustein(name, parameter),
       status: (): StatusErgebnis => {
         const s = vorschlagSpeicher.schaue()
         return {

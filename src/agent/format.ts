@@ -11,7 +11,7 @@ import type { Linienart, SymbolArt } from '../skizze/types'
 /** Version der Schnittstelle (Rückgaben von `lesen()`, `schema()`, `status()`). */
 export const SCHNITTSTELLE_VERSION = 'wep-schnittstelle/1'
 /** Version des Skizzen-Vorschlags (Elementformat). */
-export const SKIZZE_FORMAT = 'wep-skizze/1'
+export const SKIZZE_FORMAT = 'wep-skizze/2'
 
 export type Modus = 'ergaenzen' | 'gruen-ersetzen'
 export const MODI: readonly Modus[] = ['ergaenzen', 'gruen-ersetzen']
@@ -20,7 +20,7 @@ export type BezugsListe = 'aufwuchs' | 'aussenanlagen' | 'beseitigung'
 export const BEZUGS_LISTEN: readonly BezugsListe[] = ['aufwuchs', 'aussenanlagen', 'beseitigung']
 
 /** Elementtypen des Vorschlags: die Symbole der App plus Formen und Linien. */
-export const FORM_TYPEN = ['rechteck', 'ellipse', 'vieleck', 'linie', 'massangabe', 'text'] as const
+export const FORM_TYPEN = ['rechteck', 'ellipse', 'vieleck', 'bogen', 'linie', 'massangabe', 'text'] as const
 export type FormTypName = (typeof FORM_TYPEN)[number]
 
 export interface MPunkt {
@@ -33,9 +33,14 @@ export interface Bezug {
   id: string
 }
 
-/** Ein Element der Grün-Skizze im Format `wep-skizze/1` (Meter; `x`/`y` = Mittelpunkt). */
+/**
+ * Ein Element der Grün-Skizze im Format `wep-skizze/2` (Meter; `x`/`y` = Mittelpunkt). Im Vorschlag nur Grundformen (`FormTypName`);
+ * `symbol` kommt nur in `lesen()` vor (vom Nutzer mit dem Symbol-Werkzeug gesetzt, nicht als Vorschlag erlaubt).
+ */
 export interface FormatElement {
-  typ: SymbolArt | FormTypName
+  typ: FormTypName | 'symbol'
+  /** Nur `symbol` (lesen): Art des Symbols. */
+  art?: SymbolArt
   /** Nur in `lesen()`: Kennung des vorhandenen Elements. Im Vorschlag wird sie ignoriert (die App vergibt neue). */
   id?: string
   x?: number
@@ -48,6 +53,17 @@ export interface FormatElement {
   ziel?: MPunkt
   /** Vieleck: Eckpunkte (absolut, Meter). */
   punkte?: MPunkt[]
+  /** Vieleck: offener Linienzug statt geschlossener Fläche. */
+  offen?: boolean
+  /** Bogen: Anfangs- und Endwinkel in Grad (0 = rechts, im Uhrzeigersinn, y nach unten). */
+  startWinkel?: number
+  endWinkel?: number
+  /** Sprechender Name des Elements (wird zum Formnamen im Excel). */
+  name?: string
+  /** Linienstärke in pt des Excel-Blatts. */
+  linienbreite?: number
+  /** Text: Schriftgröße in pt. */
+  groesse?: number
   /** Linie, Maßangabe: Anfang und Ende. */
   von?: MPunkt
   nach?: MPunkt
@@ -175,6 +191,12 @@ export interface BeseitigungInfo {
   einzelpreis: number
 }
 
+export interface BausteinInfo {
+  name: string
+  beschreibung: string
+  standardgroesseM: { breite: number; hoehe: number }
+}
+
 export interface LesenErgebnis {
   schemaVersion: typeof SCHNITTSTELLE_VERSION
   /** Format der Elemente in `skizzeGruen` (und des Vorschlags). */
@@ -221,6 +243,8 @@ export interface LesenErgebnis {
   }
   stile: {
     elementtypen: ElementtypInfo[]
+    /** Fertige Zeichnungen aus Grundformen: `window.wep.skizze.baustein(name, { x, y })`. */
+    bausteine: BausteinInfo[]
     vorgaben: StilVorgabeInfo[]
     fuellfarben: { name: string; wert: string }[]
     linienfarben: { name: string; wert: string }[]

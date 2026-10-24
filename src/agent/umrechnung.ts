@@ -60,14 +60,16 @@ export function standardgroesseM(art: SymbolArt): { breite: number; hoehe: numbe
 
 const istSymbolArt = (t: string): t is SymbolArt => (SYMBOL_ARTEN as readonly string[]).includes(t)
 
-/** Ein vorhandenes Grün-Element im Format `wep-skizze/1` (Meter, Mittelpunkt); Bau-Formen der Grundlage geben `null`. */
-export function elementZuFormat(el: SkizzeElement, a: Abbildung): FormatElement | null {
+/** Ein vorhandenes Grün-Element im Format `wep-skizze/2` (Meter, Mittelpunkt); Bau-Formen der Grundlage geben `null`. */
+export function elementZuFormat(el: SkizzeElement, a: Abbildung, pxPt = 1): FormatElement | null {
   const L = (px: number) => r2(px / a.pxProM)
   const mitte = (x: number, y: number, b: number, h: number) => pxZuM(a, { x: x + b / 2, y: y + h / 2 })
-  const stil = (e: { fuellung?: string; linie?: string; linienart?: string }) => ({
+  const stil = (e: { fuellung?: string; linie?: string; linienart?: string; linienbreite?: number; name?: string }) => ({
+    ...(e.name ? { name: e.name } : {}),
     ...(e.fuellung ? { fuellung: e.fuellung } : {}),
     ...(e.linie ? { linie: e.linie } : {}),
     ...(e.linienart ? { linienart: e.linienart as FormatElement['linienart'] } : {}),
+    ...(e.linienbreite ? { linienbreite: e.linienbreite } : {}),
   })
   const bezug = (e: SkizzeElement) => (e.bezug ? { bezug: { liste: e.bezug.liste, id: e.bezug.id } } : {})
   switch (el.typ) {
@@ -76,13 +78,13 @@ export function elementZuFormat(el: SkizzeElement, a: Abbildung): FormatElement 
     case 'symbol': {
       const m = mitte(el.x, el.y, el.breite, el.hoehe)
       return {
-        typ: el.art,
+        typ: 'symbol',
+        art: el.art,
         id: el.id,
         ...m,
         breite: L(el.breite),
         hoehe: L(el.hoehe),
         ...(el.beschriftung ? { beschriftung: el.beschriftung } : {}),
-        ...(el.ziel ? { ziel: pxZuM(a, el.ziel) } : {}),
         ...bezug(el),
       }
     }
@@ -100,6 +102,7 @@ export function elementZuFormat(el: SkizzeElement, a: Abbildung): FormatElement 
         typ: 'vieleck',
         id: el.id,
         punkte: el.punkte.map((p) => pxZuM(a, p)),
+        ...(el.offen ? { offen: true } : {}),
         ...(el.beschriftung ? { beschriftung: el.beschriftung } : {}),
         ...stil(el),
         ...bezug(el),
@@ -110,9 +113,12 @@ export function elementZuFormat(el: SkizzeElement, a: Abbildung): FormatElement 
         id: el.id,
         von: pxZuM(a, { x: el.x1, y: el.y1 }),
         nach: pxZuM(a, { x: el.x2, y: el.y2 }),
+        ...(el.name ? { name: el.name } : {}),
         ...(el.farbe ? { farbe: el.farbe } : {}),
         ...(el.linienart ? { linienart: el.linienart } : {}),
+        ...(el.linienbreite ? { linienbreite: el.linienbreite } : {}),
         ...(el.pfeil ? { pfeil: true } : {}),
+        ...bezug(el),
       }
     case 'massangabe':
       return {
@@ -121,19 +127,30 @@ export function elementZuFormat(el: SkizzeElement, a: Abbildung): FormatElement 
         von: pxZuM(a, { x: el.x1, y: el.y1 }),
         nach: pxZuM(a, { x: el.x2, y: el.y2 }),
         beschriftung: el.beschriftung,
+        ...(el.name ? { name: el.name } : {}),
         ...(el.farbe ? { farbe: el.farbe } : {}),
       }
     case 'text': {
       const gr = el.schriftgroesse ?? 14
       const m = pxZuM(a, { x: el.x + (el.inhalt.length * gr * 0.55) / 2, y: el.y + (gr + 4) / 2 })
-      return { typ: 'text', id: el.id, ...m, inhalt: el.inhalt }
+      return {
+        typ: 'text',
+        id: el.id,
+        ...m,
+        inhalt: el.inhalt,
+        ...(el.name ? { name: el.name } : {}),
+        ...(el.farbe ? { farbe: el.farbe } : {}),
+        ...(el.schriftgroesse ? { groesse: Math.round((el.schriftgroesse / pxPt) * 10) / 10 } : {}),
+        ...bezug(el),
+      }
     }
   }
 }
 
 /** Alle Grün-Elemente (ohne Grundlage) der Skizze im Vorschlagsformat. */
 export function gruenZuFormat(skizze: SkizzeDaten | undefined, a: Abbildung): FormatElement[] {
-  return (skizze?.elemente ?? []).filter((e) => !istGrundlage(e)).flatMap((e) => elementZuFormat(e, a) ?? [])
+  const pxPt = (skizze?.breite ?? 800) / 452
+  return (skizze?.elemente ?? []).filter((e) => !istGrundlage(e)).flatMap((e) => elementZuFormat(e, a, pxPt) ?? [])
 }
 
 export { istSymbolArt }

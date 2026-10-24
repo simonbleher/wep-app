@@ -38,7 +38,7 @@ const farbe = (beschreibung: string): Schema => text(`${beschreibung} Als „#RR
 
 const bezug = (): Schema =>
   objekt(
-    'Verweis auf eine Position des WEP: Beschriftung (Name/Art) und Zuordnung folgen ihr. Ohne „beschriftung“ wird der Kurzname der Position als Beschriftung verwendet.',
+    'Verweis auf eine Position des WEP (z. B. der Kronenkreis eines Baums auf die Aufwuchs-Position „Apfel“). Nur an ein Element je Gegenstand setzen (die App zählt die Verweise gegen die Stückzahl); bei einem Text ohne „inhalt“ ist der Kurzname der Position der Text.',
     {
       liste: text('Welche Liste: aufwuchs, aussenanlagen oder beseitigung.', { enum: [...BEZUGS_LISTEN] }),
       id: text('Kennung der Position aus lesen() (gruen.aufwuchs[].id usw.).'),
@@ -47,37 +47,42 @@ const bezug = (): Schema =>
 
 const kennung = text('Nur in lesen(): Kennung des vorhandenen Elements. Im Vorschlag optional und ignoriert (die App vergibt neue Kennungen).')
 
+const NAME = text('Sprechender Name des Elements, z. B. „Stamm“, „Krone“, „Weg“ – wird zum Formnamen im Excel (mit laufender Nummer).', { maxLength: 60 })
+const LINIENBREITE = zahl('Linienstärke in pt des Excel-Blatts (0,25 bis 6; üblich 1, Maßlinien/Tor 2); weglassen = Standardstärke.', { minimum: 0.25, maximum: 6 })
+
 const stilEigenschaften = (): Record<string, Schema> => ({
   stil: text('Kurzname einer Vorgabe aus lesen().stile.vorgaben (z. B. „wiese“, „weg“, „kompost“); die Einzelangaben darunter überschreiben ihn.'),
   fuellung: { ...farbe('Füllfarbe.'), type: ['string', 'null'], description: 'Füllfarbe als „#RRGGBB“; null oder weglassen = keine Füllung.' },
-  linie: farbe('Linienfarbe; weglassen = dunkelgrau.'),
+  linie: farbe('Linienfarbe, unabhängig von der Füllung; weglassen = dunkelgrau.'),
   linienart: text('Linienart des Rahmens.', { enum: [...LINIENARTEN] }),
-  beschriftung: text('Beschriftung in der Form.'),
-  bezug: bezug(),
+  linienbreite: LINIENBREITE,
+  beschriftung: text('Text in der Mitte der Form.', { maxLength: 120 }),
 })
+
+const gemeinsam = (): Record<string, Schema> => ({ id: kennung, name: NAME, bezug: bezug() })
 
 function elementDefs(): Record<string, Schema> {
   return {
-    elementSymbol: objekt(
-      'Piktogramm der App (Baum, Hecke, Weg, Kompost, Mängelhinweis …). x/y = Mittelpunkt; breite/hoehe weggelassen = Standardgröße (lesen().stile.elementtypen).',
+    elementSymbolLesen: objekt(
+      'Nur in lesen(): ein Symbol, das der Nutzer mit dem Symbol-Werkzeug gesetzt hat (Baum, Hecke …). Im Vorschlag nicht erlaubt – dort besteht alles aus Grundformen.',
       {
-        typ: text('Art des Symbols.', { enum: [...SYMBOL_ARTEN] }),
+        typ: { const: 'symbol', description: 'Symbol des Nutzers.' },
+        art: text('Art des Symbols (baum, strauch, hecke …).', { enum: [...SYMBOL_ARTEN] }),
         id: kennung,
         x: zahl('Mittelpunkt, Meter von links.'),
         y: zahl('Mittelpunkt, Meter von oben.'),
-        breite: zahl('Breite in Metern (Hecke/Weg: die lange Seite waagerecht oder senkrecht – längere Seite = Richtung).', { exclusiveMinimum: 0, maximum: 500 }),
-        hoehe: zahl('Höhe in Metern.', { exclusiveMinimum: 0, maximum: 500 }),
-        beschriftung: text('Beschriftung (bei Baum die Art, bei Entfernen „<Name> entfernen“, beim Mängelhinweis der Hinweistext).', { maxLength: 120 }),
+        breite: zahl('Breite in Metern.'),
+        hoehe: zahl('Höhe in Metern.'),
+        beschriftung: text('Beschriftung.'),
         bezug: bezug(),
-        ziel: { ...punkt(), description: 'Nur Mängelhinweis: Punkt (Meter), auf den ein roter Pfeil vom Hinweisfeld zeigt.' },
       },
-      ['typ', 'x', 'y'],
+      ['typ', 'art', 'x', 'y', 'breite', 'hoehe'],
     ),
     elementRechteck: objekt(
-      'Rechteck, wahlweise mit Füllung und Linienart. x/y = Mittelpunkt.',
+      'Rechteck, wahlweise gefüllt, mit eigener Linienfarbe, -stärke und -art. x/y = Mittelpunkt.',
       {
-        typ: { const: 'rechteck', description: 'Rechteck.' },
-        id: kennung,
+        typ: { const: 'rechteck', description: 'Rechteck (auch Quadrat).' },
+        ...gemeinsam(),
         x: zahl('Mittelpunkt, Meter von links.'),
         y: zahl('Mittelpunkt, Meter von oben.'),
         breite: zahl('Breite in Metern.', { exclusiveMinimum: 0, maximum: 500 }),
@@ -90,7 +95,7 @@ function elementDefs(): Record<string, Schema> {
       'Ellipse oder Kreis (breite = hoehe), wahlweise gefüllt. x/y = Mittelpunkt.',
       {
         typ: { const: 'ellipse', description: 'Ellipse/Kreis.' },
-        id: kennung,
+        ...gemeinsam(),
         x: zahl('Mittelpunkt, Meter von links.'),
         y: zahl('Mittelpunkt, Meter von oben.'),
         breite: zahl('Waagerechter Durchmesser in Metern.', { exclusiveMinimum: 0, maximum: 500 }),
@@ -100,24 +105,44 @@ function elementDefs(): Record<string, Schema> {
       ['typ', 'x', 'y', 'breite', 'hoehe'],
     ),
     elementVieleck: objekt(
-      'Geschlossenes Vieleck (z. B. schräge Wiese), wahlweise gefüllt. Eckpunkte absolut in Metern.',
+      'Vieleck aus Eckpunkten (Dreieck = 3 Punkte, Stern, schräge Wiese …), wahlweise gefüllt; mit offen: true ein Linienzug (nie gefüllt). Punkte absolut in Metern.',
       {
-        typ: { const: 'vieleck', description: 'Vieleck.' },
-        id: kennung,
-        punkte: liste(punkt(), 'Eckpunkte in Reihenfolge um die Form, mindestens 3.', { minItems: 3, maxItems: 200 }),
+        typ: { const: 'vieleck', description: 'Vieleck bzw. Linienzug.' },
+        ...gemeinsam(),
+        punkte: liste(punkt(), 'Punkte in Reihenfolge um die Form (geschlossen: mindestens 3, offen: mindestens 2).', { minItems: 2, maxItems: 200 }),
+        offen: wahr('true: offener Linienzug statt geschlossener Fläche (keine Füllung).'),
         ...stilEigenschaften(),
       },
       ['typ', 'punkte'],
     ),
+    elementBogen: objekt(
+      'Kreis- oder Ellipsenbogen (Viertelbogen am Tor, Rundung …), nur Linie. x/y = Mittelpunkt des Kreises bzw. der Ellipse; die App macht daraus einen offenen Linienzug (beim Lesen kommt er als Vieleck mit offen: true zurück).',
+      {
+        typ: { const: 'bogen', description: 'Bogen.' },
+        ...gemeinsam(),
+        x: zahl('Mittelpunkt, Meter von links.'),
+        y: zahl('Mittelpunkt, Meter von oben.'),
+        breite: zahl('Waagerechter Durchmesser des vollen Kreises in Metern.', { exclusiveMinimum: 0, maximum: 500 }),
+        hoehe: zahl('Senkrechter Durchmesser in Metern.', { exclusiveMinimum: 0, maximum: 500 }),
+        startWinkel: zahl('Anfangswinkel in Grad: 0 = rechts, 90 = unten, 180 = links, 270 = oben (Uhrzeigersinn).', { minimum: -720, maximum: 720 }),
+        endWinkel: zahl('Endwinkel in Grad; der Bogen umfasst 1° bis 360° (Beispiel Viertelbogen: 180 bis 270).', { minimum: -720, maximum: 720 }),
+        stil: text('Kurzname einer Vorgabe; nur deren Linienfarbe zählt.'),
+        linie: farbe('Linienfarbe; weglassen = dunkelgrau.'),
+        linienart: text('Linienart.', { enum: [...LINIENARTEN] }),
+        linienbreite: LINIENBREITE,
+      },
+      ['typ', 'x', 'y', 'breite', 'hoehe', 'startWinkel', 'endWinkel'],
+    ),
     elementLinie: objekt(
-      'Linie von „von“ nach „nach“, wahlweise farbig, gestrichelt oder mit Pfeilspitze am Ende (z. B. Pfeil zu einem Mangel).',
+      'Gerade Linie von „von“ nach „nach“ mit eigener Farbe, Stärke und Art, wahlweise mit Pfeilspitze am Ende (z. B. Pfeil zu einem Mangel, Maßstrich, Latte).',
       {
         typ: { const: 'linie', description: 'Linie.' },
-        id: kennung,
+        ...gemeinsam(),
         von: punkt(),
         nach: { ...punkt(), description: 'Ende der Linie (hier sitzt die Pfeilspitze).' },
         farbe: farbe('Linienfarbe; weglassen = dunkelgrau.'),
         linienart: text('Linienart.', { enum: [...LINIENARTEN] }),
+        linienbreite: LINIENBREITE,
         pfeil: wahr('Pfeilspitze am Ende („nach“).'),
       },
       ['typ', 'von', 'nach'],
@@ -126,7 +151,7 @@ function elementDefs(): Record<string, Schema> {
       'Maßlinie mit Endstrichen und Text.',
       {
         typ: { const: 'massangabe', description: 'Maßlinie.' },
-        id: kennung,
+        ...gemeinsam(),
         von: punkt(),
         nach: punkt(),
         beschriftung: text('Maßtext, z. B. „4,2 m“; weggelassen = die berechnete Länge.', { maxLength: 120 }),
@@ -138,17 +163,40 @@ function elementDefs(): Record<string, Schema> {
       'Freier Text. x/y = Mittelpunkt.',
       {
         typ: { const: 'text', description: 'Text.' },
-        id: kennung,
+        ...gemeinsam(),
         x: zahl('Mittelpunkt, Meter von links.'),
         y: zahl('Mittelpunkt, Meter von oben.'),
-        inhalt: text('Der Text.', { minLength: 1, maxLength: 120 }),
+        inhalt: text('Der Text; weggelassen = Kurzname der Position aus „bezug“.', { minLength: 1, maxLength: 120 }),
+        farbe: farbe('Schriftfarbe; weglassen = dunkelgrau.'),
+        groesse: zahl('Schriftgröße in pt (5 bis 28, üblich 9).', { minimum: 5, maximum: 28 }),
       },
-      ['typ', 'x', 'y', 'inhalt'],
+      ['typ', 'x', 'y'],
     ),
-    element: {
-      description: `Ein Skizzenelement im Format ${SKIZZE_FORMAT}. Längen in Metern auf der Parzelle (Ursprung links oben, x nach rechts, y nach unten); x/y sind Mittelpunkte. Typen: ${[...SYMBOL_ARTEN, ...FORM_TYPEN].join(', ')}.`,
-      oneOf: ['elementSymbol', 'elementRechteck', 'elementEllipse', 'elementVieleck', 'elementLinie', 'elementMassangabe', 'elementText'].map((n) => ref(n)),
+    vorschlagElement: {
+      description: `Eine Grundform im Format ${SKIZZE_FORMAT}. Längen in Metern auf der Parzelle (Ursprung links oben, x nach rechts, y nach unten); x/y sind Mittelpunkte. Typen: ${FORM_TYPEN.join(', ')}. Alles ist aus diesen Formen zusammengesetzt (Baum = Stamm + Kronenkreise …); fertige Zusammenstellungen liefert window.wep.skizze.baustein(). Die Reihenfolge der Liste ist die Zeichenreihenfolge (was später kommt, liegt oben).`,
+      oneOf: ['elementRechteck', 'elementEllipse', 'elementVieleck', 'elementBogen', 'elementLinie', 'elementMassangabe', 'elementText'].map((n) => ref(n)),
     },
+    element: {
+      description: `Ein vorhandenes Skizzenelement in lesen(): eine Grundform des Formats ${SKIZZE_FORMAT} oder ein Symbol des Nutzers (nur lesend).`,
+      oneOf: ['elementSymbolLesen', 'elementRechteck', 'elementEllipse', 'elementVieleck', 'elementBogen', 'elementLinie', 'elementMassangabe', 'elementText'].map((n) => ref(n)),
+    },
+    bausteinParameter: objekt(
+      'Parameter von window.wep.skizze.baustein(name, parameter).',
+      {
+        x: zahl('Mittelpunkt in Metern, von links.'),
+        y: zahl('Mittelpunkt in Metern, von oben.'),
+        breite: zahl('Breite in Metern; weggelassen = Standardgröße (lesen().stile.bausteine).', { exclusiveMinimum: 0, maximum: 500 }),
+        hoehe: zahl('Höhe in Metern.', { exclusiveMinimum: 0, maximum: 500 }),
+        beschriftung: text('Beschriftung (bei Baum die Art, bei entfernen „<Name> entfernen“, beim mangelhinweis der Hinweistext).', { maxLength: 120 }),
+        ziel: { ...punkt(), description: 'Nur mangelhinweis: Punkt in Metern, auf den der rote Pfeil zeigt.' },
+      },
+      ['x', 'y'],
+    ),
+    bausteinErgebnis: objekt('Rückgabe von window.wep.skizze.baustein().', {
+      ok: wahr('true: Grundformen liegen in „elemente“. false: siehe fehler.'),
+      fehler: liste(objekt('Ein Fehler.', { pfad: text('Parameter.'), meldung: text('Beschreibung.') }), 'Fehler (leer bei ok = true).'),
+      elemente: liste(ref('vorschlagElement'), 'Die Grundformen des Bausteins in Zeichenreihenfolge; direkt in „elemente“ des Vorschlags übernehmbar. Den „bezug“ auf eine Position nur an das erste Element setzen.'),
+    }),
   }
 }
 
@@ -285,6 +333,10 @@ function lesenSchema(): Schema {
           elemente: liste(ref('element'), 'Vorhandene Elemente in Zeichenreihenfolge (hinten zuerst).'),
         }),
         stile: objekt('Was ein Vorschlag verwenden darf.', {
+          bausteine: liste(
+            objekt('Ein Baustein.', { name: text('Name für baustein(name, …).'), beschreibung: text('Woraus der Baustein besteht.'), standardgroesseM: objekt('Standardgröße in m.', { breite: zahl('Breite.'), hoehe: zahl('Höhe.') }) }),
+            'Fertige Zeichnungen aus Grundformen: window.wep.skizze.baustein(name, { x, y, … }).',
+          ),
           elementtypen: liste(
             objekt('Ein Elementtyp.', {
               typ: text('Wert für „typ“.'),
@@ -332,7 +384,7 @@ export function schema(): Schema {
         {
           format: { const: SKIZZE_FORMAT, description: `Muss „${SKIZZE_FORMAT}“ sein.` },
           modus: text('ergaenzen: zu den vorhandenen Elementen dazu (Standard). gruen-ersetzen: alle Grün-Elemente der Skizze ersetzen. Die Grundlage (Bau-Skizze) bleibt in beiden Modi unangetastet.', { enum: [...MODI] }),
-          elemente: liste(ref('element'), 'Die neuen Elemente in Zeichenreihenfolge (hinten zuerst; Flächen zuerst, Beschriftungen und Hinweise zuletzt).', { minItems: 1, maxItems: 400 }),
+          elemente: liste(ref('vorschlagElement'), 'Die neuen Grundformen in Zeichenreihenfolge (hinten zuerst; Flächen zuerst, Beschriftungen und Hinweise zuletzt).', { minItems: 1, maxItems: 400 }),
         },
         ['format', 'elemente'],
       ),
