@@ -5,7 +5,7 @@ Ein Browser-Agent (z. B. Claude in Chrome) soll die **Grün-Skizze** zuverlässi
 im Browser, in der Android-App und im Windows-Programm (derselbe Web-Teil) ein JavaScript-Objekt `window.wep`, **solange ein WEP
 geöffnet ist**. Für den Nutzer bleibt die Skizze fast unverändert; der Agent *schlägt vor*, der Nutzer *entscheidet*.
 
-- **Nur lesend**, außer dem Skizzen-Vorschlag. Der Vorschlag wird hervorgehoben angezeigt; **ohne „Übernehmen“ wird nichts gespeichert**.
+- **Nur lesend**, außer den Vorschlägen (Skizze, Positionen). Der Vorschlag wird hervorgehoben angezeigt; **ohne „Übernehmen“ wird nichts gespeichert**.
 - **Keine Netzwerkzugriffe** (alles läuft lokal im Browser; Formalien mit Namen verlassen das Gerät nicht).
 - Code: `src/agent/` (`format.ts`, `schema.ts`, `lesen.ts`, `vorschlag.ts`, `umrechnung.ts`, `bruecke.ts`).
 
@@ -93,8 +93,41 @@ Die vollständige Beispielskizze liegt als `docs/skizze-agent/beispiel-vorschlag
   "hinweise": [], "zusammenfassung": "Nichts angezeigt: 1 Fehler im Vorschlag.", "anzahl": 0 }
 ```
 
+## Positionen aus Text (Außenanlagen, Aufwuchs, Beseitigung)
+Zweiter Teil der Schnittstelle: Der Nutzer gibt dem Agenten einen Text (Aufnahmeliste, Notizen, Diktat), der Agent schlägt die Positionen vor,
+**der Nutzer übernimmt**. Preise, Bezeichnungen und Regelhinweise rechnet die App wie im Formular „Position hinzufügen“ – der Agent nennt nur,
+was er gelesen hat.
+
+| Aufruf | Zweck |
+|---|---|
+| `window.wep.positionen.katalogSuchen(begriff, liste?)` | Katalogsuche (`liste` = `aufwuchs` (Standard) oder `aussenanlagen`), nur lesend: `katalogId`, Einheit, Höchstwert bzw. `varianten[]` mit `index`, `merkmale`, `hoechstwert` |
+| `window.wep.positionen.vorschlagen(json)` | prüft, zeigt den Vorschlag oben im Reiter (Balken „Vorschlag: N Positionen für Aufwuchs · Summe – Übernehmen / Verwerfen“, mit Liste und Hinweisen) und liefert `{ ok, fehler[], hinweise[], zusammenfassung, anzahl, vorschau[], summe }` |
+| `window.wep.positionen.status()` | `{ offen, zustand: 'kein-vorschlag' \| 'offen' \| 'uebernommen' \| 'verworfen' \| 'zurueckgenommen', nr, liste, anzahl, entschiedenAm }` |
+
+Ablauf: `lesen()` (vorhandene Positionen mit `id`, damit nichts doppelt angelegt wird) → Text in Positionen zerlegen („eine Zeile = eine Sache“) →
+`vorschlagen` → Fehler korrigieren → `hinweise` und `vorschau` dem Nutzer berichten → Nutzer entscheidet (nach „Übernehmen“ bietet die App „Rückgängig“,
+solange die Liste offen ist). Die App öffnet den passenden Reiter selbst. Ein neuer Vorschlag ersetzt einen offenen; ohne Bestätigung wird nichts gespeichert,
+nichts wird gesperrt (Warnungen, keine Blockaden).
+
+```json
+{ "format": "wep-positionen/1", "liste": "aufwuchs", "positionen": [
+  { "suche": "Apfel", "variante": "Halbstamm 5–30", "anzahl": 2, "zustand": "gut" },
+  { "suche": "Liguster Hecke", "variante": 0, "anzahl": 12, "zustand": "mittel" },
+  { "bezeichnung": "Kirschbaum, alt", "einheit": "Stück", "anzahl": 1, "einzelpreis": 30 }
+] }
+```
+- **Katalog** (Aufwuchs/Außenanlagen): `suche` (wie die Suche in der App, tippfehlertolerant, auch Arten und Alltagsbegriffe) **oder** `katalogId`.
+  Hat der Eintrag mehrere Preisvarianten, ist `variante` Pflicht (Index oder Merkmal-Text); fehlt sie, listet der Fehler alle Varianten mit Höchstwert auf – der Agent soll **nicht raten**.
+- **Freitext:** ohne `suche`/`katalogId`, dafür `bezeichnung` und `einheit` (+ `einzelpreis`, sonst 0 € mit Hinweis).
+- `anzahl` (> 0, Dezimalpunkt), `einheit` (Standard: die des Katalogs: Stück, m, m², m³, lfdm, Pauschale), `zustand` (sehr gut · gut (Standard) · mittel · schlecht).
+  Preis = Höchstwert × Stufe (sehr gut 100 %, gut 75 %, mittel 50 %, schlecht = 1 €); `einzelpreis` überschreibt ihn (zählt als eigener Preis).
+- **Beseitigung:** `"liste": "beseitigung"`, Einträge `{ "gegenstand", "menge", "einheit", "einzelpreis", "faktor"?, "begruendung"? }`.
+- Hinweise (verhindern nichts): Unionsliste/Problempflanze, Preis über Höchstwert, Rasen > 100 m², Zeile gibt es schon, Faktor > 1 ohne Begründung.
+- Unbekannte Felder, Zahlen als Text, unbekannte Einheiten/Zustände und Katalogbegriffe ohne Treffer sind Fehler mit Pfad (`positionen[1].variante`). Höchstens 100 Positionen; alles oder nichts.
+- Grenzen: nur Anlegen (kein Ändern oder Löschen vorhandener Positionen, keine Fotos); bei `liste` ≠ `beseitigung` keine Einträge für Bau; ohne Grün-Teil wird nichts angenommen.
+
 ## Grenzen
-- Kein Schreiben außer dem Vorschlag (keine Positionen, Formalien, Fotos); kein Löschen einzelner vorhandener Elemente (nur `gruen-ersetzen` insgesamt).
+- Kein Schreiben außer den Vorschlägen (Skizze, Positionen; keine Formalien, Fotos); kein Löschen einzelner vorhandener Elemente (nur `gruen-ersetzen` insgesamt).
 - Die Grundlage und Bau-Formen lassen sich nicht per Schnittstelle ändern; Bauteile kommen aus dem Bau-Teil bzw. der Bau-Excel.
 - Ohne Grün-Teil (Rolle „bau“) wird kein Vorschlag angenommen. Ein Vorschlag lebt nur im geöffneten WEP; schließt der Nutzer das WEP, verfällt er.
 - Der Bezug übernimmt den Namen zum Zeitpunkt des Vorschlags; wird die Position später umbenannt, bleibt die Beschriftung stehen.

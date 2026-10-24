@@ -7,6 +7,7 @@
  */
 import { LINIENARTEN } from '../skizze/stile'
 import { SYMBOL_ARTEN } from '../skizze/types'
+import { EINHEITEN_BESEITIGUNG, EINHEITEN_POSITION, POSITIONEN_FORMAT, POSITIONEN_LISTEN, ZUSTAENDE } from './positionen'
 import { BEZUGS_LISTEN, FORM_TYPEN, MODI, SCHNITTSTELLE_VERSION, SKIZZE_FORMAT } from './format'
 
 type Schema = Record<string, unknown>
@@ -348,6 +349,102 @@ export function schema(): Schema {
         zusammenfassung: text('Kurzer deutscher Satz: was angezeigt wird bzw. warum nichts angezeigt wurde.'),
         anzahl: ganz('Anzahl der Elemente des Vorschlags (0 bei Fehlern).', { minimum: 0 }),
       }),
+      positionenVorschlag: {
+        type: 'object',
+        description: `Eingabe von window.wep.positionen.vorschlagen(): Positionen aus Text, Format ${POSITIONEN_FORMAT}. Nichts wird gespeichert, bis der Nutzer „Übernehmen“ wählt. Bei „aufwuchs“ und „aussenanlagen“ sind die Einträge Katalog- oder Freitext-Positionen, bei „beseitigung“ Beseitigungspositionen.`,
+        properties: {
+          format: { const: POSITIONEN_FORMAT, description: `Muss „${POSITIONEN_FORMAT}“ sein.` },
+          liste: text('Ziel: aufwuchs, aussenanlagen oder beseitigung (Beseitigungskosten Grün).', { enum: [...POSITIONEN_LISTEN] }),
+          positionen: {
+            type: 'array',
+            description: 'Die neuen Positionen; sie werden an die Liste angehängt. Einträge siehe positionPosition (aufwuchs/aussenanlagen) bzw. positionBeseitigung (beseitigung).',
+            minItems: 1,
+            maxItems: 100,
+            items: { oneOf: [ref('positionPosition'), ref('positionBeseitigung')] },
+          },
+        },
+        required: ['format', 'liste', 'positionen'],
+        additionalProperties: false,
+      },
+      positionPosition: objekt(
+        'Position für Aufwuchs oder Außenanlagen. Katalog: „suche“ (Begriff wie in der App-Suche, z. B. „Apfel“) ODER „katalogId“ (aus katalogSuchen); hat der Eintrag mehrere Preisvarianten, ist „variante“ nötig. Freitext: weder „suche“ noch „katalogId“, dafür „bezeichnung“, „einheit“ und „einzelpreis“.',
+        {
+          suche: text('Suchbegriff im Katalog (tippfehlertolerant, auch Arten und Alltagsbegriffe), z. B. „Apfel“, „Liguster Hecke“, „Regentonne“.', { maxLength: 200 }),
+          katalogId: text('Kennung der Katalog-Position (aus window.wep.positionen.katalogSuchen), z. B. „aw-hecke“.', { maxLength: 200 }),
+          variante: { description: 'Preisvariante: Index (Zahl ab 0) oder Text der Merkmale (z. B. „Halbstamm 5–30“). Fehlt sie bei mehreren Varianten, meldet die Prüfung alle zur Auswahl mit Höchstwert.', oneOf: [{ type: 'integer', minimum: 0 }, { type: 'string', maxLength: 200 }] },
+          bezeichnung: text('Bezeichnung wie in der Excel; weggelassen = die App bildet sie aus Katalog, Variante und Art („Apfel, Halbstamm, 5–30 J.“). Bei Freitext Pflicht.', { maxLength: 200 }),
+          anzahl: zahl('Menge (> 0), Dezimalpunkt.', { exclusiveMinimum: 0, maximum: 1000000 }),
+          einheit: text('Einheit; weggelassen = die des Katalogs. Bei Freitext Pflicht.', { enum: [...EINHEITEN_POSITION] }),
+          zustand: text('Zustand; bestimmt den Preisvorschlag (Höchstwert × Stufe: sehr gut 100 %, gut 75 %, mittel 50 %, schlecht = 1 €). Weggelassen = gut.', { enum: [...ZUSTAENDE] }),
+          einzelpreis: zahl('Einzelpreis in Euro; weggelassen = Preisvorschlag. Eine Angabe zählt als eigener Preis (überschreibt den Vorschlag). Bei Freitext ohne Höchstwert Pflicht (sonst 0 €).', { minimum: 0 }),
+        },
+        ['anzahl'],
+      ),
+      positionBeseitigung: objekt(
+        'Beseitigungsposition (Anlage 4, Außenanlagen/Aufwuchs).',
+        {
+          gegenstand: text('Was zu beseitigen ist, z. B. „Blaufichte entfernen“.', { maxLength: 200 }),
+          menge: zahl('Menge (> 0).', { exclusiveMinimum: 0, maximum: 1000000 }),
+          einheit: text('Einheit.', { enum: [...EINHEITEN_BESEITIGUNG] }),
+          einzelpreis: zahl('Einzelpreis in Euro.', { minimum: 0 }),
+          faktor: zahl('Faktor (Standard 1); über 1 braucht eine Begründung.', { exclusiveMinimum: 0 }),
+          begruendung: text('Begründung bei Faktor über 1.', { maxLength: 200 }),
+        },
+        ['gegenstand', 'menge', 'einheit', 'einzelpreis'],
+      ),
+      positionenErgebnis: objekt('Rückgabe von positionen.vorschlagen().', {
+        ok: wahr('true: gültig und in der App oben in der Liste angezeigt. false: nichts wurde angezeigt (siehe fehler).'),
+        fehler: liste(
+          objekt('Ein Fehler.', { pfad: text('Pfad, z. B. „positionen[1].variante“.'), meldung: text('Verständliche Beschreibung, was falsch ist und was erlaubt wäre (bei Mehrdeutigkeit mit den Auswahlmöglichkeiten).') }),
+          'Fehler (leer bei ok = true).',
+        ),
+        hinweise: liste(text('Regelhinweis (invasiv, Problempflanze, über Höchstwert, doppelt …); verhindert nichts.'), 'Hinweise.'),
+        zusammenfassung: text('Kurzer deutscher Satz.'),
+        anzahl: ganz('Anzahl der Positionen (0 bei Fehlern).', { minimum: 0 }),
+        vorschau: liste(
+          objekt(
+            'Eine vorgeschlagene Position, wie die App sie anlegen würde.',
+            {
+              bezeichnung: text('Bezeichnung.'),
+              menge: zahl('Menge.'),
+              einheit: text('Einheit.'),
+              zustand: oderNull(text('Zustand (null bei Beseitigung).')),
+              einzelpreis: zahl('Einzelpreis in Euro.'),
+              summe: zahl('Menge × Einzelpreis (× Faktor) in Euro.'),
+              quelle: text('Katalog-Position, „Freitext“ oder „Beseitigung“.'),
+              faktor: zahl('Faktor (nur Beseitigung).'),
+            },
+            ['bezeichnung', 'menge', 'einheit', 'zustand', 'einzelpreis', 'summe', 'quelle'],
+          ),
+          'Die Positionen mit berechnetem Preis – zum Berichten an den Nutzer.',
+        ),
+        summe: zahl('Summe aller Positionen in Euro.'),
+      }),
+      positionenStatus: objekt('Rückgabe von positionen.status().', {
+        offen: wahr('Ein Vorschlag wartet auf die Entscheidung des Nutzers.'),
+        zustand: text('kein-vorschlag · offen · uebernommen · verworfen · zurueckgenommen (der Nutzer hat „Rückgängig“ gewählt).', { enum: ['kein-vorschlag', 'offen', 'uebernommen', 'verworfen', 'zurueckgenommen'] }),
+        nr: ganz('Laufende Nummer des letzten Vorschlags.', { minimum: 0 }),
+        liste: oderNull(text('Liste des letzten Vorschlags.', { enum: [...POSITIONEN_LISTEN, null] })),
+        anzahl: oderNull(ganz('Anzahl der Positionen des letzten Vorschlags.')),
+        entschiedenAm: oderNull(text('Zeitpunkt (ISO) der Entscheidung.')),
+      }),
+      katalogTreffer: liste(
+        objekt('Ein Treffer der Katalogsuche.', {
+          katalogId: text('Kennung (für „katalogId“ im Vorschlag).'),
+          bezeichnung: text('Bezeichnung der Katalog-Position.'),
+          kategorie: text('Kategorie.'),
+          einheit: text('Einheit der Position.'),
+          bewrlSeite: ganz('Seite der BewRL.'),
+          regeln: text('Regeltext der Richtlinie (kann leer sein).'),
+          hoechstwert: oderNull(zahl('Höchstwert in Euro, wenn die Position keine Varianten hat.')),
+          varianten: liste(
+            objekt('Preisvariante.', { index: ganz('Wert für „variante“.', { minimum: 0 }), merkmale: text('z. B. „Halbstamm, 5–30 J.“'), hoechstwert: zahl('Höchstwert in Euro.') }),
+            'Preisvarianten (leer, wenn die Position einen einzelnen Höchstwert hat).',
+          ),
+          eigene: wahr('Eigene Position des Nutzers (immer false; eigene Positionen findet „suche“ im Vorschlag).'),
+        }),
+        'Rückgabe von positionen.katalogSuchen().',
+      ),
       status: objekt('Rückgabe von skizze.status().', {
         offen: wahr('Ein Vorschlag wartet auf die Entscheidung des Nutzers.'),
         zustand: text('kein-vorschlag · offen (wartet auf den Nutzer) · uebernommen · verworfen. Ein neuer Vorschlag ersetzt einen noch offenen.', { enum: ['kein-vorschlag', 'offen', 'uebernommen', 'verworfen'] }),

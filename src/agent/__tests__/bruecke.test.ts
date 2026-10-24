@@ -24,17 +24,18 @@ describe('window.wep', () => {
   it('ist da, solange ein WEP geöffnet ist, und danach weg', () => {
     const wep = testWep()
     expect(fenster.wep).toBeUndefined()
-    const ab = installiereSchnittstelle({ holeWep: () => wep, zeigeSkizze: () => {} })
+    const ab = installiereSchnittstelle({ holeWep: () => wep, zeigeSkizze: () => {}, zeigeListe: () => {} })
     const api = fenster.wep as ReturnType<typeof baueSchnittstelle>
     expect(api.version).toBe('wep-schnittstelle/1')
-    expect(Object.keys(api).sort()).toEqual(['lesen', 'schema', 'skizze', 'version'])
+    expect(Object.keys(api).sort()).toEqual(['lesen', 'positionen', 'schema', 'skizze', 'version'])
     expect(Object.keys(api.skizze).sort()).toEqual(['status', 'vorschlagen'])
+    expect(Object.keys(api.positionen).sort()).toEqual(['katalogSuchen', 'status', 'vorschlagen'])
     ab()
     expect(fenster.wep).toBeUndefined()
   })
 
   it('ist eingefroren (Seitenskripte können sie nicht umbiegen)', () => {
-    const api = baueSchnittstelle({ holeWep: testWep, zeigeSkizze: () => {} })
+    const api = baueSchnittstelle({ holeWep: testWep, zeigeSkizze: () => {}, zeigeListe: () => {} })
     expect(Object.isFrozen(api)).toBe(true)
     expect(Object.isFrozen(api.skizze)).toBe(true)
   })
@@ -44,7 +45,7 @@ describe('window.wep', () => {
     vi.stubGlobal('fetch', fetchSpy)
     const wep = testWep()
     const vorher = JSON.stringify(wep)
-    const api = baueSchnittstelle({ holeWep: () => wep, zeigeSkizze: () => {} })
+    const api = baueSchnittstelle({ holeWep: () => wep, zeigeSkizze: () => {}, zeigeListe: () => {} })
     api.schema()
     api.lesen()
     api.skizze.status()
@@ -56,7 +57,7 @@ describe('window.wep', () => {
 
   it('lesen() bezieht sich auf den Stand des geöffneten Skizzen-Reiters', () => {
     const wep = testWep()
-    const api = baueSchnittstelle({ holeWep: () => wep, zeigeSkizze: () => {} })
+    const api = baueSchnittstelle({ holeWep: () => wep, zeigeSkizze: () => {}, zeigeListe: () => {} })
     expect(api.lesen().skizzeGruen.elemente).toHaveLength(1)
     const weg = meldeSkizzenQuelle(() => ({ ...wep.skizze!, elemente: wep.skizze!.elemente.filter((e) => e.ebene === 'grundlage') }))
     expect(api.lesen().skizzeGruen.elemente).toHaveLength(0)
@@ -68,7 +69,7 @@ describe('window.wep', () => {
 describe('skizze.vorschlagen() und skizze.status()', () => {
   it('gültiger Vorschlag: ok, Zusammenfassung, Skizze wird gezeigt, Vorschlag wartet auf den Nutzer', () => {
     const zeige = vi.fn()
-    const api = baueSchnittstelle({ holeWep: testWep, zeigeSkizze: zeige })
+    const api = baueSchnittstelle({ holeWep: testWep, zeigeSkizze: zeige, zeigeListe: () => {} })
     expect(api.skizze.status()).toEqual({ offen: false, zustand: 'kein-vorschlag', nr: 0, anzahl: null, modus: null, entschiedenAm: null })
     const r = api.skizze.vorschlagen(BEISPIEL_VORSCHLAG)
     expect(r.ok).toBe(true)
@@ -83,7 +84,7 @@ describe('skizze.vorschlagen() und skizze.status()', () => {
 
   it('ungültiger Vorschlag: Fehler mit Pfad, nichts wird angezeigt, ein offener Vorschlag bleibt', () => {
     const zeige = vi.fn()
-    const api = baueSchnittstelle({ holeWep: testWep, zeigeSkizze: zeige })
+    const api = baueSchnittstelle({ holeWep: testWep, zeigeSkizze: zeige, zeigeListe: () => {} })
     const r = api.skizze.vorschlagen({ format: 'wep-skizze/1', elemente: [{ typ: 'baum', y: 1 }] })
     expect(r.ok).toBe(false)
     expect(r.fehler[0].pfad).toBe('elemente[0].x')
@@ -95,14 +96,14 @@ describe('skizze.vorschlagen() und skizze.status()', () => {
   })
 
   it('ein neuer Vorschlag ersetzt den offenen (laufende Nummer steigt)', () => {
-    const api = baueSchnittstelle({ holeWep: testWep, zeigeSkizze: () => {} })
+    const api = baueSchnittstelle({ holeWep: testWep, zeigeSkizze: () => {}, zeigeListe: () => {} })
     api.skizze.vorschlagen(BEISPIEL_VORSCHLAG)
     api.skizze.vorschlagen({ format: 'wep-skizze/1', modus: 'gruen-ersetzen', elemente: [{ typ: 'baum', x: 5, y: 5 }] })
     expect(api.skizze.status()).toMatchObject({ offen: true, nr: 2, anzahl: 1, modus: 'gruen-ersetzen' })
   })
 
   it('Entscheidung des Nutzers: übernommen bzw. verworfen, mit Zeitpunkt', () => {
-    const api = baueSchnittstelle({ holeWep: testWep, zeigeSkizze: () => {} })
+    const api = baueSchnittstelle({ holeWep: testWep, zeigeSkizze: () => {}, zeigeListe: () => {} })
     api.skizze.vorschlagen(BEISPIEL_VORSCHLAG)
     vorschlagSpeicher.entscheide('uebernommen')
     const s = api.skizze.status()
@@ -119,7 +120,7 @@ describe('skizze.vorschlagen() und skizze.status()', () => {
 
   it('Rolle „bau“: kein Vorschlag, nichts wird gezeigt', () => {
     const zeige = vi.fn()
-    const api = baueSchnittstelle({ holeWep: () => ({ ...testWep(), rolle: 'bau' }), zeigeSkizze: zeige })
+    const api = baueSchnittstelle({ holeWep: () => ({ ...testWep(), rolle: 'bau' }), zeigeSkizze: zeige, zeigeListe: () => {} })
     expect(api.skizze.vorschlagen(BEISPIEL_VORSCHLAG).ok).toBe(false)
     expect(zeige).not.toHaveBeenCalled()
   })
@@ -127,7 +128,7 @@ describe('skizze.vorschlagen() und skizze.status()', () => {
   it('Schließen des WEP: ein offener Vorschlag verfällt, ohne dass etwas gespeichert wird', () => {
     const wep = testWep()
     const vorher = JSON.stringify(wep)
-    const ab = installiereSchnittstelle({ holeWep: () => wep, zeigeSkizze: () => {} })
+    const ab = installiereSchnittstelle({ holeWep: () => wep, zeigeSkizze: () => {}, zeigeListe: () => {} })
     ;(fenster.wep as ReturnType<typeof baueSchnittstelle>).skizze.vorschlagen(BEISPIEL_VORSCHLAG)
     ab()
     expect(vorschlagSpeicher.schaue().anzeige).toBeNull()

@@ -1293,6 +1293,18 @@ select.eingabe {
   background: var(--farbe-grund);
 }
 
+.positionen-vorschlag-liste,
+.positionen-vorschlag-hinweise {
+  flex: 1 1 100%;
+  margin: 0;
+  padding-left: var(--abstand-4);
+  font-weight: var(--gewicht-normal);
+}
+
+.positionen-vorschlag-hinweise {
+  color: var(--farbe-warnung);
+}
+
 .skizze-vorschlag-text {
   flex: 1 1 12ch;
   font-weight: var(--gewicht-fett);
