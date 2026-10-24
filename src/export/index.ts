@@ -37,7 +37,7 @@ export { grundrissZuFormen } from './grundrissFormen'
 export { VORLAGEN_KORREKTUREN, type BauExportErgebnis, type VorlagenKorrektur } from './exportBau'
 export * from './skizzeFormen'
 export { DECKBLATT_ABSAETZE, absatzText, type DeckblattAbsatz, type TextLauf } from './deckblattText'
-export { mitLeerenBauDaten } from './ohneBau'
+export { exportRolle, hatBauDaten, mitLeerenBauDaten } from './ohneBau'
 export { leseBauFormalien, vergleichsWert, type BauFormalien } from './bauExcelLesen'
 
 /** Blatt, dessen Überschrift in der Vorlage fälschlich „Skizze – Baulichkeiten“ lautet. */
