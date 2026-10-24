@@ -21,6 +21,9 @@ interface Stand {
   dash: number[]
   lineCap: string
   lineJoin: string
+  tx: number
+  ty: number
+  winkel: number
 }
 
 type Teil =
@@ -56,6 +59,10 @@ export class PdfKontext {
   lineCap = 'butt'
   lineJoin = 'miter'
   private dash: number[] = []
+  /** Verschiebung und Drehung (Bogenmaß, Uhrzeigersinn) – gelten nur für Text (`fillText`), mehr braucht die Skizze nicht. */
+  private tx = 0
+  private ty = 0
+  private winkel = 0
 
   private pfad: Teil[] = []
   private readonly stapel: Stand[] = []
@@ -87,7 +94,17 @@ export class PdfKontext {
       dash: this.dash,
       lineCap: this.lineCap,
       lineJoin: this.lineJoin,
+      tx: this.tx,
+      ty: this.ty,
+      winkel: this.winkel,
     })
+  }
+  translate(x: number, y: number): void {
+    this.tx += x
+    this.ty += y
+  }
+  rotate(winkel: number): void {
+    this.winkel += winkel
   }
   restore(): void {
     const st = this.stapel.pop()
@@ -101,6 +118,9 @@ export class PdfKontext {
     this.dash = st.dash
     this.lineCap = st.lineCap
     this.lineJoin = st.lineJoin
+    this.tx = st.tx
+    this.ty = st.ty
+    this.winkel = st.winkel
   }
   setLineDash(d: number[]): void {
     this.dash = d
@@ -238,6 +258,18 @@ export class PdfKontext {
     if (this.textBaseline === 'middle') py = y + groesse * 0.32
     else if (this.textBaseline === 'top' || this.textBaseline === 'hanging') py = y + groesse * 0.8
     else if (this.textBaseline === 'bottom') py = y - groesse * 0.2
-    this.seite.drawText(t, { x: this.X(px), y: this.Y(py), size: groesse * this.s, font, color: farbeAusHex(this.lib, farbe) })
+    // Mit Drehung: Textanfang um den Ursprung (translate) drehen; Canvas dreht im Uhrzeigersinn, PDF gegen den Uhrzeigersinn
+    const c = Math.cos(this.winkel)
+    const sn = Math.sin(this.winkel)
+    const wx = this.tx + px * c - py * sn
+    const wy = this.ty + px * sn + py * c
+    this.seite.drawText(t, {
+      x: this.X(wx),
+      y: this.Y(wy),
+      size: groesse * this.s,
+      font,
+      color: farbeAusHex(this.lib, farbe),
+      ...(this.winkel ? { rotate: this.lib.degrees((-this.winkel * 180) / Math.PI) } : {}),
+    })
   }
 }

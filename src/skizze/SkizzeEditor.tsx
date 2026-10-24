@@ -880,6 +880,11 @@ export function SkizzeEditor({ wert, onAenderung, vorschlag, onVorschlagEntschei
             fontSize={el.schriftgroesse ?? 14}
             fill={istAusgewaehlt ? 'blue' : (el.farbe ?? '#1a1a1a')}
             dominantBaseline="hanging"
+            transform={
+              el.drehung
+                ? `rotate(${el.drehung} ${el.x + (el.inhalt.length * (el.schriftgroesse ?? 14) * 0.55) / 2} ${el.y + ((el.schriftgroesse ?? 14) + 4) / 2})`
+                : undefined
+            }
           >
             {el.inhalt}
           </text>
