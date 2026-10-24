@@ -49,6 +49,10 @@ export interface TestForm {
   fuellung?: string
   linie?: string
   gestrichelt?: boolean
+  /** Drehung in Grad im Uhrzeigersinn (`xfrm rot`), z. B. 270 für senkrechten Text von unten nach oben. */
+  drehung?: number
+  /** Textrichtung im Textkörper statt Drehung der Form (`bodyPr vert`), z. B. 'vert270'. */
+  textrichtung?: string
   /** linie: Pfeilspitze am Ende (`tailEnd`) bzw. am Anfang (`'anfang'`, `headEnd`). */
   pfeil?: boolean | 'anfang'
   /** freiform: Eckpunkte in pt relativ zur linken oberen Ecke von (x, y). */
@@ -103,7 +107,7 @@ export const TEST_BAU: Record<string, Record<string, string | number>> = {
     G12: 'Doppelwand 8,01 - 10,00 cm', C13: 1982, D13: 'lt. Bauschein', I13: 10, A17: 19.43,
     G21: 'Stein 24,00 - 35,99 cm', C22: 1983, E23: 13, A26: 3.73,
     B47: 'S1+S2', G47: 'Doppelwand bis 4,00 cm', C48: 2000, D48: 'lt. Angabe', A52: 6.41,
-    B83: 'Laube L: Baujahr 1982', B84: 'Dach: Pultdach mit Bitumenschweißbahn',
+    B83: 'Laube L: Baujahr 1982', E83: 'Typ: Fertigteil-Bungalow', B84: 'Dach: Pultdach mit Bitumenschweißbahn',
     F104: 3, G104: 100,
     H7: 181.5, I7: 'für 2026',
     D41: 160, G40: 5, I40: 8, F44: 9.5, // Gewächshaus
@@ -139,7 +143,7 @@ function testFormXml(f: TestForm, id: number, geo: ReturnType<typeof leseBlattGe
   const anker =
     `<xdr:from><xdr:col>${a.c.index}</xdr:col><xdr:colOff>${a.c.versatz}</xdr:colOff><xdr:row>${a.r.index}</xdr:row><xdr:rowOff>${a.r.versatz}</xdr:rowOff></xdr:from>` +
     `<xdr:to><xdr:col>${b.c.index}</xdr:col><xdr:colOff>${b.c.versatz}</xdr:colOff><xdr:row>${b.r.index}</xdr:row><xdr:rowOff>${b.r.versatz}</xdr:rowOff></xdr:to>`
-  const xfrm = `<a:xfrm><a:off x="${x1}" y="${y1}"/><a:ext cx="${x2 - x1}" cy="${y2 - y1}"/></a:xfrm>`
+  const xfrm = `<a:xfrm${f.drehung ? ` rot="${f.drehung * 60000}"` : ''}><a:off x="${x1}" y="${y1}"/><a:ext cx="${x2 - x1}" cy="${y2 - y1}"/></a:xfrm>`
   const fuell = f.fuellung ? `<a:solidFill><a:srgbClr val="${f.fuellung}"/></a:solidFill>` : '<a:noFill/>'
   const rahmen = f.linie
     ? `<a:ln w="12700"><a:solidFill><a:srgbClr val="${f.linie}"/></a:solidFill>${f.gestrichelt ? '<a:prstDash val="dash"/>' : ''}${f.pfeil === 'anfang' ? '<a:headEnd type="triangle"/>' : f.pfeil ? '<a:tailEnd type="triangle"/>' : ''}</a:ln>`
@@ -147,7 +151,7 @@ function testFormXml(f: TestForm, id: number, geo: ReturnType<typeof leseBlattGe
   const text = f.text
     ? `<a:p><a:pPr algn="ctr"/><a:r><a:rPr lang="de-DE" sz="1100"/><a:t>${esc(f.text)}</a:t></a:r></a:p>`
     : '<a:p><a:endParaRPr lang="de-DE" sz="1100"/></a:p>'
-  const koerper = `<xdr:txBody><a:bodyPr vertOverflow="clip" horzOverflow="clip" rtlCol="0" anchor="ctr"/><a:lstStyle/>${text}</xdr:txBody>`
+  const koerper = `<xdr:txBody><a:bodyPr vertOverflow="clip" horzOverflow="clip"${f.textrichtung ? ` vert="${f.textrichtung}"` : ''} rtlCol="0" anchor="ctr"/><a:lstStyle/>${text}</xdr:txBody>`
   const kopf = `<xdr:nvSpPr><xdr:cNvPr id="${id}" name="${esc(f.name)}"/><xdr:cNvSpPr${f.art === 'textfeld' ? ' txBox="1"' : ''}/></xdr:nvSpPr>`
   if (f.art === 'linie') {
     return (

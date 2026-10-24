@@ -227,6 +227,18 @@ function zeichneElement(ctx: CanvasRenderingContext2D, el: SkizzeElement, pt: nu
       const groesse = el.schriftgroesse ?? 14
       ctx.font = `${groesse}px sans-serif`
       ctx.fillStyle = el.farbe ?? '#1a1a1a'
+      if (el.drehung) {
+        // Gedrehter Text (aus der Bau-Excel): um die Mitte des Textes drehen
+        const breite = el.inhalt.length * groesse * 0.55
+        ctx.save()
+        ctx.translate(el.x + breite / 2, el.y + (groesse + 4) / 2)
+        ctx.rotate((el.drehung * Math.PI) / 180)
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText(el.inhalt, 0, 0)
+        ctx.restore()
+        break
+      }
       ctx.textAlign = 'left'
       ctx.textBaseline = 'top'
       ctx.fillText(el.inhalt, el.x, el.y)

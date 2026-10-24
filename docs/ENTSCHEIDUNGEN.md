@@ -290,3 +290,8 @@
 - **Entscheidung:** Schuppen und Unterstände (Bauteil-Art „Schuppen“) werden nicht bewertet, solange es eine Laube gibt (Fläche und Wert 0, nicht in Summe und bewerteter Fläche; der Hinweis am Bauteil sagt es). Gibt es keine Laube, ist der Schuppen die einzige Anlage – er ist dann in Wahrheit die Laube und wird bewertet.
 - **Grund:** Vorgabe des Auftraggebers (Rückmeldung nach Prüfung eines echten WEP). Bisher rechnete die App den Schuppen immer mit; in der Bau-Excel stand er nur mit 0 € (100 % Altersabzug), die Regel war dort nicht ausgedrückt.
 - **Ausnahmen:** Keller (teilen sich den Platz „S oder U“) und Gewächshaus zählen weiter nach eigenen Regeln. Der Export schreibt den Schuppen-Block ohne Fläche, damit die Vorlage 0 € rechnet.
+## 2026-10-24 · Bau-Excel-Import: Alter, Restnutzung, Baubeschreibung
+
+- **Alter → Baujahr:** Die Bau-Excel enthält das Alter (C74 Grube, I40 Gewächshaus, H66 Vorplatz), die App rechnet `Wertjahr − Baujahr + 1`. Beim Übernehmen wird das Baujahr daraus mit dem Wertjahr des WEP (nicht dem Index-Jahr „für 2025“) und demselben „+1“ zurückgerechnet, damit die App dasselbe Alter wie die Excel ergibt.
+- **Leere Restnutzung = 0:** In der Bau-Excel heißt eine leere Restnutzung 100 % Altersabzug. Der Import setzt 0 (manuell), die App schätzt nicht aus dem Baujahr.
+- **Baubeschreibung:** Eine Zeile steht in der Bau-Excel in mehreren Spalten (B links, E/F rechts). Der Import verbindet die Teile einer Zeile. Weil die App den Text nur in Spalte B ausgibt und dort Zeilen umbricht, schreibt der Export die Beschreibung nur, wenn sie sich gegenüber der Bau-Excel geändert hat (dann werden auch die rechten Teile entfernt); sonst bleiben die Zeilen der Bau-Excel unverändert.

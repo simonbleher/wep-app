@@ -46,6 +46,7 @@ import { SkizzeTab } from './SkizzeTab'
 import { installiereSchnittstelle } from '@/agent/bruecke'
 import { PositionenVorschlag } from './PositionenVorschlag'
 import { SkizzeBauTab } from './SkizzeBauTab'
+import { FELD_NAMEN } from '@/bauexcel/abgleich'
 import { BauExcelBereich, useBauNachladen, useBauStand, type BauNachladeStand, type BauStand } from './BauExcel'
 import { ladeExportQuelle } from './exportQuelle'
 import { PdfBereich } from './PdfExport'
@@ -1198,7 +1199,7 @@ function ExportTab({
               <ul className="meldung-liste">
                 {ergebnis.result.konflikte.map((k) => (
                   <li key={k.feld}>
-                    <strong>{k.feld}</strong> (Zelle {k.zelle}): Bau-Excel: „{k.bauExcelWert}“ · App: „{k.appWert}“
+                    <strong>{FELD_NAMEN[k.feld]}</strong> (Zelle {k.zelle}): Bau-Excel: „{k.bauExcelWert}“ · App: „{k.appWert}“
                   </li>
                 ))}
               </ul>
