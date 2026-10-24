@@ -1,0 +1,135 @@
+{
+  "format": "wep-skizze/1",
+  "modus": "ergaenzen",
+  "elemente": [
+    {
+      "typ": "vieleck",
+      "punkte": [
+        {
+          "x": 1,
+          "y": 1
+        },
+        {
+          "x": 17,
+          "y": 1
+        },
+        {
+          "x": 17,
+          "y": 8
+        },
+        {
+          "x": 1,
+          "y": 9
+        }
+      ],
+      "stil": "wiese",
+      "beschriftung": "Wiese"
+    },
+    {
+      "typ": "weg",
+      "x": 9,
+      "y": 21,
+      "breite": 1.4,
+      "hoehe": 8,
+      "beschriftung": "Weg"
+    },
+    {
+      "typ": "tor",
+      "x": 9.7,
+      "y": 25.2,
+      "breite": 1.2,
+      "hoehe": 1.2
+    },
+    {
+      "typ": "baum",
+      "x": 14,
+      "y": 5,
+      "bezug": {
+        "liste": "aufwuchs",
+        "id": "p-apfel"
+      }
+    },
+    {
+      "typ": "baum",
+      "x": 16,
+      "y": 12,
+      "bezug": {
+        "liste": "aufwuchs",
+        "id": "p-apfel"
+      }
+    },
+    {
+      "typ": "baum",
+      "x": 15,
+      "y": 18,
+      "bezug": {
+        "liste": "aufwuchs",
+        "id": "p-birne"
+      }
+    },
+    {
+      "typ": "hecke",
+      "x": 17.2,
+      "y": 12,
+      "breite": 0.9,
+      "hoehe": 9,
+      "bezug": {
+        "liste": "aufwuchs",
+        "id": "p-hecke"
+      }
+    },
+    {
+      "typ": "kompost",
+      "x": 2,
+      "y": 22,
+      "breite": 1.6,
+      "hoehe": 1
+    },
+    {
+      "typ": "entfernen",
+      "x": 3,
+      "y": 12,
+      "bezug": {
+        "liste": "aufwuchs",
+        "id": "p-fichte"
+      }
+    },
+    {
+      "typ": "mangelhinweis",
+      "x": 5,
+      "y": 19,
+      "breite": 4,
+      "hoehe": 0.9,
+      "beschriftung": "Rückschnitt nötig",
+      "ziel": {
+        "x": 8,
+        "y": 22
+      }
+    },
+    {
+      "typ": "linie",
+      "von": {
+        "x": 12,
+        "y": 3
+      },
+      "nach": {
+        "x": 13.5,
+        "y": 4.5
+      },
+      "farbe": "#C00000",
+      "pfeil": true
+    },
+    {
+      "typ": "massangabe",
+      "von": {
+        "x": 1,
+        "y": 0.4
+      },
+      "nach": {
+        "x": 17,
+        "y": 0.4
+      },
+      "beschriftung": "16 m"
+    }
+  ]
+}

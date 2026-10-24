@@ -43,6 +43,7 @@ import type { KonfliktInfo } from '@/sync/types'
 import { KonfliktHinweis } from './KonfliktHinweis'
 import { ladeWep, speichereWep } from './db'
 import { SkizzeTab } from './SkizzeTab'
+import { installiereSchnittstelle } from '@/agent/bruecke'
 import { SkizzeBauTab } from './SkizzeBauTab'
 import { BauExcelBereich, useBauNachladen, useBauStand, type BauNachladeStand, type BauStand } from './BauExcel'
 import { ladeExportQuelle } from './exportQuelle'
@@ -206,6 +207,13 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
     setMaske(null)
     window.scrollTo(0, 0)
   }, [])
+
+  // Agent-Schnittstelle `window.wep` (docs/WEP-SCHNITTSTELLE.md): verfügbar, solange das WEP geöffnet ist
+  const geladen = wep !== null
+  useEffect(() => {
+    if (!geladen) return
+    return installiereSchnittstelle({ holeWep: () => wepRef.current!, zeigeSkizze: () => wechsle('skizze') })
+  }, [wepId, geladen, wechsle])
 
   const oeffneMaske = useCallback((m: Maske) => {
     setMaske(m)

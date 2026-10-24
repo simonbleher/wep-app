@@ -16,6 +16,7 @@ import { bauExcelFuerExport } from '@/bauexcel'
 import { leseBauSkizze } from '@/export/bauSkizzeLesen'
 import { ladeBauExcelAusOneDrive } from '@/sync'
 import { KI_AKTIV } from '@/funktionen'
+import { meldeSkizzenQuelle, useVorschlag, vorschlagSpeicher } from '@/agent/bruecke'
 import { Dialog, ICON, Meldung, datumDe } from './ui'
 import { entprelle } from './entprellen'
 import { ParzelleBereich } from './ParzelleBereich'
@@ -89,6 +90,9 @@ export function SkizzeTab({
     [speichereSkizze],
   )
   const holeSkizze = useCallback(() => aktuellRef.current, [])
+  // Agent-Schnittstelle: Vorschläge beziehen sich auf den Stand dieses Editors; ein offener Vorschlag wird im Editor angezeigt
+  useEffect(() => meldeSkizzenQuelle(() => aktuellRef.current), [])
+  const vorschlag = useVorschlag()
   /** Neuer Gesamtstand nach einer Änderung der Parzelle: Editor und Anzeige übernehmen ihn, gespeichert wird mit dem WEP. */
   const uebernehmeStand = useCallback((skizze: SkizzeDaten) => {
     aktuellRef.current = skizze
@@ -323,7 +327,12 @@ export function SkizzeTab({
           </div>
         </Dialog>
       )}
-      <SkizzeEditor wert={editorWert} onAenderung={beiEditorAenderung} />
+      <SkizzeEditor
+        wert={editorWert}
+        onAenderung={beiEditorAenderung}
+        vorschlag={vorschlag}
+        onVorschlagEntscheidung={(e) => vorschlagSpeicher.entscheide(e)}
+      />
       {KI_AKTIV && <SkizzeChat holeSkizze={holeSkizze} onSkizze={beiChatAenderung} />}
     </section>
   )

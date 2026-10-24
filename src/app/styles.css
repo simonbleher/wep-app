@@ -1274,8 +1274,82 @@ select.eingabe {
   color: var(--farbe-warnung);
 }
 
-.skizze-auswahl {
+.skizze-vieleck-leiste,
+.skizze-vorschlag-balken {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--abstand-2);
   padding: var(--abstand-2) var(--abstand-3);
+  border-radius: var(--radius-klein);
+  background: var(--farbe-akzent-hell);
+  color: var(--farbe-text);
+  font-size: var(--schrift-klein);
+}
+
+/* Offener Vorschlag: auffällige Randfarbe, damit er nicht mit gespeicherten Formen verwechselt wird */
+.skizze-vorschlag-balken {
+  border: 2px solid #e36c09;
+  background: var(--farbe-grund);
+}
+
+.skizze-vorschlag-text {
+  flex: 1 1 12ch;
+  font-weight: var(--gewicht-fett);
+}
+
+.skizze-aussehen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--abstand-2);
+}
+
+.skizze-aussehen-knopf {
+  position: absolute;
+  top: 50%;
+  right: var(--abstand-2);
+  transform: translateY(-50%);
+  min-height: 40px;
+}
+
+.farbwahl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--abstand-2);
+}
+
+.farbfeld {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--beruehr-min);
+  height: var(--beruehr-min);
+  padding: 0;
+  border: 2px solid var(--farbe-rand);
+  border-radius: var(--radius);
+  color: var(--farbe-text);
+  background: var(--farbe-grund);
+}
+
+.farbfeld[aria-pressed='true'] {
+  border-color: var(--farbe-fokus);
+  outline: 3px solid var(--farbe-fokus);
+  outline-offset: 1px;
+}
+
+.knopf-klein {
+  min-height: var(--beruehr-min);
+}
+
+.knopf-klein[aria-pressed='true'] {
+  border-color: var(--farbe-akzent);
+  background: var(--farbe-akzent-hell);
+  color: var(--farbe-akzent);
+}
+
+.skizze-auswahl {
+  position: relative;
+  padding: var(--abstand-2) 120px var(--abstand-2) var(--abstand-3);
   border-radius: var(--radius-klein);
   background: var(--farbe-akzent-hell);
   color: var(--farbe-akzent);

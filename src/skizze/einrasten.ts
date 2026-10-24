@@ -39,6 +39,7 @@ export function schluesselPunkte(el: SkizzeElement): Punkt[] {
         { x: el.x + el.breite, y: el.y + el.hoehe },
         { x: el.x + el.breite / 2, y: el.y + el.hoehe / 2 },
       ]
+    case 'vieleck':
     case 'bauform':
       return el.punkte.map((q) => ({ x: q.x, y: q.y }))
     case 'linie':
@@ -52,8 +53,8 @@ export function schluesselPunkte(el: SkizzeElement): Punkt[] {
         { x: el.cx, y: el.cy },
         { x: el.cx - el.radius, y: el.cy },
         { x: el.cx + el.radius, y: el.cy },
-        { x: el.cx, y: el.cy - el.radius },
-        { x: el.cx, y: el.cy + el.radius },
+        { x: el.cx, y: el.cy - (el.radiusY ?? el.radius) },
+        { x: el.cx, y: el.cy + (el.radiusY ?? el.radius) },
       ]
     case 'text':
       return [{ x: el.x, y: el.y }]

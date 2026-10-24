@@ -29,6 +29,8 @@ export interface TestBauExcelOptionen {
   vorlagePfad?: string
   /** Handgezeichnete Formen (erfunden: Laube, Anbauten, Schuppen, Terrasse, Keller …) ins Blatt „Skizze Bau“ legen. */
   skizzeBau?: boolean
+  /** Zusätzliche Formen in „Skizze Bau“ (nur mit `skizzeBau`). */
+  weitereFormen?: TestForm[]
 }
 
 /** Eine handgezeichnete Form im Blatt „Skizze Bau“ (Punkt ab Blattecke, wie Excel sie anzeigt). */
@@ -43,6 +45,8 @@ export interface TestForm {
   fuellung?: string
   linie?: string
   gestrichelt?: boolean
+  /** linie: Pfeilspitze am Ende (`tailEnd`) bzw. am Anfang (`'anfang'`, `headEnd`). */
+  pfeil?: boolean | 'anfang'
   /** freiform: Eckpunkte in pt relativ zur linken oberen Ecke von (x, y). */
   punkte?: [number, number][]
 }
@@ -82,7 +86,7 @@ function testFormXml(f: TestForm, id: number, geo: ReturnType<typeof leseBlattGe
   const xfrm = `<a:xfrm><a:off x="${x1}" y="${y1}"/><a:ext cx="${x2 - x1}" cy="${y2 - y1}"/></a:xfrm>`
   const fuell = f.fuellung ? `<a:solidFill><a:srgbClr val="${f.fuellung}"/></a:solidFill>` : '<a:noFill/>'
   const rahmen = f.linie
-    ? `<a:ln w="12700"><a:solidFill><a:srgbClr val="${f.linie}"/></a:solidFill>${f.gestrichelt ? '<a:prstDash val="dash"/>' : ''}</a:ln>`
+    ? `<a:ln w="12700"><a:solidFill><a:srgbClr val="${f.linie}"/></a:solidFill>${f.gestrichelt ? '<a:prstDash val="dash"/>' : ''}${f.pfeil === 'anfang' ? '<a:headEnd type="triangle"/>' : f.pfeil ? '<a:tailEnd type="triangle"/>' : ''}</a:ln>`
     : '<a:ln><a:noFill/></a:ln>'
   const text = f.text
     ? `<a:p><a:pPr algn="ctr"/><a:r><a:rPr lang="de-DE" sz="1100"/><a:t>${esc(f.text)}</a:t></a:r></a:p>`
@@ -135,7 +139,7 @@ export async function erzeugeTestBauExcel(opt: TestBauExcelOptionen = {}): Promi
     let zeichnung = await zip.file('xl/drawings/drawing8.xml')!.async('string')
     const ids = [...zeichnung.matchAll(/<xdr:cNvPr\b[^>]*\sid="(\d+)"/g)].map((m) => Number(m[1]))
     let id = Math.max(1, ...ids) + 1
-    zeichnung = zeichnung.replace('</xdr:wsDr>', `${TEST_SKIZZE_BAU.map((f) => testFormXml(f, id++, geo)).join('')}</xdr:wsDr>`)
+    zeichnung = zeichnung.replace('</xdr:wsDr>', `${[...TEST_SKIZZE_BAU, ...(opt.weitereFormen ?? [])].map((f) => testFormXml(f, id++, geo)).join('')}</xdr:wsDr>`)
     zip.file('xl/drawings/drawing8.xml', zeichnung)
   }
   return zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' })

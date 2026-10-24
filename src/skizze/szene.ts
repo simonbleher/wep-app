@@ -155,6 +155,7 @@ function festAusElement(el: SkizzeElement, bw: number, bh: number): SzenenElemen
   switch (el.typ) {
     case 'symbol':
       return null
+    case 'vieleck':
     case 'bauform': {
       const xs = el.punkte.map((q) => q.x)
       const ys = el.punkte.map((q) => q.y)
@@ -166,10 +167,10 @@ function festAusElement(el: SkizzeElement, bw: number, bh: number): SzenenElemen
       }
     }
     case 'rechteck':
-      return { id: el.id, typ: 'bau', ...px(el.x, el.y, el.breite, el.hoehe), beschriftung: '', fest: true }
+      return { id: el.id, typ: 'bau', ...px(el.x, el.y, el.breite, el.hoehe), beschriftung: el.beschriftung ?? '', fest: true }
     case 'kreis':
       return {
-        id: el.id, typ: 'bau-ellipse', ...px(el.cx - el.radius, el.cy - el.radius, 2 * el.radius, 2 * el.radius),
+        id: el.id, typ: 'bau-ellipse', ...px(el.cx - el.radius, el.cy - (el.radiusY ?? el.radius), 2 * el.radius, 2 * (el.radiusY ?? el.radius)),
         beschriftung: el.beschriftung ?? '', fest: true,
       }
     case 'text': {

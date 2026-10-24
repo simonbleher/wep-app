@@ -42,15 +42,17 @@ export function transformiereElement<T extends SkizzeElement>(el: T, von: Abbild
   const e = el as SkizzeElement
   switch (e.typ) {
     case 'rechteck':
-    case 'symbol':
       return { ...e, x: X(e.x), y: Y(e.y), breite: L(e.breite), hoehe: L(e.hoehe) } as T
+    case 'symbol':
+      return { ...e, x: X(e.x), y: Y(e.y), breite: L(e.breite), hoehe: L(e.hoehe), ...(e.ziel ? { ziel: { x: X(e.ziel.x), y: Y(e.ziel.y) } } : {}) } as T
     case 'linie':
     case 'massangabe':
       return { ...e, x1: X(e.x1), y1: Y(e.y1), x2: X(e.x2), y2: Y(e.y2) } as T
     case 'kreis':
-      return { ...e, cx: X(e.cx), cy: Y(e.cy), radius: L(e.radius) } as T
+      return { ...e, cx: X(e.cx), cy: Y(e.cy), radius: L(e.radius), ...(e.radiusY !== undefined ? { radiusY: L(e.radiusY) } : {}) } as T
     case 'text':
       return { ...e, x: X(e.x), y: Y(e.y) } as T
+    case 'vieleck':
     case 'bauform':
       return { ...e, punkte: e.punkte.map((p) => ({ x: X(p.x), y: Y(p.y) })) } as T
   }
