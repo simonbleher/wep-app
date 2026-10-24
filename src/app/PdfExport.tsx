@@ -5,6 +5,7 @@
 import { useEffect, useId, useState } from 'react'
 import { Check, FileText, FileType, Share2 } from 'lucide-react'
 import { hatBauTeil, type Rolle, type Wep } from '@/model'
+import { useOhneExcel } from './ohneExcel'
 import { dbAblage } from '@/fotos/ablage'
 import { lageVon, skizzeMitParzelle } from '@/parzelle'
 import { leererGrundriss } from '@/skizze/grundriss'
@@ -40,6 +41,7 @@ function inhaltsText(rolle: Rolle, wep: Wep): string {
 }
 
 export function PdfBereich({ wep, rolle, profilIndex }: { wep: Wep; rolle: Rolle; profilIndex?: Record<string, number> }) {
+  const ohneExcel = useOhneExcel()
   const id = useId()
   const [zustand, setZustand] = useState<Zustand>({ typ: 'idle' })
   const [mitFotos, setMitFotos] = useState(false)
@@ -149,11 +151,11 @@ export function PdfBereich({ wep, rolle, profilIndex }: { wep: Wep; rolle: Rolle
         Export als PDF
       </h2>
       <p className="neben block">
-        Das PDF entsteht hier auf dem Gerät, auch ohne Netz. Es enthält: {inhaltsText(rolle, wep)} Die Zahlen sind dieselben wie in der Excel-Datei.
+        Das PDF entsteht hier auf dem Gerät, auch ohne Netz. Es enthält: {inhaltsText(rolle, wep)}{ohneExcel ? '' : ' Die Zahlen sind dieselben wie in der Excel-Datei.'}
       </p>
       <ul className="neben block">
         <li>
-          <strong>PDF übersichtlich:</strong> schlichtes, gut lesbares Protokoll mit Rechenweg je Bauteil, ohne Excel-Gitter.
+          <strong>PDF übersichtlich:</strong> schlichtes, gut lesbares Protokoll mit Rechenweg je Bauteil{ohneExcel ? '.' : ', ohne Excel-Gitter.'}
         </li>
         <li>
           <strong>PDF wie Vorlage:</strong> sieht aus wie die Blätter der BV-Vorlage (gleiche Seiten, Überschriften, Tabellen und Summen).

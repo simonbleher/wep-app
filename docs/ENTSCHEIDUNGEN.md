@@ -300,3 +300,9 @@
 
 - **Entscheidung:** Hat ein WEP Bau-Daten (Bauteile, Abwasser, Beschreibung, Beseitigung, „nicht beräumt“), enthalten Excel-Export und PDF den Bau-Teil – auch wenn die Rolle des WEP „nur Grün“ ist (`exportRolle`: Grün → beides).
 - **Grund:** Ein geteiltes oder aus der Bau-Excel gefülltes WEP mit Rolle Grün verlor beim Export die Laube und alle anderen Bau-Angaben, ohne Hinweis. Die Rolle steuert, welche Reiter man bearbeitet, nicht, welche vorhandenen Daten in die Datei kommen.
+
+## 2026-10-24 · Excel-Funktionen ausblendbar, standardmäßig aus
+
+- **Entscheidung:** Geräte-Einstellung „Ohne Excel arbeiten“ (Profil → Dieses Gerät), **standardmäßig an**. An = kein Excel in der Oberfläche (Export als Excel, Bau-Excel hinterlegen/übernehmen/abgleichen, „Neues WEP aus Bau-Excel“, Skizzen-Grundlage aus Excel, Bau-Excel beim Teilen/Sichern). Das PDF bleibt der Ausgabeweg.
+- **Grund:** Langfristig wird die Excel-Vorlage nicht mehr gebraucht; die Funktionen bleiben aber im Programm (ausschaltbar), solange der Wechsel läuft.
+- **Nicht angetastet:** Gespeicherte Daten, Bau-Excel-Dateien und der Abgleich (Sync) bleiben unverändert; ein WEP mit Bau-Excel verliert nichts. Der Export-Code (`exportWep`) wird weiter für das PDF genutzt, das aus derselben Arbeitsmappe entsteht. Beim Öffnen einer geteilten Datei und beim Einspielen einer Sicherung werden vorhandene Bau-Excel-Dateien weiter erkannt (datengetrieben).

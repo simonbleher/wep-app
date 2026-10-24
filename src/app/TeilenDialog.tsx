@@ -6,12 +6,14 @@ import type { Wep } from '@/model'
 import { lokalerStand } from '@/sicherung'
 import { anhangGroessen, erstelleTeilen, groesseText, teilenDateiname } from '@/teilen'
 import { Dialog, Meldung } from './ui'
+import { useOhneExcel } from './ohneExcel'
 import { kannTeilen, speichereDatei, speicherText, teileDatei } from './dateiSpeichern'
 
 export function TeilenDialog({ wep, appVersion, onSchliessen }: { wep: Wep; appVersion: string; onSchliessen: () => void }) {
   const g = anhangGroessen(wep)
   const [mitFotos, setMitFotos] = useState(false)
   const [mitBau, setMitBau] = useState(false)
+  const ohneExcel = useOhneExcel()
   const [laeuft, setLaeuft] = useState(false)
   const [meldung, setMeldung] = useState<{ text: string; alarm?: boolean }>()
   const hatFotos = g.fotoAnzahl > 0
@@ -55,6 +57,7 @@ export function TeilenDialog({ wep, appVersion, onSchliessen }: { wep: Wep; appV
           </span>
           <input id="teilen-fotos" type="checkbox" role="switch" className="schalter" checked={mitFotos && hatFotos} disabled={!hatFotos} onChange={(e) => setMitFotos(e.target.checked)} />
         </label>
+        {!ohneExcel && (
         <label className="schalter-zeile" htmlFor="teilen-bau">
           <span>
             Bau-Excel mitschicken
@@ -64,6 +67,7 @@ export function TeilenDialog({ wep, appVersion, onSchliessen }: { wep: Wep; appV
           </span>
           <input id="teilen-bau" type="checkbox" role="switch" className="schalter" checked={mitBau && hatBau} disabled={!hatBau} onChange={(e) => setMitBau(e.target.checked)} />
         </label>
+        )}
       </div>
       <Meldung>
         <p>Die Datei enthält Personendaten (Unterpächter, Anlage, Parzelle). Gib sie nur an Personen weiter, die das WEP bearbeiten oder prüfen dürfen.</p>

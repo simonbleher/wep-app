@@ -25,6 +25,7 @@ import {
   type ParzelleTeil,
 } from '@/parzelle'
 import { ZahlFeld } from './BauKomponenten'
+import { useOhneExcel } from './ohneExcel'
 import { Dialog, ICON, Meldung, Rueckfrage, datumDe } from './ui'
 
 const DE = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 2, minimumFractionDigits: 0 })
@@ -347,6 +348,7 @@ function ParzelleKurz({ parzelle, loesung, pxProM }: { parzelle: Parzelle; loesu
 // ---------------------------------------------------------------------------
 
 function RechteckEingabe({ entwurf, vertrag, onAendern }: { entwurf: Parzelle; vertrag: number | undefined; onAendern: (p: Partial<Parzelle>) => void }) {
+  const ohneExcel = useOhneExcel()
   const vorschlag = (() => {
     // Ist eine Seite getippt und die Vertragsfläche bekannt, liegt die andere Seite nahe
     if (!vertrag) return undefined
@@ -374,7 +376,7 @@ function RechteckEingabe({ entwurf, vertrag, onAendern }: { entwurf: Parzelle; v
         <button type="button" className="knopf" onClick={() => onAendern({ laenge: entwurf.breite, breite: entwurf.laenge })} disabled={!entwurf.laenge && !entwurf.breite}>
           Länge und Breite tauschen
         </button>
-        {ausExcel && (
+        {!ohneExcel && ausExcel && (
           <button type="button" className="knopf" data-testid="parzelle-vorschlag-excel" onClick={() => onAendern({ laenge: ausExcel.laenge, breite: ausExcel.breite })}>
             Vorschlag: {DE.format(ausExcel.laenge)} × {DE.format(ausExcel.breite)} m aus Vertragsfläche und Bau-Excel
           </button>
