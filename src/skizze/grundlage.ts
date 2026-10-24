@@ -270,15 +270,36 @@ function textElemente(f: BauSkizzeForm, P: (p: { x: number; y: number }) => { x:
   if (!zeilen.length) return []
   const gr = Math.max(9, Math.min(16, Math.round(10 * pxProPt)))
   const mitte = P({ x: f.kasten.x + f.kasten.w / 2, y: f.kasten.y + f.kasten.h / 2 })
-  return zeilen.map((z, i) => ({
-    id: neueId(),
-    typ: 'text',
-    ebene: 'grundlage',
-    inhalt: z,
-    schriftgroesse: gr,
-    x: Math.round((mitte.x - (z.length * gr * 0.55) / 2) * 10) / 10,
-    y: Math.round((mitte.y + (i - zeilen.length / 2) * gr * 1.25) * 10) / 10,
-  }))
+  const rad = ((f.drehung ?? 0) * Math.PI) / 180
+  return zeilen.map((z, i) => {
+    const breite = z.length * gr * 0.55
+    if (!f.drehung) {
+      return {
+        id: neueId(),
+        typ: 'text' as const,
+        ebene: 'grundlage' as const,
+        inhalt: z,
+        schriftgroesse: gr,
+        x: Math.round((mitte.x - breite / 2) * 10) / 10,
+        y: Math.round((mitte.y + (i - zeilen.length / 2) * gr * 1.25) * 10) / 10,
+      }
+    }
+    // Gedrehtes Feld (z. B. senkrechtes Maß, 270°): die Zeilen liegen entlang der gedrehten Querachse nebeneinander,
+    // jede um ihre eigene Mitte gedreht
+    const quer = (i - (zeilen.length - 1) / 2) * gr * 1.25
+    const cx = mitte.x - Math.sin(rad) * quer
+    const cy = mitte.y + Math.cos(rad) * quer
+    return {
+      id: neueId(),
+      typ: 'text' as const,
+      ebene: 'grundlage' as const,
+      inhalt: z,
+      schriftgroesse: gr,
+      x: Math.round((cx - breite / 2) * 10) / 10,
+      y: Math.round((cy - (gr + 4) / 2) * 10) / 10,
+      drehung: f.drehung,
+    }
+  })
 }
 
 // ---------------------------------------------------------------------------

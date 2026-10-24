@@ -129,6 +129,8 @@ export interface FormElement {
   pflanze?: boolean
   /** Schriftgröße in pt (Standard 9). */
   schriftPt?: number
+  /** text: Drehung in Grad im Uhrzeigersinn (Textfeld wird gedreht, wie in „Skizze Bau“). */
+  drehung?: number
   /**
    * Gruppe (z. B. „Hochbeet“ für 4 Hochbeete): wird beim Ausweichen gemeinsam versetzt/verkleinert,
    * Reihenfolge und relative Lage bleiben erhalten.
@@ -371,6 +373,8 @@ interface SpForm {
   schriftFarbe?: string
   /** Textfeld ohne Füllung und Rand (`txBox`) */
   textfeld?: boolean
+  /** Drehung in Grad im Uhrzeigersinn (`xfrm rot`). */
+  drehung?: number
   /** Text umbrechen (Standard: nein) */
   umbruch?: boolean
   /** Freiform ist ein offener Linienzug (nicht geschlossen, ohne Füllung). */
@@ -610,7 +614,7 @@ function formenFuer(el: FormElement, mitSvg: boolean): Form[] {
         : []
 
     case 'text':
-      return k && text ? [{ ...beschriftung(n, text, mitte(k).x, k.y, pt, k.w), kasten: k, ...(el.schriftFarbe ? { schriftFarbe: el.schriftFarbe } : {}) }] : []
+      return k && text ? [{ ...beschriftung(n, text, mitte(k).x, k.y, pt, k.w), kasten: k, ...(el.schriftFarbe ? { schriftFarbe: el.schriftFarbe } : {}), ...(el.drehung ? { drehung: el.drehung } : {}) }] : []
 
     case 'massangabe': {
       if (!el.von || !el.nach) return []
@@ -1137,7 +1141,7 @@ function spXml(f: SpForm, id: number, geo: BlattGeometrie): string {
     k,
     `<xdr:sp macro="" textlink=""><xdr:nvSpPr><xdr:cNvPr id="${id}" name="${esc(f.name)}" descr="${WEP_APP_MARKER}"/>` +
       `<xdr:cNvSpPr${f.textfeld ? ' txBox="1"' : ''}/></xdr:nvSpPr>` +
-      `<xdr:spPr><a:xfrm><a:off x="${k.x}" y="${k.y}"/><a:ext cx="${k.w}" cy="${k.h}"/></a:xfrm>` +
+      `<xdr:spPr><a:xfrm${f.drehung ? ` rot="${Math.round(f.drehung * 60000)}"` : ''}><a:off x="${k.x}" y="${k.y}"/><a:ext cx="${k.w}" cy="${k.h}"/></a:xfrm>` +
       `${f.pfad ? freiform(f.pfad, k, f.pfadOffen) : `<a:prstGeom prst="${f.prst}"><a:avLst/></a:prstGeom>`}${fill}${lnXml(f.linie)}</xdr:spPr>${body}</xdr:sp>`,
   )
 }
@@ -1365,6 +1369,7 @@ export function skizzeDatenZuFormen(daten: SkizzeDaten, bereich: Kasten, optione
           text: e.inhalt,
           schriftPt: pt,
           ...(e.farbe ? { schriftFarbe: ohneRaute(e.farbe) } : {}),
+          ...(e.drehung ? { drehung: e.drehung } : {}),
           ...gl,
         })
         break
