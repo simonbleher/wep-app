@@ -276,9 +276,3 @@
 - **Symbole des Nutzers** (Symbol-Werkzeug) bleiben unverändert; `lesen()` liefert sie als `typ: "symbol"` nur lesend, `gruen-ersetzen` ersetzt sie (mit Hinweis).
 - Bugfix nebenbei: Treffertest offener Linienzüge (keine Schlusskante, kein Inneres).
 
-## 2026-10-24 · Bau-Excel: Grün-Zeilen ins WEP übernehmen
-
-- **Entscheidung:** Außenanlagen (Blatt „Außenanlagen“, Zeilen 15–45), Aufwuchs (I ab Zeile 18, II ab Zeile 10) und Beseitigungskosten Abschnitt 2 (Zeilen 34–44, Begründung F53) werden beim Hinterlegen der Bau-Excel gelesen. Leere Listen im WEP werden sofort gefüllt; bei vorhandenen Einträgen entscheidet der Nutzer je Liste im Dialog.
-- **Grund:** Der Export schreibt die Grün-Blätter aus dem WEP und leert die übrigen Zeilen. Eine Bau-Excel mit ausgefüllten Grün-Zeilen verlor sie sonst beim Export, ohne dass die App sie je angezeigt hatte.
-- **Nichts doppelt, nichts überschrieben:** Gleich = gleiche Bezeichnung (normalisiert), Menge und Einheit; mehrfach vorkommende gleiche Zeilen werden eins zu eins gezählt. Preise aus der Bau-Excel gelten als manuell (`preisManuell`), einen fehlenden Preis nimmt die App als 0 €. Keine Katalogzuordnung (Freitext), damit nichts geraten wird.
-- **Nicht übernommen:** Baulichkeiten, Mängelliste und Beseitigung Abschnitt 1 – sie gehören zum Bau-Teil, der im Export aus der Bau-Excel erhalten bleibt, solange das WEP keine Bau-Daten hat.

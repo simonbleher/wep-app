@@ -6,7 +6,7 @@
  */
 import JSZip from 'jszip'
 import type { Formalien } from '../model'
-import { AUFWUCHS_I, AUFWUCHS_II, AUSSENANLAGEN, BESEITIGUNG_AA, FORMALIEN_MAP, SHEET_PATHS, excelSerialToIso } from './cellMapper'
+import { FORMALIEN_MAP, excelSerialToIso } from './cellMapper'
 
 /** Formalien-Felder, die in der Bau-Excel ausgefüllt sind (Zahl für die Fläche, sonst Text; Datum als ISO). */
 export type BauFormalien = Partial<Formalien>
@@ -123,99 +123,4 @@ export function vergleichsWert(feld: keyof Formalien, wert: string | number | un
   const text = String(wert).replace(/\s+/g, ' ').trim()
   if (typ === 'datum') return datumAlsIso(text) ?? text
   return text
-}
-
-// ---------------------------------------------------------------------------
-// Grün-Positionen (Außenanlagen, Aufwuchs I/II, Beseitigung Abschnitt 2)
-// ---------------------------------------------------------------------------
-
-/** Eine ausgefüllte Zeile von „Außenanlagen“ bzw. „Aufwuchs I/II“ (Spalten A, B, C, K). */
-export interface BauGruenPosition {
-  anzahl: number
-  einheit: string
-  bezeichnung: string
-  /** 0, wenn in der Bau-Excel kein Einzelpreis steht. */
-  einzelpreis: number
-}
-
-/** Eine ausgefüllte Zeile von „Beseitigungskosten“ Abschnitt 2 (Spalten B, F, G, H, J). */
-export interface BauGruenBeseitigung {
-  gegenstand: string
-  menge: number
-  einheit: string
-  einzelpreis: number
-  faktor: number
-}
-
-export interface BauGruen {
-  aussenanlagen: BauGruenPosition[]
-  /** Aufwuchs I, danach Aufwuchs II. */
-  aufwuchs: BauGruenPosition[]
-  beseitigungAA: BauGruenBeseitigung[]
-  /** Begründung bei Faktor > 100 % (Zelle F53), wenn ausgefüllt. */
-  beseitigungBegruendung?: string
-}
-
-function zahlAus(roh: string | null): number | undefined {
-  if (roh === null) return undefined
-  const n = Number(roh.replace(/\s/g, '').replace(',', '.'))
-  return Number.isFinite(n) ? n : undefined
-}
-
-function lesePositionen(xml: string | undefined, von: number, bis: number, geteilt: string[]): BauGruenPosition[] {
-  if (!xml) return []
-  const liste: BauGruenPosition[] = []
-  for (let zeile = von; zeile <= bis; zeile++) {
-    const text = zellenWert(xml, `C${zeile}`, geteilt)?.replace(/\s+/g, ' ').trim()
-    if (!text) continue // Zeile ohne Bezeichnung ist leer (Vorlage: nur Formel in L)
-    const anzahl = zahlAus(zellenWert(xml, `A${zeile}`, geteilt))
-    const preis = zahlAus(zellenWert(xml, `K${zeile}`, geteilt))
-    liste.push({
-      anzahl: anzahl !== undefined && anzahl > 0 ? anzahl : 1,
-      einheit: zellenWert(xml, `B${zeile}`, geteilt)?.replace(/\s+/g, ' ').trim() || 'Stück',
-      bezeichnung: text,
-      einzelpreis: preis !== undefined && preis > 0 ? preis : 0,
-    })
-  }
-  return liste
-}
-
-/** Liest Außenanlagen, Aufwuchs I/II und Beseitigungskosten (Abschnitt 2) aus einer Bau-Excel. */
-export async function leseBauGruen(excel: ArrayBuffer | Uint8Array): Promise<BauGruen> {
-  const zip = await JSZip.loadAsync(excel)
-  const geteilt = await sharedStrings(zip)
-  const blatt = async (name: string, standard: string) => zip.file(await blattPfadNachName(zip, name, standard))?.async('string')
-  const [aussen, aufI, aufII, besei] = await Promise.all([
-    blatt('Außenanlagen', SHEET_PATHS.aussenanlagen),
-    blatt('Aufwuchs I', SHEET_PATHS.aufwuchsI),
-    blatt('Aufwuchs II', SHEET_PATHS.aufwuchsII),
-    blatt('Beseitigungskosten', SHEET_PATHS.beseitigungskosten),
-  ])
-  const beseitigungAA: BauGruenBeseitigung[] = []
-  if (besei) {
-    for (let zeile = BESEITIGUNG_AA.ersteZeile; zeile <= BESEITIGUNG_AA.letzteZeile; zeile++) {
-      const gegenstand = zellenWert(besei, `B${zeile}`, geteilt)?.replace(/\s+/g, ' ').trim()
-      if (!gegenstand) continue // die Vorlage hat hier nur Menge 1 / Faktor 1 vorbelegt
-      const menge = zahlAus(zellenWert(besei, `F${zeile}`, geteilt))
-      const faktor = zahlAus(zellenWert(besei, `J${zeile}`, geteilt))
-      const preis = zahlAus(zellenWert(besei, `H${zeile}`, geteilt))
-      beseitigungAA.push({
-        gegenstand,
-        menge: menge !== undefined && menge > 0 ? menge : 1,
-        einheit: zellenWert(besei, `G${zeile}`, geteilt)?.replace(/\s+/g, ' ').trim() || 'Stück',
-        einzelpreis: preis !== undefined && preis > 0 ? preis : 0,
-        faktor: faktor !== undefined && faktor > 0 ? faktor : 1,
-      })
-    }
-  }
-  const begruendung = besei ? zellenWert(besei, 'F53', geteilt)?.trim() : undefined
-  return {
-    aussenanlagen: lesePositionen(aussen, AUSSENANLAGEN.ersteZeile, AUSSENANLAGEN.letzteZeile, geteilt),
-    aufwuchs: [
-      ...lesePositionen(aufI, AUFWUCHS_I.ersteZeile, AUFWUCHS_I.letzteZeile, geteilt),
-      ...lesePositionen(aufII, AUFWUCHS_II.ersteZeile, AUFWUCHS_II.letzteZeile, geteilt),
-    ],
-    beseitigungAA,
-    ...(begruendung ? { beseitigungBegruendung: begruendung } : {}),
-  }
 }

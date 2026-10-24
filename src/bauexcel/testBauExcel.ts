@@ -29,8 +29,6 @@ export interface TestBauExcelOptionen {
   vorlagePfad?: string
   /** Handgezeichnete Formen (erfunden: Laube, Anbauten, Schuppen, Terrasse, Keller …) ins Blatt „Skizze Bau“ legen. */
   skizzeBau?: boolean
-  /** Erfundene Außenanlagen, Aufwuchs I/II und Beseitigung (Abschnitt 2) in die Blätter schreiben (`TEST_GRUEN`). */
-  gruen?: boolean
   /** Zusätzliche Formen in „Skizze Bau“ (nur mit `skizzeBau`). */
   weitereFormen?: TestForm[]
 }
@@ -72,38 +70,6 @@ export const TEST_SKIZZE_BAU: TestForm[] = [
   { name: 'Gerader Verbinder 25', art: 'linie', x: 150, y: 155, w: 160, h: 0, linie: 'C00000' },
   { name: 'Textfeld 26', art: 'textfeld', x: 200, y: 135, w: 60, h: 20, text: '4 m' },
 ]
-
-/** Erfundene Grün-Zeilen: Blatt-Pfad der Vorlage → Zelle → Wert. */
-export const TEST_GRUEN: Record<string, Record<string, string | number>> = {
-  'xl/worksheets/sheet5.xml': {
-    A15: 12, B15: 'm', C15: 'Maschendrahtzaun', K15: 4,
-    A16: 2, B16: 'Stück', C16: 'Regenwassertonne', K16: 15,
-    A17: 1, B17: 'Stück', C17: 'Kompostbehälter', K17: 20,
-  },
-  'xl/worksheets/sheet6.xml': {
-    A18: 1, B18: 'Stück', C18: 'Apfel, Halbstamm', K18: 40,
-    A19: 8, B19: 'm', C19: 'Hecke Liguster', K19: 5,
-    A20: 5, B20: 'Stück', C20: 'Rosen', // ohne Preis
-  },
-  'xl/worksheets/sheet7.xml': {
-    A10: 1, B10: 'Stück', C10: 'Hochbeet', K10: 6,
-  },
-  'xl/worksheets/sheet17.xml': {
-    B34: 'Blaufichte fällen', F34: 1, G34: 'Stück', H34: 120, J34: 1.2,
-    B35: 'Wurzelstock roden', F35: 1, G35: 'Stück', H35: 60, J35: 1,
-    F53: 'Fichte am Zaun, schwer erreichbar',
-  },
-}
-
-function setzeTestZelle(xml: string, zelle: string, wert: string | number): string {
-  const re = new RegExp(`<c r="${zelle}"((?: [a-z]+="[^"]*")*?)\\s*(?:/>|>[\\s\\S]*?</c>)`)
-  if (!re.test(xml)) throw new Error(`Zelle ${zelle} nicht in der Vorlage gefunden`)
-  return xml.replace(re, (_m, attr: string) => {
-    const stil = /\bs="\d+"/.exec(attr)?.[0]
-    const a = stil ? ` ${stil}` : ''
-    return typeof wert === 'number' ? `<c r="${zelle}"${a}><v>${wert}</v></c>` : `<c r="${zelle}"${a} t="inlineStr"><is><t>${esc(wert)}</t></is></c>`
-  })
-}
 
 const emuPt = (pt: number) => Math.round(pt * 12700)
 
@@ -167,13 +133,6 @@ export async function erzeugeTestBauExcel(opt: TestBauExcelOptionen = {}): Promi
   geteilt = geteilt.replace(/uniqueCount="\d+"/, `uniqueCount="${anzahl}"`).replace(/ count="(\d+)"/, (_m, n: string) => ` count="${Number(n) + 100}"`)
   zip.file('xl/worksheets/sheet1.xml', blatt)
   zip.file('xl/sharedStrings.xml', geteilt)
-  if (opt.gruen) {
-    for (const [pfad, zellen] of Object.entries(TEST_GRUEN)) {
-      let xml = await zip.file(pfad)!.async('string')
-      for (const [zelle, wert] of Object.entries(zellen)) xml = setzeTestZelle(xml, zelle, wert)
-      zip.file(pfad, xml)
-    }
-  }
   if (opt.skizzeBau) {
     // Blatt „Skizze Bau“ = sheet18.xml mit drawing8.xml in der Vorlage; die vorhandene leere Textbox bleibt
     const geo = leseBlattGeometrie(await zip.file('xl/worksheets/sheet18.xml')!.async('string'))
