@@ -9,14 +9,15 @@
  */
 
 import { useCallback, useEffect, useId, useReducer, useRef, useState } from 'react'
-import { Circle, Grid3x3, Magnet, Maximize, MousePointer2, Redo2, Ruler, Slash, Square, Trash2, TreePine, Type, Undo2, ZoomIn, ZoomOut, type LucideIcon } from 'lucide-react'
+import { Check, Circle, Grid3x3, Magnet, Maximize, MousePointer2, Redo2, Ruler, Slash, Square, Trash2, TreePine, Type, Undo2, X, ZoomIn, ZoomOut, type LucideIcon } from 'lucide-react'
 import { Dialog, ICON } from '@/app/ui'
-import type { SkizzeDaten, SkizzeElement, SkizzeWerkzeug, SymbolArt } from './types.js'
+import type { Linienart, SkizzeDaten, SkizzeElement, SkizzeStil, SkizzeWerkzeug, SymbolArt } from './types.js'
 import { SYMBOL_ARTEN, istGrundlage, leereSkizze, neueId } from './types.js'
 import { waehlbareElemente } from './grundlage.js'
 import { primsZuSvg, symbolPrims } from './symbole.js'
 import { STANDARD_GROESSE } from './szene.js'
-import { alleTreffer, elementVerschieben, naechsterTreffer, type Punkt } from './geometrie.js'
+import { alleTreffer, elementKasten, elementVerschieben, naechsterTreffer, type Punkt } from './geometrie.js'
+import { FUELLFARBEN, LINIENARTEN, LINIENFARBEN, LINIE_STANDARD, STIL_VORGABEN, STRICH_MUSTER, gleicherStil } from './stile.js'
 import {
   GANZE_SKIZZE,
   ZOOM_MAX,
@@ -41,108 +42,22 @@ import {
   type Treffer,
   type ZielLinien,
 } from './einrasten.js'
-import {
-  neuerVerlauf,
-  verlaufSchreiben,
-  verlaufUndo,
-  verlaufRedo,
-  kannUndo,
-  kannRedo,
-} from './verlauf.js'
-import type { Verlauf } from './verlauf.js'
+import { kannUndo, kannRedo, neuerVerlauf } from './verlauf.js'
+import { editorReducer, wendeVorschlagAn, type VorschlagAnzeige } from './editorZustand.js'
 
 // ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
 
+export type { VorschlagAnzeige } from './editorZustand.js'
+
 export interface SkizzeEditorProps {
   wert: SkizzeDaten
   onAenderung: (neu: SkizzeDaten) => void
-}
-
-// ---------------------------------------------------------------------------
-// Interner Zustand
-// ---------------------------------------------------------------------------
-
-interface EditorZustand {
-  elemente: SkizzeElement[]
-  ausgewaehlt: string | null // id des ausgewählten Elements
-  verlauf: Verlauf
-}
-
-type EditorAktion =
-  | { typ: 'elemente-setzen'; elemente: SkizzeElement[] }
-  | { typ: 'element-hinzufuegen'; element: SkizzeElement }
-  | { typ: 'element-aktualisieren'; element: SkizzeElement }
-  | { typ: 'element-loeschen'; id: string }
-  | { typ: 'element-auswaehlen'; id: string | null }
-  /** Zwischenstand beim Ziehen: ersetzt das Element, ohne einen Verlaufsschritt zu schreiben. */
-  | { typ: 'verschieben-live'; element: SkizzeElement }
-  /** Ende des Ziehens: ein einziger Verlaufsschritt gegenüber dem Stand vor dem Ziehen. */
-  | { typ: 'verschieben-fertig'; vorher: SkizzeElement[] }
-  | { typ: 'undo' }
-  | { typ: 'redo' }
-
-function editorReducer(zustand: EditorZustand, aktion: EditorAktion): EditorZustand {
-  switch (aktion.typ) {
-    case 'elemente-setzen':
-      return { ...zustand, elemente: aktion.elemente, ausgewaehlt: null }
-
-    case 'element-hinzufuegen': {
-      const neueElemente = [...zustand.elemente, aktion.element]
-      return {
-        elemente: neueElemente,
-        ausgewaehlt: aktion.element.id,
-        verlauf: verlaufSchreiben(zustand.verlauf, zustand.elemente, neueElemente),
-      }
-    }
-
-    case 'element-aktualisieren': {
-      const neueElemente = zustand.elemente.map((el) =>
-        el.id === aktion.element.id ? aktion.element : el,
-      )
-      return {
-        elemente: neueElemente,
-        ausgewaehlt: zustand.ausgewaehlt,
-        verlauf: verlaufSchreiben(zustand.verlauf, zustand.elemente, neueElemente),
-      }
-    }
-
-    case 'element-loeschen': {
-      const neueElemente = zustand.elemente.filter((el) => el.id !== aktion.id)
-      return {
-        elemente: neueElemente,
-        ausgewaehlt: null,
-        verlauf: verlaufSchreiben(zustand.verlauf, zustand.elemente, neueElemente),
-      }
-    }
-
-    case 'element-auswaehlen':
-      return { ...zustand, ausgewaehlt: aktion.id }
-
-    case 'verschieben-live':
-      return {
-        ...zustand,
-        elemente: zustand.elemente.map((el) => (el.id === aktion.element.id ? aktion.element : el)),
-      }
-
-    case 'verschieben-fertig': {
-      if (zustand.elemente === aktion.vorher) return zustand
-      return { ...zustand, verlauf: verlaufSchreiben(zustand.verlauf, aktion.vorher, zustand.elemente) }
-    }
-
-    case 'undo': {
-      const ergebnis = verlaufUndo(zustand.verlauf, zustand.elemente)
-      if (!ergebnis) return zustand
-      return { elemente: [...ergebnis.elemente], ausgewaehlt: null, verlauf: ergebnis.verlauf }
-    }
-
-    case 'redo': {
-      const ergebnis = verlaufRedo(zustand.verlauf, zustand.elemente)
-      if (!ergebnis) return zustand
-      return { elemente: [...ergebnis.elemente], ausgewaehlt: null, verlauf: ergebnis.verlauf }
-    }
-  }
+  /** Offener Vorschlag: wird hervorgehoben gezeigt, mit Balken „Übernehmen / Verwerfen“. */
+  vorschlag?: VorschlagAnzeige | null
+  /** Entscheidung des Nutzers zum Vorschlag (der Editor hat bei „uebernommen“ schon die Elemente eingefügt). */
+  onVorschlagEntscheidung?: (entscheidung: 'uebernommen' | 'verworfen') => void
 }
 
 // ---------------------------------------------------------------------------
@@ -191,6 +106,7 @@ const WERKZEUGE: { id: SkizzeWerkzeug; name: string; titel: string; icon: Lucide
 /** Lesbare Namen der Elementarten für die Auswahlzeile. */
 const TYP_NAMEN: Record<SkizzeElement['typ'], string> = {
   rechteck: 'Rechteck',
+  vieleck: 'Vieleck',
   bauform: 'Bau-Form',
   linie: 'Linie',
   kreis: 'Kreis',
@@ -226,7 +142,7 @@ const SYMBOL_NAMEN: Record<SymbolArt, string> = {
 // Hauptkomponente
 // ---------------------------------------------------------------------------
 
-export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
+export function SkizzeEditor({ wert, onAenderung, vorschlag, onVorschlagEntscheidung }: SkizzeEditorProps) {
   const daten = wert.elemente ? wert : leereSkizze()
   const breite = daten.breite ?? 800
   const hoehe = daten.hoehe ?? 600
@@ -273,6 +189,7 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
     id: string; beschriftung: string
   } | null>(null)
 
+  const [aussehenOffen, setAussehenOffen] = useState(false)
   const svgRef = useRef<SVGSVGElement>(null)
   const editorId = useId()
   const ausgewaehltesEl = zustand.elemente.find((e) => e.id === zustand.ausgewaehlt)
@@ -332,7 +249,7 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
-      if (textDialog || massDialog || kreisLabelDialog) return // Dialog offen: Tasten gehören dem Dialog
+      if (textDialog || massDialog || kreisLabelDialog || aussehenOffen) return // Dialog offen: Tasten gehören dem Dialog
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
         e.preventDefault()
         dispatch({ typ: 'undo' })
@@ -348,7 +265,7 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [zustand.ausgewaehlt, zustand.elemente, textDialog, massDialog, kreisLabelDialog])
+  }, [zustand.ausgewaehlt, zustand.elemente, textDialog, massDialog, kreisLabelDialog, aussehenOffen])
 
   // ---------------------------------------------------------------------------
   // Pointer-Ereignisse
@@ -383,6 +300,13 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
       return rasteLinienEnde({ x: startX, y: startY }, roh, ziele, fangSchwelle())
     }
     return rastePunkt(roh, ziele, fangSchwelle())
+  }
+
+  /** Vorschlag übernehmen: ein Rückgängig-Schritt; die Grundlage bleibt in beiden Modi unangetastet. */
+  const vorschlagUebernehmen = () => {
+    if (!vorschlag) return
+    dispatch({ typ: 'elemente-ersetzen', elemente: wendeVorschlagAn(zustand.elemente, vorschlag) })
+    onVorschlagEntscheidung?.('uebernommen')
   }
 
   const handlePointerDown = useCallback(
@@ -780,9 +704,9 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
 
     switch (el.typ) {
       case 'symbol': {
-        const prims = symbolPrims(el.art, { x: el.x, y: el.y, w: el.breite, h: el.hoehe }, el.beschriftung ?? '', { schrift: 12 })
+        const prims = symbolPrims(el.art, { x: el.x, y: el.y, w: el.breite, h: el.hoehe }, el.beschriftung ?? '', { schrift: 12, ziel: el.ziel })
         return (
-          <g key={el.id}>
+          <g key={el.id} data-skizze-id={el.id} data-typ={`symbol-${el.art}`}>
             <g dangerouslySetInnerHTML={{ __html: primsZuSvg(prims) }} />
             {istAusgewaehlt && (
               <rect
@@ -805,13 +729,13 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
         const mx = (Math.min(...xs) + Math.max(...xs)) / 2
         const my = (Math.min(...ys) + Math.max(...ys)) / 2
         const zeilen = (el.beschriftung ?? '').split('\n').filter(Boolean)
-        const fuellung = el.art === 'grundstueck' ? '#C5E0B4' : el.art === 'pfosten' ? '#fff' : el.gestrichelt ? 'none' : '#E7E6E6'
+        const fuellung = el.fuellung ?? (el.art === 'grundstueck' ? '#C5E0B4' : el.art === 'pfosten' ? '#fff' : el.gestrichelt ? 'none' : '#E7E6E6')
         return (
-          <g key={el.id} data-grundlage={istGrundlage(el) ? '' : undefined} data-art={el.art}>
+          <g key={el.id} data-grundlage={istGrundlage(el) ? '' : undefined} data-art={el.art} data-skizze-id={el.id}>
             <polygon
               points={el.punkte.map((q) => `${q.x},${q.y}`).join(' ')}
               fill={fuellung}
-              stroke={istAusgewaehlt ? 'blue' : el.art === 'bauteil' ? '#262626' : '#595959'}
+              stroke={istAusgewaehlt ? 'blue' : (el.linie ?? (el.art === 'bauteil' ? '#262626' : '#595959'))}
               strokeWidth={istAusgewaehlt ? 2.5 : el.art === 'pfosten' ? 1 : 1.5}
               strokeDasharray={el.gestrichelt ? '6 4' : undefined}
               pointerEvents={el.gestrichelt ? 'all' : undefined}
@@ -825,46 +749,102 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
           </g>
         )
       }
-      case 'rechteck':
+      case 'rechteck': {
+        const rand = istAusgewaehlt ? 'blue' : (el.linie ?? '#1a1a1a')
         return (
-          <rect
-            key={el.id}
-            x={el.x}
-            y={el.y}
-            width={el.breite}
-            height={el.hoehe}
-            fill="none"
-            stroke={hlStil}
-            strokeWidth={hlBreite}
-          />
-        )
-      case 'linie':
-        return (
-          <line
-            key={el.id}
-            x1={el.x1}
-            y1={el.y1}
-            x2={el.x2}
-            y2={el.y2}
-            stroke={hlStil}
-            strokeWidth={hlBreite}
-          />
-        )
-      case 'kreis':
-        return (
-          <g key={el.id}>
-            <circle
-              cx={el.cx}
-              cy={el.cy}
-              r={el.radius}
-              fill="none"
-              stroke={hlStil}
+          <g key={el.id} data-skizze-id={el.id} data-typ="rechteck">
+            <rect
+              x={el.x}
+              y={el.y}
+              width={el.breite}
+              height={el.hoehe}
+              fill={el.fuellung ?? 'none'}
+              stroke={rand}
               strokeWidth={hlBreite}
+              strokeDasharray={el.linienart === 'gestrichelt' ? STRICH_MUSTER.join(' ') : undefined}
+              pointerEvents={el.fuellung ? undefined : 'all'}
             />
+            {el.beschriftung && (
+              <text x={el.x + el.breite / 2} y={el.y + el.hoehe / 2} textAnchor="middle" dominantBaseline="middle" fontSize={12} fill="#1a1a1a" pointerEvents="none">
+                {el.beschriftung}
+              </text>
+            )}
+          </g>
+        )
+      }
+      case 'vieleck': {
+        const xs = el.punkte.map((q) => q.x)
+        const ys = el.punkte.map((q) => q.y)
+        return (
+          <g key={el.id} data-skizze-id={el.id} data-typ="vieleck">
+            <polygon
+              points={el.punkte.map((q) => `${q.x},${q.y}`).join(' ')}
+              fill={el.fuellung ?? 'none'}
+              stroke={istAusgewaehlt ? 'blue' : (el.linie ?? '#1a1a1a')}
+              strokeWidth={hlBreite}
+              strokeLinejoin="round"
+              strokeDasharray={el.linienart === 'gestrichelt' ? STRICH_MUSTER.join(' ') : undefined}
+              pointerEvents="all"
+            />
+            {el.beschriftung && (
+              <text x={(Math.min(...xs) + Math.max(...xs)) / 2} y={(Math.min(...ys) + Math.max(...ys)) / 2} textAnchor="middle" dominantBaseline="middle" fontSize={12} fill="#1a1a1a" pointerEvents="none">
+                {el.beschriftung}
+              </text>
+            )}
+          </g>
+        )
+      }
+      case 'linie': {
+        const farbe = istAusgewaehlt ? 'blue' : (el.farbe ?? '#1a1a1a')
+        const w = Math.atan2(el.y2 - el.y1, el.x2 - el.x1)
+        const spitze = (winkel: number) => [el.x2 - 9 * Math.cos(w + winkel), el.y2 - 9 * Math.sin(w + winkel)] as const
+        const [ax, ay] = spitze(-0.4)
+        const [bx, by] = spitze(0.4)
+        return (
+          <g key={el.id} data-skizze-id={el.id} data-typ="linie">
+            <line
+              x1={el.x1}
+              y1={el.y1}
+              x2={el.x2}
+              y2={el.y2}
+              stroke={farbe}
+              strokeWidth={hlBreite}
+              strokeDasharray={el.linienart === 'gestrichelt' ? STRICH_MUSTER.join(' ') : undefined}
+            />
+            {el.pfeil && <polygon points={`${el.x2},${el.y2} ${ax},${ay} ${bx},${by}`} fill={farbe} stroke="none" />}
+          </g>
+        )
+      }
+      case 'kreis': {
+        const ry = el.radiusY ?? el.radius
+        return (
+          <g key={el.id} data-skizze-id={el.id} data-typ={el.radiusY !== undefined ? 'ellipse' : 'kreis'}>
+            {el.radiusY === undefined ? (
+              <circle
+                cx={el.cx}
+                cy={el.cy}
+                r={el.radius}
+                fill={el.fuellung ?? 'none'}
+                stroke={istAusgewaehlt ? 'blue' : (el.linie ?? '#1a1a1a')}
+                strokeWidth={hlBreite}
+                strokeDasharray={el.linienart === 'gestrichelt' ? STRICH_MUSTER.join(' ') : undefined}
+              />
+            ) : (
+              <ellipse
+                cx={el.cx}
+                cy={el.cy}
+                rx={el.radius}
+                ry={ry}
+                fill={el.fuellung ?? 'none'}
+                stroke={istAusgewaehlt ? 'blue' : (el.linie ?? '#1a1a1a')}
+                strokeWidth={hlBreite}
+                strokeDasharray={el.linienart === 'gestrichelt' ? STRICH_MUSTER.join(' ') : undefined}
+              />
+            )}
             {el.beschriftung && (
               <text
                 x={el.cx}
-                y={el.cy + el.radius + 14}
+                y={el.cy + ry + 14}
                 textAnchor="middle"
                 fontSize={12}
                 fill={hlStil}
@@ -874,10 +854,13 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
             )}
           </g>
         )
+      }
       case 'text':
         return (
           <text
             key={el.id}
+            data-skizze-id={el.id}
+            data-typ="text"
             x={el.x}
             y={el.y}
             fontSize={el.schriftgroesse ?? 14}
@@ -895,8 +878,9 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
         const ny = laenge > 0 ? (dx / laenge) * 6 : 6
         const mx = (el.x1 + el.x2) / 2
         const my = (el.y1 + el.y2) / 2
+        const massFarbe = istAusgewaehlt ? 'blue' : (el.farbe ?? '#1a1a1a')
         return (
-          <g key={el.id} stroke={hlStil} strokeWidth={hlBreite} fill={hlStil}>
+          <g key={el.id} stroke={massFarbe} strokeWidth={hlBreite} fill={massFarbe} data-skizze-id={el.id} data-typ="massangabe">
             <line x1={el.x1} y1={el.y1} x2={el.x2} y2={el.y2} />
             <line x1={el.x1 - nx} y1={el.y1 - ny} x2={el.x1 + nx} y2={el.y1 + ny} />
             <line x1={el.x2 - nx} y1={el.y2 - ny} x2={el.x2 + nx} y2={el.y2 + ny} />
@@ -937,6 +921,11 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
   // Render
   // ---------------------------------------------------------------------------
 
+  const stilbar = Boolean(
+    ausgewaehltesEl &&
+      !ausgewaehltesEl.fest &&
+      (ausgewaehltesEl.typ === 'rechteck' || ausgewaehltesEl.typ === 'kreis' || ausgewaehltesEl.typ === 'vieleck' || ausgewaehltesEl.typ === 'linie'),
+  )
   const auswahlName = ausgewaehltesEl
     ? ausgewaehltesEl.typ === 'symbol'
       ? SYMBOL_NAMEN[ausgewaehltesEl.art]
@@ -946,7 +935,7 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
   return (
     <div className="skizze-editor">
       {/* Werkzeugleiste */}
-      <div role="toolbar" aria-label="Zeichenwerkzeuge" className="werkzeuge">
+      <div role="toolbar" aria-label="Zeichenwerkzeuge" aria-orientation="horizontal" className="werkzeuge">
         {WERKZEUGE.map((w) => (
           <button
             key={w.id}
@@ -968,6 +957,7 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
           className="werkzeug"
           title="Rückgängig (Strg+Z)"
           aria-label="Rückgängig"
+          aria-keyshortcuts="Control+Z"
           disabled={!kannUndo(zustand.verlauf)}
           onClick={() => dispatch({ typ: 'undo' })}
         >
@@ -979,6 +969,7 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
           className="werkzeug"
           title="Wiederholen (Strg+Y)"
           aria-label="Wiederholen"
+          aria-keyshortcuts="Control+Y"
           disabled={!kannRedo(zustand.verlauf)}
           onClick={() => dispatch({ typ: 'redo' })}
         >
@@ -1060,11 +1051,32 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
               ? `Ausgewählt: ${auswahlName} (fest)`
               : `Ausgewählt: ${auswahlName} – ziehen zum Verschieben`}
             {stapel && stapel.anzahl > 1 && ` · ${stapel.index + 1} von ${stapel.anzahl} hier – nochmal tippen`}
+            {stilbar && (
+              <button type="button" className="knopf knopf-klein skizze-aussehen-knopf" aria-label="Aussehen ändern" onClick={() => setAussehenOffen(true)}>
+                Aussehen
+              </button>
+            )}
           </>
         ) : (
           <span className="neben">Nichts ausgewählt</span>
         )}
       </p>
+
+      {/* Offener Vorschlag der Agent-Schnittstelle */}
+      {vorschlag && (
+        <div role="region" aria-label="Vorschlag für die Skizze" className="skizze-vorschlag-balken" data-testid="skizze-vorschlag">
+          <span role="status" aria-live="polite" className="skizze-vorschlag-text">
+            Vorschlag: {vorschlag.elemente.length} {vorschlag.elemente.length === 1 ? 'Element' : 'Elemente'}
+            {vorschlag.modus === 'gruen-ersetzen' ? ' (ersetzt dein Grün)' : ''}
+          </span>
+          <button type="button" className="knopf knopf-primaer" aria-label="Vorschlag übernehmen" onClick={vorschlagUebernehmen}>
+            <Check {...ICON} /> Übernehmen
+          </button>
+          <button type="button" className="knopf" aria-label="Vorschlag verwerfen" onClick={() => onVorschlagEntscheidung?.('verworfen')}>
+            <X {...ICON} /> Verwerfen
+          </button>
+        </div>
+      )}
 
       {/* Zeichenfläche (mit Ansicht-Knöpfen darüber, die nicht zur Zeichnung gehören) */}
       <div className="skizze-bereich" style={{ maxWidth: breite }}>
@@ -1086,6 +1098,9 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
             width="100%"
             height="100%"
             style={{ display: 'block' }}
+            role="img"
+            aria-label={`Zeichenfläche der Skizze, ${zustand.elemente.filter((x) => !istGrundlage(x)).length} Elemente`}
+            data-testid="skizze-flaeche"
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
@@ -1128,6 +1143,34 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
                 vectorEffect="non-scaling-stroke"
                 pointerEvents="none"
               />
+            )}
+
+            {/* Vorschlag der Schnittstelle: hervorgehoben, nur Anzeige */}
+            {vorschlag && (
+              <g className="skizze-vorschlag" data-testid="skizze-vorschlag-formen" pointerEvents="none">
+                {vorschlag.elemente.map((el) => (
+                  <g key={el.id} opacity={0.9}>
+                    {elementZuSvg(el, false)}
+                    {(() => {
+                      const k = elementKasten(el)
+                      return (
+                        <rect
+                          className="skizze-vorschlag-rahmen"
+                          x={k.x - 3}
+                          y={k.y - 3}
+                          width={k.breite + 6}
+                          height={k.hoehe + 6}
+                          fill="none"
+                          stroke="#E36C09"
+                          strokeWidth={1.5}
+                          strokeDasharray="5 3"
+                          vectorEffect="non-scaling-stroke"
+                        />
+                      )
+                    })()}
+                  </g>
+                ))}
+              </g>
             )}
 
             {/* Vorschau */}
@@ -1173,6 +1216,18 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
           </span>
         )}
       </div>
+
+      {/* Aussehen der gewählten Form: Füllung, Linie, Linienart, Beschriftung (im Dialog, damit die Zeichenfläche nicht springt) */}
+      {aussehenOffen && stilbar && ausgewaehltesEl && (
+        <Dialog titel="Aussehen" onSchliessen={() => setAussehenOffen(false)}>
+          <AussehenPanel el={ausgewaehltesEl as AussehenElement} onAendern={(neu) => dispatch({ typ: 'element-aktualisieren', element: neu })} />
+          <div className="dialog-knoepfe">
+            <button type="button" className="knopf knopf-primaer" onClick={() => setAussehenOffen(false)}>
+              Fertig
+            </button>
+          </div>
+        </Dialog>
+      )}
 
       {/* Text-Eingabe-Dialog */}
       {textDialog && (
@@ -1282,5 +1337,138 @@ export function SkizzeEditor({ wert, onAenderung }: SkizzeEditorProps) {
         </Dialog>
       )}
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Aussehen der gewählten Form
+// ---------------------------------------------------------------------------
+
+type FormElementMitStil = Extract<SkizzeElement, { typ: 'rechteck' | 'kreis' | 'vieleck' }>
+type AussehenElement = FormElementMitStil | Extract<SkizzeElement, { typ: 'linie' }>
+
+/** Kopie des Elements mit geänderten Feldern; `undefined` entfernt das Feld (zurück zum Standard). */
+function mitFeldern<T extends SkizzeElement>(el: T, felder: Record<string, unknown>): T {
+  const neu: Record<string, unknown> = { ...el, ...felder }
+  for (const k of Object.keys(felder)) if (neu[k] === undefined) delete neu[k]
+  return neu as unknown as T
+}
+
+function Farbwahl({
+  gruppe,
+  farben,
+  aktuell,
+  keine,
+  onWaehlen,
+}: {
+  gruppe: string
+  farben: readonly { name: string; wert: string }[]
+  aktuell: string | undefined
+  keine?: string
+  onWaehlen: (wert: string | undefined) => void
+}) {
+  const gleich = (a?: string, b?: string) => (a ?? '').toUpperCase() === (b ?? '').toUpperCase()
+  return (
+    <div role="group" aria-label={gruppe} className="farbwahl">
+      {keine && (
+        <button type="button" className="farbfeld farbfeld-keine" aria-label={`${gruppe}: ${keine}`} aria-pressed={!aktuell} title={keine} onClick={() => onWaehlen(undefined)}>
+          <X {...ICON} />
+        </button>
+      )}
+      {farben.map((f) => (
+        <button
+          key={f.wert}
+          type="button"
+          className="farbfeld"
+          aria-label={`${gruppe}: ${f.name}`}
+          aria-pressed={gleich(aktuell, f.wert)}
+          title={f.name}
+          style={{ background: f.wert }}
+          onClick={() => onWaehlen(f.wert)}
+        />
+      ))}
+    </div>
+  )
+}
+
+function Linienwahl({ aktuell, onWaehlen }: { aktuell: Linienart | undefined; onWaehlen: (a: Linienart | undefined) => void }) {
+  return (
+    <div role="group" aria-label="Linienart" className="farbwahl">
+      {LINIENARTEN.map((a) => (
+        <button
+          key={a}
+          type="button"
+          className="knopf knopf-klein"
+          aria-label={`Linienart: ${a}`}
+          aria-pressed={(aktuell ?? 'durchgezogen') === a}
+          onClick={() => onWaehlen(a === 'durchgezogen' ? undefined : a)}
+        >
+          {a === 'durchgezogen' ? 'Durchgezogen' : 'Gestrichelt'}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+export function AussehenPanel({ el, onAendern }: { el: AussehenElement; onAendern: (el: SkizzeElement) => void }) {
+  const id = useId()
+  if (el.typ === 'linie') {
+    return (
+      <section role="group" aria-label="Aussehen der Linie" className="skizze-aussehen" data-testid="skizze-aussehen">
+        <h2 className="h2">Aussehen der Linie</h2>
+        <Farbwahl gruppe="Linienfarbe" farben={LINIENFARBEN} aktuell={el.farbe ?? LINIE_STANDARD} onWaehlen={(w) => onAendern(mitFeldern(el, { farbe: w && w !== LINIE_STANDARD ? w : undefined }))} />
+        <Linienwahl aktuell={el.linienart} onWaehlen={(a) => onAendern(mitFeldern(el, { linienart: a }))} />
+        <button type="button" className="knopf knopf-klein" aria-label="Pfeilspitze am Ende" aria-pressed={el.pfeil === true} onClick={() => onAendern(mitFeldern(el, { pfeil: el.pfeil ? undefined : true }))}>
+          Pfeilspitze am Ende
+        </button>
+      </section>
+    )
+  }
+  const stil: SkizzeStil = el
+  const vorgabeWert = STIL_VORGABEN.find((v) => gleicherStil(stil, v))?.id ?? ''
+  const art = el.typ === 'rechteck' ? 'Rechteck' : el.typ === 'kreis' ? (el.radiusY !== undefined ? 'Ellipse' : 'Kreis') : 'Vieleck'
+  return (
+    <section role="group" aria-label={`Aussehen: ${art}`} className="skizze-aussehen" data-testid="skizze-aussehen">
+      <h2 className="h2">Aussehen: {art}</h2>
+      <div className="feld">
+        <label className="label" htmlFor={`${id}-vorgabe`}>
+          Vorgabe
+        </label>
+        <select
+          id={`${id}-vorgabe`}
+          className="eingabe"
+          value={vorgabeWert}
+          onChange={(e) => {
+            const v = STIL_VORGABEN.find((x) => x.id === e.target.value)
+            if (v) onAendern(mitFeldern(el, { fuellung: v.fuellung, linie: v.linie === LINIE_STANDARD ? undefined : v.linie, linienart: v.linienart }))
+          }}
+        >
+          {vorgabeWert === '' && <option value="">Eigene Auswahl</option>}
+          {STIL_VORGABEN.map((v) => (
+            <option key={v.id} value={v.id}>
+              {v.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      <Farbwahl gruppe="Füllfarbe" farben={FUELLFARBEN} aktuell={el.fuellung} keine="keine Füllung" onWaehlen={(w) => onAendern(mitFeldern(el, { fuellung: w }))} />
+      <Farbwahl gruppe="Linienfarbe" farben={LINIENFARBEN} aktuell={el.linie ?? LINIE_STANDARD} onWaehlen={(w) => onAendern(mitFeldern(el, { linie: w && w !== LINIE_STANDARD ? w : undefined }))} />
+      <Linienwahl aktuell={el.linienart} onWaehlen={(a) => onAendern(mitFeldern(el, { linienart: a }))} />
+      <div className="feld">
+        <label className="label" htmlFor={`${id}-text`}>
+          Beschriftung
+        </label>
+        <input
+          id={`${id}-text`}
+          className="eingabe"
+          defaultValue={el.beschriftung ?? ''}
+          enterKeyHint="done"
+          onBlur={(e) => {
+            const t = e.target.value.trim()
+            if (t !== (el.beschriftung ?? '')) onAendern(mitFeldern(el, { beschriftung: t || undefined }))
+          }}
+        />
+      </div>
+    </section>
   )
 }

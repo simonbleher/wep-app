@@ -215,7 +215,18 @@ function ausExcel(q: Extract<GrundlageQuelle, { art: 'excel' }>, breite: number,
         const a = P(f.von)
         const b = P(f.nach)
         if (Math.hypot(a.x - b.x, a.y - b.y) < 1) break
-        const l: SkizzeLinie = { id: neueId(), typ: 'linie', ebene: 'grundlage', x1: a.x, y1: a.y, x2: b.x, y2: b.y }
+        const l: SkizzeLinie = {
+          id: neueId(),
+          typ: 'linie',
+          ebene: 'grundlage',
+          x1: a.x,
+          y1: a.y,
+          x2: b.x,
+          y2: b.y,
+          ...(f.linieFarbe ? { farbe: f.linieFarbe } : {}),
+          ...(f.gestrichelt ? { linienart: 'gestrichelt' as const } : {}),
+          ...(f.pfeil ? { pfeil: true } : {}),
+        }
         linien.push(l)
         break
       }
@@ -238,7 +249,9 @@ function ausExcel(q: Extract<GrundlageQuelle, { art: 'excel' }>, breite: number,
         } else if (istPfosten) {
           if (!lage) pfosten.push(form('pfosten', punkte))
         } else {
-          bauteile.push(form('bauteil', punkte, { ...(beschriftungVon(f.text, f.eigen) ? { beschriftung: beschriftungVon(f.text, f.eigen) } : {}), ...(f.gestrichelt ? { gestrichelt: true } : {}) }))
+          // Farben einer von Hand gezeichneten Form bleiben erhalten (eigene Formen der App folgen den Standardfarben)
+          const farben = f.eigen ? {} : { ...(f.fuellungFarbe ? { fuellung: f.fuellungFarbe } : {}), ...(f.linieFarbe ? { linie: f.linieFarbe } : {}) }
+          bauteile.push(form('bauteil', punkte, { ...(beschriftungVon(f.text, f.eigen) ? { beschriftung: beschriftungVon(f.text, f.eigen) } : {}), ...(f.gestrichelt ? { gestrichelt: true } : {}), ...farben }))
         }
         break
       }

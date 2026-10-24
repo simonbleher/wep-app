@@ -75,6 +75,7 @@ export function trifftElement(element: SkizzeElement, p: Punkt, toleranz?: numbe
         p.y <= element.y + element.hoehe + rand
       )
     }
+    case 'vieleck':
     case 'bauform': {
       if (imVieleck(p, element.punkte)) return true
       return element.punkte.some((a, i) => abstandPunktZuStrecke(p, a, element.punkte[(i + 1) % element.punkte.length]) <= t)
@@ -88,6 +89,13 @@ export function trifftElement(element: SkizzeElement, p: Punkt, toleranz?: numbe
     case 'massangabe':
       return abstandPunktZuStrecke(p, { x: element.x1, y: element.y1 }, { x: element.x2, y: element.y2 }) <= t
     case 'kreis': {
+      if (element.radiusY !== undefined && element.radiusY !== element.radius) {
+        // Ellipse: Abstand grob über die normierte Entfernung vom Mittelpunkt
+        const rx = Math.max(element.radius, 0.01)
+        const ry = Math.max(element.radiusY, 0.01)
+        const n = Math.hypot((p.x - element.cx) / rx, (p.y - element.cy) / ry)
+        return n <= 1 + t / Math.min(rx, ry)
+      }
       const d = abstand(p, { x: element.cx, y: element.cy })
       return Math.abs(d - element.radius) <= t || d <= element.radius + t
     }
@@ -120,7 +128,8 @@ export function elementFlaeche(element: SkizzeElement): number {
     case 'rechteck':
       return element.breite * element.hoehe
     case 'kreis':
-      return (2 * element.radius) ** 2
+      return 4 * element.radius * (element.radiusY ?? element.radius)
+    case 'vieleck':
     case 'bauform': {
       const k = kastenVonPunkten(element.punkte)
       return k.breite * k.hoehe
@@ -164,9 +173,15 @@ export function naechsterTreffer(treffer: ReadonlyArray<SkizzeElement>, aktuellI
 /** Verschiebt ein Element um den Vektor (dx, dy). */
 export function elementVerschieben(element: SkizzeElement, dx: number, dy: number): SkizzeElement {
   switch (element.typ) {
-    case 'symbol':
     case 'rechteck':
       return { ...element, x: element.x + dx, y: element.y + dy }
+    case 'symbol':
+      return {
+        ...element,
+        x: element.x + dx,
+        y: element.y + dy,
+        ...(element.ziel ? { ziel: { x: element.ziel.x + dx, y: element.ziel.y + dy } } : {}),
+      }
     case 'linie':
       return {
         ...element,
@@ -177,6 +192,7 @@ export function elementVerschieben(element: SkizzeElement, dx: number, dy: numbe
       }
     case 'kreis':
       return { ...element, cx: element.cx + dx, cy: element.cy + dy }
+    case 'vieleck':
     case 'bauform':
       return { ...element, punkte: element.punkte.map((q) => ({ x: q.x + dx, y: q.y + dy })) }
     case 'text':
@@ -189,5 +205,31 @@ export function elementVerschieben(element: SkizzeElement, dx: number, dy: numbe
         x2: element.x2 + dx,
         y2: element.y2 + dy,
       }
+  }
+}
+
+/** Umgebender Kasten eines Elements in Skizzen-Einheiten (Text und Beschriftungen grob geschätzt). */
+export function elementKasten(element: SkizzeElement): { x: number; y: number; breite: number; hoehe: number } {
+  switch (element.typ) {
+    case 'symbol':
+    case 'rechteck':
+      return { x: element.x, y: element.y, breite: element.breite, hoehe: element.hoehe }
+    case 'vieleck':
+    case 'bauform':
+      return kastenVonPunkten(element.punkte)
+    case 'kreis': {
+      const ry = element.radiusY ?? element.radius
+      return { x: element.cx - element.radius, y: element.cy - ry, breite: 2 * element.radius, hoehe: 2 * ry }
+    }
+    case 'linie':
+    case 'massangabe':
+      return kastenVonPunkten([
+        { x: element.x1, y: element.y1 },
+        { x: element.x2, y: element.y2 },
+      ])
+    case 'text': {
+      const gr = element.schriftgroesse ?? 14
+      return { x: element.x, y: element.y, breite: element.inhalt.length * gr * 0.55, hoehe: gr + 4 }
+    }
   }
 }

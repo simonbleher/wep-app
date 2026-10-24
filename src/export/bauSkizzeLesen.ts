@@ -47,6 +47,12 @@ export interface BauSkizzeForm {
   rahmen?: boolean
   /** Ursprüngliche Formart, wenn sie nur angenähert wurde (z. B. „triangle“ als Rechteck). */
   angenaehert?: string
+  /** Füllfarbe (`#RRGGBB`), falls als feste Farbe gesetzt (Designfarben aus dem Thema werden nicht aufgelöst). */
+  fuellungFarbe?: string
+  /** Linienfarbe (`#RRGGBB`), falls als feste Farbe gesetzt. */
+  linieFarbe?: string
+  /** linie: Pfeilspitze am Ende `nach` (Anfang und Ende sind dafür ggf. vertauscht). */
+  pfeil?: boolean
 }
 
 export interface BauSkizzeLesen {
@@ -204,6 +210,18 @@ function freiformPunkte(xml: string, k: Kasten, grad: number): Punkt[] | null {
   return skaliert.map((p) => ({ x: Math.round(cx + (p.x - cx) * c - (p.y - cy) * s), y: Math.round(cy + (p.x - cx) * s + (p.y - cy) * c) }))
 }
 
+/** Feste RGB-Farbe aus einem Füll-/Linien-Block (`<a:solidFill><a:srgbClr val="C00000"/>`), sonst undefined. */
+function festeFarbe(block: string): string | undefined {
+  const m = /<a:solidFill>\s*<a:srgbClr\s+val="([0-9A-Fa-f]{6})"/.exec(block)
+  return m ? `#${m[1].toUpperCase()}` : undefined
+}
+
+/** Zeigt die Linie an diesem Ende (`headEnd` = Anfang, `tailEnd` = Ende) eine Pfeilspitze? */
+function hatPfeilspitze(lnInhalt: string, ende: 'headEnd' | 'tailEnd'): boolean {
+  const t = new RegExp(`<a:${ende}\\b[^>]*\\btype="([^"]+)"`).exec(lnInhalt)?.[1]
+  return Boolean(t && t !== 'none')
+}
+
 const LINIEN_PRST = /^(line|straightConnector1|bentConnector\d|curvedConnector\d)$/
 const RECHTECK_PRST = /^(rect|roundRect|round1Rect|round2SameRect|snip\w*|flowChartProcess|flowChartAlternateProcess|plaque|frame)$/
 
@@ -229,6 +247,9 @@ function wertAus(roh: RohForm): BauSkizzeForm | null {
   const dash = /<a:prstDash\s+val="([^"]+)"/.exec(lnInhalt)?.[1]
   const gestrichelt = Boolean(dash && dash !== 'solid')
   const text = textVonForm(xml)
+  const fuellungFarbe = gefuellt ? festeFarbe(ohneLn) : undefined
+  const linieFarbe = rahmen ? festeFarbe(lnInhalt) : undefined
+  const farben = { ...(fuellungFarbe ? { fuellungFarbe } : {}), ...(linieFarbe ? { linieFarbe } : {}) }
 
   const prst = /<a:prstGeom\s+prst="([^"]+)"/.exec(xml)?.[1] ?? ''
   const istTextfeld = /<xdr:cNvSpPr\b[^>]*\btxBox="1"/.test(xml)
@@ -238,7 +259,21 @@ function wertAus(roh: RohForm): BauSkizzeForm | null {
     const flipV = /\bflipV="1"/.test(xfrm)
     const a: Punkt = { x: kasten.x + (flipH ? kasten.w : 0), y: kasten.y + (flipV ? kasten.h : 0) }
     const b: Punkt = { x: kasten.x + (flipH ? 0 : kasten.w), y: kasten.y + (flipV ? 0 : kasten.h) }
-    return { ...grund, art: 'linie', von: a, nach: b, gestrichelt, rahmen: true, ...(text ? { text } : {}) }
+    // Pfeilspitze nur am Anfang: Anfang und Ende tauschen, damit sie am Ende `nach` sitzt
+    const pfeilAmEnde = hatPfeilspitze(lnInhalt, 'tailEnd')
+    const pfeilAmAnfang = hatPfeilspitze(lnInhalt, 'headEnd')
+    const tausch = pfeilAmAnfang && !pfeilAmEnde
+    return {
+      ...grund,
+      art: 'linie',
+      von: tausch ? b : a,
+      nach: tausch ? a : b,
+      gestrichelt,
+      rahmen: true,
+      ...(pfeilAmEnde || pfeilAmAnfang ? { pfeil: true } : {}),
+      ...(linieFarbe ? { linieFarbe } : {}),
+      ...(text ? { text } : {}),
+    }
   }
 
   // Textfeld (oder Form ohne Füllung und Rahmen): nur der Text zählt
@@ -246,7 +281,7 @@ function wertAus(roh: RohForm): BauSkizzeForm | null {
     return text ? { ...grund, art: 'text', text, gefuellt: false, rahmen: false } : null
   }
 
-  const gemeinsam = { ...grund, text, gestrichelt, gefuellt, rahmen }
+  const gemeinsam = { ...grund, text, gestrichelt, gefuellt, rahmen, ...farben }
   if (/<a:custGeom\b/.test(xml)) {
     const punkte = freiformPunkte(xml, kasten, grad)
     if (punkte) return { ...gemeinsam, art: 'vieleck', punkte }

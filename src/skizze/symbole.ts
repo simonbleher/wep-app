@@ -26,6 +26,18 @@ export interface Box {
 export interface SymbolOptionen {
   /** Schriftgröße der Beschriftung (Standard 11). */
   schrift?: number
+  /** Nur Mängelhinweis: Punkt (gleiche Einheit wie der Kasten), auf den ein roter Pfeil zeigt. */
+  ziel?: { x: number; y: number }
+}
+
+/** Punkt auf dem Rand des Kastens in Richtung `ziel` (Strahl von der Mitte). */
+export function randPunktVon(b: Box, ziel: { x: number; y: number }): { x: number; y: number } {
+  const m = { x: b.x + b.w / 2, y: b.y + b.h / 2 }
+  const dx = ziel.x - m.x
+  const dy = ziel.y - m.y
+  if (dx === 0 && dy === 0) return m
+  const t = Math.min(dx === 0 ? Infinity : b.w / 2 / Math.abs(dx), dy === 0 ? Infinity : b.h / 2 / Math.abs(dy))
+  return { x: m.x + dx * t, y: m.y + dy * t }
 }
 
 const FARBE = {
@@ -349,11 +361,17 @@ export function symbolPrims(art: SymbolArt, b: Box, beschriftung = '', opt: Symb
       }
       return prims
     }
-    case 'mangelhinweis':
-      return [
+    case 'mangelhinweis': {
+      const prims: Prim[] = [
         { k: 'rect', x: b.x, y: b.y, w: b.w, h: b.h, r: 3, fill: '#FFFFFF', stroke: FARBE.rot, sw: 1 },
         { k: 'text', x: m.x, y: m.y + size / 3, s: text, size, fill: FARBE.rot, anchor: 'middle' },
       ]
+      if (opt.ziel) {
+        const von = randPunktVon(b, opt.ziel)
+        prims.push({ k: 'line', x1: von.x, y1: von.y, x2: opt.ziel.x, y2: opt.ziel.y, stroke: FARBE.rot, sw: 1, pfeil: true })
+      }
+      return prims
+    }
   }
 }
 

@@ -8,6 +8,7 @@
 
 import type { SkizzeDaten, SkizzeElement } from './types.js'
 import { symbolPrims, zeichnePrims } from './symbole.js'
+import { LINIE_STANDARD, STRICH_MUSTER } from './stile.js'
 
 /** Optionen für den PNG-Export. */
 export interface PngOptionen {
@@ -119,24 +120,45 @@ function zeichneElement(ctx: CanvasRenderingContext2D, el: SkizzeElement): void 
 
   switch (el.typ) {
     case 'symbol':
-      zeichnePrims(ctx, symbolPrims(el.art, { x: el.x, y: el.y, w: el.breite, h: el.hoehe }, el.beschriftung ?? '', { schrift: 12 }))
+      zeichnePrims(ctx, symbolPrims(el.art, { x: el.x, y: el.y, w: el.breite, h: el.hoehe }, el.beschriftung ?? '', { schrift: 12, ziel: el.ziel }))
       break
 
     case 'rechteck':
-      ctx.strokeRect(el.x, el.y, el.breite, el.hoehe)
+      if (el.fuellung || el.linie || el.linienart) {
+        ctx.beginPath()
+        ctx.rect(el.x, el.y, el.breite, el.hoehe)
+        fuelleUndRahmen(ctx, el.fuellung, el.linie, el.linienart)
+      } else {
+        ctx.strokeRect(el.x, el.y, el.breite, el.hoehe)
+      }
+      if (el.beschriftung) beschrifteMitte(ctx, el.beschriftung, el.x + el.breite / 2, el.y + el.hoehe / 2)
       break
+
+    case 'vieleck': {
+      if (el.punkte.length < 3) break
+      ctx.beginPath()
+      el.punkte.forEach((q, i) => (i === 0 ? ctx.moveTo(q.x, q.y) : ctx.lineTo(q.x, q.y)))
+      ctx.closePath()
+      fuelleUndRahmen(ctx, el.fuellung, el.linie, el.linienart)
+      if (el.beschriftung) {
+        const xs = el.punkte.map((q) => q.x)
+        const ys = el.punkte.map((q) => q.y)
+        beschrifteMitte(ctx, el.beschriftung, (Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2)
+      }
+      break
+    }
 
     case 'bauform': {
       if (el.punkte.length < 3) break
       ctx.beginPath()
       el.punkte.forEach((q, i) => (i === 0 ? ctx.moveTo(q.x, q.y) : ctx.lineTo(q.x, q.y)))
       ctx.closePath()
-      const fuellung = el.art === 'grundstueck' ? '#C5E0B4' : el.art === 'pfosten' ? '#ffffff' : el.gestrichelt ? null : '#E7E6E6'
+      const fuellung = el.fuellung ?? (el.art === 'grundstueck' ? '#C5E0B4' : el.art === 'pfosten' ? '#ffffff' : el.gestrichelt ? null : '#E7E6E6')
       if (fuellung) {
         ctx.fillStyle = fuellung
         ctx.fill()
       }
-      ctx.strokeStyle = el.art === 'bauteil' ? '#262626' : '#595959'
+      ctx.strokeStyle = el.linie ?? (el.art === 'bauteil' ? '#262626' : '#595959')
       ctx.lineWidth = el.art === 'pfosten' ? 1 : 1.5
       if (el.gestrichelt) ctx.setLineDash([6, 4])
       ctx.stroke()
@@ -154,24 +176,45 @@ function zeichneElement(ctx: CanvasRenderingContext2D, el: SkizzeElement): void 
       break
     }
 
-    case 'linie':
+    case 'linie': {
+      if (el.farbe) {
+        ctx.strokeStyle = el.farbe
+        ctx.fillStyle = el.farbe
+      }
+      if (el.linienart === 'gestrichelt') ctx.setLineDash(STRICH_MUSTER)
       ctx.beginPath()
       ctx.moveTo(el.x1, el.y1)
       ctx.lineTo(el.x2, el.y2)
       ctx.stroke()
+      if (el.pfeil) {
+        if (el.linienart === 'gestrichelt') ctx.setLineDash([])
+        ctx.fillStyle = el.farbe ?? '#1a1a1a'
+        const w = Math.atan2(el.y2 - el.y1, el.x2 - el.x1)
+        ctx.beginPath()
+        ctx.moveTo(el.x2, el.y2)
+        ctx.lineTo(el.x2 - 9 * Math.cos(w - 0.4), el.y2 - 9 * Math.sin(w - 0.4))
+        ctx.lineTo(el.x2 - 9 * Math.cos(w + 0.4), el.y2 - 9 * Math.sin(w + 0.4))
+        ctx.closePath()
+        ctx.fill()
+      }
       break
+    }
 
-    case 'kreis':
+    case 'kreis': {
+      const ry = el.radiusY ?? el.radius
       ctx.beginPath()
-      ctx.arc(el.cx, el.cy, el.radius, 0, 2 * Math.PI)
-      ctx.stroke()
+      if (ry === el.radius) ctx.arc(el.cx, el.cy, el.radius, 0, 2 * Math.PI)
+      else ctx.ellipse(el.cx, el.cy, Math.max(0.01, el.radius), Math.max(0.01, ry), 0, 0, 2 * Math.PI)
+      if (el.fuellung || el.linie || el.linienart) fuelleUndRahmen(ctx, el.fuellung, el.linie, el.linienart)
+      else ctx.stroke()
       if (el.beschriftung) {
         ctx.fillStyle = '#1a1a1a'
         ctx.textAlign = 'center'
         ctx.textBaseline = 'top'
-        ctx.fillText(el.beschriftung, el.cx, el.cy + el.radius + 2)
+        ctx.fillText(el.beschriftung, el.cx, el.cy + ry + 2)
       }
       break
+    }
 
     case 'text': {
       const groesse = el.schriftgroesse ?? 14
@@ -184,6 +227,7 @@ function zeichneElement(ctx: CanvasRenderingContext2D, el: SkizzeElement): void 
     }
 
     case 'massangabe': {
+      if (el.farbe) ctx.strokeStyle = el.farbe
       // Hauptlinie
       ctx.beginPath()
       ctx.moveTo(el.x1, el.y1)
@@ -210,7 +254,7 @@ function zeichneElement(ctx: CanvasRenderingContext2D, el: SkizzeElement): void 
       // Beschriftung in der Mitte
       const mx = (el.x1 + el.x2) / 2
       const my = (el.y1 + el.y2) / 2
-      ctx.fillStyle = '#1a1a1a'
+      ctx.fillStyle = el.farbe ?? '#1a1a1a'
       ctx.textAlign = 'center'
       ctx.textBaseline = 'bottom'
       ctx.fillText(el.beschriftung, mx, my - 2)
@@ -219,4 +263,25 @@ function zeichneElement(ctx: CanvasRenderingContext2D, el: SkizzeElement): void 
   }
 
   ctx.restore()
+}
+
+/** Füllung (falls gewählt) und Rahmen des aktuellen Pfads; ohne Angaben das bisherige Aussehen (nur dunkler Rahmen). */
+function fuelleUndRahmen(ctx: CanvasRenderingContext2D, fuellung?: string, linie?: string, linienart?: string): void {
+  if (fuellung) {
+    ctx.fillStyle = fuellung
+    ctx.fill()
+  }
+  ctx.strokeStyle = linie ?? LINIE_STANDARD
+  ctx.lineWidth = 2
+  ctx.setLineDash(linienart === 'gestrichelt' ? STRICH_MUSTER : [])
+  ctx.stroke()
+  ctx.setLineDash([])
+}
+
+function beschrifteMitte(ctx: CanvasRenderingContext2D, text: string, x: number, y: number): void {
+  ctx.fillStyle = '#1a1a1a'
+  ctx.font = '12px sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(text, x, y)
 }

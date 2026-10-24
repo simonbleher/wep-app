@@ -24,6 +24,16 @@ export type SkizzeWerkzeug =
 // Elemente
 // ---------------------------------------------------------------------------
 
+/** Verweis auf eine Position des WEP (Aufwuchs, Außenanlage, Beseitigung): Name und Art der Skizzenform folgen ihr. */
+export interface PositionsBezug {
+  liste: 'aufwuchs' | 'aussenanlagen' | 'beseitigung'
+  /** `Position.id` bzw. `BeseitigungsPosition.id` */
+  id: string
+}
+
+/** Linienart von Rahmen und Linien. */
+export type Linienart = 'durchgezogen' | 'gestrichelt'
+
 /** Basis-Felder, die alle Skizze-Elemente gemeinsam haben. */
 interface ElementBasis {
   id: string
@@ -31,32 +41,60 @@ interface ElementBasis {
   fest?: boolean
   /** `grundlage`: gehört zur übernommenen Bau-Skizze (eigene Ebene unter dem Grün, siehe `SkizzeGrundlage`). */
   ebene?: 'grundlage'
+  /** Verweis auf eine Position (z. B. Baum ↔ Aufwuchs-Position); gesetzt vom Skizzen-Vorschlag der Schnittstelle. */
+  bezug?: PositionsBezug
+}
+
+/**
+ * Aussehen ausgefüllter Formen (Rechteck, Kreis/Ellipse, Vieleck). Fehlt eine Angabe, gilt das bisherige Aussehen:
+ * keine Füllung, dunkle durchgezogene Linie – bestehende Skizzen sehen deshalb unverändert aus.
+ */
+export interface SkizzeStil {
+  /** Füllfarbe als `#RRGGBB`; fehlt = keine Füllung. */
+  fuellung?: string
+  /** Linienfarbe als `#RRGGBB`; fehlt = dunkelgrau (#1A1A1A). */
+  linie?: string
+  /** Fehlt = durchgezogen. */
+  linienart?: Linienart
 }
 
 /** Gefülltes Rechteck (z. B. Gebäude, Beet). */
-export interface SkizzeRechteck extends ElementBasis {
+export interface SkizzeRechteck extends ElementBasis, SkizzeStil {
   typ: 'rechteck'
   x: number
   y: number
   breite: number
   hoehe: number
+  beschriftung?: string
 }
 
-/** Gerade Linie zwischen zwei Punkten. */
+/** Gerade Linie zwischen zwei Punkten, optional mit Farbe, Strichart und Pfeilspitze am Ende (x2, y2). */
 export interface SkizzeLinie extends ElementBasis {
   typ: 'linie'
   x1: number
   y1: number
   x2: number
   y2: number
+  farbe?: string
+  linienart?: Linienart
+  pfeil?: boolean
 }
 
-/** Kreis (im Lageplan: Baum-Symbol), optional mit Beschriftung. */
-export interface SkizzeKreis extends ElementBasis {
+/** Kreis (im Lageplan: Baum-Symbol), optional mit Beschriftung; mit `radiusY` eine Ellipse (`radius` = waagerechter Halbmesser). */
+export interface SkizzeKreis extends ElementBasis, SkizzeStil {
   typ: 'kreis'
   cx: number
   cy: number
   radius: number
+  /** Senkrechter Halbmesser; fehlt = Kreis. */
+  radiusY?: number
+  beschriftung?: string
+}
+
+/** Geschlossenes Vieleck (frei gezeichnet oder aus der Schnittstelle), mindestens drei Eckpunkte in Skizzen-Pixeln. */
+export interface SkizzeVieleck extends ElementBasis, SkizzeStil {
+  typ: 'vieleck'
+  punkte: { x: number; y: number }[]
   beschriftung?: string
 }
 
@@ -81,6 +119,8 @@ export interface SkizzeMassangabe extends ElementBasis {
   y2: number
   /** Anzeigetext, z. B. „3,5 m". Frei eingebbar, wird nicht aus Koordinaten berechnet. */
   beschriftung: string
+  /** Farbe; fehlt = dunkelgrau (rot z. B. bei Maßlinien aus einer Bau-Excel). */
+  farbe?: string
 }
 
 /** Piktogramme im Lageplan-Stil (Skill parzellen-skizze). */
@@ -116,6 +156,8 @@ export interface SkizzeSymbol extends ElementBasis {
   breite: number
   hoehe: number
   beschriftung?: string
+  /** Nur `mangelhinweis`: Punkt, auf den ein roter Pfeil vom Hinweisfeld zeigt (Skizzen-Pixel). */
+  ziel?: { x: number; y: number }
 }
 
 /** Was eine Bauform der Grundlage darstellt (bestimmt Farbe und Ebene im Excel-Blatt). */
@@ -134,6 +176,10 @@ export interface SkizzeBauform extends ElementBasis {
   beschriftung?: string
   /** Gestrichelt ohne Füllung (Keller, Hauswasser). */
   gestrichelt?: boolean
+  /** Füllfarbe aus einer eingelesenen Bau-Excel (`#RRGGBB`); fehlt = Standard der Art. */
+  fuellung?: string
+  /** Linienfarbe aus einer eingelesenen Bau-Excel; fehlt = Standard der Art. */
+  linie?: string
 }
 
 /** Vereinigungs-Typ aller Skizze-Elemente. */
@@ -141,6 +187,7 @@ export type SkizzeElement =
   | SkizzeBauform
   | SkizzeSymbol
   | SkizzeRechteck
+  | SkizzeVieleck
   | SkizzeLinie
   | SkizzeKreis
   | SkizzeText
