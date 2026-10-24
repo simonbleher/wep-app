@@ -40,7 +40,18 @@ function inhaltsText(rolle: Rolle, wep: Wep): string {
   return 'Deckblatt, Außenanlagen, Aufwuchs, Beseitigungskosten und Skizze (soweit ausgefüllt).'
 }
 
-export function PdfBereich({ wep, rolle, profilIndex }: { wep: Wep; rolle: Rolle; profilIndex?: Record<string, number> }) {
+export function PdfBereich({
+  wep,
+  rolle,
+  profilIndex,
+  onErstellt,
+}: {
+  wep: Wep
+  rolle: Rolle
+  profilIndex?: Record<string, number>
+  /** Das PDF ist fertig (z. B. Status „exportiert“ setzen – wie nach dem Excel-Export). */
+  onErstellt?: () => Promise<void> | void
+}) {
   const ohneExcel = useOhneExcel()
   const id = useId()
   const [zustand, setZustand] = useState<Zustand>({ typ: 'idle' })
@@ -123,6 +134,7 @@ export function PdfBereich({ wep, rolle, profilIndex }: { wep: Wep; rolle: Rolle
         oneDrive = `OneDrive: ${e instanceof Error ? e.message : String(e)}`
       }
       setZustand({ typ: 'fertig', name: ausgabe.name, seiten: ausgabe.pdf.seitenZahl, blob, datei, oneDrive, hinweise })
+      await onErstellt?.()
     } catch (e) {
       setZustand({ typ: 'fehler', meldung: e instanceof Error ? e.message : String(e) })
     }

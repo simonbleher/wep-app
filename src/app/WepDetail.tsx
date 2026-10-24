@@ -1107,6 +1107,8 @@ function ExportTab({
 
   const hatSkizze = !nurBau && Boolean(skizzeMitParzelle(wep)?.elemente.length)
   const ergebnis = exportZustand.typ === 'fertig' ? exportZustand : null
+  // Nach dem PDF gilt das WEP wie nach dem Excel-Export als „exportiert“ (im Menü „⋯“ zurücksetzbar)
+  const pdfErstellt = () => aendere((w) => (w.status === 'exportiert' ? w : { ...w, status: 'exportiert' }))
 
   // Ohne Excel (Standard): nur das PDF
   if (ohneExcel) {
@@ -1115,7 +1117,7 @@ function ExportTab({
         <header className="seitenkopf">
           <h1 className="h1">Export</h1>
         </header>
-        <PdfBereich wep={wep} rolle={rolle} profilIndex={profilIndex} />
+        <PdfBereich wep={wep} rolle={rolle} profilIndex={profilIndex} onErstellt={pdfErstellt} />
       </>
     )
   }
@@ -1244,7 +1246,7 @@ function ExportTab({
         </div>
       )}
 
-      <PdfBereich wep={wep} rolle={rolle} profilIndex={profilIndex} />
+      <PdfBereich wep={wep} rolle={rolle} profilIndex={profilIndex} onErstellt={pdfErstellt} />
     </>
   )
 }
