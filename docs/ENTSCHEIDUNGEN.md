@@ -295,3 +295,8 @@
 - **Alter → Baujahr:** Die Bau-Excel enthält das Alter (C74 Grube, I40 Gewächshaus, H66 Vorplatz), die App rechnet `Wertjahr − Baujahr + 1`. Beim Übernehmen wird das Baujahr daraus mit dem Wertjahr des WEP (nicht dem Index-Jahr „für 2025“) und demselben „+1“ zurückgerechnet, damit die App dasselbe Alter wie die Excel ergibt.
 - **Leere Restnutzung = 0:** In der Bau-Excel heißt eine leere Restnutzung 100 % Altersabzug. Der Import setzt 0 (manuell), die App schätzt nicht aus dem Baujahr.
 - **Baubeschreibung:** Eine Zeile steht in der Bau-Excel in mehreren Spalten (B links, E/F rechts). Der Import verbindet die Teile einer Zeile. Weil die App den Text nur in Spalte B ausgibt und dort Zeilen umbricht, schreibt der Export die Beschreibung nur, wenn sie sich gegenüber der Bau-Excel geändert hat (dann werden auch die rechten Teile entfernt); sonst bleiben die Zeilen der Bau-Excel unverändert.
+
+## 2026-10-24 · Export: Bau-Daten werden immer mitgeschrieben
+
+- **Entscheidung:** Hat ein WEP Bau-Daten (Bauteile, Abwasser, Beschreibung, Beseitigung, „nicht beräumt“), enthalten Excel-Export und PDF den Bau-Teil – auch wenn die Rolle des WEP „nur Grün“ ist (`exportRolle`: Grün → beides).
+- **Grund:** Ein geteiltes oder aus der Bau-Excel gefülltes WEP mit Rolle Grün verlor beim Export die Laube und alle anderen Bau-Angaben, ohne Hinweis. Die Rolle steuert, welche Reiter man bearbeitet, nicht, welche vorhandenen Daten in die Datei kommen.

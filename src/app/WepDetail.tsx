@@ -75,7 +75,7 @@ import { lageVon, skizzeMitParzelle } from '@/parzelle'
 import { leererGrundriss } from '@/skizze/grundriss'
 import { hatGrundlage } from '@/skizze/grundlage'
 import { svgZuPngBrowser } from '@/export/svgRaster'
-import { exportWep, mitLeerenBauDaten, type ExportResult } from '@/export'
+import { exportRolle, exportWep, mitLeerenBauDaten, type ExportResult } from '@/export'
 import { exportFotosNachOneDrive, exportNachOneDrive, ladeFotoAusOneDrive } from '@/sync'
 import { berechneAbschnittSumme } from '@/gruen/summen'
 import { Capacitor } from '@capacitor/core'
@@ -979,7 +979,7 @@ function ExportTab({
   leseWep,
   bauStand,
   bauNachladen,
-  rolle,
+  rolle: rolleWep,
   profilIndex,
 }: {
   wep: Wep
@@ -993,6 +993,8 @@ function ExportTab({
   bauNachladen: BauNachladeStand
   rolle: Rolle
 }) {
+  // Ein Grün-WEP mit Bau-Daten wird mit beiden Teilen exportiert (Excel und PDF), sonst fehlte z. B. die Laube
+  const rolle = exportRolle(wep, rolleWep)
   // Nur Bau: eigener Export mit Bau-Blättern und Formalien, ohne Grün-Teil und ohne Bau-Excel
   const nurBau = rolle === 'bau'
   // Standard: Skizze als bearbeitbare Excel-Formen; Fallback: Bild (PNG)
