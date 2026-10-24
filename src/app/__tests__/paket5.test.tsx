@@ -5,7 +5,7 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { BauExcel } from '@/model'
 import type { FormalienAbgleich } from '@/bauexcel/abgleich'
-import { AbgleichDialog, BauExcelKarte, BAU_EXCEL_ACCEPT, bauStatusText, type BauNachladeStand, type BauStand } from '../BauExcel'
+import { AbgleichDialog, BauExcelKarte, PositionenUebernehmenDialog, BAU_EXCEL_ACCEPT, bauStatusText, type BauNachladeStand, type BauStand } from '../BauExcel'
 
 const render = (el: Parameters<typeof renderToStaticMarkup>[0]) => renderToStaticMarkup(el)
 const nichts = () => {}
@@ -32,7 +32,7 @@ describe('Karte „Bau-Excel“', () => {
   it('ohne Datei: Erklärung und „Bau-Excel auswählen“', () => {
     const h = karte({ bauExcel: undefined, stand: {} })
     expect(h).toContain('Bau-Excel auswählen')
-    expect(h).toContain('Formalien werden daraus vorbefüllt')
+    expect(h).toContain('Außenanlagen, Aufwuchs und Beseitigungen werden daraus übernommen')
     expect(h).not.toContain('Austauschen')
   })
 
@@ -60,6 +60,29 @@ describe('Karte „Bau-Excel“', () => {
   it('im Mobilfunk mit „nur WLAN“ gibt es „Jetzt laden“', () => {
     expect(karte({ stand: {}, nachladen: { ...keinNachladen, fehlt: true, netz: 'nur-wlan' } })).toContain('Jetzt laden')
     expect(karte()).not.toContain('Jetzt laden')
+  })
+
+  it('fehlende Positionen: Hinweis mit „Positionen übernehmen“; Dialog zeigt je Liste die Zeilen', () => {
+    const gruen = { aussenanlagen: [], aufwuchs: [], beseitigungAA: [] }
+    expect(karte({ stand: { ...lokal, gruen }, offenePositionen: 0, onPositionen: nichts })).not.toContain('Positionen übernehmen')
+    const h = karte({ stand: { ...lokal, gruen }, offenePositionen: 3, onPositionen: nichts })
+    expect(h).toContain('noch 3 Zeilen')
+    expect(h).toContain('Positionen übernehmen')
+    const d = render(
+      createElement(PositionenUebernehmenDialog, {
+        abgleich: [
+          { liste: 'aufwuchs', name: 'Aufwuchs', neu: [{ text: 'Magnolie', detail: '1 Stück · 3 €' }], gleich: 2, wepLeer: false },
+          { liste: 'aussenanlagen', name: 'Außenanlagen', neu: [], gleich: 1, wepLeer: false },
+        ],
+        dateiName: 'Bau.xlsx',
+        onUebernehmen: nichts,
+        onSpaeter: nichts,
+      }),
+    )
+    expect(d).toContain('Aufwuchs: 1 Zeile hinzufügen')
+    expect(d).toContain('Magnolie – 1 Stück · 3 €')
+    expect(d).toContain('2 schon im WEP')
+    expect(d).not.toContain('Außenanlagen: ')
   })
 
   it('offene Angaben: Hinweis mit „Formalien abgleichen“; abgeglichen: leiser Knopf zum erneuten Vergleich', () => {

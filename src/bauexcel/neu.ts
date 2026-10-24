@@ -5,6 +5,7 @@ import { leseBauFormalien } from '@/export/bauExcelLesen'
 import type { Wep } from '@/model'
 import { neuerWepMitProfil, type Profil } from '@/profil'
 import { fuelleLeereFelder } from './abgleich'
+import { fuelleLeereListen } from './gruenAbgleich'
 import { setzeBauExcel, type BauWerkzeuge } from './index'
 
 export async function legeWepAusBauExcelAn(opt: {
@@ -31,6 +32,8 @@ export async function legeWepAusBauExcelAn(opt: {
   })
   // Leere Felder aus der Bau-Excel; Abweichungen (z. B. Wertermittler aus dem Profil) fragt die WEP-Ansicht ab
   wep = fuelleLeereFelder(wep, erg.bau ?? pruefung)
+  // Außenanlagen, Aufwuchs und Beseitigung: ein neues WEP hat noch keine Einträge, alles aus der Bau-Excel wird übernommen
+  wep = fuelleLeereListen(wep, erg.gruen)
   await speichere(wep)
   return wep
 }
