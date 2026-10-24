@@ -29,6 +29,8 @@ export interface TestBauExcelOptionen {
   vorlagePfad?: string
   /** Handgezeichnete Formen (erfunden: Laube, Anbauten, Schuppen, Terrasse, Keller …) ins Blatt „Skizze Bau“ legen. */
   skizzeBau?: boolean
+  /** Erfundene Baulichkeiten, Mängel, Baubeschreibung und Beseitigung (Bau) in die Blätter schreiben (`TEST_BAU`). */
+  bau?: boolean
   /** Zusätzliche Formen in „Skizze Bau“ (nur mit `skizzeBau`). */
   weitereFormen?: TestForm[]
 }
@@ -70,6 +72,32 @@ export const TEST_SKIZZE_BAU: TestForm[] = [
   { name: 'Gerader Verbinder 25', art: 'linie', x: 150, y: 155, w: 160, h: 0, linie: 'C00000' },
   { name: 'Textfeld 26', art: 'textfeld', x: 200, y: 135, w: 60, h: 20, text: '4 m' },
 ]
+
+/** Erfundener Bau-Teil: Blatt-Pfad der Vorlage → Zelle → Wert (Laube L, Anbau A1, Schuppen S; A2 bleibt leer). */
+export const TEST_BAU: Record<string, Record<string, string | number>> = {
+  'xl/worksheets/sheet3.xml': {
+    G12: 'Doppelwand 8,01 - 10,00 cm', C13: 1982, D13: 'lt. Bauschein', I13: 10, A17: 19.43,
+    G21: 'Stein 24,00 - 35,99 cm', C22: 1983, E23: 13, A26: 3.73,
+    B47: 'S1+S2', G47: 'Doppelwand bis 4,00 cm', C48: 2000, D48: 'lt. Angabe', A52: 6.41,
+    B83: 'Laube L: Baujahr 1982', B84: 'Dach: Pultdach mit Bitumenschweißbahn',
+    F104: 3, G104: 100,
+  },
+  'xl/worksheets/sheet4.xml': { F5: 8, F24: 5 },
+  'xl/worksheets/sheet17.xml': {
+    B14: 'Rückbau Schuppen S1', F14: 3.93, G14: 'm³', H14: 80, J14: 1,
+    B15: 'Rückbau Schuppen S2', F15: 2.08, G15: 'm³', H15: 50, J15: 1.2,
+  },
+}
+
+function setzeTestZelle(xml: string, zelle: string, wert: string | number): string {
+  const re = new RegExp(`<c r="${zelle}"((?: [a-z]+="[^"]*")*?)\\s*(?:/>|>[\\s\\S]*?</c>)`)
+  if (!re.test(xml)) throw new Error(`Zelle ${zelle} nicht in der Vorlage gefunden`)
+  return xml.replace(re, (_m, attr: string) => {
+    const stil = /\bs="\d+"/.exec(attr)?.[0]
+    const a = stil ? ` ${stil}` : ''
+    return typeof wert === 'number' ? `<c r="${zelle}"${a}><v>${wert}</v></c>` : `<c r="${zelle}"${a} t="inlineStr"><is><t>${esc(wert)}</t></is></c>`
+  })
+}
 
 const emuPt = (pt: number) => Math.round(pt * 12700)
 
@@ -133,6 +161,13 @@ export async function erzeugeTestBauExcel(opt: TestBauExcelOptionen = {}): Promi
   geteilt = geteilt.replace(/uniqueCount="\d+"/, `uniqueCount="${anzahl}"`).replace(/ count="(\d+)"/, (_m, n: string) => ` count="${Number(n) + 100}"`)
   zip.file('xl/worksheets/sheet1.xml', blatt)
   zip.file('xl/sharedStrings.xml', geteilt)
+  if (opt.bau) {
+    for (const [pfad, zellen] of Object.entries(TEST_BAU)) {
+      let xml = await zip.file(pfad)!.async('string')
+      for (const [zelle, wert] of Object.entries(zellen)) xml = setzeTestZelle(xml, zelle, wert)
+      zip.file(pfad, xml)
+    }
+  }
   if (opt.skizzeBau) {
     // Blatt „Skizze Bau“ = sheet18.xml mit drawing8.xml in der Vorlage; die vorhandene leere Textbox bleibt
     const geo = leseBlattGeometrie(await zip.file('xl/worksheets/sheet18.xml')!.async('string'))

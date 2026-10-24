@@ -276,3 +276,11 @@
 - **Symbole des Nutzers** (Symbol-Werkzeug) bleiben unverändert; `lesen()` liefert sie als `typ: "symbol"` nur lesend, `gruen-ersetzen` ersetzt sie (mit Hinweis).
 - Bugfix nebenbei: Treffertest offener Linienzüge (keine Schlusskante, kein Inneres).
 
+## 2026-10-24 · Bau-Excel: Bau-Teil statt Grün-Zeilen übernehmen
+
+- **Entscheidung:** Aus der Bau-Excel liest die App Formalien, „Skizze Bau“ und jetzt auch den **Bau-Teil** (Baulichkeiten, Mängelliste, Baubeschreibung, Beseitigungskosten Abschnitt 1, „Laube nicht beräumt“); nach Rückfrage und je Gruppe wählbar. Der kurz zuvor eingebaute Import der Grün-Zeilen ist wieder entfernt.
+- **Grund:** Der Ablauf ist Bau-Wertermittler → Grün-Wertermittler → Bezirksverband. Die Bau-Excel kommt mit ausgefülltem Bau-Teil an, die Grün-Blätter füllt der Grün-Wertermittler selbst. Damit PDF und Excel den Bau-Teil enthalten, muss er im WEP stehen.
+- **Rolle:** Ein reines Grün-WEP wird mit der Übernahme zum WEP „beides“ (Bau-Reiter sichtbar, Export/PDF mit Bau-Teil).
+- **Beispielwerte der Vorlage zählen nicht als ausgefüllt:** Typ „fehlt“, 5 m³ × 50 € (nicht beräumt), Fäkalien-Zeile im Wortlaut der Vorlage, „Nicht fertiggestellt“ 0,05 in der Mängelliste.
+- **Mängel:** Maßgeblich ist der Gesamtabzug der Bau-Excel. Passen die Gruppen der Mängelliste nicht zu ihm (Laube) oder fehlen sie (Anbau, Schuppen), steht er als ein eigener Posten im WEP, damit das WEP wie die Bau-Excel rechnet. Ein Baujahr außerhalb 1800–2100 (Tippfehler) wird nicht übernommen.
+- **Nicht gelesen:** Abwasser, Gewächshaus, Laubenvorplatz, Baupreisindex – sie lassen sich im WEP eintragen.
