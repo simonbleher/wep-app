@@ -49,6 +49,7 @@ import { SkizzeBauTab } from './SkizzeBauTab'
 import { FELD_NAMEN } from '@/bauexcel/abgleich'
 import { KgaAuswahl } from './KgaAuswahl'
 import { VorgangsNrFeld } from './VorgangsNr'
+import { AnBvSenden } from './AnBvSenden'
 import { useOhneExcel } from './ohneExcel'
 import { BauExcelBereich, useBauNachladen, useBauStand, type BauNachladeStand, type BauStand } from './BauExcel'
 import { ladeExportQuelle } from './exportQuelle'
@@ -69,7 +70,7 @@ import { BeseitigungBauTab, EINHEITEN_BAU } from './BauBeseitigung'
 import { aendereBauTeil, bauFuerExport, entferneBauteil, ersetzeBauteil, neuesBauteil } from './bauHelfer'
 import { BESEITIGUNG_TEXTBAUSTEINE } from '@/bau'
 import type { Abschnitt } from './katalogDaten'
-import { ICON, Kopf, TEIL_TEXT, Laedt, LeerZustand, Meldung, Rueckfrage, SlEintrag, StatusMarke, TeilMarke, euroFormat } from './ui'
+import { ICON, Kopf, TEIL_TEXT, Laedt, LeerZustand, Meldung, Rueckfrage, SlEintrag, StatusMarke, TeilMarke, datumDe, euroFormat } from './ui'
 import { lokalesProfil } from '@/profil'
 import { skizzeAlsPng } from '@/skizze/skizzePng'
 import { skizzeDatenZuFormen, type Kasten } from '@/export/skizzeFormen'
@@ -357,6 +358,7 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
               <TeilMarke rolle={rolle} />
               <StatusMarke status={wepStatus(wep)} />
             </span>
+            {wep.anBvGesendetAm && <span className="neben">an BV gesendet {datumDe(wep.anBvGesendetAm.slice(0, 10))}</span>}
           </div>
           <WepMenue status={wepStatus(wep)} onStatus={(st) => void setzeStatus(st)} onDuplizieren={() => void duplizieren()} onTeilen={() => setTeilenOffen(true)} onLoeschen={() => setLoeschFrage(true)} />
         </div>
@@ -476,7 +478,7 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
           <>
             <Kopf
               titel={titel}
-              unter={[wep.formalien.kleingartenanlage.trim(), TEIL_TEXT[rolle], wepStatus(wep)].filter(Boolean).join(' · ')}
+              unter={[wep.formalien.kleingartenanlage.trim(), TEIL_TEXT[rolle], wepStatus(wep), wep.anBvGesendetAm ? `an BV gesendet ${datumDe(wep.anBvGesendetAm.slice(0, 10))}` : ''].filter(Boolean).join(' · ')}
               links={zurueckKnopf}
               rechts={
                 <>
@@ -1120,6 +1122,7 @@ function ExportTab({
           <h1 className="h1">Export</h1>
         </header>
         <PdfBereich wep={wep} rolle={rolle} profilIndex={profilIndex} onErstellt={pdfErstellt} />
+        <AnBvSenden wep={wep} rolle={rolle} profilIndex={profilIndex} aendere={aendere} />
       </>
     )
   }
@@ -1249,6 +1252,7 @@ function ExportTab({
       )}
 
       <PdfBereich wep={wep} rolle={rolle} profilIndex={profilIndex} onErstellt={pdfErstellt} />
+        <AnBvSenden wep={wep} rolle={rolle} profilIndex={profilIndex} aendere={aendere} />
     </>
   )
 }

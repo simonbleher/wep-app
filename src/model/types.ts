@@ -73,6 +73,8 @@ export interface Wep {
   grundriss?: GrundrissDaten
   /** Bearbeitungsstand; fehlt = „in Arbeit“. Wird mit OneDrive abgeglichen. */
   status?: WepStatus
+  /** Zuletzt als Paket „An den BV senden“ erstellt und geteilt/gespeichert (ISO-Zeit). */
+  anBvGesendetAm?: string
   /**
    * Fotos (nur die Angaben; die Bilddateien liegen in IndexedDB bzw. in OneDrive unter
    * `daten/fotos/<Vorgangs-Nr>/<id>.jpg`, siehe src/fotos).

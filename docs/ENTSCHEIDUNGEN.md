@@ -313,3 +313,10 @@
 - **Grund:** Die App zählte bisher je Gerät selbst hoch („2026-007“) und nutzte diese Zahl zugleich als Kennung und als Vorgangs-Nr. Zwei Wertermittler vergaben so dieselbe Nummer; beim Teilen hielt die App zwei verschiedene Fälle für einen, Sync/Papierkorb/Sicherung mussten heimlich umnummerieren, und Kennung und Vorgangs-Nr. liefen auseinander, sobald jemand die Nummer änderte. Eine UUID ist auch offline auf mehreren Geräten eindeutig.
 - **Bestehende WEPs** behalten ihre Kennung; Dateien in OneDrive werden nicht umbenannt (andere Geräte erwarten die alten Namen). Bei ihnen gilt die alte Kennung als Vorgangs-Nr., solange in den Formalien keine steht.
 - **Kopien:** „Duplizieren“ ist ein anderer Vorgang (Vorgangs-Nr. leer); bei Kollisionen in Sync, Papierkorb, Sicherung und Teilen bleibt die Vorgangs-Nr., nur die Kennung ist neu.
+
+## 2026-10-25 · Weg zum BV: Paket statt E-Mail (Stufe A)
+
+- **Entscheidung:** „An den BV senden“ erstellt ein ZIP (PDFs, WEP-Datei ohne Fotos, Fotos als JPG mit sprechenden Namen). Der Wertermittler teilt es in die Synology-Drive-App oder legt es in den Synology-Ordner des BV, in den heute schon die Fotos kommen. Die App greift nicht auf das NAS zu.
+- **Grund:** Sofort nutzbar ohne Einrichtung am NAS und ohne Zugangsdaten in der App; ersetzt das Verschicken per E-Mail. Die Geschäftsstelle bekommt alles in einer Datei mit der Vorgangs-Nr. im Namen. Fotos liegen als JPG bei (nicht doppelt in der WEP-Datei), damit sie ohne App ansehbar sind.
+- **Beide PDFs**, bis der BV sich für eine Form entschieden hat; dann wird die andere abgeschaltet.
+- **Stufe B (später):** Hochladen direkt aus der App über eine Cloudflare-Funktion mit einem NAS-Benutzer, der nur in einen Eingangsordner schreiben darf, persönliche Zugangscodes je Wertermittler und eine Eingangs-Ansicht für die Geschäftsstelle – sobald der BV die nötigen Angaben geliefert hat.
