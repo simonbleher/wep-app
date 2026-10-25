@@ -124,6 +124,15 @@ try {
   pruefe(await seite.getByText('Version', { exact: true }).isVisible(), 'App-Version wird angezeigt')
   pruefe(await seite.getByText(/Nicht angemeldet/).isVisible(), 'Konto: nicht angemeldet, Anmelden möglich')
   await seite.screenshot({ path: 'dist-e2e/profil.png' })
+  // Anleitung: eigene Seite (public/anleitung/), „Zurück zur App“ führt in die App zurück
+  await seite.getByRole('link', { name: 'Anleitung' }).click()
+  await seite.getByRole('heading', { name: 'Überblick und Ablauf' }).waitFor()
+  pruefe((await seite.locator('img').evaluateAll((bilder) => bilder.filter((b) => !b.complete || b.naturalWidth === 0).length)) === 0, 'Anleitung: alle Bilder geladen')
+  await seite.getByRole('link', { name: /Zurück zur App/ }).click()
+  await seite.getByRole('heading', { name: 'Protokolle' }).waitFor()
+  pruefe(true, 'Anleitung öffnet sich aus dem Profil, „Zurück zur App“ führt zur Startseite')
+  await seite.getByRole('button', { name: 'Profil und Einstellungen' }).filter({ visible: true }).first().click()
+  await seite.getByRole('heading', { name: 'Profil und Einstellungen' }).waitFor()
   // Standard: ohne Excel – keine Excel-Knöpfe auf der Startseite; für die Excel-Durchläufe unten wird es ausgeschaltet
   pruefe(await seite.getByLabel('Ohne Excel arbeiten').isChecked(), 'Ohne Excel arbeiten ist standardmäßig an')
   await seite.getByRole('button', { name: 'Protokolle' }).click()
