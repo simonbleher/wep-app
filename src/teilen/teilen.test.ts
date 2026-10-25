@@ -304,7 +304,7 @@ describe('Teilen: Konflikte – nichts wird still überschrieben', () => {
     expect(g.protokoll).toEqual([])
   })
 
-  it('„Als neues WEP anlegen“: neue Nummer, beide Fassungen bleiben', async () => {
+  it('„Als neues WEP anlegen“: neue Kennung (UUID), beide Fassungen bleiben', async () => {
     const { gelesen } = await teile(geraetBau(), '2026-001')
     const b = leer()
     b.weps = [{ wep: wep('2026-001', { bau: bau('hier') }), geaendertAm: JETZT }]
@@ -313,11 +313,14 @@ describe('Teilen: Konflikte – nichts wird still überschrieben', () => {
     const wahl: TeilenWahl = { wep: 'kopie', teile: {} }
     expect(anzahlGewaehlt(v, wahl)).toBe(1)
     const e = await spieleTeilenEin({ gelesen, vorschau: v, wahl, lokal: g.quelle, ziel: g.ziel })
-    expect(e.weps).toEqual([{ id: '2026-002', von: '2026-001', ersetzt: false }])
-    expect(b.weps.map((w) => w.wep.id).sort()).toEqual(['2026-001', '2026-002'])
+    expect(e.weps).toHaveLength(1)
+    const neu = e.weps[0]!.id
+    expect(neu).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
+    expect(e.weps[0]).toMatchObject({ von: '2026-001', ersetzt: false })
+    expect(b.weps.map((w) => w.wep.id).sort()).toEqual(['2026-001', neu].sort())
     expect(b.weps.find((w) => w.wep.id === '2026-001')!.wep.bau?.beschreibung).toBe('hier')
-    expect(b.weps.find((w) => w.wep.id === '2026-002')!.wep.formalien.vorgangsNr).toBe('2026-002')
-    expect(b.fotos.has('2026-002/f1')).toBe(true)
+    expect(b.weps.find((w) => w.wep.id === neu)!.wep.formalien.vorgangsNr).toBe('2026-001') // Vorgangs-Nr. aus der Datei
+    expect(b.fotos.has(`${neu}/f1`)).toBe(true)
   })
 
   it('liegt die Nummer hier im Papierkorb, wird sie nie überschrieben', async () => {

@@ -9,7 +9,7 @@ genutzt. Alles unten zu Rollen-Sync, Bau-Teil und BV-OneDrive ist Zielbild für 
  Parzelle (Handy/Tablet)        Simons privates OneDrive        Schreibtisch
 ┌──────────────────────┐  Sync  ┌───────────────────────┐      ┌────────────────────────┐
 │ PWA: Grün erfassen   │◀─────▶│ Apps/WEP-App/          │◀────▶│ PWA (Windows/Browser)  │
-│ (offline, IndexedDB) │        │   <Vorgangs-Nr>.json   │      │ Bau-Excel hochladen ──┐│
+│ (offline, IndexedDB) │        │   <Kennung>.json       │      │ Bau-Excel hochladen ──┐│
 └──────────────────────┘        └───────────────────────┘      │ + Grün aus der App    ││
                                                                 │ = <Nr>_WEP.xlsx  ◀────┘│
                                                                 └────────────────────────┘
@@ -63,7 +63,7 @@ genutzt. Alles unten zu Rollen-Sync, Bau-Teil und BV-OneDrive ist Zielbild für 
 
 ```ts
 interface Wep {
-  id: string;                 // Vorgangs-Nr., z. B. "2026-999"
+  id: string;                 // interne Kennung (UUID; alte WEPs: "2026-999"), nie angezeigt – die Vorgangs-Nr. steht in formalien.vorgangsNr
   formalien: Formalien;
   gruen: { beschreibungAussen: string; beschreibungAufwuchs: string;
            aussenanlagen: Position[]; aufwuchs: Position[];

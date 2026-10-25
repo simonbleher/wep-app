@@ -275,7 +275,7 @@ describe('Einspielen mit Konflikten: nichts wird still überschrieben', () => {
     expect(e.profil).toBe(true)
   })
 
-  it('„Als neues WEP anlegen“ behält beide Fassungen: neue Nummer, Vorgangs-Nr. in den Formalien, Fotos unter der neuen Nummer', async () => {
+  it('„Als neues WEP anlegen“ behält beide Fassungen: neue Kennung (UUID), Vorgangs-Nr. bleibt, Fotos unter der neuen Kennung', async () => {
     const { gelesen } = await sicherungAus(geraetA())
     const b = geraetB()
     const g = geraet(b)
@@ -284,18 +284,18 @@ describe('Einspielen mit Konflikten: nichts wird still überschrieben', () => {
     const e = await spieleEin({ sicherung: gelesen, vorschau: v, wahl, lokal: g.quelle, ziel: g.ziel })
     const neu = e.weps[0]!
     expect(neu.von).toBe('2026-001')
-    expect(neu.id).toBe('2026-004') // 001, 002 lokal; 003 liegt in der Sicherung im Papierkorb
+    expect(neu.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
     expect(neu.ersetzt).toBe(false)
-    expect(b.weps.map((w) => w.wep.id).sort()).toEqual(['2026-001', '2026-002', '2026-004'])
+    expect(b.weps.map((w) => w.wep.id).sort()).toEqual(['2026-001', '2026-002', neu.id].sort())
     expect(b.weps.find((w) => w.wep.id === '2026-001')!.wep.formalien.kleingartenanlage).toBe('KGA Musterwiese Nord')
-    const kopie = b.weps.find((w) => w.wep.id === '2026-004')!.wep
-    expect(kopie.formalien.vorgangsNr).toBe('2026-004')
+    const kopie = b.weps.find((w) => w.wep.id === neu.id)!.wep
+    expect(kopie.formalien.vorgangsNr).toBe('2026-001') // derselbe Vorgang
     expect(kopie.formalien.kleingartenanlage).toBe('KGA Musterwiese')
-    expect([...b.fotos.get('2026-004/f2')!]).toEqual([4, 5, 6])
-    expect([...b.bau.get('2026-004')!]).toEqual([9, 9])
+    expect([...b.fotos.get(`${neu.id}/f2`)!]).toEqual([4, 5, 6])
+    expect([...b.bau.get(neu.id)!]).toEqual([9, 9])
   })
 
-  it('zwei Kopien bekommen verschiedene Nummern', async () => {
+  it('zwei Kopien bekommen verschiedene Kennungen', async () => {
     const a = leer()
     a.weps = [{ wep: wep('2026-001', 'A') }, { wep: wep('2026-002', 'B') }]
     const { gelesen } = await sicherungAus(a)
@@ -305,7 +305,10 @@ describe('Einspielen mit Konflikten: nichts wird still überschrieben', () => {
     const v = await erstelleVorschau(gelesen, g.quelle)
     const wahl: Entscheidungen = { 'wep:2026-001': 'kopie', 'wep:2026-002': 'kopie' }
     const e = await spieleEin({ sicherung: gelesen, vorschau: v, wahl, lokal: g.quelle, ziel: g.ziel })
-    expect(e.weps.map((w) => w.id)).toEqual(['2026-003', '2026-004'])
+    const ids = e.weps.map((w) => w.id)
+    expect(ids).toHaveLength(2)
+    expect(new Set(ids).size).toBe(2)
+    for (const id of ids) expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
   })
 
   it('liegt die Nummer hier im Papierkorb, wird sie nie überschrieben: überspringen oder neue Nummer', async () => {
@@ -321,7 +324,8 @@ describe('Einspielen mit Konflikten: nichts wird still überschrieben', () => {
     expect(e1.weps).toEqual([])
     expect(b.weps).toEqual([])
     const e2 = await spieleEin({ sicherung: gelesen, vorschau: v, wahl: { 'wep:2026-005': 'kopie' }, lokal: g.quelle, ziel: g.ziel })
-    expect(e2.weps.map((w) => w.id)).toEqual(['2026-006'])
+    expect(e2.weps).toHaveLength(1)
+    expect(e2.weps[0]!.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
     expect(b.papierkorb[0]!.wep.formalien.kleingartenanlage).toBe('Gelöscht hier')
   })
 

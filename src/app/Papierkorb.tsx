@@ -13,6 +13,7 @@ import {
   verbleibendeTage,
 } from '@/sync/aktionen'
 import type { PapierkorbEintrag } from '@/sync/types'
+import { vorgangsNrVon, wepName } from '@/model'
 import { wepTitel } from './Startseite'
 import { StatusZeile, useAbgleich } from './SyncLeiste'
 import { HauptSeitenleiste, ICON, Kopf, Laedt, LeerZustand, Meldung, Rueckfrage, zeitDe } from './ui'
@@ -55,7 +56,7 @@ export function Papierkorb({ konto, verfuegbar, onZurueck, onProfil, onOeffnen }
     neuLaden()
     if (!r) return
     if (r.neueNummer) {
-      setMeldung(`Die Nummer ${e.id} ist inzwischen vergeben. Das WEP ist jetzt unter ${r.id} wiederhergestellt; das Original bleibt im Papierkorb.`)
+      setMeldung(`${wepName(e.wep, e.id)} ist als eigenes WEP wiederhergestellt, weil seine alte Kennung inzwischen wieder belegt ist; das Original bleibt im Papierkorb.`)
     } else {
       onOeffnen(r.id)
     }
@@ -117,7 +118,7 @@ export function Papierkorb({ konto, verfuegbar, onZurueck, onProfil, onOeffnen }
                   <span className="zeile-text">
                     <span className={titel ? 'zeile-titel' : 'zeile-titel leer'}>{titel || 'ohne Bezeichnung'}</span>
                     <span className="neben">
-                      {e.id} · gelöscht {zeitDe(e.geloeschtAm)} · {restText(verbleibendeTage(e.geloeschtAm, jetzt))}
+                      {vorgangsNrVon(e.wep) || 'ohne Vorgangs-Nr.'} · gelöscht {zeitDe(e.geloeschtAm)} · {restText(verbleibendeTage(e.geloeschtAm, jetzt))}
                     </span>
                   </span>
                   <span className="knopf-reihe">
@@ -139,7 +140,7 @@ export function Papierkorb({ konto, verfuegbar, onZurueck, onProfil, onOeffnen }
 
       {frage && (
         <Rueckfrage
-          titel={`WEP ${frage.id} endgültig löschen?`}
+          titel={`${wepName(frage.wep, frage.id)} endgültig löschen?`}
           text={`${wepTitel(frage.wep) ? `„${wepTitel(frage.wep)}“ wird` : 'Das Protokoll wird'} unwiderruflich gelöscht${konto ? ', auch in OneDrive und auf deinen anderen Geräten' : ''}. Das lässt sich nicht rückgängig machen.`}
           bestaetigen="Endgültig löschen"
           onAbbrechen={() => setFrage(null)}

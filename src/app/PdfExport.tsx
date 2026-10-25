@@ -4,7 +4,7 @@
 // (dateiSpeichern.ts), mit Konto zusätzlich nach OneDrive (Exporte/).
 import { useEffect, useId, useState } from 'react'
 import { Check, FileText, FileType, Share2 } from 'lucide-react'
-import { hatBauTeil, type Rolle, type Wep } from '@/model'
+import { hatBauTeil, vorgangsNrVon, type Rolle, type Wep } from '@/model'
 import { useOhneExcel } from './ohneExcel'
 import { dbAblage } from '@/fotos/ablage'
 import { lageVon, skizzeMitParzelle } from '@/parzelle'
@@ -98,8 +98,8 @@ export function PdfBereich({ wep, rolle, profilIndex }: { wep: Wep; rolle: Rolle
           },
           fotos,
           unterschrift: mitUnterschrift ? unterschriftAlsPng() : null,
-          titel: `Wertermittlungsprotokoll ${wep.id}`,
-          fotoKopf: [`Vorgangs-Nr. ${wep.id}`, f.kleingartenanlage, f.parzelle && `Parzelle ${f.parzelle}`].filter(Boolean).join(' – '),
+          titel: `Wertermittlungsprotokoll ${vorgangsNrVon(wep)}`.trim(),
+          fotoKopf: [vorgangsNrVon(wep) && `Vorgangs-Nr. ${vorgangsNrVon(wep)}`, f.kleingartenanlage, f.parzelle && `Parzelle ${f.parzelle}`].filter(Boolean).join(' – '),
         },
       )
       const blob = new Blob([ausgabe.pdf.bytes as BlobPart], { type: PDF_TYP })
@@ -150,6 +150,11 @@ export function PdfBereich({ wep, rolle, profilIndex }: { wep: Wep; rolle: Rolle
       <h2 className="gruppenkopf" id={`${id}-pdf`}>
         Export als PDF
       </h2>
+      {!vorgangsNrVon(wep) && (
+        <Meldung>
+          <p>Die Vorgangs-Nr. fehlt noch – im PDF steht dann keine Nummer. Bitte unter „Formalien“ die Nummer vom BV eintragen.</p>
+        </Meldung>
+      )}
       <p className="neben block">
         Das PDF entsteht hier auf dem Gerät, auch ohne Netz. Es enthält: {inhaltsText(rolle, wep)}{ohneExcel ? '' : ' Die Zahlen sind dieselben wie in der Excel-Datei.'}
       </p>

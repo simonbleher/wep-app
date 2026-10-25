@@ -47,6 +47,18 @@ async function waehleKga(seite, bezeichnung, text) {
     await seite.getByLabel('Name der Kleingartenanlage').first().fill(text)
   }
 }
+/** „Neues WEP“: Dialog fragt nach der Vorgangs-Nr. (vom BV); null = „Nummer noch nicht bekannt“. */
+async function neuesWepAnlegen(seite, nr) {
+  await seite.getByRole('button', { name: 'Neues WEP', exact: true }).click()
+  const dlg = seite.getByRole('dialog', { name: 'Neues WEP' })
+  await dlg.waitFor()
+  if (nr === null) await dlg.getByRole('button', { name: 'Nummer noch nicht bekannt' }).click()
+  else {
+    await dlg.getByLabel(/Vorgangs-Nr/).fill(nr)
+    await dlg.getByRole('button', { name: 'Anlegen' }).click()
+  }
+  await seite.getByLabel(/Kleingartenanlage/).first().waitFor()
+}
 async function leseKga(seite, bezeichnung) {
   const sel = seite.getByLabel(bezeichnung).first()
   const wert = await sel.inputValue()
@@ -120,9 +132,15 @@ try {
   await seite.getByLabel('Ohne Excel arbeiten').uncheck()
   await seite.getByRole('button', { name: 'Protokolle' }).click()
 
-  // 5. WEP anlegen: Name und Anlage aus dem Profil sind vorbelegt
+  // 5. WEP anlegen: Vorgangs-Nr. (vom BV) im Dialog; Name und Anlage aus dem Profil sind vorbelegt
   await seite.getByRole('button', { name: 'Neues WEP', exact: true }).click()
+  const neuDlg = seite.getByRole('dialog', { name: 'Neues WEP' })
+  await neuDlg.waitFor()
+  pruefe(await neuDlg.getByRole('button', { name: 'Anlegen' }).isDisabled(), 'Neues WEP: „Anlegen“ erst mit Vorgangs-Nr.')
+  await neuDlg.getByLabel(/Vorgangs-Nr/).fill('2026-001')
+  await neuDlg.getByRole('button', { name: 'Anlegen' }).click()
   await seite.getByLabel(/Kleingartenanlage/).first().waitFor()
+  pruefe((await seite.getByLabel(/Vorgangs-Nr/).first().inputValue()) === '2026-001', 'Neues WEP: Vorgangs-Nr. aus dem Dialog steht in den Formalien')
   pruefe((await leseKga(seite, /Kleingartenanlage/)) === 'KGA Musterwiese', 'Anlage aus dem Profil vorbelegt')
   pruefe((await seite.locator('input[value="Erika Musterfrau"]').count()) > 0, 'Wertermittler aus dem Profil vorbelegt')
 
@@ -587,12 +605,16 @@ try {
   await seite.getByRole('menuitem', { name: /Als fertig markieren/ }).click()
   pruefe(await seite.getByText('KGA Musterwiese · Grün · fertig').isVisible(), 'Status lässt sich manuell auf „fertig“ setzen')
 
-  // 11c. Duplizieren: öffnet die Kopie mit allen Daten, neuer Vorgangs-Nr., Status „in Arbeit“
+  // 11c. Duplizieren: öffnet die Kopie mit allen Daten, ohne Vorgangs-Nr. (anderer Vorgang), Status „in Arbeit“
   await seite.getByRole('button', { name: 'Weitere Aktionen' }).click()
   await seite.getByRole('menuitem', { name: /Duplizieren/ }).click()
   await seite.getByText('KGA Musterwiese · Grün · in Arbeit').waitFor()
   const jahr = new Date().getFullYear()
-  pruefe((await seite.getByLabel('Vorgangs-Nr.').inputValue()) === `${jahr}-002`, 'Kopie hat neue Vorgangs-Nr.')
+  pruefe((await seite.getByLabel(/Vorgangs-Nr/).first().inputValue()) === '', 'Kopie hat keine Vorgangs-Nr. (wird eingetragen)')
+  pruefe(await seite.getByText(/Die Vorgangs-Nr. fehlt noch/).first().isVisible(), 'Kopie: Hinweis „Vorgangs-Nr. fehlt“')
+  await seite.getByLabel(/Vorgangs-Nr/).first().fill('2026-001')
+  pruefe(await seite.getByText(/Die Vorgangs-Nr. 2026-001 gibt es auf diesem Gerät schon/).first().isVisible(), 'Doppelte Vorgangs-Nr.: Hinweis')
+  await seite.getByLabel(/Vorgangs-Nr/).first().fill(`${jahr}-002`)
   pruefe((await seite.getByLabel('Parzelle', { exact: true }).inputValue()) === 'Parzelle 42', 'Kopie enthält die Formalien')
   await nav.getByRole('button', { name: 'Aufwuchs' }).click()
   pruefe(await seite.getByText('2 Positionen').isVisible(), 'Kopie enthält die Positionen')
@@ -646,8 +668,8 @@ try {
   await seite.getByRole('alertdialog').getByRole('button', { name: 'Endgültig löschen' }).click()
   pruefe(await anzahlEintraege(korb, 1), '„Endgültig löschen“ entfernt den Eintrag')
   await korb.getByRole('button', { name: 'Wiederherstellen' }).click()
-  await seite.getByLabel('Vorgangs-Nr.').waitFor()
-  pruefe(/^\d{4}-00[12]$/.test(await seite.getByLabel('Vorgangs-Nr.').inputValue()), 'Wiederhergestelltes WEP öffnet sich')
+  await seite.getByLabel(/Vorgangs-Nr/).first().waitFor()
+  pruefe(/^\d{4}-00[12]$/.test(await seite.getByLabel(/Vorgangs-Nr/).first().inputValue()), 'Wiederhergestelltes WEP öffnet sich')
   await seite.getByRole('button', { name: 'Protokolle' }).click()
   await seite.getByRole('heading', { name: 'Protokolle' }).waitFor()
   pruefe(await anzahlEintraege(liste, 1), 'wiederhergestelltes WEP steht wieder in der Liste')
@@ -794,7 +816,7 @@ try {
   pruefe((await idbLies('fotos')).length === 3, 'Papierkorb: die Fotos bleiben erhalten (30 Tage)')
   await seite.getByRole('list', { name: 'Papierkorb' }).getByRole('button', { name: /Papierkorb/ }).click()
   await seite.getByRole('list', { name: 'Papierkorb' }).getByRole('button', { name: 'Wiederherstellen' }).click()
-  await seite.getByLabel('Vorgangs-Nr.').waitFor()
+  await seite.getByLabel(/Vorgangs-Nr/).first().waitFor()
   await nav.getByRole('button', { name: 'Fotos' }).click()
   await seite.getByText('3 Fotos', { exact: true }).waitFor()
   // Die Vorschaubilder kommen asynchron aus IndexedDB, nach dem Text „3 Fotos“ (auf main schon so: Wettlauf)
@@ -946,8 +968,8 @@ try {
   pruefe((await seite.getByLabel('Parzelle', { exact: true }).inputValue()) === 'Parzelle 42', 'Neues WEP aus Bau-Excel: Parzelle aus der Datei')
   pruefe((await seite.getByLabel(/^Weg/).inputValue()) === 'Rosenweg', 'Neues WEP aus Bau-Excel: Weg aus der Datei')
   pruefe(await seite.getByText(/WEP Bau Testgarten\.xlsx/).first().isVisible(), 'Neues WEP aus Bau-Excel: Datei bleibt am WEP')
-  // Die Bau-Excel wird nach dem Öffnen gelesen: auf die Meldung warten statt sofort zu prüfen
-  pruefe(await seite.getByText(/Angaben für die Formalien, die noch nicht abgeglichen sind/).waitFor({ timeout: 10000 }).then(() => true, () => false), 'Neues WEP aus Bau-Excel: Abweichung zum Profil wird zum Abgleich angeboten')
+  // Die Vorgangs-Nr. kommt aus der Bau-Excel (E17); die App vergibt keine eigene mehr, also gibt es nichts abzugleichen
+  pruefe((await seite.getByLabel(/Vorgangs-Nr/).first().inputValue()) === '2026-007', 'Neues WEP aus Bau-Excel: Vorgangs-Nr. aus der Datei')
 
   // Papierkorb nimmt die Bau-Excel mit; endgültig löschen entfernt sie von diesem Gerät
   pruefe((await idbLies('bauExcel')).length === 1 && (await idbLies('bauExcel'))[0].hatDatei === true, 'Bau-Excel: Datei liegt lokal (IndexedDB)')
@@ -968,9 +990,9 @@ try {
   const liste6 = seite.getByRole('list', { name: 'Protokolle' })
   pruefe(await anzahlEintraege(liste6, 1), 'Paket 6: ein älteres Protokoll ist vorhanden')
   const vorhanden6 = 1
+  let nr6 = 100
   async function neuesWep6(anlage, parzelle, paechter) {
-    await seite.getByRole('button', { name: 'Neues WEP', exact: true }).click()
-    await seite.getByLabel(/Kleingartenanlage/).first().waitFor()
+    await neuesWepAnlegen(seite, `2026-${++nr6}`)
     await waehleKga(seite, /Kleingartenanlage/, anlage)
     await seite.getByLabel('Parzelle', { exact: true }).fill(parzelle)
     await seite.getByLabel('Unterpächter', { exact: true }).fill(paechter)
@@ -1126,8 +1148,9 @@ try {
   await seite.getByRole('button', { name: 'Protokolle' }).click()
   await seite.locator('.status-teil').first().waitFor()
   pruefe((await seite.locator('.status-teil-bau').count()) === 0, 'Rolle: bestehende WEPs bleiben Grün, auch nach einem Rollenwechsel im Profil')
-  await seite.getByRole('button', { name: 'Neues WEP', exact: true }).click()
-  await seite.getByLabel(/Kleingartenanlage/).first().waitFor()
+  // Ohne Nummer anlegen geht (auf der Parzelle oft noch unbekannt) – die App weist darauf hin
+  await neuesWepAnlegen(seite, null)
+  pruefe(await seite.getByText(/Die Vorgangs-Nr. fehlt noch/).first().isVisible(), 'Ohne Vorgangs-Nr.: Hinweis in den Formalien')
   const rnav = seite.getByRole('navigation', { name: 'Abschnitte' })
   pruefe((await rnav.getByRole('button', { name: 'Baulichkeiten' }).count()) === 1 && (await rnav.getByRole('button', { name: 'Außenanlagen' }).count()) === 0, 'Rolle Bau: Bau-Reiter da, Grün-Reiter weg')
   pruefe((await seite.getByLabel('Wertermittler Baulichkeiten').inputValue()) === 'Erika Musterfrau', 'Rolle Bau: Name steht bei „Wertermittler Baulichkeiten“')

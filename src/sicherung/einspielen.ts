@@ -1,5 +1,5 @@
 // Sicherung einspielen: führt aus, was in der Vorschau gewählt wurde. Nichts wird ohne Auswahl überschrieben.
-import { naechsteVorgangsNr, type Foto, type Wep } from '@/model'
+import { neueWepId, vorgangsNrVon, type Foto, type Wep } from '@/model'
 import type { EigenePosition } from '@/katalog'
 import type { GeleseneSicherung } from './lesen'
 import type { SicherungsQuelle, SicherungsZiel } from './types'
@@ -18,14 +18,9 @@ export interface EinspielErgebnis {
   fehler: string[]
 }
 
-function jahrVon(id: string): number | undefined {
-  const j = Number.parseInt(id.slice(0, 4), 10)
-  return Number.isFinite(j) ? j : undefined
-}
-
-/** Legt eine Kopie unter neuer Nummer an (Vorgangs-Nr. in den Formalien mit ändern). */
+/** Legt eine Kopie unter neuer interner Kennung an; die Vorgangs-Nr. bleibt (derselbe Vorgang). */
 function alsKopie(wep: Wep, id: string): Wep {
-  return { ...wep, id, formalien: { ...wep.formalien, vorgangsNr: id } }
+  return { ...wep, id, formalien: { ...wep.formalien, vorgangsNr: vorgangsNrVon(wep) } }
 }
 
 export async function spieleEin(opt: {
@@ -46,8 +41,9 @@ export async function spieleEin(opt: {
     ...s.daten.weps.map((w) => w.wep.id),
     ...s.daten.papierkorb.map((k) => k.id),
   ])
-  const neueNummer = (alt: string): string => {
-    const id = naechsteVorgangsNr([...belegt].map((x) => ({ id: x })), jahrVon(alt))
+  const neueNummer = (_alt: string): string => {
+    let id = neueWepId()
+    while (belegt.has(id)) id = neueWepId()
     belegt.add(id)
     return id
   }

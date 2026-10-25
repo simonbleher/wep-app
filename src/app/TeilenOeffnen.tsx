@@ -38,7 +38,7 @@ export function teilenErgebnisText(e: TeilenErgebnis): string {
   const w = e.weps[0]
   const was = e.teile.length ? `: ${e.teile.map((t) => TEIL_TITEL[t]).join(', ')}` : ''
   const dateien = [e.fotos ? n(e.fotos, 'Foto', 'Fotos') : '', e.bauExcel ? 'Bau-Excel' : ''].filter(Boolean).join(', ')
-  return `WEP ${w.id}${w.von ? ` (als Kopie von ${w.von})` : ''} eingespielt${was}${dateien && !e.teile.length ? ` (${dateien})` : ''}.`
+  return `Das WEP ist eingespielt${w.von ? ' (als eigene Kopie, das vorhandene bleibt)' : ''}${was}${dateien && !e.teile.length ? ` (${dateien})` : ''}.`
 }
 
 export function TeilenOeffnen({

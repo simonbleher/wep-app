@@ -126,25 +126,53 @@ export function wepStatus(wep: Pick<Wep, 'status'>): WepStatus {
 
 /**
  * Komplette Kopie eines WEP (Formalien, Positionen, Beschreibungen, Beseitigung, Skizze)
- * unter einer neuen Vorgangs-Nr.; Status „in Arbeit“. Fotos und Bau-Excel werden nicht kopiert
+ * unter einer neuen internen Kennung und ohne Vorgangs-Nr. (eine Kopie ist ein anderer Vorgang; die Nummer vergibt der
+ * BV); Status „in Arbeit“. Fotos und Bau-Excel werden nicht kopiert
  * (docs/ENTSCHEIDUNGEN.md, Beta 3 Paket 4 und 5).
  */
-export function dupliziereWep(wep: Wep, neueId: string): Wep {
+export function dupliziereWep(wep: Wep, neueId: string = neueWepId()): Wep {
   const kopie = JSON.parse(JSON.stringify(wep)) as Wep
   delete kopie.fotos
   delete kopie.bauExcel
-  return { ...kopie, id: neueId, formalien: { ...kopie.formalien, vorgangsNr: neueId }, status: 'in Arbeit' }
+  return { ...kopie, id: neueId, formalien: { ...kopie.formalien, vorgangsNr: '' }, status: 'in Arbeit' }
 }
 
-/** Nächste Vorgangs-Nr. der Form "<Jahr>-<lfd. Nummer>" aus den vorhandenen WEPs des Jahres. */
-export function naechsteVorgangsNr(vorhandene: Pick<Wep, 'id'>[], jahr = new Date().getFullYear()): string {
-  const prefix = `${jahr}-`
-  const nummern = vorhandene
-    .filter((w) => w.id.startsWith(prefix))
-    .map((w) => Number.parseInt(w.id.slice(prefix.length), 10))
-    .filter((n) => Number.isFinite(n))
-  const naechste = (nummern.length ? Math.max(...nummern) : 0) + 1
-  return `${prefix}${String(naechste).padStart(3, '0')}`
+/**
+ * Interne Kennung eines neuen WEP: eine UUID. Sie wird nie angezeigt, ändert sich nie und ist der Dateiname im
+ * Abgleich (daten/<id>.json, fotos/<id>/ …). Die Vorgangs-Nr. vergibt der BV; sie steht nur in den Formalien.
+ * WEPs von vor dieser Umstellung behalten ihre alte Kennung („2026-007“).
+ */
+export function neueWepId(): string {
+  const c = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto
+  if (c?.randomUUID) return c.randomUUID()
+  // Rückfall für alte Umgebungen: Version-4-UUID aus Math.random
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (z) => {
+    const r = (Math.random() * 16) | 0
+    return (z === 'x' ? r : (r & 0x3) | 0x8).toString(16)
+  })
+}
+
+/** Alte Kennung aus der Zeit, als die App die Vorgangs-Nr. selbst hochzählte („2026-007“). */
+export const istAlteKennung = (id: string): boolean => /^\d{4}-\d+$/.test(id)
+
+/** Vorgangs-Nr. des WEP (vom BV); bei alten WEPs ohne Eintrag die alte Kennung, sonst leer. */
+export function vorgangsNrVon(wep: Pick<Wep, 'id' | 'formalien'>): string {
+  return wep.formalien.vorgangsNr?.trim() || (istAlteKennung(wep.id) ? wep.id : '')
+}
+
+/** Kurzer Name für Meldungen und Titel: „WEP 2026-152“ bzw. „WEP ohne Vorgangs-Nr. (Parzelle 42)“. */
+export function wepName(wep: Pick<Wep, 'id' | 'formalien'> | undefined, id = wep?.id ?? ''): string {
+  const nr = wep ? vorgangsNrVon(wep) : istAlteKennung(id) ? id : ''
+  if (nr) return `WEP ${nr}`
+  const parzelle = wep?.formalien.parzelle.trim()
+  return `WEP ohne Vorgangs-Nr.${parzelle ? ` (Parzelle ${parzelle})` : ''}`
+}
+
+/** Andere WEPs mit derselben Vorgangs-Nr. (Groß-/Kleinschreibung und Leerzeichen egal). */
+export function gleicheVorgangsNr<T extends Pick<Wep, 'id' | 'formalien'>>(nr: string, weps: readonly T[], ausser?: string): T[] {
+  const k = (s: string) => s.replace(/\s+/g, '').toLowerCase()
+  if (!k(nr)) return []
+  return weps.filter((w) => w.id !== ausser && k(vorgangsNrVon(w)) === k(nr))
 }
 
 /**
@@ -233,7 +261,7 @@ export const ZUSTANDSSTUFEN: Record<
  * Alle Pflichtfelder sind vorbelegt (leere Strings / leere Arrays),
  * damit die Erfassung sofort beginnen kann.
  */
-export function neuerWep(id: string): Wep {
+export function neuerWep(id: string, vorgangsNr: string = istAlteKennung(id) ? id : ''): Wep {
   return {
     id,
     formalien: {
@@ -251,7 +279,7 @@ export function neuerWep(id: string): Wep {
       wertermittlungAm: '',
       protokollerstellungAm: '',
       parzellenflaecheM2: 0,
-      vorgangsNr: id,
+      vorgangsNr,
     },
     gruen: {
       beschreibungAussen: '',

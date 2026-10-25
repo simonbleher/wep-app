@@ -23,7 +23,7 @@
 //   „Endgültig löschen“) werden die Dateien samt Konflikt-Kopien entfernt.
 // - Die „Offline-Warteschlange“ ergibt sich aus den Metadaten in IndexedDB:
 //   Jedes WEP mit lokalGeaendertAm > letzterSyncAm wartet auf den Upload.
-import { naechsteVorgangsNr, type Wep } from '@/model'
+import { neueWepId, vorgangsNrVon, wepName, type Wep } from '@/model'
 import { EIGENE_DATEI, PAPIERKORB_ORDNER, PROFIL_DATEI } from './ordner'
 import { istAbgelaufen, metaMit } from './papierkorb'
 import type {
@@ -310,7 +310,7 @@ export async function synchronisiere(opt: SyncOptionen): Promise<SyncErgebnis> {
         })
         ergebnis.konflikte.push({
           wepId: id,
-          text: `WEP ${id} wurde hier endgültig gelöscht, aber auf ${fremd.geraet} danach noch geändert. Es bleibt erhalten – bitte entscheiden.`,
+          text: `${wepName(lokal.get(id), id)} wurde hier endgültig gelöscht, aber auf ${fremd.geraet} danach noch geändert. Es bleibt erhalten – bitte entscheiden.`,
         })
         return
       }
@@ -357,7 +357,7 @@ export async function synchronisiere(opt: SyncOptionen): Promise<SyncErgebnis> {
         })
         ergebnis.konflikte.push({
           wepId: id,
-          text: `WEP ${id} wurde hier gelöscht, aber auf ${fremd.geraet} danach noch geändert. Es bleibt erhalten – bitte entscheiden.`,
+          text: `${wepName(lokal.get(id), id)} wurde hier gelöscht, aber auf ${fremd.geraet} danach noch geändert. Es bleibt erhalten – bitte entscheiden.`,
         })
         return
       }
@@ -457,7 +457,7 @@ export async function synchronisiere(opt: SyncOptionen): Promise<SyncErgebnis> {
         })
         ergebnis.konflikte.push({
           wepId: id,
-          text: `WEP ${id} wurde auf ${anderes} gelöscht, aber hier danach noch geändert. Es bleibt erhalten – bitte entscheiden.`,
+          text: `${wepName(lokal.get(id), id)} wurde auf ${anderes} gelöscht, aber hier danach noch geändert. Es bleibt erhalten – bitte entscheiden.`,
         })
         return
       }
@@ -515,7 +515,7 @@ export async function synchronisiere(opt: SyncOptionen): Promise<SyncErgebnis> {
       })
       ergebnis.konflikte.push({
         wepId: id,
-        text: `WEP ${id} wurde auf einem anderen Gerät endgültig gelöscht, aber hier danach noch geändert. Es bleibt erhalten – bitte entscheiden.`,
+        text: `${wepName(lokal.get(id), id)} wurde auf einem anderen Gerät endgültig gelöscht, aber hier danach noch geändert. Es bleibt erhalten – bitte entscheiden.`,
       })
       return
     }
@@ -523,10 +523,9 @@ export async function synchronisiere(opt: SyncOptionen): Promise<SyncErgebnis> {
   }
 
   async function nummerNeuVergeben(id: string, w: Wep): Promise<void> {
-    const bekannt = [...lokal.keys(), ...papier.keys(), ...ra.keys(), ...rp.keys()].map((i) => ({ id: i }))
-    const jahr = Number.parseInt(id.slice(0, 4), 10)
-    const nr = naechsteVorgangsNr(bekannt, Number.isFinite(jahr) ? jahr : undefined)
-    const neu: Wep = { ...w, id: nr, formalien: { ...w.formalien, vorgangsNr: nr } }
+    // Neue interne Kennung (UUID); die Vorgangs-Nr. bleibt, sie gehört zum Vorgang, nicht zur Datei
+    const nr = neueWepId()
+    const neu: Wep = { ...w, id: nr, formalien: { ...w.formalien, vorgangsNr: vorgangsNrVon(w) } }
     const zeit = jetzt()
     await opt.vorUmnummerieren?.(id, nr)
     await speicher.schreibe({ id, wep: null, meta: null })
@@ -536,7 +535,7 @@ export async function synchronisiere(opt: SyncOptionen): Promise<SyncErgebnis> {
     ergebnis.umnummeriert.push({ von: id, nach: nr })
     ergebnis.konflikte.push({
       wepId: id,
-      text: `Die Nummer ${id} gehört in OneDrive noch einem gelöschten WEP. Das neue WEP heißt jetzt ${nr}.`,
+      text: `${wepName(w, id)}: Die alte Kennung gehört in OneDrive noch einem gelöschten WEP. Das WEP ist jetzt unter einer neuen Kennung gespeichert, die Vorgangs-Nr. bleibt.`,
     })
   }
 
@@ -584,7 +583,7 @@ export async function synchronisiere(opt: SyncOptionen): Promise<SyncErgebnis> {
       })
       ergebnis.konflikte.push({
         wepId: id,
-        text: `WEP ${id} wurde auf zwei Geräten geändert. Die Fassung von diesem Gerät ist neuer und gilt vorerst; die ältere liegt als Konflikt-Kopie in OneDrive.`,
+        text: `${wepName(lokal.get(id), id)} wurde auf zwei Geräten geändert. Die Fassung von diesem Gerät ist neuer und gilt vorerst; die ältere liegt als Konflikt-Kopie in OneDrive.`,
       })
     } else {
       // OneDrive ist neuer: lokale Fassung als Kopie sichern, dann übernehmen
@@ -605,7 +604,7 @@ export async function synchronisiere(opt: SyncOptionen): Promise<SyncErgebnis> {
       })
       ergebnis.konflikte.push({
         wepId: id,
-        text: `WEP ${id} wurde auf zwei Geräten geändert. Die Fassung aus OneDrive (${fremd.geraet}) ist neuer und gilt vorerst; die Fassung von diesem Gerät liegt als Konflikt-Kopie in OneDrive.`,
+        text: `${wepName(lokal.get(id), id)} wurde auf zwei Geräten geändert. Die Fassung aus OneDrive (${fremd.geraet}) ist neuer und gilt vorerst; die Fassung von diesem Gerät liegt als Konflikt-Kopie in OneDrive.`,
       })
     }
   }

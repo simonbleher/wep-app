@@ -1,209 +1,132 @@
 // Startseite: Liste aller WEPs, Statuszeile Abgleich und „Neues WEP“.
 // Gelöscht wird nicht hier, sondern in der WEP-Ansicht (Menü „⋯“, mit Rückfrage).
-import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  ChevronRight,
-  CircleUser,
-  FileInput,
-  FileSpreadsheet,
-  FileText,
-  Plus,
-  Search,
-  Trash2,
-  X,
-} from "lucide-react";
-import {
-  WEP_STATUS,
-  naechsteVorgangsNr,
-  wepRolle,
-  wepStatus,
-  type Wep,
-  type WepStatus,
-} from "@/model";
-import type { Konto } from "@/konto";
-import { lokalesProfil, neuerWepMitProfil } from "@/profil";
-import {
-  belegteNummern,
-  ladePapierkorb,
-  offeneKonflikte,
-  raeumePapierkorbAuf,
-} from "@/sync/aktionen";
-import { alleSyncMeta, alleWeps, speichereWep } from "./db";
-import { SORTIERUNGEN, waehleWeps, type Sortierung } from "./wepListe";
-import { UpdateHinweis } from "./UpdateHinweis";
-import { BAU_EXCEL_ACCEPT } from "./BauExcel";
-import { useOhneExcel } from "./ohneExcel";
-import { legeWepAusBauExcelAn } from "@/bauexcel/neu";
-import { StatusZeile, useAbgleich } from "./SyncLeiste";
-import {
-  HauptSeitenleiste,
-  ICON,
-  Laedt,
-  LeerZustand,
-  Meldung,
-  StatusMarke,
-  TeilMarke,
-  datumDe,
-} from "./ui";
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { ChevronRight, CircleUser, FileInput, FileSpreadsheet, FileText, Plus, Search, Trash2, X } from 'lucide-react'
+import { WEP_STATUS, neueWepId, vorgangsNrVon, wepRolle, wepStatus, type Wep, type WepStatus } from '@/model'
+import type { Konto } from '@/konto'
+import { lokalesProfil, neuerWepMitProfil } from '@/profil'
+import { ladePapierkorb, offeneKonflikte, raeumePapierkorbAuf } from '@/sync/aktionen'
+import { alleSyncMeta, alleWeps, speichereWep } from './db'
+import { SORTIERUNGEN, waehleWeps, type Sortierung } from './wepListe'
+import { UpdateHinweis } from './UpdateHinweis'
+import { BAU_EXCEL_ACCEPT } from './BauExcel'
+import { useOhneExcel } from './ohneExcel'
+import { NeuesWepDialog } from './VorgangsNr'
+import { legeWepAusBauExcelAn } from '@/bauexcel/neu'
+import { StatusZeile, useAbgleich } from './SyncLeiste'
+import { HauptSeitenleiste, ICON, Laedt, LeerZustand, Meldung, StatusMarke, TeilMarke, datumDe } from './ui'
 
 interface Props {
   /** Angemeldetes Konto oder null („ohne Konto“). */
-  konto: Konto | null;
+  konto: Konto | null
   /** Ist die Anmeldung auf dieser Plattform eingerichtet? */
-  verfuegbar: boolean;
-  onProfil: () => void;
+  verfuegbar: boolean
+  onProfil: () => void
   /** Öffnet die Detailansicht des WEP mit der angegebenen id. */
-  onOeffnen: (wepId: string) => void;
-  onPapierkorb: () => void;
+  onOeffnen: (wepId: string) => void
+  onPapierkorb: () => void
   /** Eine .wep-Datei wurde gewählt: Vorschau zeigen. */
-  onWepDatei: (datei: File) => void;
+  onWepDatei: (datei: File) => void
 }
 
 /** Titel eines WEP für die Liste: „Anlage · Parzelle“ (leer, wenn nichts eingetragen). */
 export function wepTitel(wep: Wep): string {
-  const { parzelle, kleingartenanlage } = wep.formalien;
-  return [kleingartenanlage, parzelle]
-    .filter((t) => t.trim().length > 0)
-    .join(" · ");
+  const { parzelle, kleingartenanlage } = wep.formalien
+  return [kleingartenanlage, parzelle].filter((t) => t.trim().length > 0).join(' · ')
 }
 
 /** Nebenzeile: „Vorgangs-Nr. · Unterpächter · Datum“. */
 function wepNeben(wep: Wep): string {
-  const { unterpaechter, wertermittlungAm } = wep.formalien;
-  return [wep.id, unterpaechter, datumDe(wertermittlungAm ?? "")]
-    .filter((t) => t && t.trim())
-    .join(" · ");
+  const { unterpaechter, wertermittlungAm } = wep.formalien
+  return [vorgangsNrVon(wep) || 'Vorgangs-Nr. fehlt', unterpaechter, datumDe(wertermittlungAm ?? '')].filter((t) => t && t.trim()).join(' · ')
 }
 
-export function Startseite({
-  konto,
-  verfuegbar,
-  onProfil,
-  onOeffnen,
-  onPapierkorb,
-  onWepDatei,
-}: Props) {
-  const ohneExcel = useOhneExcel();
-  const [weps, setWeps] = useState<Wep[]>([]);
-  const [geladen, setGeladen] = useState(false);
-  const [filter, setFilter] = useState<WepStatus | "alle">("alle");
-  const [suchbegriff, setSuchbegriff] = useState("");
-  const [sortierung, setSortierung] = useState<Sortierung>("geaendert");
-  const [geaendertAm, setGeaendertAm] = useState<ReadonlyMap<string, string>>(
-    new Map(),
-  );
-  const [konflikte, setKonflikte] = useState<ReadonlySet<string>>(new Set());
-  const [imPapierkorb, setImPapierkorb] = useState(0);
-  const [fehler, setFehler] = useState<string>();
-  const bauEingabe = useRef<HTMLInputElement>(null);
-  const wepEingabe = useRef<HTMLInputElement>(null);
+export function Startseite({ konto, verfuegbar, onProfil, onOeffnen, onPapierkorb, onWepDatei }: Props) {
+  const ohneExcel = useOhneExcel()
+  const [neuDialog, setNeuDialog] = useState(false)
+  const [weps, setWeps] = useState<Wep[]>([])
+  const [geladen, setGeladen] = useState(false)
+  const [filter, setFilter] = useState<WepStatus | 'alle'>('alle')
+  const [suchbegriff, setSuchbegriff] = useState('')
+  const [sortierung, setSortierung] = useState<Sortierung>('geaendert')
+  const [geaendertAm, setGeaendertAm] = useState<ReadonlyMap<string, string>>(new Map())
+  const [konflikte, setKonflikte] = useState<ReadonlySet<string>>(new Set())
+  const [imPapierkorb, setImPapierkorb] = useState(0)
+  const [fehler, setFehler] = useState<string>()
+  const bauEingabe = useRef<HTMLInputElement>(null)
+  const wepEingabe = useRef<HTMLInputElement>(null)
   // Rolle aus dem Profil; ein WEP kann davon abweichen (`Wep.rolle`)
-  const profilRolle = lokalesProfil.lade().profil.rolle;
+  const profilRolle = lokalesProfil.lade().profil.rolle
 
   const neuLaden = useCallback(() => {
     // Was länger als 30 Tage im Papierkorb liegt, wird beim Öffnen der Liste endgültig gelöscht
     void (async () => {
-      await raeumePapierkorbAuf();
-      const [liste, offene, korb, meta] = await Promise.all([
-        alleWeps(),
-        offeneKonflikte(),
-        ladePapierkorb(),
-        alleSyncMeta(),
-      ]);
-      setWeps(liste);
-      setGeaendertAm(new Map(meta.map((m) => [m.id, m.lokalGeaendertAm])));
-      setKonflikte(new Set(offene.keys()));
-      setImPapierkorb(korb.length);
-      setGeladen(true);
-    })();
-  }, []);
+      await raeumePapierkorbAuf()
+      const [liste, offene, korb, meta] = await Promise.all([alleWeps(), offeneKonflikte(), ladePapierkorb(), alleSyncMeta()])
+      setWeps(liste)
+      setGeaendertAm(new Map(meta.map((m) => [m.id, m.lokalGeaendertAm])))
+      setKonflikte(new Set(offene.keys()))
+      setImPapierkorb(korb.length)
+      setGeladen(true)
+    })()
+  }, [])
 
-  useEffect(neuLaden, [neuLaden]);
-  const abgleich = useAbgleich(konto, neuLaden);
+  useEffect(neuLaden, [neuLaden])
+  const abgleich = useAbgleich(konto, neuLaden)
 
-  async function neuesWep() {
-    const id = naechsteVorgangsNr(await belegteNummern()); // auch Gelöschtes zählt: keine Nummer doppelt
-    const wep = neuerWepMitProfil(id, lokalesProfil.lade().profil);
-    await speichereWep(wep);
-    setWeps((alt) => [wep, ...alt]);
-    onOeffnen(id);
+  /** Legt das WEP an, nachdem der Dialog die Vorgangs-Nr. erfragt hat (leer = „noch nicht bekannt“). */
+  async function neuesWep(vorgangsNr: string) {
+    setNeuDialog(false)
+    // Interne Kennung: UUID; die Vorgangs-Nr. vergibt der BV
+    const id = neueWepId()
+    const wep = neuerWepMitProfil(id, lokalesProfil.lade().profil)
+    wep.formalien.vorgangsNr = vorgangsNr
+    await speichereWep(wep)
+    setWeps((alt) => [wep, ...alt])
+    onOeffnen(id)
   }
 
   /** „Neues WEP aus Bau-Excel“: Datei prüfen, WEP anlegen, Formalien vorbefüllen, öffnen. */
   async function neuesWepAusBauExcel(datei: File) {
-    setFehler(undefined);
+    setFehler(undefined)
     try {
-      const id = naechsteVorgangsNr(await belegteNummern());
-      const wep = await legeWepAusBauExcelAn({
-        id,
-        datei,
-        profil: lokalesProfil.lade().profil,
-      });
-      setWeps((alt) => [wep, ...alt]);
-      onOeffnen(id);
+      const id = neueWepId() // Vorgangs-Nr. kommt aus der Bau-Excel (E17), sonst später eintragen
+      const wep = await legeWepAusBauExcelAn({ id, datei, profil: lokalesProfil.lade().profil })
+      setWeps((alt) => [wep, ...alt])
+      onOeffnen(id)
     } catch (e) {
-      setFehler(e instanceof Error ? e.message : String(e));
+      setFehler(e instanceof Error ? e.message : String(e))
     }
   }
 
-  const sichtbar = waehleWeps(weps, {
-    suchbegriff,
-    status: filter,
-    sortierung,
-    geaendertAm,
-  });
-  const gefiltert = suchbegriff.trim() !== "" || filter !== "alle";
+  const sichtbar = waehleWeps(weps, { suchbegriff, status: filter, sortierung, geaendertAm })
+  const gefiltert = suchbegriff.trim() !== '' || filter !== 'alle'
 
-  const status = (
-    <StatusZeile konto={konto} verfuegbar={verfuegbar} abgleich={abgleich} />
-  );
+  const status = <StatusZeile konto={konto} verfuegbar={verfuegbar} abgleich={abgleich} />
 
   return (
     <div className="rahmen">
-      <HauptSeitenleiste
-        aktiv="protokolle"
-        onProtokolle={() => undefined}
-        onPapierkorb={onPapierkorb}
-        onProfil={onProfil}
-        fuss={verfuegbar ? status : undefined}
-      />
+      <HauptSeitenleiste aktiv="protokolle" onProtokolle={() => undefined} onPapierkorb={onPapierkorb} onProfil={onProfil} fuss={verfuegbar ? status : undefined} />
 
       <main className="inhalt">
         <UpdateHinweis />
         <header className="seitenkopf">
           <h1 className="h1">Protokolle</h1>
-          <button
-            type="button"
-            className="symbolknopf nur-handy"
-            aria-label="Profil und Einstellungen"
-            onClick={onProfil}
-          >
+          <button type="button" className="symbolknopf nur-handy" aria-label="Profil und Einstellungen" onClick={onProfil}>
             <CircleUser {...ICON} size={26} />
           </button>
           <div className="knopf-reihe nur-tablet">
-            <button
-              type="button"
-              className="knopf"
-              onClick={() => wepEingabe.current?.click()}
-            >
+            <button type="button" className="knopf" onClick={() => wepEingabe.current?.click()}>
               <FileInput {...ICON} />
               WEP-Datei öffnen
             </button>
             {!ohneExcel && (
-              <button
-                type="button"
-                className="knopf"
-                onClick={() => bauEingabe.current?.click()}
-              >
+              <button type="button" className="knopf" onClick={() => bauEingabe.current?.click()}>
                 <FileSpreadsheet {...ICON} />
                 Neues WEP aus Bau-Excel
               </button>
             )}
-            <button
-              type="button"
-              className="knopf knopf-primaer"
-              onClick={() => void neuesWep()}
-            >
+            <button type="button" className="knopf knopf-primaer" onClick={() => setNeuDialog(true)}>
               <Plus {...ICON} />
               Neues WEP
             </button>
@@ -212,29 +135,17 @@ export function Startseite({
 
         <div className="nur-handy block">
           {status}
-          <button
-            type="button"
-            className="knopf knopf-primaer knopf-breit"
-            onClick={() => void neuesWep()}
-          >
+          <button type="button" className="knopf knopf-primaer knopf-breit" onClick={() => setNeuDialog(true)}>
             <Plus {...ICON} />
             Neues WEP
           </button>
           {!ohneExcel && (
-            <button
-              type="button"
-              className="knopf knopf-breit"
-              onClick={() => bauEingabe.current?.click()}
-            >
+            <button type="button" className="knopf knopf-breit" onClick={() => bauEingabe.current?.click()}>
               <FileSpreadsheet {...ICON} />
               Neues WEP aus Bau-Excel
             </button>
           )}
-          <button
-            type="button"
-            className="knopf knopf-breit"
-            onClick={() => wepEingabe.current?.click()}
-          >
+          <button type="button" className="knopf knopf-breit" onClick={() => wepEingabe.current?.click()}>
             <FileInput {...ICON} />
             WEP-Datei öffnen
           </button>
@@ -246,9 +157,9 @@ export function Startseite({
           aria-label="WEP-Datei wählen"
           data-testid="wep-datei-eingabe"
           onChange={(e) => {
-            const datei = e.target.files?.[0];
-            e.target.value = "";
-            if (datei) onWepDatei(datei);
+            const datei = e.target.files?.[0]
+            e.target.value = ''
+            if (datei) onWepDatei(datei)
           }}
         />
         {!ohneExcel && (
@@ -260,12 +171,13 @@ export function Startseite({
             aria-label="Bau-Excel für ein neues WEP wählen"
             data-testid="neu-bau-excel-eingabe"
             onChange={(e) => {
-              const datei = e.target.files?.[0];
-              e.target.value = "";
-              if (datei) void neuesWepAusBauExcel(datei);
+              const datei = e.target.files?.[0]
+              e.target.value = ''
+              if (datei) void neuesWepAusBauExcel(datei)
             }}
           />
         )}
+        {neuDialog && <NeuesWepDialog onAnlegen={(nr) => void neuesWep(nr)} onAbbrechen={() => setNeuDialog(false)} />}
         {fehler && (
           <Meldung alarm>
             <p>{fehler}</p>
@@ -293,56 +205,25 @@ export function Startseite({
                 autoComplete="off"
               />
               {suchbegriff && (
-                <button
-                  type="button"
-                  className="symbolknopf suchfeld-leeren"
-                  aria-label="Suche leeren"
-                  onClick={() => setSuchbegriff("")}
-                >
+                <button type="button" className="symbolknopf suchfeld-leeren" aria-label="Suche leeren" onClick={() => setSuchbegriff('')}>
                   <X {...ICON} />
                 </button>
               )}
             </div>
-            <div
-              className="segmente status-filter"
-              role="group"
-              aria-label="Nach Status filtern"
-            >
-              {(["alle", ...WEP_STATUS] as const).map((f) => (
-                <button
-                  key={f}
-                  type="button"
-                  className="segment"
-                  aria-pressed={f === filter}
-                  onClick={() => setFilter(f)}
-                >
-                  {f === "alle"
-                    ? "Alle"
-                    : f.charAt(0).toUpperCase() + f.slice(1)}
+            <div className="segmente status-filter" role="group" aria-label="Nach Status filtern">
+              {(['alle', ...WEP_STATUS] as const).map((f) => (
+                <button key={f} type="button" className="segment" aria-pressed={f === filter} onClick={() => setFilter(f)}>
+                  {f === 'alle' ? 'Alle' : f.charAt(0).toUpperCase() + f.slice(1)}
                 </button>
               ))}
             </div>
             <div className="listen-kopf">
               <p className="neben" role="status" data-testid="listen-anzahl">
-                {gefiltert
-                  ? `${sichtbar.length} von ${weps.length} Protokollen`
-                  : weps.length === 1
-                    ? "1 Protokoll"
-                    : `${weps.length} Protokolle`}
+                {gefiltert ? `${sichtbar.length} von ${weps.length} Protokollen` : weps.length === 1 ? '1 Protokoll' : `${weps.length} Protokolle`}
               </p>
-              <div
-                className="segmente segmente-2"
-                role="group"
-                aria-label="Sortierung"
-              >
+              <div className="segmente segmente-2" role="group" aria-label="Sortierung">
                 {SORTIERUNGEN.map((s) => (
-                  <button
-                    key={s.wert}
-                    type="button"
-                    className="segment"
-                    aria-pressed={s.wert === sortierung}
-                    onClick={() => setSortierung(s.wert)}
-                  >
+                  <button key={s.wert} type="button" className="segment" aria-pressed={s.wert === sortierung} onClick={() => setSortierung(s.wert)}>
                     {s.text}
                   </button>
                 ))}
@@ -362,64 +243,39 @@ export function Startseite({
         ) : sichtbar.length === 0 ? (
           <LeerZustand
             icon={FileText}
-            titel={
-              suchbegriff.trim()
-                ? `Kein Protokoll zu „${suchbegriff.trim()}“`
-                : `Kein Protokoll „${filter}“`
-            }
-            text={
-              suchbegriff.trim()
-                ? "Anderen Suchbegriff eingeben oder die Suche leeren."
-                : "Mit „Alle“ sind wieder alle Protokolle zu sehen."
-            }
+            titel={suchbegriff.trim() ? `Kein Protokoll zu „${suchbegriff.trim()}“` : `Kein Protokoll „${filter}“`}
+            text={suchbegriff.trim() ? 'Anderen Suchbegriff eingeben oder die Suche leeren.' : 'Mit „Alle“ sind wieder alle Protokolle zu sehen.'}
           />
         ) : (
           <ul className="liste" aria-label="Protokolle">
             {sichtbar.map((wep) => {
-              const titel = wepTitel(wep);
+              const titel = wepTitel(wep)
               return (
                 <li key={wep.id}>
-                  <button
-                    type="button"
-                    className="zeile"
-                    onClick={() => onOeffnen(wep.id)}
-                  >
+                  <button type="button" className="zeile" onClick={() => onOeffnen(wep.id)}>
                     <span className="zeile-text">
-                      <span
-                        className={titel ? "zeile-titel" : "zeile-titel leer"}
-                      >
-                        {titel || "ohne Bezeichnung"}
-                      </span>
+                      <span className={titel ? 'zeile-titel' : 'zeile-titel leer'}>{titel || 'ohne Bezeichnung'}</span>
                       <span className="neben">{wepNeben(wep)}</span>
                     </span>
-                    {konflikte.has(wep.id) && (
-                      <span className="status status-konflikt">Konflikt</span>
-                    )}
+                    {konflikte.has(wep.id) && <span className="status status-konflikt">Konflikt</span>}
                     <TeilMarke rolle={wepRolle(wep, profilRolle)} />
                     <StatusMarke status={wepStatus(wep)} />
                     <ChevronRight {...ICON} className="chevron" />
                   </button>
                 </li>
-              );
+              )
             })}
           </ul>
         )}
 
-        <ul
-          className="liste papierkorb-zugang nur-handy"
-          aria-label="Papierkorb"
-        >
+        <ul className="liste papierkorb-zugang nur-handy" aria-label="Papierkorb">
           <li>
             <button type="button" className="zeile" onClick={onPapierkorb}>
               <Trash2 {...ICON} />
               <span className="zeile-text">
                 <span className="zeile-titel">Papierkorb</span>
                 <span className="neben">
-                  {imPapierkorb === 0
-                    ? "leer"
-                    : imPapierkorb === 1
-                      ? "1 gelöschtes Protokoll"
-                      : `${imPapierkorb} gelöschte Protokolle`}
+                  {imPapierkorb === 0 ? 'leer' : imPapierkorb === 1 ? '1 gelöschtes Protokoll' : `${imPapierkorb} gelöschte Protokolle`}
                 </span>
               </span>
               <ChevronRight {...ICON} className="chevron" />
@@ -428,5 +284,5 @@ export function Startseite({
         </ul>
       </main>
     </div>
-  );
+  )
 }

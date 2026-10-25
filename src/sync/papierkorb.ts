@@ -11,7 +11,7 @@
 //   endgültig löschen  → Eintrag weg; gibt es Spuren in OneDrive, bleibt eine Marke
 //                        (Meta.endgueltig), bis der Abgleich die Dateien entfernt hat
 //   30 Tage            → wie „endgültig löschen“ (raeumePapierkorbAuf)
-import { naechsteVorgangsNr, type Wep } from '@/model'
+import { neueWepId, vorgangsNrVon, type Wep } from '@/model'
 import type { LokalSpeicher, PapierkorbEintrag, SyncMeta } from './types'
 
 export const PAPIERKORB_TAGE = 30
@@ -88,10 +88,10 @@ export async function stelleWiederHer(
   if (!eintrag) return undefined
 
   if (weps.some((w) => w.id === id)) {
-    // Die Nummer wurde inzwischen neu vergeben (z. B. auf einem anderen Gerät): nichts überschreiben.
-    const jahr = Number.parseInt(id.slice(0, 4), 10)
-    const nr = naechsteVorgangsNr([...weps, ...korb], Number.isFinite(jahr) ? jahr : undefined)
-    const kopie: Wep = { ...eintrag.wep, id: nr, formalien: { ...eintrag.wep.formalien, vorgangsNr: nr } }
+    // Die (alte) Kennung ist inzwischen wieder belegt: nichts überschreiben, unter neuer Kennung wiederherstellen.
+    // Die Vorgangs-Nr. bleibt – es ist derselbe Vorgang.
+    const nr = neueWepId()
+    const kopie: Wep = { ...eintrag.wep, id: nr, formalien: { ...eintrag.wep.formalien, vorgangsNr: vorgangsNrVon(eintrag.wep) } }
     await spei.schreibe({ id: nr, wep: kopie, meta: metaMit(undefined, nr, k.jetzt), ereignis: 'geaendert' })
     return { id: nr, neueNummer: true }
   }
