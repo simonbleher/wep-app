@@ -328,3 +328,8 @@
 - **Gleiches Fenster statt neuem Tab:** In der Android- und Windows-App gibt es keine Tabs; die Anleitung hat oben „Zurück zur App“.
 - **Anrede „Sie“:** Die Anleitung ist ein Dokument zum Weitergeben im BV; die App selbst bleibt beim „du“.
 - Eingecheckt sind die verkleinerten JPGs (≈1,5 MB) und das PDF, nicht die PNG-Rohfotos.
+
+## 2026-10-25 · Bauteile ohne Form in der Skizze Bau
+
+- **Entscheidung:** Ein Bauteil, dessen Fläche aus der Skizze Bau kam (`ausGrundriss`) und dessen Form gelöscht oder getrennt wurde, verliert Fläche und Maße (0 m²) und bleibt stehen. Der Abgleich mit der Bau-Excel ergänzt Bauteile, die nur gezeichnet sind, mit Typ, Baujahr, Restnutzung und Mängeln; die gezeichnete Fläche bleibt.
+- **Grund:** Gelöschte Formen hinterließen Phantom-Flächen (Editor-Rechteck 12 × 8 m), die voll bewertet wurden. Ganz löschen wäre still: Dieselbe Lage entsteht beim Trennen einer Form von einem Bauteil, das jemand bewusst unter „Baulichkeiten“ angelegt hat. Ein nur gezeichnetes Bauteil enthält keine Eingaben des Wertermittlers, die die Excel überschreiben könnte – „nichts überschreiben“ gilt weiter für alles, was er eingetragen hat.
