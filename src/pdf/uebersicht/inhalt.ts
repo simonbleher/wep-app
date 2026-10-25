@@ -46,7 +46,7 @@ function deckblatt(s: Satz, p: Protokoll): void {
 
   s.abstand(4)
   s.platz(90)
-  s.absatz('„Sachlich und rechnerisch geprüft“', { groesse: 9, fett: true, nach: 20 })
+  s.absatz('Sachlich und rechnerisch geprüft', { groesse: 9, fett: true, nach: 20 })
   const box = s.reserviere(30)
   const unten = box.y + 26
   s.seite.ops.push({ t: 'text', x: box.x, y: unten - 3, s: 'Datum:', groesse: 9, fett: false, kursiv: false, unterstrichen: false, farbe: FARBE.text2 })
