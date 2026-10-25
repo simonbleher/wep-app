@@ -25,6 +25,7 @@ import {
   tabellenEnde,
   umbrechen,
   weisePlaetzeZu,
+  grubeAltersabzug,
 } from '..'
 import { blattPfadNachName, sharedStrings, zellenWert } from '../../export/bauExcelLesen'
 
@@ -245,6 +246,27 @@ describe('Baupreisindex', () => {
     expect(berechneBau(w)!.indexFaktor).toBeCloseTo(1.8)
     w.bau!.index = { jahr: 2020, wert: 120, quelle: 'alt' } // anderes Jahr, nicht von Hand: neu ermitteln
     expect(berechneBau(w)!.indexFaktor).toBeCloseTo(1.792)
+  })
+})
+
+describe('Abwassergrube: Altersabzug jährlich 3 % vom Restwert', () => {
+  it('(1 − 0,97^Alter) × 100: 16 Jahre 38,57 % statt 48 %', () => {
+    expect(grubeAltersabzug(0)).toBe(0)
+    expect(grubeAltersabzug(1)).toBeCloseTo(3, 10)
+    expect(grubeAltersabzug(16)).toBeCloseTo(38.5746, 4)
+  })
+  it('Tank 16 Jahre gedeckelt, Schachtringe ohne Grenze (nie 100 %)', () => {
+    const tank = wepMit((_, wep) => { wep.bau!.abwasser = { art: 'grube', kanal: {}, grube: { typ: 'kunststoff', inhaltM3: 5, baujahr: 2000, dichtheitAm: '2025-01-03' } } })
+    const g = berechneBau(tank)!.grube!
+    expect(g.wirksamesAlter).toBe(16)
+    expect(g.altersabzugProzent).toBeCloseTo(38.5746, 4)
+    expect(g.wertProM3).toBe(288.7) // 470 − 470 × 38,57 %
+    expect(g.wert).toBe(1443.5)
+    const alt = wepMit((_, wep) => { wep.bau!.abwasser = { art: 'grube', kanal: {}, grube: { typ: 'schachtringe', inhaltM3: 3, baujahr: 1965, dichtheitAm: '2025-01-03' } } })
+    const s = berechneBau(alt)!.grube!
+    expect(s.wirksamesAlter).toBe(s.alter)
+    expect(s.altersabzugProzent).toBeLessThan(100)
+    expect(s.wert).toBeGreaterThan(0)
   })
 })
 

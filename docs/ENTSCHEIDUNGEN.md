@@ -333,3 +333,9 @@
 
 - **Entscheidung:** Ein Bauteil, dessen Fläche aus der Skizze Bau kam (`ausGrundriss`) und dessen Form gelöscht oder getrennt wurde, verliert Fläche und Maße (0 m²) und bleibt stehen. Der Abgleich mit der Bau-Excel ergänzt Bauteile, die nur gezeichnet sind, mit Typ, Baujahr, Restnutzung und Mängeln; die gezeichnete Fläche bleibt.
 - **Grund:** Gelöschte Formen hinterließen Phantom-Flächen (Editor-Rechteck 12 × 8 m), die voll bewertet wurden. Ganz löschen wäre still: Dieselbe Lage entsteht beim Trennen einer Form von einem Bauteil, das jemand bewusst unter „Baulichkeiten“ angelegt hat. Ein nur gezeichnetes Bauteil enthält keine Eingaben des Wertermittlers, die die Excel überschreiben könnte – „nichts überschreiben“ gilt weiter für alles, was er eingetragen hat.
+
+## 2026-10-25 · Altersabzug der Abwassergrube vom Restwert
+
+- **Entscheidung:** Der jährliche Abzug von 3 % (Richtlinie S. 13) gilt vom Restwert: Altersabzug = (1 − 0,97^Alter) × 100, bei 16 Jahren 38,57 % statt 16 × 3 = 48 %. Der Export korrigiert dafür die Formel `Baulichkeiten!C75` der Vorlage (`C74*3` → `(1-0.97^C74)*100`) auf der Kopie, wie die anderen Vorlagen-Korrekturen; die App rechnet gleich (`grubeAltersabzug`).
+- **Grund:** Fachliche Vorgabe des Wertermittlers (so wird im BV gerechnet). Die alte 33-Jahre-Grenze für Gruben, die keine Tanks sind, diente nur dazu, dass der lineare Abzug nicht über 100 % steigt; vom Restwert gerechnet ist sie überflüssig und entfällt. Tanks und monolithische Betongruben bleiben nach 16 Jahren stehen (S. 14).
+- **Hinweis:** Die Zelle C75 hat in der Vorlage das Zahlenformat ohne Nachkommastellen; Excel und „PDF wie Vorlage“ zeigen deshalb 39 %, gerechnet wird mit dem genauen Wert.

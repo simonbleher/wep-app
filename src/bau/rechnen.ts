@@ -9,7 +9,7 @@ import { bauklasseAusAngaben } from './assistent'
 import {
   GEWAECHSHAUS,
   GRUBE_MAX_ALTER_TANK,
-  GRUBE_MINDERUNG_PRO_JAHR,
+  grubeAltersabzug,
   GRUBE_NICHT_GELEERT_ABZUG,
   GRUBEN_TYPEN,
   KANAL_HOECHSTWERT,
@@ -386,9 +386,12 @@ export function grubenGrundwert(typ: string | undefined): number {
   return GRUBEN_TYPEN.find((t) => t.id === typ)?.grundwert ?? 470
 }
 
-/** Höchstalter für die Abschreibung: Tanks/monolithische Gruben 16 Jahre (S. 14), sonst 33 Jahre (3 % je Jahr, nie unter 0). */
+/**
+ * Höchstalter für die Abschreibung: Tanks/monolithische Gruben 16 Jahre (S. 14); sonst ohne Grenze – der Abzug vom
+ * Restwert (`grubeAltersabzug`) erreicht nie 100 %.
+ */
 export function grubeMaxAlter(typ: string | undefined): number {
-  return typ === 'beton' || typ === 'tank' || typ === 'kunststoff' ? GRUBE_MAX_ALTER_TANK : Math.floor(100 / GRUBE_MINDERUNG_PRO_JAHR)
+  return typ === 'beton' || typ === 'tank' || typ === 'kunststoff' ? GRUBE_MAX_ALTER_TANK : Infinity
 }
 
 export function nachweisVorhanden(g: { dichtheitAm?: string; dichtheitFehlt?: boolean }): boolean {
@@ -399,7 +402,7 @@ function rechneGrube(bau: BauDaten, wertjahr: number): GrubeErgebnis {
   const g = bau.abwasser.grube
   const alter = alterInJahren(g.baujahr, wertjahr)
   const wirksam = Math.min(alter ?? 0, grubeMaxAlter(g.typ)) // C74
-  const abzug = wirksam * GRUBE_MINDERUNG_PRO_JAHR // C75
+  const abzug = grubeAltersabzug(wirksam) // C75
   const grundwert = g.grundwert ?? grubenGrundwert(g.typ) // F74
   const wertProM3 = rund2(grundwert - (grundwert * abzug) / 100) // F75
   const inhalt = g.zuBeseitigen ? 0 : (g.inhaltM3 ?? 0) // I75
@@ -420,7 +423,7 @@ function rechneKanal(bau: BauDaten, wertjahr: number): KanalErgebnis {
   return { alter, kosten, hoechstens, abzug, wert }
 }
 
-/** Das wirksame Alter (höchstens 16/33 Jahre), das der Export in C74 bzw. G78 schreibt. */
+/** Das wirksame Alter (Grube: Tanks höchstens 16 Jahre; Kanal höchstens 33), das der Export in C74 bzw. G78 schreibt. */
 export function wirksamesAlterGrube(bau: BauDaten, wertjahr: number): number {
   return rechneGrube(bau, wertjahr).wirksamesAlter
 }

@@ -130,7 +130,7 @@ function abwasser(s: Satz, p: Protokoll): void {
         rz('Genehmigungsnummer', grube.nr),
         grube.alter !== undefined ? rz('Alter', `${zahl(grube.alter)} Jahre`) : undefined,
         grube.grundwert !== undefined ? rz('Grundwert', `${euro(grube.grundwert)}/m³`) : undefined,
-        grube.abzugProzent !== undefined ? rz('Altersabzug (3 % je Jahr)', prozent(grube.abzugProzent)) : undefined,
+        grube.abzugProzent !== undefined ? rz('Altersabzug (3 % je Jahr vom Restwert)', prozent(grube.abzugProzent)) : undefined,
         grube.wertProM3 !== undefined ? rz('Wert nach Altersabzug', `${euro(grube.wertProM3)}/m³`) : undefined,
         grube.menge !== undefined ? rz('Inhalt', `${zahl(grube.menge)} m³`) : undefined,
         rz('Dichtheitsgutachten vom', grube.dichtheitAm ?? (grube.nachweisFehlt ? 'fehlt' : undefined)),

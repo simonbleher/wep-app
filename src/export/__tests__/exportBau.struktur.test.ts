@@ -58,7 +58,7 @@ describe('Bau-Export: Struktur', () => {
       // keine Formel ging verloren
       expect([...a.keys()].filter((k) => !n.has(k))).toEqual([])
     }
-    expect(r.bau!.korrekturen.map((k) => k.zelle).sort()).toEqual(['C33', 'C64', 'J52', 'K21', 'K81'])
+    expect(r.bau!.korrekturen.map((k) => k.zelle).sort()).toEqual(['C33', 'C64', 'C75', 'J52', 'K21', 'K81'])
   })
 
   it('Eingabezellen: Typ mit Leerzeichen am Ende, Baujahr, Mängel %, Fläche, Index, Abwasser, Baubeschreibung', async () => {
