@@ -72,7 +72,7 @@ export function AbwasserTab({ wep, aendere, profilIndex }: Props) {
       {abw.art === 'grube' && (
         <section className="abschnitt" aria-label="Abwassersammelgrube">
           <h2 className="gruppenkopf">Abwassersammelgrube</h2>
-          <p className="neben">Nur genehmigte Anlagen mit gültigem Dichtheitsnachweis werden bewertet, mit 3 % Alterswertminderung je Jahr von den Höchstwerten ausgehend.</p>
+          <p className="neben">Nur genehmigte Anlagen mit gültigem Dichtheitsnachweis werden bewertet, mit 3 % Alterswertminderung je Jahr vom Restwert, von den Höchstwerten ausgehend.</p>
           <AuswahlFeld label="Art der Grube" wert={g.typ ?? ''} optionen={GRUBEN_TYPEN.map((t) => ({ wert: t.id, text: `${t.text} (bis ${t.grundwert} € je m³)` }))} onChange={(v) => grube({ typ: v, grundwert: undefined })} />
           <div className="feld-reihe">
             <ZahlFeld label="Inhalt" einheit="m³" wert={g.inhaltM3} onChange={(v) => grube({ inhaltM3: v })} />
@@ -101,7 +101,7 @@ export function AbwasserTab({ wep, aendere, profilIndex }: Props) {
           {erg?.grube && (
             <dl className="werte rechenweg" aria-label="Rechenweg Grube">
               <div><dt>Grundwert</dt><dd className="zahl">{euroFormat(erg.grube.grundwert)} je m³</dd></div>
-              <div><dt>abzüglich Altersabzug {zahlDe(erg.grube.altersabzugProzent)} % ({erg.grube.wirksamesAlter} Jahre × 3 %)</dt><dd className="zahl">{euroFormat(erg.grube.wertProM3)} je m³</dd></div>
+              <div><dt>abzüglich Altersabzug {zahlDe(erg.grube.altersabzugProzent)} % (1 − 0,97^{erg.grube.wirksamesAlter})</dt><dd className="zahl">{euroFormat(erg.grube.wertProM3)} je m³</dd></div>
               <div><dt>mal {zahlDe(erg.grube.inhaltM3)} m³{erg.grube.nachweisFehlt ? ' (ohne Nachweis: 0 €)' : ''}</dt><dd className="zahl">{euroFormat(erg.grube.wert)}</dd></div>
               {erg.grube.nichtGeleertAbzug !== 0 && <div><dt>nicht geleert</dt><dd className="zahl">{euroFormat(erg.grube.nichtGeleertAbzug)}</dd></div>}
             </dl>
@@ -112,7 +112,7 @@ export function AbwasserTab({ wep, aendere, profilIndex }: Props) {
       {abw.art === 'kanal' && (
         <section className="abschnitt" aria-label="Kanalisationsanschluss">
           <h2 className="gruppenkopf">Kanalisationsanschluss</h2>
-          <p className="neben">Bewertet wird der Erstellungspreis, höchstens {KANAL_HOECHSTWERT.toLocaleString('de-DE')} €, mit 3 % Alterswertminderung je Jahr.</p>
+          <p className="neben">Bewertet wird der Erstellungspreis, höchstens {KANAL_HOECHSTWERT.toLocaleString('de-DE')} €, mit 3 % Alterswertminderung je Jahr vom Restwert.</p>
           <div className="feld-reihe">
             <ZahlFeld label="Erstellt im Jahr" wert={abw.kanal.baujahr} onChange={(v) => kanal({ baujahr: v })} hilfe={alterKanal !== undefined ? `Alter ${alterKanal} Jahre` : undefined} />
             <ZahlFeld label="Erstellungspreis" einheit="€" wert={abw.kanal.kosten} onChange={(v) => kanal({ kosten: v })} />

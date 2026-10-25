@@ -53,6 +53,17 @@ describe('Blätter je Rolle', () => {
     expect(zelle(f, 'Deckbl UPV', 'E26')).toBe(0)
     expect(zelle(f, 'Deckbl UPV', 'E28')).toBe(0)
   })
+  it('Altersabzug von Grube und Kanal mit 2 Nachkommastellen (vom Restwert)', async () => {
+    const text = async (f: FallErgebnis) => (await liesPdf(f.ausgabe.pdf.bytes)).map((x) => x.text).join(' ')
+    const grube = fall('Bau normal')
+    expect(zelle(grube, 'Baulichkeiten', 'C75')).toBeCloseTo((1 - 0.97 ** 16) * 100, 6)
+    expect(await text(grube)).toContain('38,57')
+    const kanal = fall('Beides (Laube über 24 m², Vorplatz, Kanal)')
+    const h79 = zelle(kanal, 'Baulichkeiten', 'H79')
+    expect(h79).toBeCloseTo(1 - 0.97 ** zelle(kanal, 'Baulichkeiten', 'G78'), 10)
+    expect(await text(kanal)).toContain(zeigeWert(h79, '0.00%')!.links)
+  })
+
   it('waehleBlaetter nimmt nur sichtbare Blätter der Datei', async () => {
     const mappe = await leseMappe(vorlageBytes())
     const rechen = new Rechenwerk(mappe)

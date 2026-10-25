@@ -182,7 +182,7 @@ export function hinweiseBau(wep: Pick<Wep, 'bau' | 'formalien'>, optionen: BauOp
     const alter = alterInJahren(g.baujahr, erg.wertjahr)
     if (alter === undefined && !g.zuBeseitigen) h.push(warn('Abwassersammelgrube: Baujahr bzw. Sanierungsjahr fehlt – ohne Alter keine Alterswertminderung.', 'Richtlinie S. 13', { bereich: 'abwasser' }))
     if (alter !== undefined && alter > grubeMaxAlter(g.typ)) {
-      h.push(info(`Alter ${alter} Jahre: gerechnet wird mit höchstens ${grubeMaxAlter(g.typ)} Jahren${grubeMaxAlter(g.typ) === GRUBE_MAX_ALTER_TANK ? ' (Tanks und monolithische Betongruben mit gültigem Nachweis werden nach 16 Jahren nicht weiter abgeschrieben)' : ' (3 % je Jahr, nie unter 0 €)'}.`, 'Richtlinie S. 14', { bereich: 'abwasser' }))
+      h.push(info(`Alter ${alter} Jahre: gerechnet wird mit höchstens ${grubeMaxAlter(g.typ)} Jahren (Tanks und monolithische Betongruben mit gültigem Nachweis werden nach ${GRUBE_MAX_ALTER_TANK} Jahren nicht weiter abgeschrieben).`, 'Richtlinie S. 14', { bereich: 'abwasser' }))
     }
     if (g.grundwert !== undefined && g.grundwert > 470) h.push(warn('Grundwert über 470 € je m³.', 'Richtlinie S. 13', { bereich: 'abwasser' }))
     if (!g.zuBeseitigen && !(g.inhaltM3 && g.inhaltM3 > 0)) h.push(warn('Abwassersammelgrube: Inhalt in m³ fehlt.', 'Richtlinie S. 13', { bereich: 'abwasser' }))
