@@ -21,6 +21,9 @@ const BLATT = {
 } as const
 
 /** Lesezugriff auf ein Blatt: Zellen per Adresse („K17“). */
+/** Spalten der Baubeschreibung (Zeilen 83–99); ab L steht die Ausfüllhilfe der Vorlage. */
+const BESCHREIBUNG_SPALTEN = ['B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K']
+
 class Blatt {
   constructor(
     private readonly r: Rechenwerk,
@@ -314,6 +317,28 @@ function maengel(rw: Rechenwerk, wep: Wep): MaengelBauteil[] {
   return zeilen.length ? [{ titel: 'Laube', zeilen, gesamt }] : []
 }
 
+/**
+ * Baubeschreibung in Absätzen; eine Zeile bleibt eine Zeile (Umbruch wie in der Bau-Excel bzw. wie eingetippt), eine
+ * Leerzeile beginnt einen neuen Absatz. Quelle ist der Text im WEP, nicht die Zeilen 83–99: Dort verteilt der Export lange
+ * Zeilen auf mehrere Excel-Zeilen, das gäbe Umbrüche mitten im Satz. Ohne Text im WEP (nur Bau-Excel): je Excel-Zeile
+ * eine Zeile (Spalten B–K wie `leseBeschreibung`).
+ */
+function baubeschreibung(text: string | undefined, bl: Blatt): string[] {
+  const zeilen = text?.trim()
+    ? text.split('\n').map((z) => z.trim())
+    : Array.from({ length: 17 }, (_, i) => BESCHREIBUNG_SPALTEN.map((sp) => bl.text(`${sp}${83 + i}`)?.replace(/\s+/g, ' ').trim()).filter(Boolean).join('   '))
+  const absaetze: string[] = []
+  let absatz: string[] = []
+  for (const z of [...zeilen, '']) {
+    if (z) absatz.push(z)
+    else if (absatz.length) {
+      absaetze.push(absatz.join('\n'))
+      absatz = []
+    }
+  }
+  return absaetze
+}
+
 export function leseProtokoll(rw: Rechenwerk, wep: Wep, rolle: Rolle): Protokoll {
   const fo = new Blatt(rw, BLATT.formalien)
   const dk = new Blatt(rw, BLATT.deck)
@@ -380,17 +405,7 @@ export function leseProtokoll(rw: Rechenwerk, wep: Wep, rolle: Rolle): Protokoll
     if (abw.grube?.nichtGeleertAbzug) bauZusammenstellung.push({ text: 'Abzug wegen nicht geleerter Abwassergrube', betrag: abw.grube.nichtGeleertAbzug, art: 'plus' })
     if (abw.kanal) bauZusammenstellung.push({ text: 'Abwasserkanal', betrag: abw.kanal.wert, art: 'plus' })
     bauZusammenstellung.push({ text: 'Baulichkeiten insgesamt', betrag: bl.zahl('K81') ?? 0, art: 'gesamt' })
-    bauBeschreibung = []
-    let absatz: string[] = []
-    for (let z = 83; z <= 99; z++) {
-      const t = bl.text(`B${z}`)
-      if (t) absatz.push(t)
-      else if (absatz.length) {
-        bauBeschreibung.push(absatz.join(' '))
-        absatz = []
-      }
-    }
-    if (absatz.length) bauBeschreibung.push(absatz.join(' '))
+    bauBeschreibung = baubeschreibung(wep.bau?.beschreibung, bl)
     const nicht = bl.zahl('H104') ?? 0
     if (nicht !== 0 || bl.zahl('F104')) {
       bauAbzuege.push({ text: 'Abzug wegen nicht beräumter Baulichkeiten', rechnung: `${zahl(bl.zahl('F104') ?? 0)} m³ × ${euro(bl.zahl('G104') ?? 0)}`, betrag: nicht })
