@@ -22,7 +22,7 @@ export const DECKBLATT_ABSAETZE: readonly DeckblattAbsatz[] = [
   ],
   [
     {
-      text: 'Dieses Protokoll ist das Ergebnis einer Momentaufnahme von Daten zum Zeitpunkt der Wertermittlung auf der Parzelle. Es ist rechtlich nicht mit einem Gutachten gleichzusetzen. Widersprüche sind innerhalb von 14 Tagen schriftlich an den Bezirksverband der Gartenfreunde Pankow e.V. zu richten.',
+      text: 'Dieses Protokoll ist das Ergebnis einer Momentaufnahme von Daten zum Zeitpunkt der Wertermittlung auf der Parzelle. Es ist rechtlich nicht mit einem Gutachten gleichzusetzen.',
     },
   ],
   [{ text: 'Der neue Unterpächter muss das Inventar nicht übernehmen, es muss dann vom scheidenden Unterpächter entfernt werden.' }],
