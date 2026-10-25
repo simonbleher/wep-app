@@ -37,8 +37,8 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { TeilenDialog } from './TeilenDialog'
-import { dupliziereWep, hatBauTeil, type BauteilArt, hatGruenTeil, naechsteVorgangsNr, rolleAusTeilen, wepRolle, wepStatus, type Rolle, type Wep, type Position, type BeseitigungsPosition, type Formalien, type WepStatus } from '@/model'
-import { PAPIERKORB_TAGE, belegteNummern, ladeKonflikt, loescheWep } from '@/sync/aktionen'
+import { dupliziereWep, hatBauTeil, type BauteilArt, hatGruenTeil, vorgangsNrVon, wepName, rolleAusTeilen, wepRolle, wepStatus, type Rolle, type Wep, type Position, type BeseitigungsPosition, type Formalien, type WepStatus } from '@/model'
+import { PAPIERKORB_TAGE, ladeKonflikt, loescheWep } from '@/sync/aktionen'
 import type { KonfliktInfo } from '@/sync/types'
 import { KonfliktHinweis } from './KonfliktHinweis'
 import { ladeWep, speichereWep } from './db'
@@ -48,6 +48,7 @@ import { PositionenVorschlag } from './PositionenVorschlag'
 import { SkizzeBauTab } from './SkizzeBauTab'
 import { FELD_NAMEN } from '@/bauexcel/abgleich'
 import { KgaAuswahl } from './KgaAuswahl'
+import { VorgangsNrFeld } from './VorgangsNr'
 import { useOhneExcel } from './ohneExcel'
 import { BauExcelBereich, useBauNachladen, useBauStand, type BauNachladeStand, type BauStand } from './BauExcel'
 import { ladeExportQuelle } from './exportQuelle'
@@ -77,7 +78,7 @@ import { lageVon, skizzeMitParzelle } from '@/parzelle'
 import { leererGrundriss } from '@/skizze/grundriss'
 import { hatGrundlage } from '@/skizze/grundlage'
 import { svgZuPngBrowser } from '@/export/svgRaster'
-import { exportRolle, exportWep, mitLeerenBauDaten, type ExportResult } from '@/export'
+import { dateiStamm, exportRolle, exportWep, mitLeerenBauDaten, type ExportResult } from '@/export'
 import { exportFotosNachOneDrive, exportNachOneDrive, ladeFotoAusOneDrive } from '@/sync'
 import { berechneAbschnittSumme } from '@/gruen/summen'
 import { Capacitor } from '@capacitor/core'
@@ -153,7 +154,7 @@ function bereichSumme(wep: Wep, b: Bereich): number | undefined {
 
 /** Titel für Kopf und Seitenleiste: die Parzelle, sonst die Vorgangs-Nr. */
 function wepTitel(wep: Wep): string {
-  return wep.formalien.parzelle.trim() || `WEP ${wep.id}`
+  return wep.formalien.parzelle.trim() || wepName(wep)
 }
 
 // ---------------------------------------------------------------------------
@@ -263,7 +264,8 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
   }
 
   async function duplizieren() {
-    const kopie = dupliziereWep(wep!, naechsteVorgangsNr(await belegteNummern()))
+    // Kopie = anderer Vorgang: neue Kennung, Vorgangs-Nr. leer (wird eingetragen)
+    const kopie = dupliziereWep(wep!)
     await speichereWep(kopie)
     onOeffnen?.(kopie.id)
   }
@@ -349,7 +351,7 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
             <span className="sl-wep-titel">{titel}</span>
             <span className="neben">
               {wep.formalien.kleingartenanlage.trim() && `${wep.formalien.kleingartenanlage.trim()} · `}
-              <span className="nowrap">{wep.id}</span>
+              <span className="nowrap">{vorgangsNrVon(wep) || 'Vorgangs-Nr. fehlt'}</span>
             </span>
             <span className="sl-status">
               <TeilMarke rolle={rolle} />
@@ -594,8 +596,8 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
 
       {loeschFrage && (
         <Rueckfrage
-          titel={`WEP ${wep.id} in den Papierkorb?`}
-          text={`${titel !== `WEP ${wep.id}` ? `„${titel}“ wird` : 'Das Protokoll wird'} auf allen deinen Geräten entfernt. Du findest es ${PAPIERKORB_TAGE} Tage lang im Papierkorb und kannst es dort wiederherstellen.`}
+          titel={`${wepName(wep)} in den Papierkorb?`}
+          text={`${titel !== wepName(wep) ? `„${titel}“ wird` : 'Das Protokoll wird'} auf allen deinen Geräten entfernt. Du findest es ${PAPIERKORB_TAGE} Tage lang im Papierkorb und kannst es dort wiederherstellen.`}
           bestaetigen="In den Papierkorb"
           onAbbrechen={() => setLoeschFrage(false)}
           onBestaetigen={() => void loeschen()}
@@ -780,6 +782,7 @@ function FormalienTab({
           Anlage und Parzelle
         </h2>
         <div className="formular">
+          <VorgangsNrFeld wep={wep} onChange={(v) => setFeld('vorgangsNr', v)} />
           <KgaAuswahl label="Kleingartenanlage" wert={f.kleingartenanlage} onChange={(v) => setFeld('kleingartenanlage', v)} />
           <div className="feld-reihe">
             <Eingabe label="Parzelle" wert={f.parzelle} onChange={(v) => setFeld('parzelle', v)} />
@@ -840,7 +843,6 @@ function FormalienTab({
               wert={f.wertermittlungAm}
               onChange={(v) => setFeld('wertermittlungAm', v)}
             />
-            <Eingabe label="Vorgangs-Nr." wert={f.vorgangsNr} onChange={(v) => setFeld('vorgangsNr', v)} />
           </div>
         </div>
       </section>
@@ -958,7 +960,7 @@ function BeseitigungTab({
  * Positionsnummer), ohne Konto als ZIP zum Herunterladen. Nicht in der Excel-Datei.
  */
 async function exportiereFotos(wep: Wep): Promise<string> {
-  const ordner = fotoOrdnerName(wep.id)
+  const ordner = fotoOrdnerName(dateiStamm(wep))
   const { dateien, fehlen } = await sammleExportFotos(wep, dbAblage, ladeFotoAusOneDrive)
   const fehlt = fehlen.length ? ` ${fehlen.length} Foto${fehlen.length === 1 ? ' fehlt' : 's fehlen'} (noch nicht auf diesem Gerät).` : ''
   if (!dateien.length) return `Keine Fotos exportiert.${fehlt}`

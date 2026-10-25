@@ -237,10 +237,11 @@ describe('Wiederherstellen', () => {
     await handy.loesche(ID)
     handy.lokal.weps.set(ID, wep(ID, 'Neues WEP mit alter Nummer')) // z. B. vom anderen Gerät übernommen
     const r = await handy.stelleWiederHer(ID)
-    expect(r).toEqual({ id: '2026-002', neueNummer: true })
+    expect(r?.neueNummer).toBe(true)
+    expect(r?.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
     expect(anlage(handy.lokal, ID)).toBe('Neues WEP mit alter Nummer')
-    expect(anlage(handy.lokal, '2026-002')).toBe('Start')
-    expect(handy.lokal.weps.get('2026-002')?.formalien.vorgangsNr).toBe('2026-002')
+    expect(anlage(handy.lokal, r!.id)).toBe('Start')
+    expect(handy.lokal.weps.get(r!.id)?.formalien.vorgangsNr).toBe(ID) // derselbe Vorgang: Vorgangs-Nr. bleibt
     expect(handy.imKorb(ID)).toBe(true) // Original bleibt, bis man es endgültig löscht
   })
 
@@ -476,7 +477,7 @@ describe('Änderung nach dem Löschzeitpunkt → Konflikt', () => {
     expect(drive.namen('daten')).toEqual([`${ID}.json`])
   })
 
-  it('neues WEP mit einer Nummer aus dem Papierkorb eines anderen Geräts bekommt eine neue Nummer', async () => {
+  it('neues WEP mit einer Kennung aus dem Papierkorb eines anderen Geräts bekommt eine neue Kennung', async () => {
     const { drive, handy, tablet } = await zweiGeraete()
     await handy.loesche(ID)
     await handy.sync()
@@ -486,11 +487,13 @@ describe('Änderung nach dem Löschzeitpunkt → Konflikt', () => {
     await tablet.bearbeite(wep(ID, 'Ganz anderes WEP'))
 
     const e = await tablet.sync()
-    expect(e.konflikte[0].text).toContain('2026-002')
-    expect(anlage(tablet.lokal, '2026-002')).toBe('Ganz anderes WEP')
+    expect(e.konflikte[0].text).toContain('neuen Kennung')
+    const nach = e.umnummeriert[0]!.nach
+    expect(anlage(tablet.lokal, nach)).toBe('Ganz anderes WEP')
+    expect(tablet.lokal.weps.get(nach)?.formalien.vorgangsNr).toBe(ID)
     expect(tablet.hat(ID)).toBe(false)
     expect(entpacke(drive.text(KORB)).wep.formalien.kleingartenanlage).toBe('Start') // gelöschtes WEP unangetastet
-    expect(drive.namen('daten')).toEqual(['2026-002.json'])
+    expect(drive.namen('daten')).toEqual([`${nach}.json`])
   })
 })
 

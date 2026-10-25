@@ -6,13 +6,13 @@ sein **privates OneDrive** ab. Die App sieht dabei **nur ihren eigenen Ordner**
 
 ## So funktioniert es
 
-- Pro WEP liegt eine Datei `<Vorgangs-Nr>.json` im Ordner `daten/` des App-Ordners.
+- Pro WEP liegt eine Datei `<Kennung>.json` im Ordner `daten/` des App-Ordners. Die Kennung ist seit 25.10.2026 eine UUID (vorher die von der App hochgezählte Nummer „2026-007“, alte WEPs behalten sie); die Vorgangs-Nr. des BV steht nur in den Formalien.
 - Jede Änderung wird zuerst lokal gespeichert (IndexedDB, funktioniert offline)
   und als „wartet auf Upload“ markiert.
 - Abgeglichen wird beim Öffnen der Startseite, wenn das Gerät wieder online geht,
   und über den Textknopf **„Abgleichen“** in der Statuszeile der Startseite.
 - **Konflikt** (dasselbe WEP auf zwei Geräten geändert): Die neuere Änderung gilt vorerst.
-  Die andere Fassung liegt als `<Vorgangs-Nr>.konflikt-<Zeit>.json` in `daten/` **und** am
+  Die andere Fassung liegt als `<Kennung>.konflikt-<Zeit>.json` in `daten/` **und** am
   WEP selbst. Am WEP erscheint der Hinweis **„Auf zwei Geräten geändert“** (auch als Marke
   „Konflikt“ in der Liste) mit den Knöpfen **„Diese Fassung behalten“** und **„Andere Fassung
   übernehmen“**. Nach der Entscheidung wird die Konflikt-Kopie beim nächsten Abgleich aus
@@ -54,13 +54,13 @@ sein **privates OneDrive** ab. Die App sieht dabei **nur ihren eigenen Ordner**
 
 ```
 Apps/WEP-App/
-  daten/          WEP-Dateien (<Vorgangs-Nr>.json), Konflikt-Kopien, profil.json,
+  daten/          WEP-Dateien (<Kennung>.json), Konflikt-Kopien, profil.json,
                   eigene-positionen.json
-  daten/papierkorb/   gelöschte WEPs (<Vorgangs-Nr>.json mit Löschzeitpunkt, 30 Tage)
-  daten/fotos/<Vorgangs-Nr>/            Fotos (<Foto-Id>.jpg) aktiver WEPs
-  daten/papierkorb/fotos/<Vorgangs-Nr>/ Fotos gelöschter WEPs (ziehen mit dem WEP um)
-  daten/bau/<Vorgangs-Nr>.xlsx          Bau-Excel eines aktiven WEP (eine Datei je WEP)
-  daten/papierkorb/bau/<Vorgangs-Nr>.xlsx  Bau-Excel eines gelöschten WEP (zieht mit um)
+  daten/papierkorb/   gelöschte WEPs (<Kennung>.json mit Löschzeitpunkt, 30 Tage)
+  daten/fotos/<Kennung>/            Fotos (<Foto-Id>.jpg) aktiver WEPs
+  daten/papierkorb/fotos/<Kennung>/ Fotos gelöschter WEPs (ziehen mit dem WEP um)
+  daten/bau/<Kennung>.xlsx          Bau-Excel eines aktiven WEP (eine Datei je WEP)
+  daten/papierkorb/bau/<Kennung>.xlsx  Bau-Excel eines gelöschten WEP (zieht mit um)
   Exporte/        fertige Excel-Dateien (<Vorgangs-Nr>_WEP.xlsx)
   LIESMICH.txt    „Ordner der WEP-App – bitte nichts von Hand ändern; fertige
                   Excel-Dateien liegen in Exporte/.“

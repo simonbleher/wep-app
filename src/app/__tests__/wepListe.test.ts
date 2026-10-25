@@ -97,6 +97,12 @@ describe('Sortierung', () => {
     expect(ids({ sortierung: 'geaendert', geaendertAm })).toEqual(['2026-002', '2026-010', '2026-001', '2025-120'])
   })
 
+  it('Nummer: nach Vorgangs-Nr. (nicht nach der internen UUID), ohne Nummer am Ende', () => {
+    const mit = (id: string, nr: string) => ({ ...neuerWep(id), formalien: { ...neuerWep(id).formalien, vorgangsNr: nr } })
+    const liste = [mit('ffff-1', '2026-003'), mit('0000-2', '2026-152'), mit('aaaa-3', ''), mit('9999-4', '2026-020')]
+    expect(waehleWeps(liste, auswahl({ sortierung: 'nummer' })).map((w) => w.formalien.vorgangsNr)).toEqual(['2026-152', '2026-020', '2026-003', ''])
+  })
+
   it('verändert die Eingabeliste nicht', () => {
     const vorher = LISTE.map((w) => w.id)
     waehleWeps(LISTE, auswahl({ sortierung: 'geaendert', suchbegriff: 'a' }))

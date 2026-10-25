@@ -9,7 +9,7 @@
  */
 
 import JSZip from 'jszip'
-import type { Wep, Position, BeseitigungsPosition, Formalien, Rolle } from '../model'
+import { vorgangsNrVon, type Wep, type Position, type BeseitigungsPosition, type Formalien, type Rolle } from '../model'
 import {
   FORMALIEN_MAP,
   AUSSENANLAGEN,
@@ -267,7 +267,7 @@ export async function exportWep(
     compressionOptions: { level: 6 },
   })
 
-  const filename = `${wep.formalien.vorgangsNr || wep.id}_WEP${nurBau ? '_Bau' : ''}.xlsx`
+  const filename = `${dateiStamm(wep)}_WEP${nurBau ? '_Bau' : ''}.xlsx`
 
   return {
     bau: bauErgebnis,
@@ -621,4 +621,10 @@ export async function deckblattPfade(zip: JSZip): Promise<string[]> {
     if (target) pfade.push(target.startsWith('/') ? target.slice(1) : `xl/${target}`)
   }
   return pfade
+}
+
+/** Anfang des Dateinamens: die Vorgangs-Nr. (ohne Zeichen, die in Dateinamen stören), sonst „ohne-Vorgangs-Nr“. */
+export function dateiStamm(wep: Pick<Wep, 'id' | 'formalien'>): string {
+  const nr = vorgangsNrVon(wep).replace(/[\\/:*?"<>|]+/g, '-').trim()
+  return nr || 'ohne-Vorgangs-Nr'
 }

@@ -1,6 +1,6 @@
 // WEP teilen: sammelt ein WEP (und auf Wunsch Fotos und Bau-Excel) in einer `.wep`-Datei.
 import JSZip from 'jszip'
-import type { Wep } from '@/model'
+import { vorgangsNrVon, type Wep } from '@/model'
 import type { SicherungsQuelle } from '@/sicherung'
 import { TEILEN_ENDUNG, TEILEN_FORMAT, TEILEN_JSON, TEILEN_MIME, type TeilenDatei } from './types'
 
@@ -31,7 +31,8 @@ export function teilenDateiname(wep: Wep): string {
     .replace(/\s+/g, '_')
     .replace(/^[._]+|[._]+$/g, '')
     .slice(0, 60)
-  return `${wep.id}${anlage ? `_${anlage}` : ''}${TEILEN_ENDUNG}`
+  const nr = vorgangsNrVon(wep).replace(/[\\/:*?"<>|]+/g, '-') || 'ohne-Vorgangs-Nr'
+  return `${nr}${anlage ? `_${anlage}` : ''}${TEILEN_ENDUNG}`
 }
 
 /** Größe der optionalen Anhänge laut WEP (für die Anzeige vor dem Teilen). */

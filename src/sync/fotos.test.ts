@@ -379,7 +379,7 @@ describe('Papierkorb mit Fotos (Regeln aus Paket 2)', () => {
 })
 
 describe('Umnummerieren', () => {
-  it('die Fotos ziehen auf die neue Nummer um, die alte bleibt dem gelöschten WEP', async () => {
+  it('die Fotos ziehen auf die neue Kennung um, die alte bleibt dem gelöschten WEP', async () => {
     const drive = new FakeDrive()
     const uhr = new Uhr()
     const handy = new Geraet('Handy', drive, uhr)
@@ -396,10 +396,13 @@ describe('Umnummerieren', () => {
     await tablet.bearbeite(neu)
     await tablet.neuesFoto(ID, 'n1', 'neues-foto')
     const e = await tablet.syncMitFotos()
-    expect(e.wep.umnummeriert).toEqual([{ von: ID, nach: '2026-002' }])
-    expect(await tablet.fotos.recordsVon(ID)).toEqual([]) // alte Nummer aufgeräumt
-    expect(tablet.fotos.hat('2026-002', 'n1')).toBe(true)
-    expect(drive.namen('daten/fotos/2026-002')).toEqual(['n1.jpg'])
+    expect(e.wep.umnummeriert).toHaveLength(1)
+    const nach = e.wep.umnummeriert[0]!.nach
+    expect(e.wep.umnummeriert[0]!.von).toBe(ID)
+    expect(nach).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
+    expect(await tablet.fotos.recordsVon(ID)).toEqual([]) // alte Kennung aufgeräumt
+    expect(tablet.fotos.hat(nach, 'n1')).toBe(true)
+    expect(drive.namen(`daten/fotos/${nach}`)).toEqual(['n1.jpg'])
     // Das gelöschte WEP behält seine Fotos
     expect(drive.namen(P)).toEqual(['a1.jpg'])
     expect(drive.namen(D)).toEqual([])
