@@ -1223,6 +1223,18 @@ try {
   await pdfLaden
   pruefe(await seite.getByText(/ · exportiert$/).first().waitFor({ timeout: 15000 }).then(() => true, () => false), 'Ohne Excel: nach dem PDF ist das WEP „exportiert“')
 
+  // An den BV senden (Stufe A): Paket mit PDFs, WEP-Datei und Fotos zum Ablegen im Synology-Ordner
+  await seite.getByRole('button', { name: 'Paket für den BV erstellen' }).click()
+  await seite.getByRole('button', { name: 'Speichern', exact: true }).waitFor({ timeout: 60000 })
+  const paketLaden = seite.waitForEvent('download')
+  await seite.getByRole('button', { name: 'Speichern', exact: true }).click()
+  const paket = await paketLaden
+  pruefe(/_an-BV\.zip$/.test(paket.suggestedFilename()), 'An den BV: Dateiname endet auf _an-BV.zip')
+  const paketZip = await JSZip.loadAsync(readFileSync(await paket.path()))
+  const paketNamen = Object.keys(paketZip.files)
+  pruefe(paketNamen.filter((n) => n.endsWith('.pdf')).length === 2 && paketNamen.some((n) => n.endsWith('.wep')), 'An den BV: zwei PDFs und die WEP-Datei im Paket')
+  pruefe(await seite.getByText(/an BV gesendet/).filter({ visible: true }).first().waitFor({ timeout: 10000 }).then(() => true, () => false), 'An den BV: „an BV gesendet“ mit Datum steht am WEP')
+
   // 12. Keine Skriptfehler
   pruefe(fehler.length === 0, `keine Skriptfehler im Browser ${fehler.join('; ')}`)
   console.log('Durchlauf erfolgreich')

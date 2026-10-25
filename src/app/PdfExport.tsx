@@ -26,7 +26,7 @@ type Zustand =
   | { typ: 'fehler'; meldung: string }
 
 /** `uebersichtlich`: schlichtes Protokoll; `vorlage`: Blätter der BV-Vorlage. */
-type PdfStil = 'uebersichtlich' | 'vorlage'
+export type PdfStil = 'uebersichtlich' | 'vorlage'
 
 const mb = (bytes: number) => `${(bytes / (1024 * 1024)).toLocaleString('de-DE', { maximumFractionDigits: 1 })} MB`
 
@@ -38,6 +38,65 @@ function inhaltsText(rolle: Rolle, wep: Wep): string {
       ? 'Deckblatt, Baulichkeiten, Mängelliste, Außenanlagen, Aufwuchs, Beseitigungskosten und beide Skizzen (soweit ausgefüllt).'
       : 'Deckblatt, Baulichkeiten, Mängelliste, Außenanlagen, Aufwuchs, Beseitigungskosten und Skizze (soweit ausgefüllt).'
   return 'Deckblatt, Außenanlagen, Aufwuchs, Beseitigungskosten und Skizze (soweit ausgefüllt).'
+}
+
+/**
+ * Erzeugt das PDF eines WEP (wie der Knopf „PDF übersichtlich“ bzw. „PDF wie Vorlage“), ohne es zu speichern. Wird auch
+ * für „An den BV senden“ genutzt.
+ */
+export async function erstellePdf(
+  wep: Wep,
+  rolle: Rolle,
+  stil: PdfStil,
+  opt: { profilIndex?: Record<string, number>; mitFotos?: boolean; unterschrift?: Uint8Array | null; schritt?: (text: string) => void } = {},
+): Promise<{ blob: Blob; name: string; seiten: number; hinweise: string[] }> {
+  const { profilIndex } = opt
+  const nurBau = rolle === 'bau'
+  opt.schritt?.('Bereite die Daten vor …')
+  const quelle = await ladeExportQuelle(wep, nurBau)
+  const wepFuerExport = hatBauTeil(rolle) ? bauFuerExport(wep, profilIndex) : wep
+
+  let fotos
+  let fehlendeFotos = 0
+  if (opt.mitFotos) {
+    opt.schritt?.('Hole die Fotos …')
+    const g = await sammlePdfFotos(wep, async (fotoId) => (await dbAblage.ladeDatei(wep.id, fotoId)) ?? (await ladeFotoAusOneDrive(wep.id, fotoId).catch(() => undefined)))
+    fotos = g.fotos
+    fehlendeFotos = g.fehlen
+  }
+
+  opt.schritt?.('Erzeuge das PDF …')
+  const f = wep.formalien
+  // Parzelle (Beta 6, Paket 1): beide Skizzen zeigen sie gleich; die Grün-Skizze entsteht bei Bedarf aus der Parzelle
+  const parzellenLage = lageVon(wepFuerExport)
+  const skizzeFuerExport = skizzeMitParzelle(wepFuerExport)
+  const erzeuge = stil === 'uebersichtlich' ? erzeugeWepUebersichtPdf : erzeugeWepPdf
+  const ausgabe = await erzeuge(
+    {
+      wep: wepFuerExport,
+      quelle: quelle.buffer,
+      hatBauExcel: quelle.hatBauExcel,
+      rolle,
+      exportOptionen: { profilIndex, formalienAbgeglichen: wep.bauExcel?.abgeglichen === true },
+    },
+    {
+      skizzen: {
+        gruen: skizzeFuerExport?.elemente.length ? skizzeFuerExport : undefined,
+        grundriss:
+          wepFuerExport.grundriss?.teile.length || parzellenLage
+            ? { daten: wepFuerExport.grundriss ?? leererGrundriss(), bauteile: wepFuerExport.bau?.bauteile ?? [], parzelle: parzellenLage }
+            : undefined,
+      },
+      fotos,
+      unterschrift: opt.unterschrift ?? null,
+      titel: `Wertermittlungsprotokoll ${vorgangsNrVon(wep)}`.trim(),
+      fotoKopf: [vorgangsNrVon(wep) && `Vorgangs-Nr. ${vorgangsNrVon(wep)}`, f.kleingartenanlage, f.parzelle && `Parzelle ${f.parzelle}`].filter(Boolean).join(' – '),
+    },
+  )
+  const blob = new Blob([ausgabe.pdf.bytes as BlobPart], { type: PDF_TYP })
+  const hinweise = [...ausgabe.pdf.hinweise]
+  if (fehlendeFotos) hinweise.push(`${fehlendeFotos} Foto${fehlendeFotos === 1 ? ' fehlt' : 's fehlen'} (noch nicht auf diesem Gerät, kein Netz).`)
+  return { blob, name: ausgabe.name, seiten: ausgabe.pdf.seitenZahl, hinweise }
 }
 
 export function PdfBereich({
@@ -61,7 +120,6 @@ export function PdfBereich({
   const anzahlFotos = wep.fotos?.length ?? 0
   const fotoGroesse = (wep.fotos ?? []).reduce((s, f) => s + f.groesse, 0)
   const hatUnterschrift = unterschriftAlsPng() !== null
-  const nurBau = rolle === 'bau'
 
   // Nach einem Wechsel des WEP oder der Rolle gilt das alte Ergebnis nicht mehr
   useEffect(() => {
@@ -73,49 +131,13 @@ export function PdfBereich({
     setTeilenMeldung(undefined)
     setZustand({ typ: 'laedt', schritt: 'Bereite die Daten vor …', stil })
     try {
-      const quelle = await ladeExportQuelle(wep, nurBau)
-      const wepFuerExport = hatBauTeil(rolle) ? bauFuerExport(wep, profilIndex) : wep
-
-      let fotos
-      let fehlendeFotos = 0
-      if (mitFotos && anzahlFotos) {
-        setZustand({ typ: 'laedt', schritt: 'Hole die Fotos …', stil })
-        const g = await sammlePdfFotos(wep, async (fotoId) => (await dbAblage.ladeDatei(wep.id, fotoId)) ?? (await ladeFotoAusOneDrive(wep.id, fotoId).catch(() => undefined)))
-        fotos = g.fotos
-        fehlendeFotos = g.fehlen
-      }
-
-      setZustand({ typ: 'laedt', schritt: 'Erzeuge das PDF …', stil })
-      const f = wep.formalien
-      // Parzelle (Beta 6, Paket 1): beide Skizzen zeigen sie gleich; die Grün-Skizze entsteht bei Bedarf aus der Parzelle
-      const parzellenLage = lageVon(wepFuerExport)
-      const skizzeFuerExport = skizzeMitParzelle(wepFuerExport)
-      const erzeuge = stil === 'uebersichtlich' ? erzeugeWepUebersichtPdf : erzeugeWepPdf
-      const ausgabe = await erzeuge(
-        {
-          wep: wepFuerExport,
-          quelle: quelle.buffer,
-          hatBauExcel: quelle.hatBauExcel,
-          rolle,
-          exportOptionen: { profilIndex, formalienAbgeglichen: wep.bauExcel?.abgeglichen === true },
-        },
-        {
-          skizzen: {
-            gruen: skizzeFuerExport?.elemente.length ? skizzeFuerExport : undefined,
-            grundriss:
-              wepFuerExport.grundriss?.teile.length || parzellenLage
-                ? { daten: wepFuerExport.grundriss ?? leererGrundriss(), bauteile: wepFuerExport.bau?.bauteile ?? [], parzelle: parzellenLage }
-                : undefined,
-          },
-          fotos,
-          unterschrift: mitUnterschrift ? unterschriftAlsPng() : null,
-          titel: `Wertermittlungsprotokoll ${vorgangsNrVon(wep)}`.trim(),
-          fotoKopf: [vorgangsNrVon(wep) && `Vorgangs-Nr. ${vorgangsNrVon(wep)}`, f.kleingartenanlage, f.parzelle && `Parzelle ${f.parzelle}`].filter(Boolean).join(' – '),
-        },
-      )
-      const blob = new Blob([ausgabe.pdf.bytes as BlobPart], { type: PDF_TYP })
-      const hinweise = [...ausgabe.pdf.hinweise]
-      if (fehlendeFotos) hinweise.push(`${fehlendeFotos} Foto${fehlendeFotos === 1 ? ' fehlt' : 's fehlen'} (noch nicht auf diesem Gerät, kein Netz).`)
+      const { blob, name, seiten, hinweise } = await erstellePdf(wep, rolle, stil, {
+        profilIndex,
+        mitFotos: mitFotos && anzahlFotos > 0,
+        unterschrift: mitUnterschrift ? unterschriftAlsPng() : null,
+        schritt: (schritt) => setZustand({ typ: 'laedt', schritt, stil }),
+      })
+      const ausgabe = { name, pdf: { seitenZahl: seiten } }
 
       // Wie beim Excel: im Browser und im Windows-Programm gleich speichern, auf dem Handy mit Konto nur nach OneDrive
       const nativ = Capacitor.isNativePlatform()

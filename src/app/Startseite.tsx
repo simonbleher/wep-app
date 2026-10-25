@@ -38,7 +38,7 @@ export function wepTitel(wep: Wep): string {
 /** Nebenzeile: „Vorgangs-Nr. · Unterpächter · Datum“. */
 function wepNeben(wep: Wep): string {
   const { unterpaechter, wertermittlungAm } = wep.formalien
-  return [vorgangsNrVon(wep) || 'Vorgangs-Nr. fehlt', unterpaechter, datumDe(wertermittlungAm ?? '')].filter((t) => t && t.trim()).join(' · ')
+  return [vorgangsNrVon(wep) || 'Vorgangs-Nr. fehlt', unterpaechter, datumDe(wertermittlungAm ?? ''), wep.anBvGesendetAm ? `an BV gesendet ${datumDe(wep.anBvGesendetAm.slice(0, 10))}` : ''].filter((t) => t && t.trim()).join(' · ')
 }
 
 export function Startseite({ konto, verfuegbar, onProfil, onOeffnen, onPapierkorb, onWepDatei }: Props) {
