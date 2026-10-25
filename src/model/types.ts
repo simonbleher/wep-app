@@ -115,7 +115,7 @@ export interface Foto {
   groesse: number
 }
 
-/** in Arbeit (Standard) · fertig (manuell) · exportiert (automatisch nach dem Excel-Export). */
+/** in Arbeit (Standard) · fertig (manuell) · exportiert (automatisch nach dem Excel- oder PDF-Export). */
 export type WepStatus = 'in Arbeit' | 'fertig' | 'exportiert'
 export const WEP_STATUS: readonly WepStatus[] = ['in Arbeit', 'fertig', 'exportiert']
 

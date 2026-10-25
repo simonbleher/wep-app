@@ -1191,6 +1191,14 @@ try {
   await seite.getByRole('button', { name: 'Export', exact: true }).click()
   await seite.getByRole('heading', { name: 'Export als PDF' }).waitFor()
   pruefe((await seite.getByRole('button', { name: 'Excel exportieren' }).count()) === 0, 'Ohne Excel: kein „Excel exportieren“, das PDF bleibt')
+  // Ohne Excel setzt das PDF den Status „exportiert“ (vorher nur der Excel-Export)
+  await seite.getByRole('button', { name: 'Weitere Aktionen' }).click()
+  await seite.getByRole('menuitem', { name: /Als fertig markieren/ }).click()
+  await seite.getByText(/ · fertig$/).first().waitFor()
+  const pdfLaden = seite.waitForEvent('download', { timeout: 60000 })
+  await seite.getByRole('button', { name: 'PDF übersichtlich' }).click()
+  await pdfLaden
+  pruefe(await seite.getByText(/ · exportiert$/).first().waitFor({ timeout: 15000 }).then(() => true, () => false), 'Ohne Excel: nach dem PDF ist das WEP „exportiert“')
 
   // 12. Keine Skriptfehler
   pruefe(fehler.length === 0, `keine Skriptfehler im Browser ${fehler.join('; ')}`)
