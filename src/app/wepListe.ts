@@ -1,5 +1,5 @@
 // Suche, Filter und Sortierung der WEP-Liste (reine Funktionen, getestet).
-import { wepStatus, type Wep, type WepStatus } from '@/model'
+import { vorgangsNrVon, wepStatus, type Wep, type WepStatus } from '@/model'
 import { normalisiere } from '@/katalog/util'
 
 export type Sortierung = 'geaendert' | 'nummer'
@@ -37,7 +37,13 @@ function zeitpunkt(wep: Wep, geaendertAm: ReadonlyMap<string, string>): number {
   return Number.isFinite(t) ? t : 0
 }
 
-const nachNummer = (a: Wep, b: Wep) => b.id.localeCompare(a.id, 'de', { numeric: true })
+/** Höchste Vorgangs-Nr. zuerst; WEPs ohne Vorgangs-Nr. stehen am Ende (die interne Kennung ist eine UUID, keine Nummer). */
+const nachNummer = (a: Wep, b: Wep) => {
+  const x = vorgangsNrVon(a)
+  const y = vorgangsNrVon(b)
+  if (!x || !y) return (x ? 0 : 1) - (y ? 0 : 1)
+  return y.localeCompare(x, 'de', { numeric: true })
+}
 
 /** Wendet Suche, Status-Filter und Sortierung an; die Eingabeliste bleibt unverändert. */
 export function waehleWeps(weps: readonly Wep[], a: ListenAuswahl): Wep[] {
