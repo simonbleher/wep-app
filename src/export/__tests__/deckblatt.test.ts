@@ -65,7 +65,7 @@ describe('Deckblatt-Text im Excel-Export', () => {
       'Die Wertermittlung erfolgt auf der Grundlage der "Wertermittlungsrichtlinie für Kleingärten" des Landesverbandes Berlin der Gartenfreunde e.V.',
       'Erklärung: Die Wertermittler haften nicht für versteckte Mängel.',
       'Versteckte Mängel im Sinne dieses Protokolls sind Mängel an Baulichkeiten und baulichen Anlagen, die vom Wertermittler nicht eingesehen werden konnten. Dabei ist es unwichtig, ob die Einsehbarkeit wegen Wandverkleidungen innen und/oder außen (mit oder ohne Baugenehmigung), dichtem Pflanzenwuchs, eingebautem Mobiliar oder sonstigen Gegenständen behindert wurde.',
-      'Dieses Protokoll ist das Ergebnis einer Momentaufnahme von Daten zum Zeitpunkt der Wertermittlung auf der Parzelle. Es ist rechtlich nicht mit einem Gutachten gleichzusetzen. Widersprüche sind innerhalb von 14 Tagen schriftlich an den Bezirksverband der Gartenfreunde Pankow e.V. zu richten.',
+      'Dieses Protokoll ist das Ergebnis einer Momentaufnahme von Daten zum Zeitpunkt der Wertermittlung auf der Parzelle. Es ist rechtlich nicht mit einem Gutachten gleichzusetzen.',
       'Der neue Unterpächter muss das Inventar nicht übernehmen, es muss dann vom scheidenden Unterpächter entfernt werden.',
       'Wir weisen Sie darauf hin, dass die durch die Wertermittler ermittelten Beträge erst bei Neuverpachtung zur Zahlung fällig werden.',
       'Ein Widerspruch gegen diese Wertermittlung ist innerhalb von 14 Tagen schriftlich an den Bezirksverband der Gartenfreunde Pankow e.V. zu richten.',
