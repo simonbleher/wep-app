@@ -148,7 +148,7 @@ function abwasser(s: Satz, p: Protokoll): void {
         kanal.alter !== undefined ? rz('Alter', `${zahl(kanal.alter)} Jahre`) : undefined,
         kanal.kosten !== undefined ? rz('Kosten', euro(kanal.kosten)) : undefined,
         kanal.hoechstens !== undefined ? rz('höchstens', euro(kanal.hoechstens)) : undefined,
-        kanal.abzug !== undefined ? rz('Altersabzug (3 % je Jahr)', prozent(kanal.abzug * 100)) : undefined,
+        kanal.abzug !== undefined ? rz('Altersabzug (3 % je Jahr vom Restwert)', prozent(kanal.abzug * 100)) : undefined,
         { art: 'summe', zellen: [{ text: 'Wert des Kanals' }, r(euro(kanal.wert))] },
       ]),
     })

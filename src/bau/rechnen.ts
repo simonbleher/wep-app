@@ -9,7 +9,7 @@ import { bauklasseAusAngaben } from './assistent'
 import {
   GEWAECHSHAUS,
   GRUBE_MAX_ALTER_TANK,
-  grubeAltersabzug,
+  altersabzugVomRestwert,
   GRUBE_NICHT_GELEERT_ABZUG,
   GRUBEN_TYPEN,
   KANAL_HOECHSTWERT,
@@ -388,7 +388,7 @@ export function grubenGrundwert(typ: string | undefined): number {
 
 /**
  * Höchstalter für die Abschreibung: Tanks/monolithische Gruben 16 Jahre (S. 14); sonst ohne Grenze – der Abzug vom
- * Restwert (`grubeAltersabzug`) erreicht nie 100 %.
+ * Restwert (`altersabzugVomRestwert`) erreicht nie 100 %.
  */
 export function grubeMaxAlter(typ: string | undefined): number {
   return typ === 'beton' || typ === 'tank' || typ === 'kunststoff' ? GRUBE_MAX_ALTER_TANK : Infinity
@@ -402,7 +402,7 @@ function rechneGrube(bau: BauDaten, wertjahr: number): GrubeErgebnis {
   const g = bau.abwasser.grube
   const alter = alterInJahren(g.baujahr, wertjahr)
   const wirksam = Math.min(alter ?? 0, grubeMaxAlter(g.typ)) // C74
-  const abzug = grubeAltersabzug(wirksam) // C75
+  const abzug = altersabzugVomRestwert(wirksam) // C75
   const grundwert = g.grundwert ?? grubenGrundwert(g.typ) // F74
   const wertProM3 = rund2(grundwert - (grundwert * abzug) / 100) // F75
   const inhalt = g.zuBeseitigen ? 0 : (g.inhaltM3 ?? 0) // I75
@@ -415,20 +415,20 @@ function rechneGrube(bau: BauDaten, wertjahr: number): GrubeErgebnis {
 function rechneKanal(bau: BauDaten, wertjahr: number): KanalErgebnis {
   const k = bau.abwasser.kanal
   const alter = alterInJahren(k.baujahr, wertjahr)
-  const wirksam = Math.min(alter ?? 0, 33) // G78 (höchstens 33 Jahre, sonst wäre der Abzug über 100 %)
+  const wirksam = alter ?? 0 // G78 (keine Grenze: der Abzug vom Restwert erreicht nie 100 %)
   const kosten = k.kosten ?? 0 // C79
   const hoechstens = wirksam > 0 ? Math.min(KANAL_HOECHSTWERT, kosten) : 0 // E79
-  const abzug = (wirksam / 100) * 3 // H79
+  const abzug = altersabzugVomRestwert(wirksam) / 100 // H79: jährlich 3 % vom Restwert, wie die Grube
   const wert = kosten > 74 ? rund2(hoechstens - hoechstens * abzug) : 0 // K79
   return { alter, kosten, hoechstens, abzug, wert }
 }
 
-/** Das wirksame Alter (Grube: Tanks höchstens 16 Jahre; Kanal höchstens 33), das der Export in C74 bzw. G78 schreibt. */
+/** Das wirksame Alter (Grube: Tanks höchstens 16 Jahre; Kanal ohne Grenze), das der Export in C74 bzw. G78 schreibt. */
 export function wirksamesAlterGrube(bau: BauDaten, wertjahr: number): number {
   return rechneGrube(bau, wertjahr).wirksamesAlter
 }
 export function wirksamesAlterKanal(bau: BauDaten, wertjahr: number): number {
-  return Math.min(alterInJahren(bau.abwasser.kanal.baujahr, wertjahr) ?? 0, 33)
+  return alterInJahren(bau.abwasser.kanal.baujahr, wertjahr) ?? 0
 }
 
 // ---------------------------------------------------------------------------

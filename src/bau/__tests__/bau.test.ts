@@ -25,7 +25,7 @@ import {
   tabellenEnde,
   umbrechen,
   weisePlaetzeZu,
-  grubeAltersabzug,
+  altersabzugVomRestwert,
 } from '..'
 import { blattPfadNachName, sharedStrings, zellenWert } from '../../export/bauExcelLesen'
 
@@ -251,9 +251,9 @@ describe('Baupreisindex', () => {
 
 describe('Abwassergrube: Altersabzug jährlich 3 % vom Restwert', () => {
   it('(1 − 0,97^Alter) × 100: 16 Jahre 38,57 % statt 48 %', () => {
-    expect(grubeAltersabzug(0)).toBe(0)
-    expect(grubeAltersabzug(1)).toBeCloseTo(3, 10)
-    expect(grubeAltersabzug(16)).toBeCloseTo(38.5746, 4)
+    expect(altersabzugVomRestwert(0)).toBe(0)
+    expect(altersabzugVomRestwert(1)).toBeCloseTo(3, 10)
+    expect(altersabzugVomRestwert(16)).toBeCloseTo(38.5746, 4)
   })
   it('Tank 16 Jahre gedeckelt, Schachtringe ohne Grenze (nie 100 %)', () => {
     const tank = wepMit((_, wep) => { wep.bau!.abwasser = { art: 'grube', kanal: {}, grube: { typ: 'kunststoff', inhaltM3: 5, baujahr: 2000, dichtheitAm: '2025-01-03' } } })
@@ -267,6 +267,20 @@ describe('Abwassergrube: Altersabzug jährlich 3 % vom Restwert', () => {
     expect(s.wirksamesAlter).toBe(s.alter)
     expect(s.altersabzugProzent).toBeLessThan(100)
     expect(s.wert).toBeGreaterThan(0)
+  })
+})
+
+describe('Kanalanschluss: Altersabzug jährlich 3 % vom Restwert', () => {
+  it('Abzug 1 − 0,97^Alter vom Erstellungspreis (höchstens 2.200 €), auch nach über 33 Jahren nicht 0 €', () => {
+    const w = wepMit((_, wep) => { wep.bau!.abwasser = { art: 'kanal', grube: {}, kanal: { baujahr: 2006, kosten: 3000 } } })
+    const k = berechneBau(w)!.kanal!
+    expect(k.alter).toBeGreaterThan(0)
+    expect(k.abzug).toBeCloseTo(1 - 0.97 ** k.alter!, 10)
+    expect(k.wert).toBe(Math.round(2200 * 0.97 ** k.alter! * 100) / 100)
+    const alt = wepMit((_, wep) => { wep.bau!.abwasser = { art: 'kanal', grube: {}, kanal: { baujahr: 1960, kosten: 1500 } } })
+    const ka = berechneBau(alt)!.kanal!
+    expect(ka.alter).toBeGreaterThan(33)
+    expect(ka.wert).toBeGreaterThan(0)
   })
 })
 

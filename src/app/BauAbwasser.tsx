@@ -112,7 +112,7 @@ export function AbwasserTab({ wep, aendere, profilIndex }: Props) {
       {abw.art === 'kanal' && (
         <section className="abschnitt" aria-label="Kanalisationsanschluss">
           <h2 className="gruppenkopf">Kanalisationsanschluss</h2>
-          <p className="neben">Bewertet wird der Erstellungspreis, höchstens {KANAL_HOECHSTWERT.toLocaleString('de-DE')} €, mit 3 % Alterswertminderung je Jahr.</p>
+          <p className="neben">Bewertet wird der Erstellungspreis, höchstens {KANAL_HOECHSTWERT.toLocaleString('de-DE')} €, mit 3 % Alterswertminderung je Jahr vom Restwert.</p>
           <div className="feld-reihe">
             <ZahlFeld label="Erstellt im Jahr" wert={abw.kanal.baujahr} onChange={(v) => kanal({ baujahr: v })} hilfe={alterKanal !== undefined ? `Alter ${alterKanal} Jahre` : undefined} />
             <ZahlFeld label="Erstellungspreis" einheit="€" wert={abw.kanal.kosten} onChange={(v) => kanal({ kosten: v })} />

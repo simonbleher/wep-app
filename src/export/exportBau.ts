@@ -25,7 +25,7 @@ import {
 } from '../bau'
 import { isoDateToExcelSerial } from './cellMapper'
 import { blattPfadNachName, leseBeschreibung, sharedStrings, zellenWert } from './bauExcelLesen'
-import { patchCells, patchFormel, type CellPatch } from './xmlPatcher'
+import { mitZahlenformat, patchCells, patchFormel, type CellPatch } from './xmlPatcher'
 
 export const BAULICHKEITEN_BLATT = 'Baulichkeiten'
 export const MAENGEL_BLATT = 'Mängelliste'
@@ -44,6 +44,8 @@ export interface VorlagenKorrektur {
   vorher: string
   nachher: string
   grund: string
+  /** Neues Zahlenformat der Zelle (eingebautes `numFmtId`, z. B. 2 = „0.00“), wenn die Korrektur Nachkommastellen bringt. */
+  zahlenformat?: number
 }
 
 /** Fehler der Vorlage, die der Export korrigiert (jeweils nur, wenn die Zelle noch die erwartete Formel hat). */
@@ -51,7 +53,8 @@ export const VORLAGEN_KORREKTUREN: readonly (VorlagenKorrektur & { blattName: st
   { blattName: BAULICHKEITEN_BLATT, blatt: 'Baulichkeiten', zelle: 'C33', vorher: '$H$23', nachher: '$H$32', grund: 'Anbau A2 rechnete mit dem Ergebnis von A1 (H23) statt mit dem eigenen nach Mängelabzug (H32).' },
   { blattName: BAULICHKEITEN_BLATT, blatt: 'Baulichkeiten', zelle: 'J52', vorher: '$B$21', nachher: '$B$47', grund: 'Die Beschriftung „Wert BT“ beim Schuppen zeigte das Kürzel von A1.' },
   { blattName: BAULICHKEITEN_BLATT, blatt: 'Baulichkeiten', zelle: 'K81', vorher: 'K52+K61+K71+K75+K77+K79', nachher: 'K61+K71+K75+K77+K79', grund: 'Der Schuppen (K52) steckt schon in der Zwischensumme K61 und wurde doppelt gezählt.' },
-  { blattName: BAULICHKEITEN_BLATT, blatt: 'Baulichkeiten', zelle: 'C75', vorher: 'C74*3', nachher: '(1-0.97^C74)*100', grund: 'Altersabzug der Abwassergrube: jährlich 3 % vom Restwert, (1 − 0,97^Alter) × 100 statt Alter × 3 (16 Jahre: 38,57 % statt 48 %).' },
+  { blattName: BAULICHKEITEN_BLATT, blatt: 'Baulichkeiten', zelle: 'C75', vorher: 'C74*3', nachher: '(1-0.97^C74)*100', zahlenformat: 2, grund: 'Altersabzug der Abwassergrube: jährlich 3 % vom Restwert, (1 − 0,97^Alter) × 100 statt Alter × 3 (16 Jahre: 38,57 % statt 48 %); mit 2 Nachkommastellen.' },
+  { blattName: BAULICHKEITEN_BLATT, blatt: 'Baulichkeiten', zelle: 'H79', vorher: 'G78/100*3', nachher: '1-0.97^G78', zahlenformat: 10, grund: 'Altersabzug des Kanalanschlusses: jährlich 3 % vom Restwert, 1 − 0,97^Alter statt Alter × 3 %; mit 2 Nachkommastellen.' },
   { blattName: BAULICHKEITEN_BLATT, blatt: 'Baulichkeiten', zelle: 'C64', vorher: '', nachher: 'I63', grund: 'Beim integrierten Laubenvorplatz fehlte der Bezug auf den Wert nach Mängelabzug; der Wert ging verloren.' },
   { blattName: BESEITIGUNG_BLATT, blatt: 'Beseitigungskosten', zelle: 'K21', vorher: '', nachher: '<f t="shared" si="0"/>', grund: 'In Zeile 9 (Abschnitt 1) fehlte die Summenformel; die Zeile zählte nicht in die Summe.' },
 ]
@@ -308,6 +311,8 @@ export async function schreibeBau(zip: JSZip, wep: Wep, optionen: BauExportOptio
   let xmlK = patchCells(await lies(pfadK), k.patches)
 
   if (korrigieren) {
+    const stylesPfad = 'xl/styles.xml'
+    let styles = await zip.file(stylesPfad)?.async('string')
     const wende = (blattName: string, xml: string): string => {
       let aus = xml
       for (const kor of VORLAGEN_KORREKTUREN.filter((x) => x.blattName === blattName)) {
@@ -317,12 +322,17 @@ export async function schreibeBau(zip: JSZip, wep: Wep, optionen: BauExportOptio
         const aktuell = formelInhalt(aus, kor.zelle)
         if (aktuell !== kor.vorher) continue
         aus = neu
+        if (kor.zahlenformat !== undefined && styles) {
+          const f = mitZahlenformat(styles, aus, kor.zelle, kor.zahlenformat)
+          if (f) ({ styles, sheet: aus } = f)
+        }
         korrekturen.push({ blatt: kor.blatt, zelle: kor.zelle, vorher: kor.vorher, nachher: kor.nachher, grund: kor.grund })
       }
       return aus
     }
     xmlB = wende(BAULICHKEITEN_BLATT, xmlB)
     xmlK = wende(BESEITIGUNG_BLATT, xmlK)
+    if (styles) zip.file(stylesPfad, styles)
   }
   zip.file(pfadB, xmlB)
   zip.file(pfadM, xmlM)

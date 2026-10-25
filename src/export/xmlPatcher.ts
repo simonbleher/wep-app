@@ -272,3 +272,28 @@ export function readCellFormula(xml: string, cell: string): string | null {
   const f = m && /<f\b[^>]*>([^<]*)<\/f>/.exec(m[1])
   return f ? f[1].replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"') : null
 }
+
+/**
+ * Gibt einer Zelle ein anderes Zahlenformat (z. B. 2 = „0.00“, 10 = „0.00%“): Das Zellformat (`cellXfs`) der Zelle wird
+ * mit dem neuen `numFmtId` kopiert und angehängt, die Zelle zeigt auf die Kopie – andere Zellen mit demselben Format
+ * bleiben unberührt. `null`, wenn Zelle oder Format nicht zu finden sind.
+ */
+export function mitZahlenformat(stylesXml: string, sheetXml: string, cell: string, numFmtId: number): { styles: string; sheet: string } | null {
+  const zelle = new RegExp(`<c r="${cell}"(\\s[^>]*)?>`).exec(sheetXml)
+  if (!zelle) return null
+  const s = Number(/\ss="(\d+)"/.exec(zelle[1] ?? '')?.[1] ?? 0)
+  const xfs = /<cellXfs\b[^>]*>([\s\S]*?)<\/cellXfs>/.exec(stylesXml)
+  if (!xfs) return null
+  const liste = [...xfs[1].matchAll(/<xf\b[^>]*?(?:\/>|>[\s\S]*?<\/xf>)/g)].map((m) => m[0])
+  const alt = liste[s]
+  if (!alt) return null
+  const kopf = alt.replace(/^<xf\b[^>]*?(?=\/?>)/, (k) => {
+    const ohne = k.replace(/\snumFmtId="\d+"/, '').replace(/\sapplyNumberFormat="\d+"/, '')
+    return `${ohne} numFmtId="${numFmtId}" applyNumberFormat="1"`
+  })
+  const neuIndex = liste.length
+  const neuXfs = `<cellXfs count="${neuIndex + 1}">${xfs[1]}${kopf}</cellXfs>`
+  const styles = stylesXml.replace(xfs[0], neuXfs)
+  const neuZelle = zelle[0].includes(' s="') ? zelle[0].replace(/\ss="\d+"/, ` s="${neuIndex}"`) : zelle[0].replace(/>$/, ` s="${neuIndex}">`)
+  return { styles, sheet: sheetXml.replace(zelle[0], neuZelle) }
+}
