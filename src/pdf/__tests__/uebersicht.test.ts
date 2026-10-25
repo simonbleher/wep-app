@@ -5,6 +5,7 @@ import { createCanvas } from '@napi-rs/canvas'
 import { erzeugeTestBauExcel } from '../../bauexcel/testBauExcel'
 import { DECKBLATT_ABSAETZE, absatzText } from '../../export/deckblattText'
 import { testFoto } from '../../fotos/testBilder'
+import { neuerWep } from '../../model'
 import { erzeugeWepPdf, erzeugeWepUebersichtPdf, type WepPdfAusgabe, type WepUebersichtAusgabe } from '../index'
 import { euro, abzugEuro } from '../uebersicht/format'
 import { testFaelle, type TestFall } from '../testFaelle'
@@ -209,6 +210,27 @@ describe('Kopfzeile, Seitenzahlen, Format', () => {
   it('Dateiname', () => {
     expect(fall('Grün einfach').neu.name).toBe('2026-101_WEP_uebersichtlich.pdf')
     expect(fall('Bau normal').neu.name).toBe('2026-103_WEP_Bau_uebersichtlich.pdf')
+  })
+
+  it('Baubeschreibung: jede Zeile der Excel ist eine eigene Zeile, auch der rechte Teil („Typ: …“)', () => {
+    const mit = paare.filter((p) => p.neu.pdf.protokoll.bauBeschreibung.length)
+    expect(mit.length).toBeGreaterThan(0)
+    for (const p of mit) {
+      // Zeilen wie im WEP (bzw. in der Bau-Excel), nicht wie der Export sie auf die Excel-Zeilen verteilt
+      const erwartet = p.fall.wep.bau?.beschreibung?.split(/\n\s*\n/).map((a) => a.split('\n').map((z) => z.trim()).join('\n'))
+      if (erwartet) expect(p.neu.pdf.protokoll.bauBeschreibung, p.fall.name).toEqual(erwartet)
+    }
+    expect(fall('Bau normal').neu.pdf.protokoll.bauBeschreibung).toEqual([
+      'Laube in Holzständerbauweise, Satteldach mit Bitumenschindeln. Der Anbau (Süd) ist als Abstellraum genutzt. Schuppen aus Blech, standsicher.\nDer Zustand ist altersgemäß, kleinere Mängel am Dach.',
+    ])
+  })
+
+  it('Baubeschreibung nur aus der Bau-Excel: je Excel-Zeile eine Zeile, linker und rechter Teil zusammen', async () => {
+    const bx = await erzeugeTestBauExcel({ bau: true })
+    const quelle = bx.buffer.slice(bx.byteOffset, bx.byteOffset + bx.byteLength) as ArrayBuffer
+    const wep = neuerWep('2026-990')
+    const erg = await erzeugeWepUebersichtPdf({ wep, quelle, hatBauExcel: true, rolle: 'bau' }, {})
+    expect(erg.pdf.protokoll.bauBeschreibung).toEqual(['Laube L: Baujahr 1982   Typ: Fertigteil-Bungalow\nDach: Pultdach mit Bitumenschweißbahn'])
   })
 
   it('Fließtext bricht nicht über den Rand: keine Seite mit mehr als ihrem Inhalt (Seiten sind A4)', () => {
