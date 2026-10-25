@@ -5,7 +5,8 @@ import { readFileSync } from 'node:fs'
 import { berechneBau } from '@/bau'
 import { exportWep } from '@/export'
 import { leseBauTeil, type BauTeil } from '@/export/bauTeilLesen'
-import { neuerWep } from '@/model'
+import { neuerWep, neueBauDaten, type Bauteil } from '@/model'
+import { rechteckPunkte } from '@/skizze/grundriss'
 import { BAU_LISTEN, offeneBauZeilen, pruefeBau, uebernimmBau } from '../bauAbgleich'
 import { erzeugeTestBauExcel } from '../testBauExcel'
 
@@ -73,6 +74,33 @@ describe('Abgleich', () => {
     const mit = uebernimmBau(eigen, teil, alle)
     expect(mit.bau?.beschreibung).toBe('Meine Beschreibung')
     expect(mit.bau?.bauteile).toHaveLength(5)
+  })
+
+  it('nur gezeichnete Laube wird ergänzt (Typ, Baujahr, Mängel), ihre Fläche aus der Skizze bleibt; Phantom-Fläche zählt nicht', () => {
+    const w = neuerWep('x')
+    const gezeichnet: Bauteil = { id: 'l1', art: 'laube', kuerzel: 'L', flaeche: 30, laenge: 6, breite: 5, flaecheManuell: true, ausGrundriss: true, maengel: [] }
+    // Form gelöscht, Bauteil blieb mit 96 m² stehen (Editor-Rechteck 12 × 8)
+    const phantom: Bauteil = { id: 'g1', art: 'gewaechshaus', kuerzel: 'GWH', flaeche: 96, laenge: 12, breite: 8, flaecheManuell: true, ausGrundriss: true, nhk: 160, minderungProJahr: 5, maengel: [] }
+    w.bau = { ...neueBauDaten(), bauteile: [gezeichnet, phantom] }
+    w.grundriss = { teile: [{ id: 't1', kuerzel: 'L', bauteilId: 'l1', punkte: rechteckPunkte(0, 0, 6, 5) }] }
+    const ab = pruefeBau(w, teil).find((l) => l.liste === 'bauteile')!
+    expect(ab.neu.map((n) => n.text)).toEqual(['Anbau A1', 'Schuppen S1+S2', 'Vorplatz Ü1', 'Laube L ergänzen', 'Gewächshaus GWH ergänzen'])
+    expect(ab.neu[3].detail).toContain('Fläche aus der Skizze (30 m²) bleibt')
+    const neu = uebernimmBau(w, teil, new Set(['bauteile']))
+    const l = neu.bau!.bauteile.find((b) => b.id === 'l1')!
+    expect(l).toMatchObject({ flaeche: 30, laenge: 6, ausGrundriss: true, typ: 'Doppelwand 8,01 - 10,00 cm', baujahr: 1982, restnutzungsjahre: 10 })
+    expect(l.maengel.map((m) => m.abzug)).toEqual([8, 5])
+    // Das Gewächshaus (Form gelöscht, 96 m² aus dem Editor-Rechteck) bekommt die 9,5 m² aus der Excel
+    expect(neu.bau!.bauteile.filter((b) => b.art === 'gewaechshaus').map((b) => [b.id, b.flaeche])).toEqual([['g1', 9.5]])
+    expect(offeneBauZeilen(pruefeBau(neu, teil).filter((x) => x.liste === 'bauteile'))).toBe(0)
+  })
+
+  it('eine Laube mit eigenen Angaben wird nicht ergänzt (nichts überschreiben)', () => {
+    const w = neuerWep('x')
+    w.bau = { ...neueBauDaten(), bauteile: [{ id: 'l1', art: 'laube', kuerzel: 'L', flaeche: 20, baujahr: 1990, maengel: [] }] }
+    const ab = pruefeBau(w, teil).find((l) => l.liste === 'bauteile')!
+    expect(ab.neu.map((n) => n.text)).not.toContain('Laube L ergänzen')
+    expect(uebernimmBau(w, teil, new Set(['bauteile'])).bau!.bauteile[0]).toMatchObject({ baujahr: 1990, flaeche: 20 })
   })
 })
 

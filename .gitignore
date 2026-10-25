@@ -22,3 +22,6 @@ __pycache__/
 .pytest_cache/
 # Bildschirmfotos der Anleitung (Quelle, 2× Handy); npm run anleitung erzeugt sie neu, eingecheckt sind die JPGs in public/anleitung/
 /docs/anleitung/bilder/
+# Build-Zwischenstände von tsc -b
+/dist-tsnode/
+*.tsbuildinfo

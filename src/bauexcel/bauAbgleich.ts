@@ -3,7 +3,10 @@
 //
 // Regeln: nichts wird überschrieben und nichts doppelt angelegt. Was im WEP schon steht (Bauteil mit gleichem Kürzel,
 // Beschreibung, Beseitigungszeile mit gleichem Gegenstand/Menge/Einheit), bleibt; der Nutzer wählt, welche Gruppen dazukommen.
-import { MANGEL_EIGEN, kuerzelFuer, wertjahrVon } from '@/bau'
+// Ausnahme: Ein Bauteil, das nur in der Skizze Bau gezeichnet ist (`nurGezeichnet`), bekommt Typ, Baujahr, Mängel …
+// aus der Excel ergänzt; seine Fläche aus der Skizze bleibt. Vorher fallen Bauteile weg, deren Form gelöscht wurde
+// (`uebernehmeGrundriss`), damit keine Phantom-Flächen den Abgleich verfälschen.
+import { MANGEL_EIGEN, kuerzelFuer, nurGezeichnet, uebernehmeGrundriss, wertjahrVon } from '@/bau'
 import type { BauTeil, BauTeilBauteil } from '@/export/bauTeilLesen'
 import { normalisiere } from '@/katalog/util'
 import { neueBauDaten, type BauDaten, type Bauteil, type BeseitigungsPosition, type Wep } from '@/model'
@@ -27,9 +30,27 @@ const ART_NAME: Record<Bauteil['art'], string> = { laube: 'Laube', anbau: 'Anbau
 const kuerzelVon = (b: BauTeilBauteil, andere: readonly { art: Bauteil['art']; kuerzel: string }[]) => b.kuerzel || kuerzelFuer(b.art, andere as Bauteil[])
 const beSchluessel = (g: string, m: number, e: string) => `${normalisiere(g)}|${m}|${normalisiere(e)}`
 
+const gleichesBauteil = (v: Bauteil, b: BauTeilBauteil, vorhanden: readonly Bauteil[]) =>
+  v.art === b.art && normalisiere(v.kuerzel) === normalisiere(kuerzelVon(b, vorhanden))
+
 function fehlendeBauteile(wep: Wep, teil: BauTeil): BauTeilBauteil[] {
   const vorhanden = wep.bau?.bauteile ?? []
-  return teil.bauteile.filter((b) => !vorhanden.some((v) => v.art === b.art && normalisiere(v.kuerzel) === normalisiere(kuerzelVon(b, vorhanden))))
+  return teil.bauteile.filter((b) => !vorhanden.some((v) => gleichesBauteil(v, b, vorhanden)))
+}
+
+/** Hat die Excel zu diesem Bauteil mehr als die Fläche (Typ, Baujahr, Restnutzung, Mängel …)? */
+const hatAngaben = (b: BauTeilBauteil) =>
+  !!b.typ || b.baujahr !== undefined || b.alter !== undefined || b.restnutzungsjahre !== undefined || b.maengel.length > 0 || !!b.nhk || !!b.minderungProJahr
+
+/** Bauteile, die im WEP nur gezeichnet sind und die die Excel ergänzt: [im WEP, aus der Excel]. */
+function ergaenzbareBauteile(wep: Wep, teil: BauTeil): [Bauteil, BauTeilBauteil][] {
+  const vorhanden = wep.bau?.bauteile ?? []
+  const paare: [Bauteil, BauTeilBauteil][] = []
+  for (const b of teil.bauteile) {
+    const v = vorhanden.find((x) => gleichesBauteil(x, b, vorhanden))
+    if (v && nurGezeichnet(v) && hatAngaben(b) && !paare.some(([x]) => x === v)) paare.push([v, b])
+  }
+  return paare
 }
 
 function fehlendeBeseitigung(wep: Wep, teil: BauTeil) {
@@ -49,18 +70,26 @@ function fehlendeBeseitigung(wep: Wep, teil: BauTeil) {
   })
 }
 
-export function pruefeBau(wep: Wep, teil: BauTeil): BauListenAbgleich[] {
+const bauteilDetail = (b: BauTeilBauteil, mitFlaeche = true) =>
+  [b.typ, b.baujahr ? `Baujahr ${b.baujahr}` : '', mitFlaeche && b.flaeche > 0 ? `${zahlText(b.flaeche)} m²` : '', b.maengel.length ? `Mängel ${zahlText(b.maengel.reduce((s, m) => s + m.abzug, 0))} %` : ''].filter(Boolean).join(' · ')
+
+export function pruefeBau(wepVorher: Wep, teil: BauTeil): BauListenAbgleich[] {
+  const wep = uebernehmeGrundriss(wepVorher)
   const bt = fehlendeBauteile(wep, teil)
+  const erg = ergaenzbareBauteile(wep, teil)
   const be = fehlendeBeseitigung(wep, teil)
   const liste: BauListenAbgleich[] = [
     {
       liste: 'bauteile',
       name: 'Baulichkeiten',
-      neu: bt.map((b) => ({
-        text: `${ART_NAME[b.art]} ${b.kuerzel}`.trim(),
-        detail: [b.typ, b.baujahr ? `Baujahr ${b.baujahr}` : '', b.flaeche > 0 ? `${zahlText(b.flaeche)} m²` : '', b.maengel.length ? `Mängel ${zahlText(b.maengel.reduce((s, m) => s + m.abzug, 0))} %` : ''].filter(Boolean).join(' · '),
-      })),
-      gleich: teil.bauteile.length - bt.length,
+      neu: [
+        ...bt.map((b) => ({ text: `${ART_NAME[b.art]} ${b.kuerzel}`.trim(), detail: bauteilDetail(b) })),
+        ...erg.map(([v, b]) => ({
+          text: `${ART_NAME[v.art]} ${v.kuerzel} ergänzen`.trim(),
+          detail: [bauteilDetail(b, v.flaeche <= 0), v.flaeche > 0 ? `Fläche aus der Skizze (${zahlText(v.flaeche)} m²) bleibt` : ''].filter(Boolean).join(' · '),
+        })),
+      ],
+      gleich: teil.bauteile.length - bt.length - erg.length,
     },
     {
       liste: 'beschreibung',
@@ -110,6 +139,12 @@ const neueId = (vorsatz: string) => `${vorsatz}-${Date.now()}-${(zaehler++).toSt
 /** Baujahr aus dem Alter laut Bau-Excel – wie die App das Alter rechnet (Wertjahr − Baujahr + 1). */
 const baujahrAusAlter = (alter: number | undefined, wertjahr: number): number | undefined => (alter && alter > 0 ? wertjahr - alter + 1 : undefined)
 
+/** Ein nur gezeichnetes Bauteil mit den Angaben aus der Excel; Kennung, Kürzel und Fläche/Maße aus der Skizze bleiben. */
+function ergaenztesBauteil(v: Bauteil, b: BauTeilBauteil, wertjahr: number): Bauteil {
+  const { id: _id, kuerzel: _k, flaeche, flaecheManuell, ...angaben } = neuesBauteil(b, [], wertjahr)
+  return { ...v, ...angaben, ...(v.flaeche > 0 ? {} : { flaeche, flaecheManuell }) }
+}
+
 function neuesBauteil(b: BauTeilBauteil, bisher: readonly Bauteil[], wertjahr: number): Bauteil {
   return {
     id: neueId('bt'),
@@ -135,14 +170,19 @@ function neuesBauteil(b: BauTeilBauteil, bisher: readonly Bauteil[], wertjahr: n
 }
 
 /** Hängt die gewählten Gruppen an; vorhandene Einträge bleiben unverändert. */
-export function uebernimmBau(wep: Wep, teil: BauTeil, listen: ReadonlySet<BauListe>): Wep {
-  const ab = new Map(pruefeBau(wep, teil).map((l) => [l.liste, l]))
+export function uebernimmBau(wepVorher: Wep, teil: BauTeil, listen: ReadonlySet<BauListe>): Wep {
+  const ab = new Map(pruefeBau(wepVorher, teil).map((l) => [l.liste, l]))
   const neu = (l: BauListe) => listen.has(l) && (ab.get(l)?.neu.length ?? 0) > 0
-  if (!BAU_LISTEN.some(neu)) return wep
+  if (!BAU_LISTEN.some(neu)) return wepVorher
+  const wep = uebernehmeGrundriss(wepVorher)
   const bau: BauDaten = wep.bau ?? neueBauDaten()
   const wertjahr = wertjahrVon(wep)
   let bauteile = bau.bauteile
-  if (neu('bauteile')) for (const b of fehlendeBauteile(wep, teil)) bauteile = [...bauteile, neuesBauteil(b, bauteile, wertjahr)]
+  if (neu('bauteile')) {
+    const ergaenzt = new Map(ergaenzbareBauteile(wep, teil).map(([v, b]) => [v.id, ergaenztesBauteil(v, b, wertjahr)]))
+    bauteile = bauteile.map((v) => ergaenzt.get(v.id) ?? v)
+    for (const b of fehlendeBauteile(wep, teil)) bauteile = [...bauteile, neuesBauteil(b, bauteile, wertjahr)]
+  }
   const beseitigung: BeseitigungsPosition[] = neu('beseitigung')
     ? [...bau.beseitigung, ...fehlendeBeseitigung(wep, teil).map((b): BeseitigungsPosition => ({ id: neueId('bes'), ...b }))]
     : bau.beseitigung

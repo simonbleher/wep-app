@@ -2,7 +2,7 @@
 // Beta 4, Paket 3: Grundriss → Bauteile (Fläche, Maße, Höhe, Kubatur fließen in die Bewertung). Erfundene Daten.
 import { describe, expect, it } from 'vitest'
 import { neuerWep, neueBauDaten, type Bauteil, type Wep } from '@/model'
-import { berechneBau, bauteileOhneGrundriss, bauteilMitGrundriss, hinweiseBau, kubaturVon, teileVon, uebernehmeGrundriss } from '..'
+import { berechneBau, bauteileOhneGrundriss, bauteilMitGrundriss, hinweiseBau, kubaturVon, nurGezeichnet, teileVon, uebernehmeGrundriss } from '..'
 import { neuesBauteil } from '@/app/bauHelfer'
 import { rechteckPunkte, type GrundrissDaten } from '@/skizze/grundriss'
 
@@ -54,6 +54,33 @@ describe('Grundriss → Bauteile', () => {
     expect(uebernehmeGrundriss(wep())).toEqual(wep()) // ohne Grundriss
     const ohneBau = neuerWep('x')
     expect(uebernehmeGrundriss({ ...ohneBau, grundriss })).toEqual({ ...ohneBau, grundriss })
+  })
+
+  it('Form gelöscht: Bauteil bleibt, verliert aber Fläche und Maße aus der Form (kein Phantom mehr)', () => {
+    const w1 = uebernehmeGrundriss({ ...wep(), grundriss })
+    expect(w1.bau!.bauteile.map((b) => b.flaeche)).toEqual([24, 6])
+    const w2 = uebernehmeGrundriss({ ...w1, grundriss: { teile: [grundriss.teile[2]] } })
+    expect(w2.bau!.bauteile.map((b) => [b.id, b.flaeche])).toEqual([['l1', 0], ['a1', 0]])
+    const l = w2.bau!.bauteile[0]
+    expect(l.baujahr).toBe(1998)
+    expect(l.ausGrundriss).toBeUndefined()
+    expect(l.laenge).toBeUndefined()
+    expect(l.kubaturM3).toBeUndefined()
+    expect(berechneBau(w2)!.laube!.flaeche).toBe(0)
+    expect(bauteileOhneGrundriss(w2).map((b) => b.id)).toEqual(['l1', 'a1'])
+    expect(uebernehmeGrundriss(w2)).toBe(w2)
+    // von Hand gesetzte Fläche (ausGrundriss false) bleibt auch ohne Form
+    const w3 = wep()
+    w3.bau!.bauteile[0] = { ...w3.bau!.bauteile[0], flaeche: 22.5, flaecheManuell: true, ausGrundriss: false }
+    expect(uebernehmeGrundriss({ ...w3, grundriss: { teile: [] } }).bau!.bauteile[0].flaeche).toBe(22.5)
+  })
+
+  it('nurGezeichnet: Voreinstellungen zählen nicht, jede eigene Angabe schon', () => {
+    expect(nurGezeichnet(neuesBauteil('gewaechshaus', []))).toBe(true)
+    expect(nurGezeichnet(neuesBauteil('keller', []))).toBe(true)
+    expect(nurGezeichnet({ ...neuesBauteil('gewaechshaus', []), nhk: 120 })).toBe(false)
+    expect(nurGezeichnet({ ...neuesBauteil('laube', []), typ: 'Stein 10,00 - 12,00 cm' })).toBe(false)
+    expect(nurGezeichnet({ ...neuesBauteil('laube', []), maengel: [{ gruppe: 'dach', maengel: [], abzug: 5, begruendung: '' }] })).toBe(false)
   })
 
   it('der Wertermittler kann überschreiben: ausGrundriss=false schützt die Handeingabe', () => {
