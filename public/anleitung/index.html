@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Anleitung WEP-App</title>
+<style>
+  :root {
+    --gruen: #2e6640;
+    --gruen-dunkel: #234f31;
+    --gruen-hell: #e7efe9;
+    --text: #1d1f1e;
+    --text-2: #5a605c;
+    --linie: #d9ddd9;
+    --hinweis: #fff6e0;
+    --hinweis-rand: #e0b84a;
+    --flaeche: #ffffff;
+    --grund: #f6f7f5;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--grund);
+    color: var(--text);
+    font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  main { max-width: 860px; margin: 0 auto; padding: 0 16px 48px; }
+  .zurueck {
+    display: block;
+    background: var(--gruen-dunkel);
+    color: #fff;
+    padding: 10px 16px;
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .titel {
+    background: var(--gruen);
+    color: #fff;
+    padding: 48px 24px 40px;
+    text-align: center;
+  }
+  .titel h1 { margin: 0 0 6px; font-size: 34px; letter-spacing: -0.5px; }
+  .titel p { margin: 0; font-size: 17px; opacity: 0.92; }
+  .titel .stand { margin-top: 14px; font-size: 13px; opacity: 0.8; }
+  nav.inhalt {
+    background: var(--flaeche);
+    border: 1px solid var(--linie);
+    border-radius: 14px;
+    padding: 18px 22px;
+    margin: 24px 0;
+  }
+  nav.inhalt h2 { margin: 0 0 8px; font-size: 18px; }
+  nav.inhalt ol { margin: 0; padding-left: 22px; columns: 2; column-gap: 32px; }
+  nav.inhalt li { margin: 3px 0; break-inside: avoid; }
+  nav.inhalt a { color: var(--gruen); text-decoration: none; }
+  section.kapitel {
+    background: var(--flaeche);
+    border: 1px solid var(--linie);
+    border-radius: 14px;
+    padding: 22px 24px;
+    margin: 20px 0;
+  }
+  section.kapitel > h2 {
+    margin: 0 0 4px;
+    font-size: 23px;
+    color: var(--gruen-dunkel);
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+  }
+  .nr {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 30px;
+    height: 30px;
+    border-radius: 15px;
+    background: var(--gruen);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+  }
+  .unter { color: var(--text-2); margin: 0 0 14px; }
+  h3 { font-size: 17px; margin: 18px 0 6px; }
+  .schritt { display: grid; grid-template-columns: 1fr 210px; gap: 22px; align-items: start; margin: 14px 0; }
+  .schritt.ohne-bild { grid-template-columns: 1fr; }
+  .schritt figure { margin: 0; }
+  .schritt img {
+    width: 100%;
+    border: 1px solid var(--linie);
+    border-radius: 18px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+    background: #fff;
+  }
+  figcaption { font-size: 12.5px; color: var(--text-2); text-align: center; margin-top: 6px; }
+  ol.schritte, ul.punkte { margin: 6px 0; padding-left: 22px; }
+  ol.schritte li, ul.punkte li { margin: 5px 0; }
+  .knopf {
+    display: inline-block;
+    padding: 0 7px;
+    border: 1px solid var(--gruen);
+    border-radius: 6px;
+    color: var(--gruen-dunkel);
+    font-weight: 600;
+    font-size: 0.92em;
+    white-space: nowrap;
+  }
+  .tipp, .achtung {
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin: 12px 0;
+    font-size: 15px;
+  }
+  .tipp { background: var(--gruen-hell); border-left: 4px solid var(--gruen); }
+  .achtung { background: var(--hinweis); border-left: 4px solid var(--hinweis-rand); }
+  .tipp b:first-child, .achtung b:first-child { margin-right: 4px; }
+  .ablauf { display: flex; gap: 8px; flex-wrap: wrap; align-items: stretch; margin: 12px 0 4px; }
+  .ablauf div {
+    flex: 1 1 150px;
+    background: var(--gruen-hell);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 14.5px;
+  }
+  .ablauf div b { display: block; color: var(--gruen-dunkel); }
+  dl.fragen dt { font-weight: 700; margin-top: 12px; }
+  dl.fragen dd { margin: 3px 0 0; color: var(--text); }
+  footer { text-align: center; color: var(--text-2); font-size: 13px; margin-top: 28px; }
+  @media (max-width: 640px) {
+    .titel h1 { font-size: 28px; }
+    nav.inhalt ol { columns: 1; }
+    .schritt { grid-template-columns: 1fr; }
+    .schritt figure { max-width: 260px; margin: 0 auto; }
+    section.kapitel { padding: 18px 16px; }
+  }
+  @media print {
+    @page { size: A4; margin: 14mm 14mm 16mm; }
+    body { background: #fff; font-size: 10.5pt; }
+    main { max-width: none; padding: 0; }
+    .titel { padding: 26mm 10mm 18mm; border-radius: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .titel h1 { font-size: 30pt; }
+    nav.inhalt { break-after: page; }
+    section.kapitel { border: none; padding: 0; margin: 0 0 8mm; break-inside: auto; }
+    section.kapitel > h2 { break-after: avoid; }
+    .schritt { grid-template-columns: 1fr 48mm; break-inside: avoid; }
+    .schritt img { box-shadow: none; }
+    .tipp, .achtung, .ablauf div, .nr, .knopf { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    a { color: inherit; text-decoration: none; }
+    .nur-bildschirm { display: none; }
+  }
+</style>
+</head>
+<body>
+<a class="zurueck nur-bildschirm" href="../">‹ Zurück zur App</a>
+<header class="titel">
+  <h1>WEP-App</h1>
+  <p>Anleitung für Wertermittler im Bezirksverband Pankow</p>
+  <p class="stand">Stand Oktober 2026 · Alle Namen und Daten in den Bildern sind erfunden.</p>
+</header>
+<main>
+
+<nav class="inhalt" aria-label="Inhalt">
+  <h2>Inhalt</h2>
+  <ol>
+    <li><a href="#ueberblick">Überblick und Ablauf</a></li>
+    <li><a href="#start">Start und Profil</a></li>
+    <li><a href="#neu">Neues WEP und Formalien</a></li>
+    <li><a href="#gruen">Außenanlagen, Aufwuchs, Beseitigung</a></li>
+    <li><a href="#bau">Baulichkeiten und Mängel</a></li>
+    <li><a href="#skizze">Parzelle und Skizzen</a></li>
+    <li><a href="#fotos">Fotos</a></li>
+    <li><a href="#uebergabe">Übergabe Bau → Grün</a></li>
+    <li><a href="#abgabe">PDF und „An den BV senden“</a></li>
+    <li><a href="#offline">Ohne Netz, Abgleich, Sicherheit</a></li>
+    <li><a href="#fragen">Häufige Fragen</a></li>
+  </ol>
+</nav>
+
+<section class="kapitel" id="ueberblick">
+  <h2><span class="nr">1</span> Überblick und Ablauf</h2>
+  <p class="unter">Die WEP-App ersetzt die Excel-Vorlage: Sie erfassen das Wertermittlungsprotokoll direkt auf der Parzelle – auf dem Handy, Tablet oder am Windows-PC, auch ohne Netz.</p>
+  <div class="ablauf">
+    <div><b>1. Bau</b>Der Bau-Wertermittler legt das WEP an und erfasst Baulichkeiten, Mängel, Abwasser und Skizze Bau.</div>
+    <div><b>2. Übergabe</b>Er schickt die WEP-Datei an den Grün-Wertermittler (siehe Kapitel 8).</div>
+    <div><b>3. Grün</b>Der Grün-Wertermittler erfasst Außenanlagen, Aufwuchs, Beseitigung, Skizze und Fotos.</div>
+    <div><b>4. Abgabe</b>Fertiges WEP als Paket „An den BV senden“ und in den Synology-Ordner legen.</div>
+  </div>
+  <div class="tipp"><b>Grundsatz:</b> Die App schlägt Preise nach der Wertermittlungsrichtlinie vor (Höchstwert × Zustand). Sie können jeden Wert überschreiben. Regelverstöße (z. B. Hecke zu hoch, invasive Art) zeigt die App als Hinweis an – sie sperrt nie etwas. Prüfen Sie jedes Ergebnis, bevor Sie es abgeben.</div>
+</section>
+
+<section class="kapitel" id="start">
+  <h2><span class="nr">2</span> Start und Profil</h2>
+  <p class="unter">Einmal einrichten, dann gilt es für alle neuen WEPs.</p>
+  <div class="schritt">
+    <div>
+      <h3>App öffnen und anmelden</h3>
+      <ol class="schritte">
+        <li>Öffnen Sie die App (Android-App, Windows-Programm oder im Browser <i>wep-pankow.pages.dev</i>). Im Browser können Sie sie über „Zum Startbildschirm hinzufügen“ wie eine App installieren.</li>
+        <li><span class="knopf">Mit Microsoft anmelden</span>, wenn Ihre Protokolle über OneDrive auf alle Ihre Geräte kommen sollen.</li>
+        <li>Oder <span class="knopf">Ohne Konto fortfahren</span> – dann bleibt alles nur auf diesem Gerät.</li>
+      </ol>
+    </div>
+    <figure><img src="bilder/01-anmelden.jpg" alt="Anmeldebildschirm mit „Mit Microsoft anmelden“ und „Ohne Konto fortfahren“"><figcaption>Anmelden</figcaption></figure>
+  </div>
+  <div class="schritt">
+    <div>
+      <h3>Profil ausfüllen</h3>
+      <p>Tippen Sie oben auf das Personen-Symbol (<i>Profil und Einstellungen</i>):</p>
+      <ul class="punkte">
+        <li><b>Name</b> – steht in jedem neuen WEP als Wertermittler.</li>
+        <li><b>Rolle</b> – Grün, Bau oder beides. Sie bestimmt, welche Reiter Sie sehen.</li>
+        <li><b>Standard-Kleingartenanlage</b> – wird in neuen WEPs vorbelegt (Auswahlliste aller Anlagen des BV).</li>
+        <li><b>Meine Unterschrift</b> – zeichnen oder als Bild hochladen; sie kommt nur ins PDF, wenn Sie es beim Erzeugen bestätigen.</li>
+        <li><b>Eigene Positionen</b> – Freitext-Positionen, die Sie sich gemerkt haben (aufklappbar).</li>
+      </ul>
+    </div>
+    <figure><img src="bilder/02-profil.jpg" alt="Profil mit Name, Rolle und Standard-Kleingartenanlage"><figcaption>Profil</figcaption></figure>
+  </div>
+  <div class="schritt">
+    <div>
+      <h3>Dieses Gerät</h3>
+      <ul class="punkte">
+        <li><b>Upload nur über WLAN</b> spart mobile Daten (Fotos und Hintergrund-Upload).</li>
+        <li><b>Sonnen-Kontrast</b>: kräftigere Farben und größere Schrift für draußen.</li>
+        <li><b>Ohne Excel arbeiten</b> ist standardmäßig an. Die Excel-Funktionen sind dann ausgeblendet; das Protokoll entsteht als PDF.</li>
+      </ul>
+    </div>
+    <figure><img src="bilder/03-profil-geraet.jpg" alt="Einstellungen „Dieses Gerät“"><figcaption>Einstellungen dieses Geräts</figcaption></figure>
+  </div>
+</section>
+
+<section class="kapitel" id="neu">
+  <h2><span class="nr">3</span> Neues WEP und Formalien</h2>
+  <p class="unter">Jedes WEP trägt die Vorgangs-Nr. des BV.</p>
+  <div class="schritt">
+    <div>
+      <h3>Die Protokoll-Liste</h3>
+      <p>Auf der Startseite sehen Sie alle Protokolle mit Anlage, Parzelle, Vorgangs-Nr., Teil (Grün/Bau) und Status. Suchen Sie nach Nummer, Anlage, Parzelle oder Pächter; filtern Sie nach Status oder sortieren Sie nach Nummer.</p>
+      <p>Fehlt bei einem WEP noch die Vorgangs-Nr., steht dort „Vorgangs-Nr. fehlt“.</p>
+    </div>
+    <figure><img src="bilder/04-liste.jpg" alt="Liste der Protokolle"><figcaption>Startseite</figcaption></figure>
+  </div>
+  <div class="schritt">
+    <div>
+      <h3>Neues WEP anlegen</h3>
+      <ol class="schritte">
+        <li>Tippen Sie auf <span class="knopf">Neues WEP</span>.</li>
+        <li>Tragen Sie die <b>Vorgangs-Nr. vom BV</b> ein und tippen Sie auf <span class="knopf">Anlegen</span>.</li>
+        <li>Kennen Sie die Nummer noch nicht (z. B. auf der Parzelle ohne Netz), tippen Sie auf <span class="knopf">Nummer noch nicht bekannt</span>. Tragen Sie sie später unter „Formalien“ nach – die App erinnert Sie daran.</li>
+      </ol>
+      <div class="achtung"><b>Doppelt?</b> Gibt es die Nummer auf Ihrem Gerät schon, zeigt die App einen Hinweis mit Anlage und Parzelle. Prüfen Sie dann, ob Sie das richtige WEP bearbeiten.</div>
+    </div>
+    <figure><img src="bilder/05-neues-wep.jpg" alt="Dialog „Neues WEP“ mit Vorgangs-Nr."><figcaption>Vorgangs-Nr. eingeben</figcaption></figure>
+  </div>
+  <div class="schritt">
+    <div>
+      <h3>Formalien</h3>
+      <p>Hier stehen Vorgangs-Nr., Kleingartenanlage (Auswahlliste, „Andere …“ für eine eigene Eingabe), Parzelle, Weg, Fläche, Beteiligte und Termine. Name und Anlage aus dem Profil sind schon eingetragen.</p>
+      <p>Unten unter „Bearbeiteter Teil“ können Sie in Sonderfällen ein WEP auch als Grün <i>und</i> Bau bearbeiten.</p>
+    </div>
+    <figure><img src="bilder/06-formalien.jpg" alt="Formalien"><figcaption>Formalien</figcaption></figure>
+  </div>
+</section>
+
+<section class="kapitel" id="gruen">
+  <h2><span class="nr">4</span> Außenanlagen, Aufwuchs, Beseitigung</h2>
+  <p class="unter">Positionen aus dem Katalog der Richtlinie – oder als Freitext.</p>
+  <div class="schritt">
+    <div>
+      <h3>Liste der Positionen</h3>
+      <p>Jeder Reiter (Außenanlagen, Aufwuchs, Beseitigung Grün) zeigt die Positionen mit Menge, Zustand, Einzel- und Gesamtpreis und unten die Summe. Tippen Sie eine Position an, um sie zu ändern.</p>
+      <p>Hinweise der Richtlinie erscheinen rot direkt an der Position, z. B. bei invasiven Arten oder Problempflanzen – mit dem Knopf <span class="knopf">Zur Beseitigung</span> legen Sie die passende Beseitigung gleich an.</p>
+    </div>
+    <figure><img src="bilder/08-aufwuchs.jpg" alt="Aufwuchs mit Positionen und Hinweis"><figcaption>Aufwuchs</figcaption></figure>
+  </div>
+  <div class="schritt">
+    <div>
+      <h3>Position hinzufügen</h3>
+      <ol class="schritte">
+        <li><span class="knopf">+ Hinzufügen</span> und einen Suchbegriff eingeben, z. B. „apfel“.</li>
+        <li>Die passende Variante antippen (Wuchsform, Alter). Rechts steht der Höchstwert („bis …&nbsp;€“).</li>
+        <li>Findet die Suche nichts, legen Sie die Position als Freitext an und können sie als <i>eigene Position</i> merken.</li>
+      </ol>
+    </div>
+    <figure><img src="bilder/09-suche.jpg" alt="Katalogsuche"><figcaption>Katalog durchsuchen</figcaption></figure>
+  </div>
+  <div class="schritt">
+    <div>
+      <h3>Menge, Zustand, Preis</h3>
+      <ol class="schritte">
+        <li><b>Anzahl</b> und <b>Einheit</b> eintragen.</li>
+        <li><b>Zustand</b> wählen. Der Preisvorschlag ist Höchstwert × Zustand (sehr gut 100 %, gut 75 %, mittel 50 %, schlecht = Erinnerungswert 1&nbsp;€).</li>
+        <li>Mit <span class="knopf">Überschreiben</span> setzen Sie einen eigenen Preis; er ist dann als „manuell“ markiert.</li>
+        <li><span class="knopf">Hinzufügen</span> speichert die Position.</li>
+      </ol>
+    </div>
+    <figure><img src="bilder/10-position.jpg" alt="Position mit Zustand und Preisvorschlag"><figcaption>Preisvorschlag</figcaption></figure>
+  </div>
+  <div class="schritt">
+    <div>
+      <h3>Außenanlagen und Beseitigung</h3>
+      <p>Außenanlagen (Zäune, Wege, Kompost, Türen …) funktionieren genauso. Unter <b>Beseitigung Grün</b> erfassen Sie zu entfernende Pflanzen und Anlagen mit Menge, Einzelpreis und Faktor; bei einem Faktor über 100 % geben Sie eine Begründung an.</p>
+      <div class="tipp"><b>Hinweis:</b> Bäume und Gehölze dürfen vom 1. März bis 30. September nicht entfernt werden (Naturschutz). Das steht auch im Protokoll.</div>
+    </div>
+    <figure><img src="bilder/11-aussenanlagen.jpg" alt="Außenanlagen mit Summe"><figcaption>Außenanlagen</figcaption></figure>
+  </div>
+</section>
+
+<section class="kapitel" id="bau">
+  <h2><span class="nr">5</span> Baulichkeiten und Mängel</h2>
+  <p class="unter">Für den Bau-Wertermittler (Rolle Bau oder beides).</p>
+  <div class="schritt">
+    <div>
+      <h3>Baulichkeiten</h3>
+      <ul class="punkte">
+        <li><span class="knopf">+ Bauteil</span>: Laube, Anbau, Schuppen, Gewächshaus, Laubenvorplatz oder Keller.</li>
+        <li>Je Bauteil: Außenmaße bzw. Fläche, Baujahr mit Quelle, Material und Wanddicke (daraus die Bauklasse), Restnutzungsjahre.</li>
+        <li>Die App rechnet NHK, Mängel- und Altersabzug und Baupreisindex wie die Vorlage. Schuppen und Unterstände werden nicht bewertet, wenn es eine Laube gibt.</li>
+        <li>Abwasser (Grube oder Kanal) und Beseitigung Bau haben eigene Reiter.</li>
+      </ul>
+    </div>
+    <figure><img src="bilder/13-baulichkeiten.jpg" alt="Baulichkeiten mit Laube und Anbau"><figcaption>Baulichkeiten</figcaption></figure>
+  </div>
+  <div class="schritt">
+    <div>
+      <h3>Mängel</h3>
+      <p>Wählen Sie oben das Bauteil. Je Gruppe der Mängeltabelle (Dach, Decken, Wände …) kreuzen Sie die festgestellten Mängel an und setzen den Abzug (höchstens der Wert in Klammern). Die App zieht den Gesamtabzug von den Normalherstellungskosten ab.</p>
+    </div>
+    <figure><img src="bilder/14-maengel.jpg" alt="Mängel je Gruppe"><figcaption>Mängel</figcaption></figure>
+  </div>
+</section>
+
+<section class="kapitel" id="skizze">
+  <h2><span class="nr">6</span> Parzelle und Skizzen</h2>
+  <p class="unter">Beide Skizzen nutzen denselben Maßstab: 1 Kästchen = 1 m.</p>
+  <div class="schritt">
+    <div>
+      <h3>Parzelle anlegen</h3>
+      <p>Unter <b>Skizze</b> (bzw. Skizze Bau) legen Sie die Parzelle an: rechteckig mit Länge × Breite oder als freie Form (Ecken zeichnen, Seiten eintippen). Die App berechnet die Fläche und weist auf eine Abweichung zur Vertragsfläche hin.</p>
+    </div>
+    <figure><img src="bilder/07-parzelle.jpg" alt="Parzelle 26 × 18 m"><figcaption>Parzelle</figcaption></figure>
+  </div>
+  <div class="schritt">
+    <div>
+      <h3>Skizze Bau (Grundriss)</h3>
+      <p>Der Bau-Wertermittler zeichnet die Bauteile als Rechteck oder Vieleck und tippt die Kantenlängen ein. Die Flächen und die Kubatur gehen direkt in die Bewertung; darunter steht die Massenberechnung.</p>
+    </div>
+    <figure><img src="bilder/15-skizze-bau.jpg" alt="Grundriss mit Laube, Anbau, Keller"><figcaption>Skizze Bau</figcaption></figure>
+  </div>
+  <div class="schritt">
+    <div>
+      <h3>Skizze Außenanlagen &amp; Aufwuchs</h3>
+      <ol class="schritte">
+        <li><span class="knopf">Aus Bau-Teil übernehmen</span> legt den Grundriss als gesperrte Grundlage unter die Skizze.</li>
+        <li>Mit den Werkzeugen zeichnen Sie Rechteck, Linie, Kreis, Text, Maßangabe und Symbole (Baum, Hecke, Beet, Kompost …).</li>
+        <li>Antippen wählt aus, Ziehen verschiebt. Rückgängig/Wiederholen oben in der Leiste.</li>
+      </ol>
+    </div>
+    <figure><img src="bilder/16-skizze-gruen.jpg" alt="Grün-Skizze mit Bäumen, Hecke, Weg"><figcaption>Skizze Grün</figcaption></figure>
+  </div>
+</section>
+
+<section class="kapitel" id="fotos">
+  <h2><span class="nr">7</span> Fotos</h2>
+  <div class="schritt">
+    <div>
+      <p><span class="knopf">Foto aufnehmen</span> oder <span class="knopf">Aus Galerie</span>. Fotos können zur ganzen Parzelle gehören oder einer Position zugeordnet werden (z. B. ein Mangel an der Laube). Sie werden verkleinert gespeichert, mit Ihren Geräten abgeglichen und kommen auf Wunsch ins PDF und in das Paket für den BV.</p>
+    </div>
+    <figure><img src="bilder/17-fotos.jpg" alt="Fotos"><figcaption>Fotos</figcaption></figure>
+  </div>
+</section>
+
+<section class="kapitel" id="uebergabe">
+  <h2><span class="nr">8</span> Übergabe Bau → Grün</h2>
+  <p class="unter">Das WEP wandert als Datei vom Bau- zum Grün-Wertermittler.</p>
+  <div class="schritt">
+    <div>
+      <h3>Teilen (Bau-Wertermittler)</h3>
+      <ol class="schritte">
+        <li>Im WEP oben auf <span class="knopf">⋯</span> und <span class="knopf">Teilen …</span>.</li>
+        <li>Wählen Sie, ob Fotos mitgehen, und schicken Sie die <b>.wep-Datei</b> per Messenger oder E-Mail – oder speichern Sie sie.</li>
+      </ol>
+      <h3>Öffnen (Grün-Wertermittler)</h3>
+      <ol class="schritte">
+        <li>Die Datei antippen („Öffnen mit WEP“) oder auf der Startseite <span class="knopf">WEP-Datei öffnen</span>.</li>
+        <li>Die App zeigt, was neu ist und was abweicht, und Sie wählen je Teil, was übernommen wird. Nichts wird still überschrieben.</li>
+      </ol>
+      <div class="achtung"><b>Datenschutz:</b> Die Datei enthält Personendaten. Geben Sie sie nur an Personen weiter, die das WEP bearbeiten oder prüfen dürfen.</div>
+    </div>
+    <figure><img src="bilder/21-teilen.jpg" alt="Dialog WEP teilen"><figcaption>WEP teilen</figcaption></figure>
+  </div>
+</section>
+
+<section class="kapitel" id="abgabe">
+  <h2><span class="nr">9</span> PDF und „An den BV senden“</h2>
+  <p class="unter">Oben rechts im WEP: <span class="knopf">Export</span>.</p>
+  <div class="schritt">
+    <div>
+      <h3>PDF erzeugen</h3>
+      <ul class="punkte">
+        <li><b>PDF übersichtlich</b>: gut lesbares Protokoll mit Rechenweg.</li>
+        <li><b>PDF wie Vorlage</b>: sieht aus wie die Blätter der BV-Vorlage.</li>
+        <li>Optional mit Fotos als Anhang und mit Ihrer Unterschrift.</li>
+      </ul>
+      <p>Danach steht das WEP auf „exportiert“ (im Menü <span class="knopf">⋯</span> zurücksetzbar).</p>
+    </div>
+    <figure><img src="bilder/18-export-pdf.jpg" alt="Export als PDF"><figcaption>Export als PDF</figcaption></figure>
+  </div>
+  <div class="schritt">
+    <div>
+      <h3>An den BV senden</h3>
+      <ol class="schritte">
+        <li><span class="knopf">Paket für den BV erstellen</span>: Die App packt beide PDFs, die WEP-Datei und alle Fotos in <b>eine ZIP-Datei</b> mit der Vorgangs-Nr. im Namen.</li>
+        <li><span class="knopf">Teilen …</span> direkt in die <b>Synology-Drive-App</b> – oder <span class="knopf">Speichern</span> und die Datei in den <b>Synology-Ordner des BV</b> legen.</li>
+        <li>Die Geschäftsstelle kümmert sich um den Rest. Am WEP steht danach „an BV gesendet“ mit Datum.</li>
+      </ol>
+      <div class="achtung"><b>Vor dem Senden:</b> Ist die Vorgangs-Nr. eingetragen? Die App erinnert Sie, wenn sie fehlt.</div>
+    </div>
+    <figure><img src="bilder/19-an-bv.jpg" alt="Paket für den BV erstellt"><figcaption>An den BV senden</figcaption></figure>
+  </div>
+</section>
+
+<section class="kapitel" id="offline">
+  <h2><span class="nr">10</span> Ohne Netz, Abgleich, Sicherheit</h2>
+  <div class="schritt ohne-bild">
+    <div>
+      <ul class="punkte">
+        <li><b>Ohne Netz</b> funktioniert alles: Erfassen, Skizzen, Fotos, PDF. Die Daten liegen auf dem Gerät.</li>
+        <li><b>Abgleich</b>: Mit Microsoft-Konto gleicht die App automatisch mit Ihrem OneDrive ab, sobald Netz da ist (Ordner „Apps/WEP-App“). Die Zeile auf der Startseite zeigt den Stand.</li>
+        <li><b>Zwei Geräte gleichzeitig geändert?</b> Die neuere Fassung gilt, die andere bleibt als Kopie erhalten; die App zeigt einen Hinweis zum Entscheiden.</li>
+        <li><b>Papierkorb</b>: Gelöschte WEPs liegen 30 Tage im Papierkorb und lassen sich wiederherstellen.</li>
+        <li><b>Sicherung</b>: Unter Profil → Sicherung erstellen Sie eine Datei mit allen WEPs (z. B. vor einem Gerätewechsel).</li>
+        <li><b>Neueste Version</b>: Die App aktualisiert sich selbst, wenn eine neue Version freigegeben ist.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="kapitel" id="fragen">
+  <h2><span class="nr">11</span> Häufige Fragen</h2>
+  <dl class="fragen">
+    <dt>Ich finde eine Pflanze nicht im Katalog.</dt>
+    <dd>Legen Sie sie als Freitext an (Bezeichnung, Menge, Preis) und merken Sie sie als eigene Position – beim nächsten Mal finden Sie sie in der Suche.</dd>
+    <dt>Der Preisvorschlag passt nicht.</dt>
+    <dd>Mit „Überschreiben“ setzen Sie Ihren Preis. Er ist als „manuell“ markiert; der Höchstwert bleibt als Orientierung sichtbar.</dd>
+    <dt>Die App zeigt eine rote Warnung.</dt>
+    <dd>Das ist ein Hinweis der Richtlinie (z. B. invasive Art, Hecke zu hoch, Rasen über 100 m²). Sie können trotzdem weiterarbeiten; prüfen Sie den Fall und tragen Sie ggf. eine Beseitigung ein.</dd>
+    <dt>Die Vorgangs-Nr. kenne ich noch nicht.</dt>
+    <dd>„Nummer noch nicht bekannt“ wählen und später unter „Formalien“ eintragen. Vor dem Senden an den BV sollte sie stehen.</dd>
+    <dt>Ich habe ein neues Handy.</dt>
+    <dd>Mit Microsoft-Konto anmelden – Ihre WEPs kommen aus OneDrive. Ohne Konto vorher unter Profil → Sicherung eine Datei erstellen und auf dem neuen Gerät einspielen.</dd>
+    <dt>Wem melde ich einen Fehler?</dt>
+    <dd>Beschreiben Sie, was Sie getan haben und was passiert ist, gern mit Bildschirmfoto. Bitte ohne echte Namen und Anschriften – Beispieldateien vorher anonymisieren.</dd>
+  </dl>
+</section>
+
+<footer>WEP-App · Wertermittlungsprotokoll für den Bezirksverband Pankow</footer>
+</main>
+</body>
+</html>

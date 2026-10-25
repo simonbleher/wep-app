@@ -117,7 +117,9 @@ export default defineConfig({
       },
       workbox: {
         // Offline-Precaching aller gebauten Assets
-        globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest,xlsx}'],
+        globPatterns: ['**/*.{js,css,html,svg,png,jpg,ico,webmanifest,xlsx}'],
+        // Die Anleitung (public/anleitung/) ist eine eigene Seite, nicht die App
+        navigateFallbackDenylist: [/^\/anleitung\//],
       },
     }),
   ],

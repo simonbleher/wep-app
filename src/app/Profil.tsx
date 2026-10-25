@@ -1,7 +1,7 @@
 // Profil und Einstellungen: Name, Rolle, Standard-Anlage (werden über OneDrive
 // abgeglichen), Geräte-Einstellungen (nur lokal), Konto, App-Version, Speicherort.
 import { useEffect, useId, useRef, useState } from 'react'
-import { ChevronLeft } from 'lucide-react'
+import { BookOpen, ChevronLeft } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
 import type { Konto } from '@/konto'
 import {
@@ -89,6 +89,12 @@ export function Profil({ konto, verfuegbar, onZurueck, onAnmelden, onAbmelden }:
         <header className="seitenkopf">
           <h1 className="h1">Profil und Einstellungen</h1>
         </header>
+        {/* Anleitung liegt als eigene Seite unter public/anleitung/ (auch offline, siehe vite.config.ts). Gleiches Fenster,
+            damit es auch in der Android- und Windows-App funktioniert; dort führt „Zurück zur App“ hierher zurück. */}
+        <a className="knopf knopf-breit" href={`${import.meta.env.BASE_URL}anleitung/index.html`} style={{ marginBottom: 24, color: 'inherit', textDecoration: 'none' }}>
+          <BookOpen {...ICON} />
+          Anleitung
+        </a>
 
         <section className="abschnitt" aria-labelledby={`${id}-wm`}>
           <h2 className="gruppenkopf" id={`${id}-wm`}>

@@ -320,3 +320,11 @@
 - **Grund:** Sofort nutzbar ohne Einrichtung am NAS und ohne Zugangsdaten in der App; ersetzt das Verschicken per E-Mail. Die Geschäftsstelle bekommt alles in einer Datei mit der Vorgangs-Nr. im Namen. Fotos liegen als JPG bei (nicht doppelt in der WEP-Datei), damit sie ohne App ansehbar sind.
 - **Beide PDFs**, bis der BV sich für eine Form entschieden hat; dann wird die andere abgeschaltet.
 - **Stufe B (später):** Hochladen direkt aus der App über eine Cloudflare-Funktion mit einem NAS-Benutzer, der nur in einen Eingangsordner schreiben darf, persönliche Zugangscodes je Wertermittler und eine Eingangs-Ansicht für die Geschäftsstelle – sobald der BV die nötigen Angaben geliefert hat.
+
+## 2026-10-25 · Anleitung als HTML-Seite und PDF aus einer Quelle
+
+- **Entscheidung:** Die Anleitung ist eine HTML-Datei (`docs/anleitung/anleitung.html`) mit Druck-CSS. Daraus entstehen die Seite in der App (`public/anleitung/`, im Service Worker vorgeladen, also offline) und das PDF (Chromium, A4). Die Bildschirmfotos erzeugt ein Skript mit erfundenen Beispieldaten aus der echten App.
+- **Grund:** Eine Quelle für beide Fassungen; nach Änderungen an der Oberfläche macht `npm run anleitung` Bilder und PDF neu, statt sie von Hand nachzuziehen. Keine echten Personendaten in den Bildern.
+- **Gleiches Fenster statt neuem Tab:** In der Android- und Windows-App gibt es keine Tabs; die Anleitung hat oben „Zurück zur App“.
+- **Anrede „Sie“:** Die Anleitung ist ein Dokument zum Weitergeben im BV; die App selbst bleibt beim „du“.
+- Eingecheckt sind die verkleinerten JPGs (≈1,5 MB) und das PDF, nicht die PNG-Rohfotos.

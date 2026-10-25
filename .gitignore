@@ -20,3 +20,5 @@ dist-e2e/
 pruefbericht.*
 __pycache__/
 .pytest_cache/
+# Bildschirmfotos der Anleitung (Quelle, 2× Handy); npm run anleitung erzeugt sie neu, eingecheckt sind die JPGs in public/anleitung/
+/docs/anleitung/bilder/
