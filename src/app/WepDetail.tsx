@@ -36,6 +36,7 @@ import {
   Trash2,
   type LucideIcon,
   ClipboardList,
+  Send,
 } from 'lucide-react'
 import { TeilenDialog } from './TeilenDialog'
 import { Uebersicht } from './Uebersicht'
@@ -52,7 +53,7 @@ import { FELD_NAMEN } from '@/bauexcel/abgleich'
 import { KgaAuswahl } from './KgaAuswahl'
 import { VorgangsNrFeld } from './VorgangsNr'
 import { AnBvSenden } from './AnBvSenden'
-import { useOhneExcel } from './ohneExcel'
+import { useOhneExcel, usePdfExport } from './ohneExcel'
 import { BauExcelBereich, useBauNachladen, useBauStand, type BauNachladeStand, type BauStand } from './BauExcel'
 import { ladeExportQuelle } from './exportQuelle'
 import { PdfBereich } from './PdfExport'
@@ -381,7 +382,7 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
           })}
         </nav>
         <nav className="sl-nav sl-trenner">
-          <SlEintrag icon={ohneExcel ? FileText : FileSpreadsheet} text={ohneExcel ? 'Export (PDF)' : 'Export als Excel'} aktiv={tab === 'export'} onClick={() => wechsle('export')} />
+          <SlEintrag icon={ohneExcel ? Send : FileSpreadsheet} text={ohneExcel ? 'An den BV senden' : 'Export'} aktiv={tab === 'export'} onClick={() => wechsle('export')} />
         </nav>
       </aside>
 
@@ -491,7 +492,7 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
                     aria-current={tab === 'export' ? 'page' : undefined}
                     onClick={() => wechsle('export')}
                   >
-                    Export
+                    {ohneExcel ? 'An den BV' : 'Export'}
                   </button>
                   <WepMenue status={wepStatus(wep)} onStatus={(st) => void setzeStatus(st)} onDuplizieren={() => void duplizieren()} onTeilen={() => setTeilenOffen(true)} onLoeschen={() => setLoeschFrage(true)} />
                 </>
@@ -1008,6 +1009,7 @@ function ExportTab({
   // Ein Grün-WEP mit Bau-Daten wird mit beiden Teilen exportiert (Excel und PDF), sonst fehlte z. B. die Laube
   const rolle = exportRolle(wep, rolleWep)
   const ohneExcel = useOhneExcel()
+  const pdfExport = usePdfExport()
   // Nur Bau: eigener Export mit Bau-Blättern und Formalien, ohne Grün-Teil und ohne Bau-Excel
   const nurBau = rolle === 'bau'
   // Standard: Skizze als bearbeitbare Excel-Formen; Fallback: Bild (PNG)
@@ -1118,15 +1120,13 @@ function ExportTab({
   // Nach dem PDF gilt das WEP wie nach dem Excel-Export als „exportiert“ (im Menü „⋯“ zurücksetzbar)
   const pdfErstellt = () => aendere((w) => (w.status === 'exportiert' ? w : { ...w, status: 'exportiert' }))
 
-  // Ohne Excel (Standard): nur das PDF
+  // Standard: nur „An den BV senden“ (Drucken und PDF macht die BV-Kontrollseite). Excel und PDF nur über die
+  // Entwickleroptionen im Profil.
   if (ohneExcel) {
     return (
       <>
-        <header className="seitenkopf">
-          <h1 className="h1">Export</h1>
-        </header>
-        <PdfBereich wep={wep} rolle={rolle} profilIndex={profilIndex} onErstellt={pdfErstellt} />
         <AnBvSenden wep={wep} rolle={rolle} profilIndex={profilIndex} aendere={aendere} />
+        {pdfExport && <PdfBereich wep={wep} rolle={rolle} profilIndex={profilIndex} onErstellt={pdfErstellt} />}
       </>
     )
   }
@@ -1255,8 +1255,8 @@ function ExportTab({
         </div>
       )}
 
-      <PdfBereich wep={wep} rolle={rolle} profilIndex={profilIndex} onErstellt={pdfErstellt} />
-        <AnBvSenden wep={wep} rolle={rolle} profilIndex={profilIndex} aendere={aendere} />
+      {pdfExport && <PdfBereich wep={wep} rolle={rolle} profilIndex={profilIndex} onErstellt={pdfErstellt} />}
+      <AnBvSenden wep={wep} rolle={rolle} profilIndex={profilIndex} aendere={aendere} />
     </>
   )
 }

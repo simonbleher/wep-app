@@ -7,6 +7,7 @@ import { ladeGeraeteEinstellungen } from '@/profil'
 import { neuerWep } from '@/model'
 import { PdfBereich } from '../PdfExport'
 import { TeilenDialog } from '../TeilenDialog'
+import { AnBvSenden } from '../AnBvSenden'
 
 const render = (el: Parameters<typeof renderToStaticMarkup>[0]) => renderToStaticMarkup(el)
 
@@ -19,6 +20,15 @@ describe('Ohne Excel arbeiten', () => {
     const h = render(createElement(PdfBereich, { wep: neuerWep('2026-001'), rolle: 'gruen' }))
     expect(h).toContain('Export als PDF')
     expect(h).not.toContain('Excel')
+  })
+
+  it('PDF-Export ist standardmäßig aus (Notfall-Schalter); „An den BV senden“ ohne PDF und ohne Unterschrift', () => {
+    expect(ladeGeraeteEinstellungen().pdfExport).toBe(false)
+    const h = render(createElement(AnBvSenden, { wep: neuerWep('2026-001'), rolle: 'gruen', aendere: async () => {} }))
+    expect(h).toContain('An den BV senden')
+    expect(h).toContain('Kontrollseite')
+    expect(h).not.toContain('PDF')
+    expect(h).not.toContain('Unterschrift')
   })
 
   it('Teilen bietet keine Bau-Excel an', () => {

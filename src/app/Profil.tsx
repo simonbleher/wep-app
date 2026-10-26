@@ -40,6 +40,7 @@ export function Profil({ konto, verfuegbar, onZurueck, onAnmelden, onAbmelden }:
   const [nurWlan, setNurWlan] = useState(() => ladeGeraeteEinstellungen().nurWlan)
   const [sonne, setSonne] = useState(() => ladeGeraeteEinstellungen().sonnenKontrast)
   const [ohneExcel, setOhneExcel] = useState(() => ladeGeraeteEinstellungen().ohneExcel)
+  const [pdfExport, setPdfExport] = useState(() => ladeGeraeteEinstellungen().pdfExport)
   const nativ = Capacitor.isNativePlatform()
   // Android-App oder Windows-Programm: Selbst-Update (Anzeige, Knopf „Nach Update suchen“)
   const mitUpdate = hatSelbstUpdate()
@@ -189,26 +190,6 @@ export function Profil({ konto, verfuegbar, onZurueck, onAnmelden, onAbmelden }:
             </label>
           </div>
           <p className="neben">Kräftigere Linien und Texte und größere Schrift, damit alles im Freien bei Sonne lesbar bleibt. Gilt nur für dieses Gerät.</p>
-          <div>
-            <label className="schalter-zeile" htmlFor={`${id}-ohne-excel`}>
-              <span>Ohne Excel arbeiten</span>
-              <input
-                id={`${id}-ohne-excel`}
-                type="checkbox"
-                role="switch"
-                className="schalter"
-                checked={ohneExcel}
-                onChange={(e) => {
-                  setOhneExcel(e.target.checked)
-                  speichereGeraeteEinstellungen({ ohneExcel: e.target.checked })
-                }}
-              />
-            </label>
-          </div>
-          <p className="neben">
-            An (Standard): Alle Excel-Funktionen sind ausgeblendet – Excel-Export, Bau-Excel hinterlegen und übernehmen, „Neues WEP aus Bau-Excel“.
-            Das PDF bleibt. Bereits gespeicherte Daten und Bau-Excel-Dateien bleiben erhalten. Gilt nur für dieses Gerät.
-          </p>
         </section>
 
         <Sicherung id={`${id}-sicherung`} appVersion={__APP_VERSION__} />
@@ -291,6 +272,45 @@ export function Profil({ konto, verfuegbar, onZurueck, onAnmelden, onAbmelden }:
             </>
           )}
         </section>
+
+        <details className="details entwickler">
+          <summary>Entwickleroptionen</summary>
+          <p className="neben">Nur bei einem Ausfall (z. B. wenn die Kontrollseite des BV nicht erreichbar ist). Normalerweise bleiben beide Schalter aus. Gilt nur für dieses Gerät.</p>
+          <div>
+            <label className="schalter-zeile" htmlFor={`${id}-mit-excel`}>
+              <span>Mit Excel arbeiten</span>
+              <input
+                id={`${id}-mit-excel`}
+                type="checkbox"
+                role="switch"
+                className="schalter"
+                checked={!ohneExcel}
+                onChange={(e) => {
+                  setOhneExcel(!e.target.checked)
+                  speichereGeraeteEinstellungen({ ohneExcel: !e.target.checked })
+                }}
+              />
+            </label>
+          </div>
+          <p className="neben">Zeigt wieder Excel-Export, Bau-Excel hinterlegen und übernehmen und „Neues WEP aus Bau-Excel“. Gespeicherte Daten und Bau-Excel-Dateien bleiben in jedem Fall erhalten.</p>
+          <div>
+            <label className="schalter-zeile" htmlFor={`${id}-pdf`}>
+              <span>PDF-Export anzeigen</span>
+              <input
+                id={`${id}-pdf`}
+                type="checkbox"
+                role="switch"
+                className="schalter"
+                checked={pdfExport}
+                onChange={(e) => {
+                  setPdfExport(e.target.checked)
+                  speichereGeraeteEinstellungen({ pdfExport: e.target.checked })
+                }}
+              />
+            </label>
+          </div>
+          <p className="neben">Zeigt im Reiter „An den BV senden“ wieder „PDF übersichtlich“ und „PDF wie Vorlage“ und legt beide PDFs mit ins Paket für den BV.</p>
+        </details>
       </main>
     </div>
   )

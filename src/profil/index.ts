@@ -113,9 +113,14 @@ export interface GeraeteEinstellungen {
    * übernehmen, „Neues WEP aus Bau-Excel“, Grundlage „Aus Bau-Excel“. Das PDF bleibt. Ausgeschaltet kommen sie zurück.
    */
   ohneExcel: boolean
+  /**
+   * Entwickleroption „PDF-Export anzeigen“ (Standard aus): Notfall-Schalter, falls die BV-Kontrollseite ausfällt. Zeigt
+   * im Export-Reiter wieder „PDF übersichtlich“/„PDF wie Vorlage“ und legt die PDFs mit ins Paket für den BV.
+   */
+  pdfExport: boolean
 }
 
-const STANDARD_GERAET: GeraeteEinstellungen = { nurWlan: true, sonnenKontrast: false, ohneExcel: true }
+const STANDARD_GERAET: GeraeteEinstellungen = { nurWlan: true, sonnenKontrast: false, ohneExcel: true, pdfExport: false }
 
 /** Ereignis, mit dem sich offene Ansichten nach einer Änderung der Geräte-Einstellungen aktualisieren. */
 export const GERAET_GEAENDERT = 'wep-geraete-geaendert'

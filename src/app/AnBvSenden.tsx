@@ -1,18 +1,17 @@
-// „An den BV senden“ (Stufe A): erstellt ein ZIP mit PDF, WEP-Datei und Fotos. Der Wertermittler teilt es direkt in die
-// Synology-Drive-App oder speichert es und legt es in den Synology-Ordner des BV; die Geschäftsstelle kümmert sich darum.
-// Kein Zugriff der App auf das NAS (Stufe B mit direktem Hochladen kommt, wenn der BV die Angaben geliefert hat).
+// „An den BV senden“ (Stufe A): erstellt ein ZIP mit der WEP-Datei (samt Fotos und ggf. Bau-Excel). Der Wertermittler teilt
+// es direkt in die Synology-Drive-App oder speichert es und legt es in den Synology-Ordner des BV; die Geschäftsstelle
+// öffnet es auf der BV-Kontrollseite (/bv) – dort entstehen Übersicht, PDF und Ausdruck. Mit der Entwickleroption
+// „PDF-Export anzeigen“ (Notfall) liegen zusätzlich beide PDFs im Paket. Kein Zugriff der App auf das NAS (Stufe B).
 import { useId, useState } from 'react'
 import { Download, Send, Share2 } from 'lucide-react'
 import { vorgangsNrVon, type Rolle, type Wep } from '@/model'
 import type { WepAendern } from '@/fotos'
-import { dbAblage } from '@/fotos/ablage'
-import { sammleExportFotos } from '@/fotos/exportOrdner'
 import { lokalerStand } from '@/sicherung'
-import { ladeFotoAusOneDrive } from '@/sync'
 import { erstelleTeilen } from '@/teilen'
 import { unterschriftAlsPng } from '@/unterschrift'
 import { baueBvPaket, paketName } from '@/senden/paket'
 import { kannTeilen, speichereDatei, speicherText, teileDatei } from './dateiSpeichern'
+import { usePdfExport } from './ohneExcel'
 import { erstellePdf } from './PdfExport'
 import { ICON, Meldung, zeitDe } from './ui'
 
@@ -37,7 +36,8 @@ export function AnBvSenden({
   const [zustand, setZustand] = useState<Zustand>({ typ: 'idle' })
   const [mitUnterschrift, setMitUnterschrift] = useState(false)
   const [meldung, setMeldung] = useState<string>()
-  const hatUnterschrift = unterschriftAlsPng() !== null
+  const pdfExport = usePdfExport()
+  const hatUnterschrift = pdfExport && unterschriftAlsPng() !== null
   const nr = vorgangsNrVon(wep)
 
   async function erstellen() {
@@ -45,29 +45,29 @@ export function AnBvSenden({
     try {
       const unterschrift = mitUnterschrift ? unterschriftAlsPng() : null
       const schritt = (s: string) => setZustand({ typ: 'laedt', schritt: s })
-      // Beide PDF-Arten, bis der BV sich für eine entschieden hat (Fotos liegen als JPG daneben, nicht im PDF)
-      const pdfUebersicht = await erstellePdf(wep, rolle, 'uebersichtlich', { profilIndex, unterschrift, schritt: (s) => schritt(`PDF übersichtlich: ${s}`) })
-      const pdfVorlage = await erstellePdf(wep, rolle, 'vorlage', { profilIndex, unterschrift, schritt: (s) => schritt(`PDF wie Vorlage: ${s}`) })
+      // Die WEP-Datei mit Fotos und Bau-Excel: Daraus rechnet die BV-Kontrollseite dieselben Zahlen wie dieses Gerät
       schritt('WEP-Datei und Fotos …')
-      const wepDatei = await erstelleTeilen(lokalerStand, wep.id, { mitFotos: false, mitBauExcel: false, appVersion: __APP_VERSION__ })
-      const fotos = await sammleExportFotos(wep, dbAblage, ladeFotoAusOneDrive)
+      const wepDatei = await erstelleTeilen(lokalerStand, wep.id, { mitFotos: true, mitBauExcel: true, appVersion: __APP_VERSION__ })
+      const hinweise: string[] = []
+      const pdfs: { name: string; daten: Blob }[] = []
+      if (pdfExport) {
+        // Notfall (Entwickleroption): beide PDF-Arten zusätzlich ins Paket
+        for (const stil of ['uebersichtlich', 'vorlage'] as const) {
+          const pdf = await erstellePdf(wep, rolle, stil, { profilIndex, unterschrift, schritt: (s) => schritt(`PDF ${stil === 'vorlage' ? 'wie Vorlage' : 'übersichtlich'}: ${s}`) })
+          pdfs.push({ name: pdf.name, daten: pdf.blob })
+          hinweise.push(...pdf.hinweise.filter((h) => !hinweise.includes(h)))
+        }
+      }
       schritt('Packe die Datei …')
-      const blob = await baueBvPaket({
-        pdfs: [
-          { name: pdfUebersicht.name, daten: pdfUebersicht.blob },
-          { name: pdfVorlage.name, daten: pdfVorlage.blob },
-        ],
-        wepDatei: { name: wepDatei.dateiname, daten: wepDatei.blob },
-        fotos: fotos.dateien.map((f) => ({ name: f.name, daten: f.blob })),
-      })
-      const hinweise = [...new Set([...pdfUebersicht.hinweise, ...pdfVorlage.hinweise])]
-      if (fotos.fehlen.length) hinweise.push(`${fotos.fehlen.length} Foto${fotos.fehlen.length === 1 ? ' fehlt' : 's fehlen'} (noch nicht auf diesem Gerät, kein Netz).`)
-      const n = fotos.dateien.length
+      const blob = await baueBvPaket({ pdfs, wepDatei: { name: wepDatei.dateiname, daten: wepDatei.blob }, fotos: [] })
+      if (wepDatei.fotosOhneDatei) hinweise.push(`${wepDatei.fotosOhneDatei} Foto${wepDatei.fotosOhneDatei === 1 ? ' fehlt' : 's fehlen'} (noch nicht auf diesem Gerät, kein Netz).`)
+      if (wepDatei.bauExcelOhneDatei) hinweise.push('Die Bau-Excel liegt nicht auf diesem Gerät und fehlt im Paket.')
+      const n = wepDatei.inhalt.fotos
       setZustand({
         typ: 'fertig',
         blob,
         name: paketName(wep),
-        inhalt: `2 PDFs, WEP-Datei${n ? `, ${n} Foto${n === 1 ? '' : 's'}` : ''} · ${(blob.size / (1024 * 1024)).toLocaleString('de-DE', { maximumFractionDigits: 1 })} MB`,
+        inhalt: `WEP-Datei${n ? ` mit ${n} Foto${n === 1 ? '' : 's'}` : ''}${wepDatei.inhalt.bauExcel ? ' und Bau-Excel' : ''}${pdfs.length ? `, ${pdfs.length} PDFs` : ''} · ${(blob.size / (1024 * 1024)).toLocaleString('de-DE', { maximumFractionDigits: 1 })} MB`,
         hinweise,
       })
     } catch (e) {
@@ -97,13 +97,15 @@ export function AnBvSenden({
 
   const laedt = zustand.typ === 'laedt'
   return (
-    <section className="abschnitt" aria-labelledby={`${id}-bv`} style={{ marginTop: 40 }}>
-      <h2 className="gruppenkopf" id={`${id}-bv`}>
-        An den BV senden
-      </h2>
+    <section aria-labelledby={`${id}-bv`}>
+      <header className="seitenkopf">
+        <h1 className="h1" id={`${id}-bv`}>
+          An den BV senden
+        </h1>
+      </header>
       <p className="neben block">
-        Erstellt eine Datei mit dem Protokoll als PDF, der WEP-Datei (zum Öffnen in der App) und allen Fotos. Teile sie direkt in die
-        Synology-Drive-App oder speichere sie und lege sie in den Synology-Ordner des BV.
+        Erstellt eine Datei mit dem WEP und allen Fotos. Teile sie direkt in die Synology-Drive-App oder speichere sie und lege sie in
+        den Synology-Ordner des BV. Die Geschäftsstelle prüft und druckt das Protokoll auf ihrer Kontrollseite.
         {wep.anBvGesendetAm && ` Zuletzt gesendet am ${zeitDe(wep.anBvGesendetAm)}.`}
       </p>
       {!nr && (
