@@ -16,7 +16,7 @@ import { unterschriftAlsPng } from '@/unterschrift'
 import { Capacitor } from '@capacitor/core'
 import { bauFuerExport } from './bauHelfer'
 import { kannTeilen, speichereDatei, speicherText, teileDatei } from './dateiSpeichern'
-import { ladeExportQuelle } from './exportQuelle'
+import { ladeExportQuelle, type ExportQuelle } from './exportQuelle'
 import { ICON, Meldung } from './ui'
 
 type Zustand =
@@ -48,19 +48,29 @@ export async function erstellePdf(
   wep: Wep,
   rolle: Rolle,
   stil: PdfStil,
-  opt: { profilIndex?: Record<string, number>; mitFotos?: boolean; unterschrift?: Uint8Array | null; schritt?: (text: string) => void } = {},
+  opt: {
+    profilIndex?: Record<string, number>
+    mitFotos?: boolean
+    unterschrift?: Uint8Array | null
+    schritt?: (text: string) => void
+    /** Basis-Excel; ohne Angabe die dieses Geräts (Bau-Excel am WEP, sonst Vorlage). Die BV-Kontrollseite gibt ihre eigene. */
+    quelle?: () => Promise<ExportQuelle>
+    /** Fotodatei laden; ohne Angabe lokal, sonst aus OneDrive. */
+    ladeFoto?: (fotoId: string) => Promise<Blob | undefined>
+  } = {},
 ): Promise<{ blob: Blob; name: string; seiten: number; hinweise: string[] }> {
   const { profilIndex } = opt
   const nurBau = rolle === 'bau'
   opt.schritt?.('Bereite die Daten vor …')
-  const quelle = await ladeExportQuelle(wep, nurBau)
+  const quelle = await (opt.quelle ?? (() => ladeExportQuelle(wep, nurBau)))()
   const wepFuerExport = hatBauTeil(rolle) ? bauFuerExport(wep, profilIndex) : wep
 
   let fotos
   let fehlendeFotos = 0
   if (opt.mitFotos) {
     opt.schritt?.('Hole die Fotos …')
-    const g = await sammlePdfFotos(wep, async (fotoId) => (await dbAblage.ladeDatei(wep.id, fotoId)) ?? (await ladeFotoAusOneDrive(wep.id, fotoId).catch(() => undefined)))
+    const lade = opt.ladeFoto ?? (async (fotoId: string) => (await dbAblage.ladeDatei(wep.id, fotoId)) ?? (await ladeFotoAusOneDrive(wep.id, fotoId).catch(() => undefined)))
+    const g = await sammlePdfFotos(wep, lade)
     fotos = g.fotos
     fehlendeFotos = g.fehlen
   }

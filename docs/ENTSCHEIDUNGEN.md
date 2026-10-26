@@ -351,3 +351,10 @@
 - **Entscheidung:** Drucken und PDF gibt es nur noch auf der BV-Kontrollseite. Der Export-Reiter der Wertermittler zeigt nur „An den BV senden“. „Mit Excel arbeiten“ und „PDF-Export anzeigen“ stehen in den zugeklappten „Entwickleroptionen“ am Ende des Profils, Standard aus, Erklärtext „nur bei Ausfall“.
 - **Paket:** Die WEP-Datei im Paket enthält jetzt Fotos und (falls vorhanden) die Bau-Excel. Die Kontrollseite braucht beides, um dieselben Zahlen (gleiche Export-Quelle) und die Fotos zu zeigen. Die zusätzlichen JPG-Kopien entfallen (sonst läge jedes Foto doppelt im Paket); PDFs kommen nur mit dem Notfall-Schalter dazu.
 - **Grund:** Ein Protokoll, eine Stelle zum Drucken; Wertermittler sehen ihre Zahlen im Reiter „Übersicht“.
+
+## 2026-10-26 · BV-Kontrollseite ohne Server
+
+- **Entscheidung:** Die Kontrollseite ist eine Unterseite derselben App (`/bv`, eigener Einstieg in `main.tsx`, nachgeladen). Sie liest die Dateien, die der BV ohnehin bekommt (.wep oder Paket aus „An den BV senden“), mit der vorhandenen Teilen-Logik und speichert sie nur in einer eigenen IndexedDB `wep-bv` dieses Browsers. Status und Notiz setzt der BV dort.
+- **Grund:** Keine WEP-Daten auf einem Server (Datenschutz, kein Betrieb nötig), sofort vorführbar; Synology bleibt der Transportweg. Gleiche Zahlen wie beim Wertermittler: dieselbe Übersicht-Komponente und dieselbe Export-Quelle (mitgeschickte Bau-Excel, sonst die Vorlage).
+- **Doppelte Vorgangs-Nr.:** Jede Fassung bleibt als eigener Eingang erhalten (Schlüssel: Kennung + Stand); die neueste ist gekennzeichnet, gesperrt oder zusammengeführt wird nichts.
+- **Später (Sitzung B):** Zugang zur Seite nur mit Microsoft-Anmeldung und Freigabe durch den Admin; gespeichert werden auf dem Server dann nur Anträge/Freigaben, keine WEP-Daten.

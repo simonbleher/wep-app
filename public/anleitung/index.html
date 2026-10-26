@@ -85,6 +85,8 @@
   h3 { font-size: 17px; margin: 18px 0 6px; }
   .schritt { display: grid; grid-template-columns: 1fr 210px; gap: 22px; align-items: start; margin: 14px 0; }
   .schritt.ohne-bild { grid-template-columns: 1fr; }
+  .schritt.quer { grid-template-columns: 1fr; }
+  .schritt.quer img { border-radius: 8px; }
   .schritt figure { margin: 0; }
   .schritt img {
     width: 100%;
@@ -132,6 +134,7 @@
     nav.inhalt ol { columns: 1; }
     .schritt { grid-template-columns: 1fr; }
     .schritt figure { max-width: 260px; margin: 0 auto; }
+    .schritt.quer figure { max-width: none; }
     section.kapitel { padding: 18px 16px; }
   }
   @media print {
@@ -144,6 +147,7 @@
     section.kapitel { border: none; padding: 0; margin: 0 0 8mm; break-inside: auto; }
     section.kapitel > h2 { break-after: avoid; }
     .schritt { grid-template-columns: 1fr 48mm; break-inside: avoid; }
+    .schritt.quer { grid-template-columns: 1fr; }
     .schritt img { box-shadow: none; }
     .tipp, .achtung, .ablauf div, .nr, .knopf { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     a { color: inherit; text-decoration: none; }
@@ -171,7 +175,8 @@
     <li><a href="#skizze">Parzelle und Skizzen</a></li>
     <li><a href="#fotos">Fotos</a></li>
     <li><a href="#uebergabe">Übergabe Bau → Grün</a></li>
-    <li><a href="#abgabe">PDF und „An den BV senden“</a></li>
+    <li><a href="#abgabe">Übersicht und „An den BV senden“</a></li>
+    <li><a href="#bv">Für den BV: die Kontrollseite</a></li>
     <li><a href="#offline">Ohne Netz, Abgleich, Sicherheit</a></li>
     <li><a href="#fragen">Häufige Fragen</a></li>
   </ol>
@@ -185,6 +190,7 @@
     <div><b>2. Übergabe</b>Er schickt die WEP-Datei an den Grün-Wertermittler (siehe Kapitel 8).</div>
     <div><b>3. Grün</b>Der Grün-Wertermittler erfasst Außenanlagen, Aufwuchs, Beseitigung, Skizze und Fotos.</div>
     <div><b>4. Abgabe</b>Fertiges WEP als Paket „An den BV senden“ und in den Synology-Ordner legen.</div>
+    <div><b>5. BV</b>Die Geschäftsstelle öffnet das Paket auf ihrer Kontrollseite, prüft und druckt das Protokoll.</div>
   </div>
   <div class="tipp"><b>Grundsatz:</b> Die App schlägt Preise nach der Wertermittlungsrichtlinie vor (Höchstwert × Zustand). Sie können jeden Wert überschreiben. Regelverstöße (z. B. Hecke zu hoch, invasive Art) zeigt die App als Hinweis an – sie sperrt nie etwas. Prüfen Sie jedes Ergebnis, bevor Sie es abgeben.</div>
 </section>
@@ -211,7 +217,7 @@
         <li><b>Name</b> – steht in jedem neuen WEP als Wertermittler.</li>
         <li><b>Rolle</b> – Grün, Bau oder beides. Sie bestimmt, welche Reiter Sie sehen.</li>
         <li><b>Standard-Kleingartenanlage</b> – wird in neuen WEPs vorbelegt (Auswahlliste aller Anlagen des BV).</li>
-        <li><b>Meine Unterschrift</b> – zeichnen oder als Bild hochladen; sie kommt nur ins PDF, wenn Sie es beim Erzeugen bestätigen.</li>
+        <li><b>Meine Unterschrift</b> – zeichnen oder als Bild hochladen; sie wird nur beim PDF-Export (Notfall, siehe unten) verwendet.</li>
         <li><b>Eigene Positionen</b> – Freitext-Positionen, die Sie sich gemerkt haben (aufklappbar).</li>
       </ul>
     </div>
@@ -223,8 +229,8 @@
       <ul class="punkte">
         <li><b>Upload nur über WLAN</b> spart mobile Daten (Fotos und Hintergrund-Upload).</li>
         <li><b>Sonnen-Kontrast</b>: kräftigere Farben und größere Schrift für draußen.</li>
-        <li><b>Ohne Excel arbeiten</b> ist standardmäßig an. Die Excel-Funktionen sind dann ausgeblendet; das Protokoll entsteht als PDF.</li>
       </ul>
+      <p>Ganz unten im Profil liegen zugeklappt die <b>Entwickleroptionen</b> („Mit Excel arbeiten“, „PDF-Export anzeigen“). Sie sind nur für einen Ausfall gedacht und bleiben normalerweise aus.</p>
     </div>
     <figure><img src="bilder/03-profil-geraet.jpg" alt="Einstellungen „Dieses Gerät“"><figcaption>Einstellungen dieses Geräts</figcaption></figure>
   </div>
@@ -393,27 +399,27 @@
 </section>
 
 <section class="kapitel" id="abgabe">
-  <h2><span class="nr">9</span> PDF und „An den BV senden“</h2>
-  <p class="unter">Oben rechts im WEP: <span class="knopf">Export</span>.</p>
+  <h2><span class="nr">9</span> Übersicht und „An den BV senden“</h2>
+  <p class="unter">Ein PDF erstellen Sie nicht mehr selbst – das macht der BV auf seiner Kontrollseite. Ihre Zahlen sehen Sie in der Übersicht.</p>
   <div class="schritt">
     <div>
-      <h3>PDF erzeugen</h3>
+      <h3>Übersicht</h3>
+      <p>Der Reiter <span class="knopf">Übersicht</span> zeigt das Protokoll so, wie es beim BV ankommt:</p>
       <ul class="punkte">
-        <li><b>PDF übersichtlich</b>: gut lesbares Protokoll mit Rechenweg.</li>
-        <li><b>PDF wie Vorlage</b>: sieht aus wie die Blätter der BV-Vorlage.</li>
-        <li>Optional mit Fotos als Anhang und mit Ihrer Unterschrift.</li>
+        <li>Formalien und die <b>Bewertung wie das Deckblatt</b> – Baulichkeiten, Außenanlagen, Aufwuchs, Zwischensumme, Abzüge und der Gesamtbetrag (hervorgehoben).</li>
+        <li>Darunter alle Positionen mit Menge, Einzelpreis und Summe, beim Bau mit dem Rechenweg je Bauteil.</li>
       </ul>
-      <p>Danach steht das WEP auf „exportiert“ (im Menü <span class="knopf">⋯</span> zurücksetzbar).</p>
+      <p>Die Übersicht ist nur zum Lesen; ändern Sie Werte in den einzelnen Reitern. Der BV sieht genau dieselben Zahlen.</p>
     </div>
-    <figure><img src="bilder/18-export-pdf.jpg" alt="Export als PDF"><figcaption>Export als PDF</figcaption></figure>
+    <figure><img src="bilder/18-uebersicht.jpg" alt="Übersicht mit Bewertung und Gesamtbetrag"><figcaption>Übersicht</figcaption></figure>
   </div>
   <div class="schritt">
     <div>
       <h3>An den BV senden</h3>
       <ol class="schritte">
-        <li><span class="knopf">Paket für den BV erstellen</span>: Die App packt beide PDFs, die WEP-Datei und alle Fotos in <b>eine ZIP-Datei</b> mit der Vorgangs-Nr. im Namen.</li>
-        <li><span class="knopf">Teilen …</span> direkt in die <b>Synology-Drive-App</b> – oder <span class="knopf">Speichern</span> und die Datei in den <b>Synology-Ordner des BV</b> legen.</li>
-        <li>Die Geschäftsstelle kümmert sich um den Rest. Am WEP steht danach „an BV gesendet“ mit Datum.</li>
+        <li>Oben rechts im WEP <span class="knopf">An den BV</span> und dann <span class="knopf">Paket für den BV erstellen</span>: Die App packt die WEP-Datei mit allen Fotos in <b>eine ZIP-Datei</b> mit der Vorgangs-Nr. im Namen.</li>
+        <li><span class="knopf">Teilen …</span> direkt in die <b>Synology-Drive-App</b> – oder <span class="knopf">Speichern</span> und die Datei in den <b>Synology-Ordner des BV</b> legen (oder per E-Mail schicken).</li>
+        <li>Am WEP steht danach „an BV gesendet“ mit Datum. Die Geschäftsstelle prüft und druckt das Protokoll auf ihrer Kontrollseite (Kapitel 10).</li>
       </ol>
       <div class="achtung"><b>Vor dem Senden:</b> Ist die Vorgangs-Nr. eingetragen? Die App erinnert Sie, wenn sie fehlt.</div>
     </div>
@@ -421,12 +427,40 @@
   </div>
 </section>
 
+<section class="kapitel" id="bv">
+  <h2><span class="nr">10</span> Für den BV: die Kontrollseite</h2>
+  <p class="unter">Für die Geschäftsstelle: <i>wep-pankow.pages.dev/bv</i> im Browser am PC öffnen. Die Seite steht nicht im Menü der Wertermittler.</p>
+  <div class="schritt quer">
+    <div>
+      <h3>Pakete öffnen</h3>
+      <ol class="schritte">
+        <li>Die eingegangenen Dateien (<b>…_an-BV.zip</b> oder <b>.wep</b>) aus dem Synology-Ordner oder aus E-Mails auf die Seite ziehen – auch mehrere oder einen ganzen Ordner. Oder <span class="knopf">Dateien öffnen</span> bzw. <span class="knopf">Ordner öffnen</span>.</li>
+        <li>Die Tabelle zeigt Vorgangs-Nr., Anlage, Parzelle, Unterpächter, Wertermittler, Datum, Gesamtbetrag, Eingang und Status.</li>
+        <li>Hinweise: <b>Vorgangs-Nr. fehlt</b> und <b>doppelte Vorgangs-Nr.</b> – die neueste Fassung ist gekennzeichnet.</li>
+      </ol>
+      <div class="tipp"><b>Datenschutz:</b> Es gibt keinen Server mit WEP-Daten. Die Protokolle liegen nur im Browser dieses BV-Rechners.</div>
+    </div>
+    <figure><img src="bilder/22-bv-liste.jpg" alt="Kontrollseite mit Tabelle der eingegangenen WEPs"><figcaption>Eingänge</figcaption></figure>
+  </div>
+  <div class="schritt quer">
+    <div>
+      <h3>Prüfen, PDF und Drucken</h3>
+      <ol class="schritte">
+        <li>Eine Zeile anklicken: Die Detailansicht zeigt dieselbe Übersicht wie beim Wertermittler, dazu Skizzen und Fotos.</li>
+        <li>Status setzen: <b>neu</b>, <b>geprüft</b> oder <b>Rückfrage</b> – mit Notiz, z. B. was beim Wertermittler nachzufragen ist.</li>
+        <li><span class="knopf">PDF übersichtlich</span> oder <span class="knopf">PDF wie Vorlage</span> speichert das Protokoll als PDF (beide Formen, bis der BV sich entschieden hat); <span class="knopf">Drucken</span> druckt die Seite.</li>
+      </ol>
+    </div>
+    <figure><img src="bilder/23-bv-detail.jpg" alt="Detailansicht mit Status, PDF und Drucken"><figcaption>Detailansicht</figcaption></figure>
+  </div>
+</section>
+
 <section class="kapitel" id="offline">
-  <h2><span class="nr">10</span> Ohne Netz, Abgleich, Sicherheit</h2>
+  <h2><span class="nr">11</span> Ohne Netz, Abgleich, Sicherheit</h2>
   <div class="schritt ohne-bild">
     <div>
       <ul class="punkte">
-        <li><b>Ohne Netz</b> funktioniert alles: Erfassen, Skizzen, Fotos, PDF. Die Daten liegen auf dem Gerät.</li>
+        <li><b>Ohne Netz</b> funktioniert alles: Erfassen, Skizzen, Fotos, Übersicht, das Paket für den BV. Die Daten liegen auf dem Gerät.</li>
         <li><b>Abgleich</b>: Mit Microsoft-Konto gleicht die App automatisch mit Ihrem OneDrive ab, sobald Netz da ist (Ordner „Apps/WEP-App“). Die Zeile auf der Startseite zeigt den Stand.</li>
         <li><b>Zwei Geräte gleichzeitig geändert?</b> Die neuere Fassung gilt, die andere bleibt als Kopie erhalten; die App zeigt einen Hinweis zum Entscheiden.</li>
         <li><b>Papierkorb</b>: Gelöschte WEPs liegen 30 Tage im Papierkorb und lassen sich wiederherstellen.</li>
@@ -438,7 +472,7 @@
 </section>
 
 <section class="kapitel" id="fragen">
-  <h2><span class="nr">11</span> Häufige Fragen</h2>
+  <h2><span class="nr">12</span> Häufige Fragen</h2>
   <dl class="fragen">
     <dt>Ich finde eine Pflanze nicht im Katalog.</dt>
     <dd>Legen Sie sie als Freitext an (Bezeichnung, Menge, Preis) und merken Sie sie als eigene Position – beim nächsten Mal finden Sie sie in der Suche.</dd>
@@ -448,6 +482,8 @@
     <dd>Das ist ein Hinweis der Richtlinie (z. B. invasive Art, Hecke zu hoch, Rasen über 100 m²). Sie können trotzdem weiterarbeiten; prüfen Sie den Fall und tragen Sie ggf. eine Beseitigung ein.</dd>
     <dt>Die Vorgangs-Nr. kenne ich noch nicht.</dt>
     <dd>„Nummer noch nicht bekannt“ wählen und später unter „Formalien“ eintragen. Vor dem Senden an den BV sollte sie stehen.</dd>
+    <dt>Wo ist das PDF geblieben?</dt>
+    <dd>Das PDF erstellt die Geschäftsstelle auf ihrer Kontrollseite. Ihre Zahlen sehen Sie im Reiter „Übersicht“. Nur bei einem Ausfall gibt es unter Profil → Entwickleroptionen „PDF-Export anzeigen“.</dd>
     <dt>Ich habe ein neues Handy.</dt>
     <dd>Mit Microsoft-Konto anmelden – Ihre WEPs kommen aus OneDrive. Ohne Konto vorher unter Profil → Sicherung eine Datei erstellen und auf dem neuen Gerät einspielen.</dd>
     <dt>Wem melde ich einen Fehler?</dt>

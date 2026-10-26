@@ -20,11 +20,13 @@ function chromiumPfad() {
   return kandidaten.find((p) => existsSync(p))
 }
 
-// Bilder: PNG (2× Handy) → JPEG mit 560 px Breite, reicht für Bildschirm und Druck (48 mm breit) und hält die App klein
+// Bilder: PNG (2× Handy) → JPEG mit 560 px Breite, reicht für Bildschirm und Druck (48 mm breit) und hält die App klein;
+// Bilder der BV-Kontrollseite (am PC, volle Breite) mit 1100 px
 rmSync(APP, { recursive: true, force: true })
 mkdirSync(join(APP, 'bilder'), { recursive: true })
 for (const png of readdirSync(join(QUELLE, 'bilder')).filter((n) => n.endsWith('.png'))) {
-  execFileSync('convert', [join(QUELLE, 'bilder', png), '-resize', '560x', '-strip', '-quality', '82', join(APP, 'bilder', png.replace(/\.png$/, '.jpg'))])
+  const breite = png.includes('-bv-') ? '1100x' : '560x'
+  execFileSync('convert', [join(QUELLE, 'bilder', png), '-resize', breite, '-strip', '-quality', '82', join(APP, 'bilder', png.replace(/\.png$/, '.jpg'))])
 }
 copyFileSync(join(QUELLE, 'anleitung.html'), join(APP, 'index.html'))
 
