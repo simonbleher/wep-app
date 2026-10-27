@@ -66,10 +66,13 @@ export function unterschiedlicheTeile(lokal: Wep, datei: Wep): TeilPunkt[] {
   const punkte: TeilPunkt[] = []
   const punkt = (teil: TeilId, hier: string, dort: string) =>
     punkte.push({ teil, titel: TEIL_TITEL[teil], detail: `Hier: ${hier} · Datei: ${dort}` })
-  if (!bauLeer(datei) && stabil([lokal.bau, lokal.grundriss]) !== stabil([datei.bau, datei.grundriss])) {
+  // Eine neu mitgeschickte Unterschrift zählt zum Teil (sonst käme sie bei sonst gleichem Stand nie an)
+  const uBau = (w: Wep) => w.unterschriften?.bau ?? null
+  const uGruen = (w: Wep) => w.unterschriften?.gruen ?? null
+  if (!bauLeer(datei) && stabil([lokal.bau, lokal.grundriss, datei.unterschriften?.bau ? uBau(lokal) : null]) !== stabil([datei.bau, datei.grundriss, datei.unterschriften?.bau ? uBau(datei) : null])) {
     punkt('bau', beschreibe('bau', lokal), beschreibe('bau', datei))
   }
-  if (!gruenLeer(datei) && stabil([lokal.gruen, lokal.skizze]) !== stabil([datei.gruen, datei.skizze])) {
+  if (!gruenLeer(datei) && stabil([lokal.gruen, lokal.skizze, datei.unterschriften?.gruen ? uGruen(lokal) : null]) !== stabil([datei.gruen, datei.skizze, datei.unterschriften?.gruen ? uGruen(datei) : null])) {
     punkt('gruen', beschreibe('gruen', lokal), beschreibe('gruen', datei))
   }
   const vorhandeneFotos = new Set((lokal.fotos ?? []).map((f) => f.id))

@@ -85,6 +85,12 @@ export interface Wep {
    * `daten/bau/<Vorgangs-Nr>.xlsx`, siehe src/bauexcel). Der Export nimmt sie automatisch.
    */
   bauExcel?: BauExcel
+  /**
+   * Unterschriften der Wertermittler je Teil (PNG als Data-URL), die mit dem WEP weitergereicht wurden: Beim Teilen und
+   * beim Paket „An den BV senden“ setzt die App die Unterschrift des Absenders für seinen Teil ein (src/teilen/
+   * unterschriften.ts). Die BV-Kontrollseite setzt sie in beiden PDF-Formen ein.
+   */
+  unterschriften?: { bau?: string; gruen?: string }
 }
 
 /** Angaben zur Bau-Excel am WEP. */

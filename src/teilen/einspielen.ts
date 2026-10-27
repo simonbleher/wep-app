@@ -11,6 +11,12 @@ export interface TeilenErgebnis extends EinspielErgebnis {
   teile: TeilId[]
 }
 
+/** Die Unterschrift eines Teils kommt mit dem Teil (fehlt sie in der Datei, bleibt die hiesige). */
+function mitUnterschrift(w: Wep, teil: 'bau' | 'gruen', url: string | undefined): Wep {
+  if (!url) return w
+  return { ...w, unterschriften: { ...w.unterschriften, [teil]: url } }
+}
+
 export async function spieleTeilenEin(opt: {
   gelesen: GeleseneTeilen
   vorschau: TeilenVorschau
@@ -64,10 +70,12 @@ export async function spieleTeilenEin(opt: {
         neu = { ...neu, bau: datei.bau }
         if (datei.grundriss !== undefined) neu.grundriss = datei.grundriss
         else delete neu.grundriss
+        neu = mitUnterschrift(neu, 'bau', datei.unterschriften?.bau)
       } else if (teil === 'gruen') {
         neu = { ...neu, gruen: datei.gruen }
         if (datei.skizze !== undefined) neu.skizze = datei.skizze
         else delete neu.skizze
+        neu = mitUnterschrift(neu, 'gruen', datei.unterschriften?.gruen)
       } else if (teil === 'fotos') {
         const vorhanden = new Set((neu.fotos ?? []).map((f) => f.id))
         const dazu: Foto[] = []

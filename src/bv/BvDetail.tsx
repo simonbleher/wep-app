@@ -16,6 +16,7 @@ import { ICON, Meldung, Rueckfrage, zeitDe } from '@/app/ui'
 import { BV_STATUS_TEXT, type BvEingang, type BvStatus } from './eingang'
 import { aendereEingang, entferneEingang, ladeFoto } from './speicher'
 import { bvQuelle, bvRolle } from './quelle'
+import { pngAusUrl } from '@/unterschrift'
 
 /** Bild-URL für die Lebensdauer der Ansicht. */
 function useBildUrl(erzeuge: () => Promise<Blob | undefined>, deps: unknown[]): string | undefined {
@@ -135,6 +136,8 @@ export function BvDetail({
         quelle,
         mitFotos: e.fotoIds.length > 0,
         ladeFoto: (fotoId) => ladeFoto(e.id, fotoId),
+        // Die mitgeschickten Unterschriften an der Stelle des jeweiligen Wertermittlers; fehlt eine, bleibt das Feld leer
+        unterschriften: { bau: pngAusUrl(e.wep.unterschriften?.bau), gruen: pngAusUrl(e.wep.unterschriften?.gruen) },
         schritt: (schritt) => setPdf({ stil, schritt }),
       })
       const s = await speichereDatei(erg.blob, erg.name)
@@ -172,6 +175,11 @@ export function BvDetail({
             </p>
           </Meldung>
         )}
+        <p className="neben">
+          {e.wep.unterschriften?.bau || e.wep.unterschriften?.gruen
+            ? `Unterschrift mitgeschickt: ${[e.wep.unterschriften?.bau && 'Bau', e.wep.unterschriften?.gruen && 'Grün'].filter(Boolean).join(' und ')} – sie steht in beiden PDF-Formen.`
+            : 'Keine Unterschrift im Paket – die Unterschriftsfelder im PDF bleiben leer.'}
+        </p>
         <div className="segmente" role="group" aria-label="Status">
           {(['neu', 'geprueft', 'rueckfrage'] as const).map((s) => (
             <button key={s} type="button" className="segment" aria-pressed={e.status === s} onClick={() => void setzeStatus(s)}>
