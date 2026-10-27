@@ -36,7 +36,7 @@ if (!container) {
 }
 
 // BV-Kontrollseite unter /bv (nicht in der Navigation der Wertermittler); lädt erst bei Bedarf nach
-const BvApp = lazy(() => import('@/bv/BvApp'))
+const BvApp = lazy(() => import('@/bv/BvSeite'))
 const istBvSeite = /^\/bv(\/|$)/.test(window.location.pathname)
 
 createRoot(container).render(
