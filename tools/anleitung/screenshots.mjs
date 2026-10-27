@@ -1,7 +1,8 @@
 // Bildschirmfotos für die Anleitung (docs/anleitung/bilder/, Handy-Größe) mit einem erfundenen Beispiel-WEP.
 // Aufruf: npm run anleitung (baut nach dist-e2e/, erzeugt das Beispiel, startet vite preview, danach tools/anleitung/pdf.mjs).
 import { execFileSync, spawn } from 'node:child_process'
-import { existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import JSZip from 'jszip'
 import { chromium } from 'playwright'
 
 const PORT = 4197
@@ -158,15 +159,19 @@ try {
   await reiter('Fotos')
   await bild('17-fotos')
 
-  // 10. Export: PDF und An den BV senden
-  await seite.getByRole('button', { name: 'Export', exact: true }).click()
-  await seite.getByRole('heading', { name: 'Export als PDF' }).waitFor()
-  await bild('18-export-pdf')
-  await seite.getByRole('heading', { name: 'An den BV senden' }).scrollIntoViewIfNeeded()
+  // 10. Übersicht und An den BV senden
+  await reiter('Übersicht')
+  await seite.getByRole('heading', { name: 'Bewertung' }).waitFor({ timeout: 30000 })
+  await seite.getByRole('heading', { name: 'Bewertung' }).scrollIntoViewIfNeeded()
+  await bild('18-uebersicht')
+  await seite.getByRole('button', { name: 'An den BV', exact: true }).click()
+  await seite.getByRole('heading', { name: 'An den BV senden' }).waitFor()
   await seite.getByRole('button', { name: 'Paket für den BV erstellen' }).click()
   await seite.getByRole('button', { name: 'Speichern', exact: true }).waitFor({ timeout: 90000 })
-  await seite.getByRole('button', { name: 'Speichern', exact: true }).scrollIntoViewIfNeeded()
   await bild('19-an-bv')
+  const paketLaden = seite.waitForEvent('download')
+  await seite.getByRole('button', { name: 'Speichern', exact: true }).click()
+  const paket = await (await paketLaden).path()
 
   // 11. Teilen (Bau → Grün)
   await seite.getByRole('button', { name: 'Weitere Aktionen' }).click()
@@ -174,6 +179,30 @@ try {
   await seite.getByRole('menuitem', { name: /Teilen/ }).click()
   await seite.getByRole('dialog').first().waitFor()
   await bild('21-teilen')
+
+  // 12. BV-Kontrollseite (am PC): das Paket von oben, dazu ein WEP ohne Vorgangs-Nr. und eine ältere Fassung
+  const wepDatei = async (wep, stand) => {
+    const z = new JSZip()
+    z.file('wep.json', JSON.stringify({ format: 'wep-teilen/1', erstelltAm: stand, appVersion: '', wep, geaendertAm: stand, enthaelt: { fotos: false, bauExcel: false }, fotos: [] }))
+    return z.generateAsync({ type: 'nodebuffer' })
+  }
+  writeFileSync('dist-e2e/ohne-nr.wep', await wepDatei(ohneNr, '2026-10-23T15:00:00.000Z'))
+  writeFileSync('dist-e2e/aeltere-fassung.wep', await wepDatei(beispiel, '2026-10-20T08:00:00.000Z'))
+  const bvKontext = await browser.newContext({ viewport: { width: 1200, height: 760 }, deviceScaleFactor: 1, serviceWorkers: 'block', locale: 'de-DE', acceptDownloads: true })
+  const bv = await bvKontext.newPage()
+  bv.on('pageerror', (e) => fehler.push(e.message))
+  await bv.goto(`${URL}bv`)
+  await bv.getByRole('heading', { name: 'Kontrollseite BV' }).waitFor()
+  await bv.locator('input[type=file][accept]').setInputFiles([paket, 'dist-e2e/ohne-nr.wep', 'dist-e2e/aeltere-fassung.wep'])
+  await bv.getByText(/3 WEPs eingelesen/).waitFor({ timeout: 30000 })
+  await bv.waitForFunction(() => ![...document.querySelectorAll('tr.bv-zeile td.zahl')].some((t) => t.textContent === '…'), null, { timeout: 60000 })
+  await bv.screenshot({ path: `${ZIEL}/22-bv-liste.png` })
+  console.log(`  ${ZIEL}/22-bv-liste.png`)
+  await bv.getByRole('button', { name: '2026-152' }).first().click()
+  await bv.getByRole('heading', { name: 'Bewertung' }).waitFor({ timeout: 30000 })
+  await bv.waitForTimeout(500)
+  await bv.screenshot({ path: `${ZIEL}/23-bv-detail.png` })
+  console.log(`  ${ZIEL}/23-bv-detail.png`)
 
   if (fehler.length) throw new Error(`Skriptfehler im Browser: ${fehler.join('; ')}`)
   console.log('Bilder fertig')

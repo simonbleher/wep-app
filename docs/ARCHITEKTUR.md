@@ -57,6 +57,7 @@ genutzt. Alles unten zu Rollen-Sync, Bau-Teil und BV-OneDrive ist Zielbild für 
 | skizze    | #skizze       | `src/skizze/`                        |
 | sync      | #sync         | `src/sync/`                          |
 | bau       | (später)      | `src/bau/`                           |
+| bv        | –             | `src/bv/` (BV-Kontrollseite unter `/bv`, eigene IndexedDB `wep-bv`) |
 | gemeinsam | –             | `src/model/` (nur per PR mit Begründung, betrifft alle) |
 
 ## Datenmodell (Entwurf, wird in `src/model/` verbindlich)

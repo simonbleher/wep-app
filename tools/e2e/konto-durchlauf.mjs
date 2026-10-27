@@ -176,7 +176,7 @@ try {
   // 6b. Reiter „Übersicht“: Bewertung wie das Deckblatt, die Position mit Menge, Einzelpreis und Summe
   await seite.getByRole('navigation', { name: 'Abschnitte' }).getByRole('button', { name: 'Übersicht' }).click()
   await seite.getByRole('heading', { name: 'Bewertung' }).waitFor({ timeout: 30000 })
-  const gesamtZeile = seite.locator('.ueb-gesamt')
+  const gesamtZeile = seite.locator('.ueb-bewertung .ueb-gesamt')
   pruefe((await gesamtZeile.innerText()).includes('140,00'), 'Übersicht: Gesamtbetrag 140,00 € hervorgehoben')
   pruefe(await seite.locator('.ueb-posten').getByText('Apfel, Halbstamm, 5–30 J.').isVisible(), 'Übersicht: Position im Aufwuchs aufgelistet')
   await seite.getByRole('navigation', { name: 'Abschnitte' }).getByRole('button', { name: 'Aufwuchs' }).click()
@@ -1245,6 +1245,36 @@ try {
   const paketOhnePdf = await JSZip.loadAsync(readFileSync(await (await paketOhnePdfLaden).path()))
   const namenOhnePdf = Object.keys(paketOhnePdf.files)
   pruefe(namenOhnePdf.some((n) => n.endsWith('.wep')) && !namenOhnePdf.some((n) => n.endsWith('.pdf')), 'An den BV (Standard): WEP-Datei im Paket, keine PDFs')
+
+  // BV-Kontrollseite (/bv): Paket öffnen, Tabelle, Detail mit Übersicht, Status, PDF – eigene Seite, eigener Speicher
+  const bvSeite = await kontext.newPage()
+  bvSeite.on('pageerror', (e) => fehler.push(`BV: ${e.message}`))
+  await bvSeite.goto(`${URL}bv`)
+  await bvSeite.getByRole('heading', { name: 'Kontrollseite BV' }).waitFor()
+  pruefe((await bvSeite.getByRole('button', { name: 'Neues WEP', exact: true }).count()) === 0, 'BV-Seite: eigene Seite ohne die Navigation der Wertermittler')
+  await bvSeite.locator('input[type=file][accept]').setInputFiles(await (await paketOhnePdfLaden).path())
+  await bvSeite.getByText(/1 WEP eingelesen/).waitFor({ timeout: 20000 })
+  // Das Paket heißt nach der Vorgangs-Nr.; fehlt sie, steht in der Tabelle „ohne Nr.“ mit Hinweis
+  const paketNr = (await paketOhnePdfLaden).suggestedFilename().split('_')[0]
+  const bvNr = paketNr === 'ohne-Vorgangs-Nr' ? 'ohne Nr.' : paketNr
+  const bvZeile = bvSeite.locator('tr.bv-zeile').first()
+  pruefe((await bvZeile.innerText()).includes(bvNr), `BV-Seite: Tabelle mit der Vorgangs-Nr. ${bvNr}`)
+  await bvSeite.locator('tr.bv-zeile td.zahl').first().filter({ hasText: '€' }).waitFor({ timeout: 30000 })
+  const bvGesamt = await bvSeite.locator('tr.bv-zeile td.zahl').first().innerText()
+  await bvSeite.getByRole('button', { name: bvNr, exact: true }).click()
+  await bvSeite.getByRole('heading', { name: 'Bewertung' }).waitFor({ timeout: 30000 })
+  const ohneLeer = (t) => t.replace(/[\s\u00a0\u202f]/g, '')
+  pruefe(ohneLeer(await bvSeite.locator('.ueb-bewertung .ueb-gesamt').innerText()).includes(ohneLeer(bvGesamt)), `BV-Seite: Gesamtbetrag in Tabelle und Detail gleich (${bvGesamt})`)
+  await bvSeite.getByRole('button', { name: 'Rückfrage' }).click()
+  const bvPdf = bvSeite.waitForEvent('download', { timeout: 60000 })
+  await bvSeite.getByRole('button', { name: 'PDF übersichtlich' }).click()
+  pruefe(/_WEP(_Bau)?_uebersichtlich\.pdf$/.test((await bvPdf).suggestedFilename()), 'BV-Seite: „PDF übersichtlich“ erzeugt das PDF')
+  await bvSeite.getByRole('button', { name: /Alle Eingänge/ }).click()
+  pruefe(await bvSeite.locator('.bv-status-rueckfrage').first().isVisible(), 'BV-Seite: Status „Rückfrage“ steht in der Tabelle')
+  await bvSeite.reload()
+  await bvSeite.locator('tr.bv-zeile').first().waitFor()
+  pruefe((await bvSeite.locator('tr.bv-zeile').count()) === 1 && (await bvSeite.locator('.bv-status-rueckfrage').count()) === 1, 'BV-Seite: Eingang und Status bleiben nach dem Neuladen (lokal gespeichert)')
+  await bvSeite.close()
   // Notfall-Schalter „PDF-Export anzeigen“: PDF wieder da
   await seite.getByRole('button', { name: 'Protokolle' }).click()
   await seite.getByRole('button', { name: 'Profil und Einstellungen' }).filter({ visible: true }).first().click()

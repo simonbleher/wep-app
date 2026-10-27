@@ -1,5 +1,5 @@
 // Einstiegspunkt: rendert die React-App und registriert den Service Worker.
-import { StrictMode } from 'react'
+import { StrictMode, lazy, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
 import { Capacitor, SystemBars, SystemBarsStyle } from '@capacitor/core'
 import { registerSW } from 'virtual:pwa-register'
@@ -35,8 +35,18 @@ if (!container) {
   throw new Error('Wurzelelement #root nicht gefunden')
 }
 
+// BV-Kontrollseite unter /bv (nicht in der Navigation der Wertermittler); lädt erst bei Bedarf nach
+const BvApp = lazy(() => import('@/bv/BvApp'))
+const istBvSeite = /^\/bv(\/|$)/.test(window.location.pathname)
+
 createRoot(container).render(
   <StrictMode>
-    <App />
+    {istBvSeite ? (
+      <Suspense fallback={<div className="app" aria-busy="true" />}>
+        <BvApp />
+      </Suspense>
+    ) : (
+      <App />
+    )}
   </StrictMode>,
 )
