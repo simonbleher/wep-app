@@ -1,4 +1,4 @@
-// Profil des Wertermittlers (Name, Rolle, Standard-Kleingartenanlage) und
+// Profil des Wertermittlers (Name, Rolle, Unterschrift) und
 // Geräte-Einstellungen.
 //
 // - Profil: wird über OneDrive (daten/profil.json) zwischen den Geräten abgeglichen,
@@ -18,7 +18,6 @@ export interface Profil {
   name: string
   /** Schaltet Reiter und Export frei (Grün / Bau / Beides); pro WEP umschaltbar (`Wep.rolle`). */
   rolle: Rolle
-  standardAnlage: string
   /**
    * Baupreisindex-Werte (2015 = 100) je Jahr der Wertermittlung, die der Wertermittler selbst eingetragen hat;
    * sie überschreiben die Tabelle der App (src/bau/baupreisindex.ts). Schlüssel = Jahr als Text.
@@ -31,7 +30,7 @@ export interface Profil {
   unterschrift?: string
 }
 
-export const LEERES_PROFIL: Profil = { name: '', rolle: 'gruen', standardAnlage: '' }
+export const LEERES_PROFIL: Profil = { name: '', rolle: 'gruen' }
 
 /** Profil samt Abgleich-Stand, wie es lokal liegt. */
 export interface ProfilStand {
@@ -58,7 +57,9 @@ export const lokalesProfil: ProfilSpeicher = {
       const roh = localStorage.getItem(PROFIL_KEY)
       if (roh) {
         const d = JSON.parse(roh) as Partial<ProfilStand>
-        return { ...d, profil: { ...LEERES_PROFIL, ...d.profil } }
+        // standardAnlage: frühere Vorbelegung der Kleingartenanlage, gibt es nicht mehr
+        const { standardAnlage: _alt, ...profil } = { ...LEERES_PROFIL, ...d.profil } as Profil & { standardAnlage?: unknown }
+        return { ...d, profil }
       }
     } catch {
       /* kaputter oder gesperrter Speicher → leeres Profil */
@@ -90,13 +91,12 @@ export function aendereProfil(
   return neu
 }
 
-/** Neues WEP mit Vorbelegung aus dem Profil (Wertermittler, Kleingartenanlage). */
+/** Neues WEP mit Vorbelegung aus dem Profil (Wertermittler, Rolle). */
 export function neuerWepMitProfil(id: string, profil: Profil): Wep {
   const wep = neuerWep(id)
   // Der Name kommt in die Zelle des eigenen Teils: Grün E13, Bau E12 (Beides: beide)
   if (profil.rolle !== 'bau') wep.formalien.wertermittlerAussenAufwuchs = profil.name.trim()
   if (profil.rolle !== 'gruen') wep.formalien.wertermittlerBaulichkeiten = profil.name.trim()
-  wep.formalien.kleingartenanlage = profil.standardAnlage.trim()
   wep.rolle = profil.rolle // fest am WEP: ein späterer Rollenwechsel im Profil ändert es nicht
   return wep
 }

@@ -89,7 +89,7 @@ export async function leseTeilen(quelle: Blob | Uint8Array | ArrayBuffer): Promi
     weps: [{ wep, geaendertAm: daten.geaendertAm }],
     papierkorb: [],
     eigenePositionen: [],
-    profil: { profil: { name: '', rolle: 'gruen', standardAnlage: '' } },
+    profil: { profil: { name: '', rolle: 'gruen' } },
     enthaelt: sauber.enthaelt,
     fotos: sauber.fotos.map((f) => ({ wepId: wep.id, id: f.id })),
     bauExcel: wep.bauExcel && zip.file('bau.xlsx') ? [{ wepId: wep.id }] : [],

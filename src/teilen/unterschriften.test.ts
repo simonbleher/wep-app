@@ -46,7 +46,7 @@ function geraet(weps: SicherungsWep[]) {
     weps: async () => weps,
     papierkorb: async () => [],
     eigenePositionen: async () => [],
-    profil: async () => ({ profil: { name: '', rolle: 'gruen', standardAnlage: '' } }),
+    profil: async () => ({ profil: { name: '', rolle: 'gruen' } }),
     fotoDatei: async () => undefined,
     bauExcelDatei: async () => undefined,
   }

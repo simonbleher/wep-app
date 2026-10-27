@@ -125,8 +125,8 @@ Apps/WEP-App/
   damit ein Gerät mit altem Stand sie nicht zurückbringt. Es gibt keine Konflikt-Kopien; überschreibt
   ein anderes Gerät die Datei, heilt der nächste Abgleich (Vereinigung). Ohne Konto bleiben sie lokal
   (`localStorage`), nach der Anmeldung werden sie hochgeladen.
-- **Profil:** `daten/profil.json` (`wep-profil/1`) enthält Name, Rolle und
-  Standard-Kleingartenanlage. Es gibt kein Konflikt-Verfahren, die neuere Änderung
+- **Profil:** `daten/profil.json` (`wep-profil/1`) enthält Name, Rolle, eigene
+  Baupreisindex-Werte und die Unterschrift. Es gibt kein Konflikt-Verfahren, die neuere Änderung
   gewinnt. Geräte-Einstellungen („Upload nur über WLAN“) bleiben lokal und stehen
   nie in dieser Datei.
 
@@ -157,8 +157,7 @@ Code: `src/teilen/` (nutzt `src/sicherung/`).
 - **Abmelden** (im Profil) vergisst nur den Abgleich-Stand (damit ein anderes Konto
   sauber bei null beginnt) – WEPs und Profil bleiben auf dem Gerät.
 - Im Profil: Name (wird „Wertermittler Außenanlagen & Aufwuchs“ in neuen WEPs),
-  Rolle (Grün / Bau / beides, vorerst nur gespeichert), Standard-Kleingartenanlage
-  (Vorbelegung neuer WEPs), „Upload nur über WLAN“ (nur dieses Gerät, Standard an;
+  Rolle (Grün / Bau / beides, vorerst nur gespeichert), „Upload nur über WLAN“ (nur dieses Gerät, Standard an;
   wirkt erst in der Android-App), Konto, App-Version, Speicherort.
 
 ## Einmalig: App bei Microsoft registrieren

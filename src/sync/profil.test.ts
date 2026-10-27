@@ -32,7 +32,7 @@ describe('Profil-Abgleich (daten/profil.json)', () => {
 
   it('lokale Änderung wird hochgeladen, ein zweiter Abgleich lässt alles in Ruhe', async () => {
     const sp = speicher()
-    sp.stand = aendereProfil({ name: 'Erika Musterfrau', standardAnlage: 'KGA Musterwiese' }, sp, jetzt)
+    sp.stand = aendereProfil({ name: 'Erika Musterfrau' }, sp, jetzt)
 
     expect(await abgleich(sp)).toBe('hochgeladen')
     const datei = JSON.parse(drive.dateien.get('daten/profil.json')?.inhalt as string)
@@ -62,10 +62,10 @@ describe('Profil-Abgleich (daten/profil.json)', () => {
     const b = speicher()
     await abgleich(b, 'Gerät B')
 
-    b.stand = aendereProfil({ standardAnlage: 'KGA Beispielhain' }, b, jetzt)
+    b.stand = aendereProfil({ rolle: 'bau' }, b, jetzt)
     expect(await abgleich(b, 'Gerät B')).toBe('hochgeladen')
     expect(await abgleich(a)).toBe('geladen')
-    expect(a.stand.profil).toMatchObject({ name: 'Erika Musterfrau', standardAnlage: 'KGA Beispielhain' })
+    expect(a.stand.profil).toMatchObject({ name: 'Erika Musterfrau', rolle: 'bau' })
   })
 
   it('beide Geräte geändert: die neuere Änderung gewinnt', async () => {
@@ -134,14 +134,10 @@ describe('Unterschrift im Profil-Abgleich', () => {
 })
 
 describe('Vorbelegung neuer WEPs aus dem Profil', () => {
-  it('übernimmt Name als Wertermittler und die Standard-Anlage', () => {
-    const wep = neuerWepMitProfil('2026-001', {
-      name: ' Erika Musterfrau ',
-      rolle: 'gruen',
-      standardAnlage: 'KGA Musterwiese',
-    })
+  it('übernimmt den Namen als Wertermittler; die Kleingartenanlage bleibt leer', () => {
+    const wep = neuerWepMitProfil('2026-001', { name: ' Erika Musterfrau ', rolle: 'gruen' })
     expect(wep.formalien.wertermittlerAussenAufwuchs).toBe('Erika Musterfrau')
-    expect(wep.formalien.kleingartenanlage).toBe('KGA Musterwiese')
+    expect(wep.formalien.kleingartenanlage).toBe('')
     expect(wep.id).toBe('2026-001')
   })
 

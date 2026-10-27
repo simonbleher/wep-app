@@ -43,7 +43,7 @@ export async function leseSicherung(quelle: Blob | Uint8Array | ArrayBuffer): Pr
     eigenePositionen: liste(daten.eigenePositionen),
     fotos: liste(daten.fotos),
     bauExcel: liste(daten.bauExcel),
-    profil: daten.profil ?? { profil: { name: '', rolle: 'gruen', standardAnlage: '' } },
+    profil: daten.profil ?? { profil: { name: '', rolle: 'gruen' } },
     enthaelt: daten.enthaelt ?? { fotos: false, bauExcel: false },
   }
   const bytes = async (pfad: string) => {

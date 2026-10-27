@@ -47,7 +47,7 @@ function geraet(stand: Stand) {
     weps: async () => stand.weps,
     papierkorb: async () => stand.papierkorb,
     eigenePositionen: async () => [],
-    profil: async () => ({ profil: { name: '', rolle: 'gruen', standardAnlage: '' } }),
+    profil: async () => ({ profil: { name: '', rolle: 'gruen' } }),
     fotoDatei: async (wepId, f) => stand.fotos.get(`${wepId}/${f.id}`),
     bauExcelDatei: async (w) => stand.bau.get(w.id),
   }

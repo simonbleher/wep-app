@@ -22,7 +22,7 @@ describe('Rolle pro WEP', () => {
   })
 
   it('Neues WEP: Name des Profils kommt in die Zelle des eigenen Teils', () => {
-    const profil = { name: 'Erika Musterfrau', standardAnlage: 'KGA Testhain' }
+    const profil = { name: 'Erika Musterfrau' }
     const gruen = neuerWepMitProfil('2026-001', { ...profil, rolle: 'gruen' })
     expect([gruen.formalien.wertermittlerAussenAufwuchs, gruen.formalien.wertermittlerBaulichkeiten]).toEqual(['Erika Musterfrau', ''])
     const bau = neuerWepMitProfil('2026-002', { ...profil, rolle: 'bau' })

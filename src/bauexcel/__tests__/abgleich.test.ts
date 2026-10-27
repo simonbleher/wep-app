@@ -205,13 +205,13 @@ describe('Bau-Excel wählen und austauschen', () => {
 describe('Neues WEP aus Bau-Excel', () => {
   const datei = (b: Uint8Array) => Object.assign(new Blob([b.slice().buffer]), { name: 'Bau Testgarten.xlsx' })
 
-  it('legt das WEP an, merkt die Datei und befüllt die Formalien (Profil-Angaben bleiben, Unterschiede werden gefragt)', async () => {
+  it('legt das WEP an, merkt die Datei und befüllt die Formalien (Name aus dem Profil bleibt)', async () => {
     const gespeichert: Wep[] = []
     const ablage = new FakeBau()
     const w = await legeWepAusBauExcelAn({
       id: '2026-007',
       datei: datei(bytes),
-      profil: { ...LEERES_PROFIL, name: 'Max Mustermann', standardAnlage: 'KGA Andere' },
+      profil: { ...LEERES_PROFIL, name: 'Max Mustermann' },
       speichere: async (x) => void gespeichert.push(structuredClone(x)),
       werkzeuge: { ablage },
     })
@@ -221,10 +221,10 @@ describe('Neues WEP aus Bau-Excel', () => {
       unterpaechter: 'Erika Musterfrau',
       wertermittlerBaulichkeiten: 'Bert Bauer',
       wertermittlerAussenAufwuchs: 'Max Mustermann', // aus dem Profil, nicht in der Bau-Excel
-      kleingartenanlage: 'KGA Andere', // Profil sagt etwas anderes: nicht überschrieben
+      kleingartenanlage: 'KGA Testgarten', // aus der Bau-Excel
     })
-    expect(w.bauExcel).toMatchObject({ name: 'Bau Testgarten.xlsx', abgeglichen: false })
-    expect(pruefeFormalien(w.formalien, bau).unterschiede.map((f) => f.feld)).toEqual(['kleingartenanlage'])
+    expect(w.bauExcel).toMatchObject({ name: 'Bau Testgarten.xlsx', abgeglichen: true }) // nichts zu fragen
+    expect(pruefeFormalien(w.formalien, bau).unterschiede).toEqual([])
     expect(ablage.record('2026-007')?.hatDatei).toBe(true)
     expect(gespeichert.at(-1)).toEqual(w)
   })
