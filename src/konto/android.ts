@@ -10,8 +10,29 @@
 // Alle Abhängigkeiten (Browser, Rücksprung, natives Plugin, Zufall, SHA-256) sind
 // austauschbar, damit die Logik ohne Gerät getestet werden kann (android.test.ts).
 import type { Konto, KontoDienst } from './types'
+import { anmeldeFehlerText } from './fehler'
 
-export const AUTHORITY = 'https://login.microsoftonline.com/consumers'
+const BASIS = 'https://login.microsoftonline.com'
+/** Anmeldung über „common“: persönliche Microsoft-Konten und Geschäfts-/Schulkonten (Ziel 5). */
+export const AUTHORITY = `${BASIS}/common`
+/** Tenant aller persönlichen Microsoft-Konten (`tid` im ID-Token). */
+export const CONSUMERS_TID = '9188040d-6c67-4c5b-b112-36a304b66dad'
+
+/**
+ * Token-Endpunkt für die Erneuerung: im Tenant des Kontos. Gespeicherte Anmeldungen von vor der Umstellung haben keinen
+ * Tenant und erneuern wie bisher über „consumers“ – für persönliche Konten ändert sich nichts.
+ */
+export function tokenUrl(tenant: string | undefined): string {
+  const t = tenant && /^[A-Za-z0-9.-]{1,64}$/.test(tenant) ? tenant : 'consumers'
+  return `${BASIS}/${t}/oauth2/v2.0/token`
+}
+
+/** Tenant aus dem ID-Token (`tid`): persönliche Konten → „consumers“, sonst die Tenant-ID der Organisation. */
+export function tenantAusIdToken(idToken: string | undefined): string | undefined {
+  const tid = idTokenDaten(idToken)?.tid
+  if (!tid) return undefined
+  return tid === CONSUMERS_TID ? 'consumers' : tid
+}
 export const REDIRECT_URI = 'de.wep.app://auth'
 /** openid/profile liefern den Anzeigenamen (id_token); wie in der Web-Umsetzung (MSAL). */
 export const ANDROID_SCOPES = ['openid', 'profile', 'offline_access', 'Files.ReadWrite.AppFolder']
@@ -31,6 +52,8 @@ export interface GespeicherteAnmeldung {
   ablauf: number
   name: string
   benutzername: string
+  /** Tenant des Kontos für die Erneuerung („consumers“ oder Tenant-ID); fehlt bei Anmeldungen von vor der Umstellung. */
+  tenant?: string
 }
 
 export interface TokenAntwort {
@@ -93,24 +116,25 @@ export function baueAnmeldeUrl(p: { clientId: string; state: string; challenge: 
   return `${AUTHORITY}/oauth2/v2.0/authorize?${q.toString()}`
 }
 
-/** Liest Namen und Anmeldenamen aus dem id_token (ohne Signaturprüfung, nur Anzeige). */
-export function kontoAusIdToken(idToken: string | undefined): Konto {
-  const leer: Konto = { name: '', benutzername: 'Microsoft-Konto' }
-  if (!idToken) return leer
+/** Inhalt des id_token (ohne Signaturprüfung – nur Anzeige und Tenant für die Erneuerung). */
+function idTokenDaten(idToken: string | undefined): { name?: string; preferred_username?: string; email?: string; tid?: string } | undefined {
+  if (!idToken) return undefined
   try {
     const teil = idToken.split('.')[1]
     const bin = atob(teil.replace(/-/g, '+').replace(/_/g, '/'))
-    const daten = JSON.parse(new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)))) as {
-      name?: string
-      preferred_username?: string
-      email?: string
-    }
-    return {
-      name: daten.name ?? '',
-      benutzername: daten.preferred_username ?? daten.email ?? 'Microsoft-Konto',
-    }
+    return JSON.parse(new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0))))
   } catch {
-    return leer
+    return undefined
+  }
+}
+
+/** Liest Namen und Anmeldenamen aus dem id_token (ohne Signaturprüfung, nur Anzeige). */
+export function kontoAusIdToken(idToken: string | undefined): Konto {
+  const daten = idTokenDaten(idToken)
+  if (!daten) return { name: '', benutzername: 'Microsoft-Konto' }
+  return {
+    name: daten.name ?? '',
+    benutzername: daten.preferred_username ?? daten.email ?? 'Microsoft-Konto',
   }
 }
 
@@ -133,7 +157,7 @@ function parseToken(a: TokenAntwort): TokenJson {
 
 function fehlerText(a: TokenAntwort, j: TokenJson): string {
   const detail = j.error_description?.split('\r\n')[0] ?? j.error ?? a.text.slice(0, 120)
-  return `Microsoft-Anmeldung fehlgeschlagen (${a.status}): ${detail}`
+  return anmeldeFehlerText(`Microsoft-Anmeldung fehlgeschlagen (${a.status}): ${detail}`)
 }
 
 // --- Dienst -------------------------------------------------------------------
@@ -176,6 +200,7 @@ export function erstelleAndroidKontoDienst(
       throw new Error(fehlerText(antwort, j))
     }
     const konto = kontoAusIdToken(j.id_token)
+    const tenant = tenantAusIdToken(j.id_token)
     await abh.speichereAnmeldung({
       clientId: id,
       refreshToken: j.refresh_token,
@@ -183,6 +208,7 @@ export function erstelleAndroidKontoDienst(
       ablauf: abh.jetzt() + (j.expires_in ?? 3600) * 1000,
       name: konto.name,
       benutzername: konto.benutzername,
+      ...(tenant ? { tenant } : {}),
     })
   }
 
@@ -202,7 +228,7 @@ export function erstelleAndroidKontoDienst(
       const q = new URL(url).searchParams
       const fehler = q.get('error')
       if (fehler) {
-        throw new Error(`Anmeldung abgebrochen: ${q.get('error_description') ?? fehler}`)
+        throw new Error(anmeldeFehlerText(`Anmeldung abgebrochen: ${q.get('error_description') ?? fehler}`))
       }
       const code = q.get('code')
       if (!pending || !code || q.get('state') !== pending.state) {
@@ -246,7 +272,7 @@ export function erstelleAndroidKontoDienst(
   }
 
   async function erneuere(a: Partial<GespeicherteAnmeldung>): Promise<string> {
-    const antwort = await abh.tokenAnfrage(`${AUTHORITY}/oauth2/v2.0/token`, {
+    const antwort = await abh.tokenAnfrage(tokenUrl(a.tenant), {
       client_id: id,
       grant_type: 'refresh_token',
       refresh_token: a.refreshToken as string,
@@ -266,6 +292,7 @@ export function erstelleAndroidKontoDienst(
       ablauf: abh.jetzt() + (j.expires_in ?? 3600) * 1000,
       name: a.name ?? '',
       benutzername: a.benutzername ?? '',
+      ...(a.tenant ? { tenant: a.tenant } : {}),
     })
     return j.access_token
   }

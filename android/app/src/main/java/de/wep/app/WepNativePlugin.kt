@@ -54,6 +54,7 @@ class WepNativePlugin : Plugin() {
                     ablauf = call.getData().optLong("ablauf", 0),
                     name = call.getString("name") ?: "",
                     benutzername = call.getString("benutzername") ?: "",
+                    tenant = call.getString("tenant") ?: "consumers",
                 ),
             )
             // Nach der Anmeldung: eventuell schon Wartendes hochladen
@@ -72,7 +73,7 @@ class WepNativePlugin : Plugin() {
             if (a != null) {
                 r.put("clientId", a.clientId).put("refreshToken", a.refreshToken)
                     .put("accessToken", a.accessToken).put("ablauf", a.ablauf)
-                    .put("name", a.name).put("benutzername", a.benutzername)
+                    .put("name", a.name).put("benutzername", a.benutzername).put("tenant", a.tenant)
             }
             call.resolve(r)
         } catch (e: Exception) {

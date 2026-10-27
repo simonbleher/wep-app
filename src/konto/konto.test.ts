@@ -99,6 +99,13 @@ describe('Start: Login-Bildschirm und „ohne Konto“', () => {
     expect(await startZustand()).toEqual({ typ: 'start', konto: null })
   })
 
+  it('Rückkehr von Microsoft mit Fehler (z. B. fehlende Administratorzustimmung) → Login-Bildschirm mit verständlicher Meldung', async () => {
+    setzeKontoDienst(mock({ fehler: new Error('AADSTS90094: Admin consent is required') }).dienst)
+    const s = await startZustand()
+    expect(s.typ).toBe('login')
+    expect(s.typ === 'login' && s.fehler).toMatch(/Administratorzustimmung.*AADSTS90094/)
+  })
+
   it('Anmeldung abgebrochen (Wahl „konto“, aber kein Konto) → wieder Login-Bildschirm', async () => {
     setzeKontoDienst(mock().dienst)
     speichereStartWahl('konto')

@@ -194,6 +194,18 @@ describe('Anmeldung über Loopback (Windows)', () => {
     expect(t.anfragen).toHaveLength(1)
   })
 
+  it('alle Microsoft-Konten: Erneuerung im Tenant des Kontos, ohne Tenant (alte Anmeldung) über „consumers“', async () => {
+    const firma = aufbau([TOKEN_OK({ access_token: 'A2', refresh_token: 'R2' })])
+    firma.setzeGespeichert({ clientId: 'CID', refreshToken: 'R1', name: 'E', benutzername: 'e@x', tenant: '0a1b2c3d-1111-2222-3333-444455556666' })
+    await erstelleWindowsKontoDienst('CID', firma.abh).zugriffstoken()
+    expect(firma.anfragen[0].url).toBe('https://login.microsoftonline.com/0a1b2c3d-1111-2222-3333-444455556666/oauth2/v2.0/token')
+    expect(firma.gespeichert().tenant).toBe('0a1b2c3d-1111-2222-3333-444455556666')
+    const alt = aufbau([TOKEN_OK({ access_token: 'A2' })])
+    alt.setzeGespeichert({ clientId: 'CID', refreshToken: 'R1', name: 'E', benutzername: 'e@x' })
+    await erstelleWindowsKontoDienst('CID', alt.abh).zugriffstoken()
+    expect(alt.anfragen[0].url).toBe('https://login.microsoftonline.com/consumers/oauth2/v2.0/token')
+  })
+
   it('gleichzeitige Aufrufe teilen sich eine Erneuerung', async () => {
     const t = aufbau([TOKEN_OK({ access_token: 'ACCESS2' })])
     t.setzeGespeichert({ clientId: 'CID', refreshToken: 'REFRESH1' })

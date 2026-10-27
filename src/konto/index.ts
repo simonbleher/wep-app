@@ -14,6 +14,7 @@ import type { Konto, KontoDienst } from './types'
 
 export type { Konto, KontoDienst } from './types'
 export { speichereStartWahl, type Start } from './startwahl'
+export { anmeldeFehlerText } from './fehler'
 
 /**
  * Plattform automatisch: in der Android-App System-Browser + PKCE (Rücksprung per App-Link),

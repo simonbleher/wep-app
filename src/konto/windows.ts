@@ -10,7 +10,8 @@
 //
 // Alle Abhängigkeiten sind austauschbar, damit die Logik ohne Windows getestet werden kann
 // (windows.test.ts).
-import { AUTHORITY, ANDROID_SCOPES, base64url, erzeugePkce, kontoAusIdToken } from './android'
+import { AUTHORITY, ANDROID_SCOPES, base64url, erzeugePkce, kontoAusIdToken, tenantAusIdToken, tokenUrl } from './android'
+import { anmeldeFehlerText } from './fehler'
 import type { TokenAntwort } from './android'
 import type { Konto, KontoDienst } from './types'
 
@@ -24,6 +25,8 @@ export interface GespeicherteWindowsAnmeldung {
   refreshToken: string
   name: string
   benutzername: string
+  /** Tenant des Kontos für die Erneuerung (siehe android.ts); fehlt bei Anmeldungen von vor der Umstellung. */
+  tenant?: string
 }
 
 export interface WindowsAbhaengigkeiten {
@@ -79,7 +82,7 @@ function parseToken(a: TokenAntwort): TokenJson {
 
 function fehlerText(a: TokenAntwort, j: TokenJson): string {
   const detail = j.error_description?.split('\r\n')[0] ?? j.error ?? a.text.slice(0, 120)
-  return `Microsoft-Anmeldung fehlgeschlagen (${a.status}): ${detail}`
+  return anmeldeFehlerText(`Microsoft-Anmeldung fehlgeschlagen (${a.status}): ${detail}`)
 }
 
 export function erstelleWindowsKontoDienst(clientId: string | undefined, abh: WindowsAbhaengigkeiten): KontoDienst {
@@ -102,17 +105,19 @@ export function erstelleWindowsKontoDienst(clientId: string | undefined, abh: Wi
       throw new Error(fehlerText(antwort, j))
     }
     const konto = kontoAusIdToken(j.id_token)
+    const tenant = tenantAusIdToken(j.id_token)
     await abh.speichereAnmeldung({
       clientId: id,
       refreshToken: j.refresh_token,
       name: konto.name,
       benutzername: konto.benutzername,
+      ...(tenant ? { tenant } : {}),
     })
     zugriff = { token: j.access_token, ablauf: abh.jetzt() + (j.expires_in ?? 3600) * 1000 }
   }
 
   async function erneuere(a: Partial<GespeicherteWindowsAnmeldung>): Promise<string> {
-    const antwort = await abh.tokenAnfrage(`${AUTHORITY}/oauth2/v2.0/token`, {
+    const antwort = await abh.tokenAnfrage(tokenUrl(a.tenant), {
       client_id: id,
       grant_type: 'refresh_token',
       refresh_token: a.refreshToken as string,
@@ -131,6 +136,7 @@ export function erstelleWindowsKontoDienst(clientId: string | undefined, abh: Wi
         refreshToken: j.refresh_token,
         name: a.name ?? '',
         benutzername: a.benutzername ?? '',
+        ...(a.tenant ? { tenant: a.tenant } : {}),
       })
     }
     zugriff = { token: j.access_token, ablauf: abh.jetzt() + (j.expires_in ?? 3600) * 1000 }
@@ -163,7 +169,7 @@ export function erstelleWindowsKontoDienst(clientId: string | undefined, abh: Wi
       }
       const q = new URL(ziel, windowsRedirectUri(port)).searchParams
       const fehler = q.get('error')
-      if (fehler) throw new Error(`Anmeldung abgebrochen: ${q.get('error_description') ?? fehler}`)
+      if (fehler) throw new Error(anmeldeFehlerText(`Anmeldung abgebrochen: ${q.get('error_description') ?? fehler}`))
       const code = q.get('code')
       if (!code || q.get('state') !== state) {
         throw new Error('Anmeldung ungültig (Rücksprung passt zu keiner offenen Anmeldung)')

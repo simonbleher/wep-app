@@ -195,7 +195,7 @@ unter `src-tauri/` (oder von Hand). Reine Web-Änderungen erreichen das Programm
 |-------|---------|
 | `tauri.conf.json` | Fenster, Installer (NSIS, `currentUser`, Deutsch), Updater-Adresse, CSP |
 | `huelle-version.txt` | Hüllen-Nummer (siehe oben) |
-| `src/anmeldung.rs` | Loopback-Server auf `127.0.0.1:<freier Port>`, Standardbrowser öffnen, Token-Anfragen an Microsoft (nur `login.microsoftonline.com/consumers`, ohne Origin-Header) |
+| `src/anmeldung.rs` | Loopback-Server auf `127.0.0.1:<freier Port>`, Standardbrowser öffnen, Token-Anfragen an Microsoft (Anmeldung über `login.microsoftonline.com/common`, Token nur an `login.microsoftonline.com/<tenant>/oauth2/v2.0/token`, ohne Origin-Header) |
 | `src/tresor.rs` | Anmeldedaten in der Windows-Anmeldeinformationsverwaltung (große Daten auf mehrere Einträge verteilt) |
 | `src/speichern.rs` | „Speichern unter…“-Dialog, Datei roh (ohne Base64) übernehmen |
 | `src/eingang.rs` | Doppelklick auf `.wep`: Pfad aus den Programmargumenten (Start bzw. zweiter Start über die Einzelinstanz-Weiche) merken, Name und Bytes an die Oberfläche geben, Ereignis `wep-datei` |

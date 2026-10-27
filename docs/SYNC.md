@@ -178,8 +178,9 @@ Microsoft-Konto (dem, mit dem du auch OneDrive nutzt).
 3. Ausfüllen:
    - **Name:** `WEP-App` (unter diesem Namen erscheint später der Ordner
      `Apps/WEP-App` in deinem OneDrive)
-   - **Unterstützte Kontotypen:** **Nur persönliche Microsoft-Konten**
-     (*Personal Microsoft accounts only*)
+   - **Unterstützte Kontotypen:** **Konten in einem beliebigen Organisationsverzeichnis
+     und persönliche Microsoft-Konten** (*Accounts in any organizational directory and
+     personal Microsoft accounts*) – seit Oktober 2026, siehe „Alle Microsoft-Konten“ unten
    - **Umleitungs-URI:** Plattform **Single-Page-Webanwendung (SPA)**,
      Adresse `http://localhost:5173/`
    - **Registrieren** klicken.
@@ -197,6 +198,42 @@ Microsoft-Konto (dem, mit dem du auch OneDrive nutzt).
    ist bei privaten Konten nicht nötig – du stimmst beim ersten Verbinden selbst zu.
 7. **Kein** geheimer Clientschlüssel und **kein** Zertifikat anlegen – eine
    Browser-App braucht das nicht (Anmeldung per Authorization Code + PKCE).
+
+## Alle Microsoft-Konten (persönlich und Geschäfts-/Schulkonto)
+
+Seit Oktober 2026 meldet die App in Browser, Android und Windows über `common` an:
+persönliche Microsoft-Konten **und** Geschäfts-/Schulkonten (z. B. die Konten der
+BV-Mitarbeitenden). Der App-Ordner (`special/approot`, Berechtigung
+`Files.ReadWrite.AppFolder`) funktioniert auch mit OneDrive for Business.
+Persönliche Konten merken nichts davon: Bestehende Anmeldungen erneuern weiter
+über `consumers`, neue persönliche Anmeldungen merken sich `consumers` als Tenant.
+
+**Einmalig in Azure umstellen (Simon, nicht die App):**
+
+1. <https://entra.microsoft.com> → **Identität → Anwendungen → App-Registrierungen**
+   → **WEP-App** öffnen.
+2. Links **Authentifizierung** (*Authentication*) → Abschnitt **Unterstützte
+   Kontotypen** (*Supported account types*) → **Konten in einem beliebigen
+   Organisationsverzeichnis (beliebiger Microsoft Entra ID-Mandant – mehrinstanzenfähig)
+   und persönliche Microsoft-Konten (z. B. Skype, Xbox)** wählen → **Speichern**.
+3. Ist die Auswahl gesperrt oder kommt eine Fehlermeldung: links **Manifest** öffnen,
+   den Eintrag `"signInAudience"` auf `"AzureADandPersonalMicrosoftAccount"` setzen
+   (im neuen Manifest-Editor heißt er ebenso) → **Speichern**. Meldet Azure dabei
+   Fehler zu `accessTokenAcceptedVersion`, dort `2` eintragen und erneut speichern.
+4. Unter **API-Berechtigungen** muss weiter `Files.ReadWrite.AppFolder` (delegiert)
+   stehen; mehr braucht es nicht. Die Umleitungs-URIs bleiben, wie sie sind.
+5. Danach eine neue Version der App freigeben (dieser Stand muss auf den Geräten sein,
+   Android- und Windows-App bekommen dafür ein Programm-Update).
+
+**Hinweis für den BV (IT):** Manche Organisationen erlauben Mitarbeitenden nicht,
+Apps selbst zuzustimmen. Dann zeigt die App beim Anmelden: „Deine Organisation
+erlaubt nicht, dass du der WEP-App selbst zustimmst …“ (Microsoft-Fehler
+AADSTS65001 bzw. AADSTS90094). Die IT des BV muss dann **einmal** eine
+Administratorzustimmung geben: Microsoft Entra Admin Center → **Unternehmensanwendungen**
+→ **WEP-App** → **Berechtigungen** → **Administratorzustimmung für … erteilen**
+(oder über den Link
+`https://login.microsoftonline.com/<Tenant-ID des BV>/adminconsent?client_id=<Client-ID der App>`).
+Danach können sich alle Mitarbeitenden anmelden.
 
 ## Client-ID in der App eintragen
 
@@ -246,7 +283,8 @@ gebaut, damit der Login-Bildschirm erscheint; angemeldet wird dabei nie.
 | Datei | Inhalt |
 |-------|--------|
 | `src/konto/index.ts` | Schnittstelle: `anmelden`, `abmelden`, `aktuellesKonto`, `zugriffstoken`, `istAngemeldet` (Umsetzung austauschbar über `setzeKontoDienst`) |
-| `src/konto/web.ts` | Web-Umsetzung mit MSAL.js, Authority `consumers` |
+| `src/konto/web.ts` | Web-Umsetzung mit MSAL.js, Authority `common` (alle Microsoft-Konten) |
+| `src/konto/fehler.ts` | Verständliche Anmeldefehler (fehlende Administratorzustimmung AADSTS65001/90094) |
 | `src/konto/android.ts` | Android-Umsetzung: System-Browser + PKCE, Token nativ (docs/ANDROID.md) |
 | `src/konto/startwahl.ts` | Gemerkte Wahl „mit Konto / ohne Konto“ und Start-Entscheidung |
 | `src/sync/engine.ts` | Abgleich-Logik für die WEPs inkl. Papierkorb und Konflikte (rein, getestet) |
