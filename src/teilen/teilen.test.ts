@@ -391,6 +391,12 @@ describe('Teilen: kaputte und fremde Dateien', () => {
     expect(g.daten.wep.id).toBe('2026-001')
     expect(g.sicherung.daten.weps).toHaveLength(1)
   })
+  it('neues WEP mit UUID als Kennung wird gelesen (Teilen und Wieder-Öffnen)', async () => {
+    const id = '7c1e9f4a-2b3d-4e5f-8a9b-0c1d2e3f4a5b'
+    const g = await leseTeilen(await zipMit({ 'wep.json': gueltig({ ...wep('2026-001'), id }) }))
+    expect(g.daten.wep.id).toBe(id)
+    await expect(leseTeilen(await zipMit({ 'wep.json': gueltig({ ...wep('2026-001'), id: id.toUpperCase() + '/..' }) }))).rejects.toBeInstanceOf(TeilenFehler)
+  })
   it('Fotos fehlen im ZIP, obwohl das WEP sie nennt: das WEP kommt, die Fotos werden gemeldet', async () => {
     const s = geraetBau()
     const hin = await teile(s, '2026-001')

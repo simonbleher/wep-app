@@ -10,7 +10,8 @@ export interface GeleseneTeilen {
   sicherung: GeleseneSicherung
 }
 
-const WEP_ID = /^\d{4}-\d{3,6}$/
+/** Interne Kennung: alte WEPs „2026-007“, neue eine UUID (seit der Vorgangs-Nr. vom BV). Wird Dateiname, daher streng. */
+const WEP_ID = /^(\d{4}-\d{3,6}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/
 const FOTO_ID = /^[A-Za-z0-9_-]{1,64}$/
 
 const istObjekt = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x)
@@ -18,7 +19,7 @@ const istObjekt = (x: unknown): x is Record<string, unknown> => !!x && typeof x 
 /** Grobe Prüfung, damit eine fremde oder halbe Datei nicht erst später in der Oberfläche abstürzt. */
 function pruefeWep(w: unknown): string | undefined {
   if (!istObjekt(w)) return 'Das WEP in der Datei fehlt.'
-  if (typeof w.id !== 'string' || !WEP_ID.test(w.id)) return 'Die Vorgangs-Nr. des WEP ist ungültig.'
+  if (typeof w.id !== 'string' || !WEP_ID.test(w.id)) return 'Die Kennung des WEP ist ungültig.'
   if (!istObjekt(w.formalien)) return 'Die Formalien des WEP fehlen.'
   const g = w.gruen
   if (!istObjekt(g) || !Array.isArray(g.aussenanlagen) || !Array.isArray(g.aufwuchs) || !Array.isArray(g.beseitigungAA)) {
