@@ -377,3 +377,9 @@
 - **Entscheidung:** /bv verlangt (wenn eingeschaltet) eine Microsoft-Anmeldung und eine Freigabe durch einen Admin. Eine Pages Function prüft das ID-Token serverseitig (Signatur gegen die Microsoft-JWKS, `aud` = Client-ID, `iss` = `https://login.microsoftonline.com/<tid>/v2.0`, `exp`/`nbf`) und hält in einer KV-Bindung nur Anträge und Freigaben; Admins stehen in `BV_ADMINS`. Ein- und ausgeschaltet über `BV_ZUGANG_AKTIV` (nur Produktion), damit Vorschau und lokale Tests ohne Anmeldung laufen. Offline gilt eine bestätigte Freigabe 7 Tage.
 - **Grund:** Die Protokolle liegen weiter nur im Browser des BV-Rechners (kein Server mit WEP-Daten); die Freigabe regelt, wer die Seite überhaupt bedienen darf. ID-Token statt eigener Passwörter: keine Zugangsdaten zu verwalten, Geschäftskonten des BV funktionieren (Ziel 5).
 - **Sitzungsspeicher für die BV-Anmeldung:** Die Seite nutzt MSAL mit `sessionStorage` und nur `openid profile email`, damit die Wertermittler-App im selben Browser (MSAL mit `localStorage`) das BV-Konto nicht als ihr OneDrive-Konto aufgreift; beim nächsten Öffnen meldet `ssoSilent` ohne Klick wieder an.
+
+## 2026-10-27 · Keine Standard-Kleingartenanlage im Profil
+
+- **Entscheidung:** Das Feld „Standard-Kleingartenanlage“ (Vorbelegung neuer WEPs) entfällt ganz. Die Anlage wird je WEP in den Formalien gewählt.
+- **Grund:** Wunsch von Simon. Die Anlage ist je WEP verschieden; eine Vorbelegung kann unbemerkt falsch stehen bleiben.
+- **Alte Daten:** Ein gespeichertes `standardAnlage` wird beim Laden des Profils verworfen; ältere Apps, die es noch in `daten/profil.json` schreiben, stören nicht (das Feld wird nicht gelesen). Das Profil-Format bleibt `wep-profil/1`.

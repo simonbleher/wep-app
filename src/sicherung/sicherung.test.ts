@@ -37,7 +37,7 @@ interface Stand {
   bau: Map<string, Uint8Array>
 }
 const leer = (): Stand => ({
-  weps: [], papierkorb: [], eigene: [], profil: { profil: { name: '', rolle: 'gruen', standardAnlage: '' } },
+  weps: [], papierkorb: [], eigene: [], profil: { profil: { name: '', rolle: 'gruen' } },
   fotos: new Map(), bau: new Map(),
 })
 
@@ -96,7 +96,7 @@ function geraetA(): Stand {
   ]
   a.papierkorb = [{ id: '2026-003', wep: wep('2026-003', 'KGA Seeblick'), geloeschtAm: '2026-10-15T08:00:00.000Z' }]
   a.eigene = [eigene('e1', 'Hochbeet, Lärche'), eigene('e2', 'Regentonne', 25)]
-  a.profil = { profil: { name: 'Max Mustermann', rolle: 'gruen', standardAnlage: 'KGA Musterwiese' }, geaendertAm: '2026-10-10T00:00:00.000Z' }
+  a.profil = { profil: { name: 'Max Mustermann', rolle: 'gruen' }, geaendertAm: '2026-10-10T00:00:00.000Z' }
   a.fotos.set('2026-001/f1', bytes(1, 2, 3))
   a.fotos.set('2026-001/f2', bytes(4, 5, 6))
   a.bau.set('2026-001', bytes(9, 9))
@@ -224,7 +224,7 @@ describe('Einspielen mit Konflikten: nichts wird still überschrieben', () => {
       a.weps[1]!,
     ]
     b.eigene = [eigene('e1', 'Hochbeet, Lärche', 15, '2026-10-12T00:00:00.000Z'), eigene('e9', 'Eigene nur hier')]
-    b.profil = { profil: { name: 'Max Mustermann', rolle: 'gruen', standardAnlage: 'KGA Seeblick' }, geaendertAm: '2026-10-11T00:00:00.000Z' }
+    b.profil = { profil: { name: 'Max Mustermann', rolle: 'bau' }, geaendertAm: '2026-10-11T00:00:00.000Z' }
     return b
   }
 
@@ -258,7 +258,7 @@ describe('Einspielen mit Konflikten: nichts wird still überschrieben', () => {
     expect(e.weps).toEqual([])
     expect(b.eigene.find((x) => x.id === 'e1')!.einzelpreis).toBe(15)
     expect(b.eigene.map((x) => x.id).sort()).toEqual(['e1', 'e2', 'e9'])
-    expect(b.profil.profil.standardAnlage).toBe('KGA Seeblick')
+    expect(b.profil.profil.rolle).toBe('bau')
   })
 
   it('„Aus der Sicherung übernehmen“ ersetzt den Stand hier ausdrücklich; eigene Positionen gelten ab jetzt', async () => {
@@ -271,7 +271,7 @@ describe('Einspielen mit Konflikten: nichts wird still überschrieben', () => {
     expect(e.weps).toContainEqual({ id: '2026-001', von: undefined, ersetzt: true })
     expect(b.weps.find((w) => w.wep.id === '2026-001')!.wep.formalien.kleingartenanlage).toBe('KGA Musterwiese')
     expect(b.eigene.find((x) => x.id === 'e1')).toMatchObject({ einzelpreis: 12, geaendertAm: JETZT })
-    expect(b.profil.profil.standardAnlage).toBe('KGA Musterwiese')
+    expect(b.profil.profil.rolle).toBe('gruen')
     expect(e.profil).toBe(true)
   })
 

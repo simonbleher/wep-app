@@ -188,12 +188,12 @@ function vergleicheEigene(sicherung: EigenePosition[], lokal: EigenePosition[]):
   return punkte
 }
 
-const profilLeer = (p: Profil) => !p.name.trim() && !p.standardAnlage.trim()
+const profilLeer = (p: Profil) => !p.name.trim()
 
 function vergleicheProfil(sicherung: Profil, lokal: Profil): Punkt | undefined {
   if (profilLeer(sicherung)) return undefined
-  const beschreibe = (p: Profil) => [p.name, p.standardAnlage].filter((t) => t.trim()).join(', ') || 'leer'
-  if (sicherung.name === lokal.name && sicherung.rolle === lokal.rolle && sicherung.standardAnlage === lokal.standardAnlage) return undefined
+  const beschreibe = (p: Profil) => p.name.trim() || 'leer'
+  if (sicherung.name === lokal.name && sicherung.rolle === lokal.rolle) return undefined
   if (profilLeer(lokal)) {
     return { schluessel: 'profil', titel: 'Profil', detail: `Hier noch leer. Sicherung: ${beschreibe(sicherung)}.`, status: 'neu', optionen: ['uebernehmen', 'ueberspringen'], standard: 'uebernehmen' }
   }

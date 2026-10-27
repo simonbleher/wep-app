@@ -113,11 +113,11 @@ try {
   await seite.getByRole('heading', { name: 'Protokolle' }).waitFor()
   pruefe((await seite.getByRole('button', { name: 'Mit Microsoft anmelden' }).count()) === 0, 'nach Neustart kein Login-Bildschirm mehr')
 
-  // 4. Profil öffnen, Name und Anlage eintragen
+  // 4. Profil öffnen, Name eintragen (eine Standard-Anlage gibt es nicht mehr)
   await seite.getByRole('button', { name: 'Profil und Einstellungen' }).click()
   await seite.getByRole('heading', { name: 'Profil und Einstellungen' }).waitFor()
   await seite.getByLabel(/^Name/).fill('Erika Musterfrau')
-  await waehleKga(seite, /Standard-Kleingartenanlage/, 'KGA Musterwiese')
+  pruefe((await seite.getByLabel(/Standard-Kleingartenanlage/).count()) === 0, 'Profil: keine Standard-Kleingartenanlage')
   await seite.getByLabel('Rolle').selectOption('gruen')
   pruefe(await seite.getByLabel('Upload nur über WLAN').isChecked(), 'Upload nur über WLAN ist standardmäßig an')
   pruefe(await seite.getByText(/Gilt für Fotos und den Hintergrund-Upload der Android-App/).isVisible(), 'Hinweis zu „nur WLAN“ nennt Fotos und die Android-App')
@@ -145,7 +145,7 @@ try {
   await seite.getByLabel('Mit Excel arbeiten').check()
   await seite.getByRole('button', { name: 'Protokolle' }).click()
 
-  // 5. WEP anlegen: Vorgangs-Nr. (vom BV) im Dialog; Name und Anlage aus dem Profil sind vorbelegt
+  // 5. WEP anlegen: Vorgangs-Nr. (vom BV) im Dialog; Name aus dem Profil ist vorbelegt, die Anlage wählt man im WEP
   await seite.getByRole('button', { name: 'Neues WEP', exact: true }).click()
   const neuDlg = seite.getByRole('dialog', { name: 'Neues WEP' })
   await neuDlg.waitFor()
@@ -154,7 +154,9 @@ try {
   await neuDlg.getByRole('button', { name: 'Anlegen' }).click()
   await seite.getByLabel(/Kleingartenanlage/).first().waitFor()
   pruefe((await seite.getByLabel(/Vorgangs-Nr/).first().inputValue()) === '2026-001', 'Neues WEP: Vorgangs-Nr. aus dem Dialog steht in den Formalien')
-  pruefe((await leseKga(seite, /Kleingartenanlage/)) === 'KGA Musterwiese', 'Anlage aus dem Profil vorbelegt')
+  pruefe((await leseKga(seite, /Kleingartenanlage/)) === '', 'Neues WEP: Anlage ist leer (keine Vorbelegung)')
+  await waehleKga(seite, /Kleingartenanlage/, 'KGA Musterwiese')
+  pruefe((await leseKga(seite, /Kleingartenanlage/)) === 'KGA Musterwiese', 'Anlage im WEP gewählt')
   pruefe((await seite.locator('input[value="Erika Musterfrau"]').count()) > 0, 'Wertermittler aus dem Profil vorbelegt')
 
   // 6. Aufwuchs: Position über die Suche hinzufügen – die Variante steht direkt im Treffer

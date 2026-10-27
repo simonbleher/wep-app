@@ -100,7 +100,6 @@ try {
   await seite.getByRole('heading', { name: 'Profil und Einstellungen' }).waitFor()
   await seite.getByLabel(/^Name/).fill('Hans Beispiel')
   await seite.getByLabel('Rolle').selectOption('gruen')
-  await seite.getByLabel(/Standard-Kleingartenanlage/).first().selectOption({ label: 'Rosenthal-Süd' })
   await bild('02-profil')
   await seite.getByText('Dieses Gerät', { exact: true }).scrollIntoViewIfNeeded()
   await bild('03-profil-geraet')

@@ -1,4 +1,4 @@
-// Abgleich des Profils (Name, Rolle, Standard-Kleingartenanlage) mit daten/profil.json.
+// Abgleich des Profils (Name, Rolle, Baupreisindex, Unterschrift) mit daten/profil.json.
 //
 // Ein Profil für alle Geräte, ohne Konflikt-Kopien: Die neuere Änderung gewinnt.
 // Geräte-Einstellungen (z. B. „Upload nur über WLAN“) gehören nicht hierher.

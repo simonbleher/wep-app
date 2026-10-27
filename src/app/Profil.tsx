@@ -1,4 +1,4 @@
-// Profil und Einstellungen: Name, Rolle, Standard-Anlage (werden über OneDrive
+// Profil und Einstellungen: Name, Rolle, Unterschrift (werden über OneDrive
 // abgeglichen), Geräte-Einstellungen (nur lokal), Konto, App-Version, Speicherort.
 import { useEffect, useId, useRef, useState } from 'react'
 import { BookOpen, ChevronLeft } from 'lucide-react'
@@ -16,7 +16,6 @@ import {
 } from '@/profil'
 import { BaupreisindexProfil } from './BauIndexProfil'
 import { EigenePositionen } from './EigenePositionen'
-import { KgaAuswahl } from './KgaAuswahl'
 import { Fehlersuche } from './Fehlersuche'
 import { Sicherung } from './Sicherung'
 import { Synchronisierung } from './Synchronisierung'
@@ -130,14 +129,9 @@ export function Profil({ konto, verfuegbar, onZurueck, onAnmelden, onAbmelden }:
               ))}
             </select>
           </div>
-          <KgaAuswahl
-            label="Standard-Kleingartenanlage (Vorbelegung neuer WEPs)"
-            wert={profil.standardAnlage}
-            onChange={(v) => aendern({ standardAnlage: v })}
-          />
           <p className="neben">
             {konto
-              ? 'Name, Rolle und Anlage werden mit deinen anderen Geräten abgeglichen.'
+              ? 'Name und Rolle werden mit deinen anderen Geräten abgeglichen.'
               : 'Ohne Konto bleiben diese Angaben auf diesem Gerät.'}
           </p>
         </section>
