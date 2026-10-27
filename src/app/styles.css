@@ -2604,3 +2604,122 @@ input[type='range'] {
   display: grid;
   gap: var(--abstand-2);
 }
+
+/* ---------------------------------------------------------------------------
+   Übersicht (Reiter „Übersicht“, BV-Kontrollseite): das Protokoll als Seite
+   ------------------------------------------------------------------------- */
+
+.ueb-abschnitt {
+  margin-bottom: var(--abstand-6);
+}
+
+.ueb-h2 {
+  margin: var(--abstand-5) 0 var(--abstand-3);
+  padding-bottom: var(--abstand-2);
+  border-bottom: 2px solid var(--farbe-akzent);
+  color: var(--farbe-akzent);
+  font-size: var(--schrift-gross);
+  font-weight: var(--gewicht-fett);
+}
+
+.ueb-h3 {
+  margin: var(--abstand-4) 0 var(--abstand-2);
+  font-size: var(--schrift-basis);
+  font-weight: var(--gewicht-fett);
+}
+
+.ueb-bauteil {
+  margin-bottom: var(--abstand-4);
+}
+
+.ueb-text {
+  margin-bottom: var(--abstand-3);
+  white-space: pre-line;
+}
+
+.ueb-block {
+  display: block;
+}
+
+.ueb-scroll {
+  overflow-x: auto;
+}
+
+.ueb-formalien {
+  display: grid;
+  gap: var(--abstand-1) var(--abstand-4);
+}
+
+.ueb-formalien > div {
+  display: grid;
+  grid-template-columns: minmax(9rem, 40%) 1fr;
+  gap: var(--abstand-3);
+  padding: var(--abstand-1) 0;
+  border-bottom: var(--linie) solid var(--farbe-linie);
+}
+
+.ueb-formalien dt {
+  color: var(--farbe-text-2);
+}
+
+.ueb-tabelle {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--schrift-klein);
+}
+
+.ueb-tabelle th,
+.ueb-tabelle td {
+  padding: var(--abstand-2) var(--abstand-2);
+  border-bottom: var(--linie) solid var(--farbe-linie);
+  text-align: left;
+  vertical-align: top;
+}
+
+.ueb-tabelle th[scope='row'] {
+  font-weight: var(--gewicht-normal);
+}
+
+.ueb-tabelle thead th {
+  color: var(--farbe-text-2);
+  font-weight: var(--gewicht-mittel);
+}
+
+.ueb-tabelle .zahl {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.ueb-tabelle .ueb-summe th,
+.ueb-tabelle .ueb-summe td {
+  font-weight: var(--gewicht-fett);
+}
+
+.ueb-tabelle .ueb-gesamt th,
+.ueb-tabelle .ueb-gesamt td {
+  border-bottom: 0;
+  background: var(--farbe-akzent-hell);
+  color: var(--farbe-akzent);
+  font-size: var(--schrift-basis);
+  font-weight: var(--gewicht-fett);
+}
+
+.ueb-bewertung {
+  font-size: var(--schrift-basis);
+}
+
+.ueb-posten td:first-child {
+  width: 2.5rem;
+  color: var(--farbe-text-2);
+}
+
+@media (max-width: 599px) {
+  .ueb-tabelle th,
+  .ueb-tabelle td {
+    padding: var(--abstand-2) var(--abstand-1);
+  }
+
+  .ueb-posten td:first-child {
+    width: 1.75rem;
+  }
+}

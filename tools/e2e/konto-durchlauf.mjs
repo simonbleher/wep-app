@@ -169,6 +169,15 @@ try {
   pruefe(await seite.getByText(/2.Stück · gut · je 70,00/).isVisible(), 'Position mit überschriebenem Preis in der Liste')
   pruefe(await seite.getByText(/manuell/).filter({ visible: true }).first().isVisible(), 'überschriebener Preis ist als „manuell“ markiert')
 
+  // 6b. Reiter „Übersicht“: Bewertung wie das Deckblatt, die Position mit Menge, Einzelpreis und Summe
+  await seite.getByRole('navigation', { name: 'Abschnitte' }).getByRole('button', { name: 'Übersicht' }).click()
+  await seite.getByRole('heading', { name: 'Bewertung' }).waitFor({ timeout: 30000 })
+  const gesamtZeile = seite.locator('.ueb-gesamt')
+  pruefe((await gesamtZeile.innerText()).includes('140,00'), 'Übersicht: Gesamtbetrag 140,00 € hervorgehoben')
+  pruefe(await seite.locator('.ueb-posten').getByText('Apfel, Halbstamm, 5–30 J.').isVisible(), 'Übersicht: Position im Aufwuchs aufgelistet')
+  await seite.getByRole('navigation', { name: 'Abschnitte' }).getByRole('button', { name: 'Aufwuchs' }).click()
+  await seite.getByRole('heading', { name: 'Aufwuchs' }).waitFor()
+
   // 7. Rasen über 100 m² → Warnung (nur Hinweis, keine Sperre), Summe
   await seite.getByRole('button', { name: 'Hinzufügen', exact: true }).click()
   await seite.getByLabel('Katalog durchsuchen').fill('rasen')

@@ -8,6 +8,9 @@ import { exportWep, mitLeerenBauDaten, type ExportOptionen, type ExportResult } 
 import type { Rolle, Wep } from '../model'
 import { erzeugePdf, type PdfErgebnis, type PdfOptionen } from './erzeugen'
 import { erzeugeUebersichtPdf, type UebersichtErgebnis } from './uebersicht/erzeugen'
+import { leseProtokoll, type Protokoll } from './uebersicht/daten'
+import { leseMappe } from './mappe'
+import { Rechenwerk } from './formeln'
 
 export { erzeugePdf, waehleBlaetter, unterschriftsFelder, BLATT } from './erzeugen'
 export type { PdfErgebnis, PdfOptionen, PdfSkizzen, PdfBlattErgebnis } from './erzeugen'
@@ -70,4 +73,17 @@ export async function erzeugeWepUebersichtPdf(eingabe: WepPdfEingabe, optionen: 
   const xlsx = await exportErg.blob.arrayBuffer()
   const pdf = await erzeugeUebersichtPdf(xlsx, { ...optionen, rolle, wep: fuerExport.wep })
   return { name: exportErg.filename.replace(/\.xlsx$/i, '_uebersichtlich.pdf'), pdf, export: exportErg }
+}
+
+/**
+ * Die Zahlen des übersichtlichen PDF ohne das PDF: gleicher Excel-Export, gleiches Rechenwerk, gleiches `leseProtokoll`.
+ * Grundlage des Reiters „Übersicht“ (Wertermittler) und der Detailansicht der BV-Kontrollseite – beide zeigen also
+ * genau die Zahlen, die auch im PDF stehen.
+ */
+export async function erzeugeWepProtokoll(eingabe: WepPdfEingabe): Promise<Protokoll> {
+  const { wep, rolle } = eingabe
+  const fuerExport = mitLeerenBauDaten(wep, rolle, eingabe.hatBauExcel)
+  const exportErg = await exportWep(fuerExport.wep, eingabe.quelle, { ...eingabe.exportOptionen, teil: fuerExport.teil })
+  const mappe = await leseMappe(await exportErg.blob.arrayBuffer())
+  return leseProtokoll(new Rechenwerk(mappe), fuerExport.wep, rolle)
 }

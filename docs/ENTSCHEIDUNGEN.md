@@ -340,3 +340,8 @@
 - **Grund:** Fachliche Vorgabe des Wertermittlers (so wird im BV gerechnet). Die alte 33-Jahre-Grenze für Gruben, die keine Tanks sind, diente nur dazu, dass der lineare Abzug nicht über 100 % steigt; vom Restwert gerechnet ist sie überflüssig und entfällt. Tanks und monolithische Betongruben bleiben nach 16 Jahren stehen (S. 14).
 - **Kanalanschluss** (S. 14, gleiche Formulierung): ebenso, Abzug = 1 − 0,97^Alter vom Erstellungspreis (höchstens 2.200 €); Korrektur `H79` (`G78/100*3` → `1-0.97^G78`), die 33-Jahre-Grenze entfällt.
 - **2 Nachkommastellen:** C75 („0“) und H79 („0%“) zeigten in der Vorlage keine Nachkommastellen (38,57 % erschien als 39 %). Der Export hängt dafür eine Kopie des Zellformats mit „0.00“ bzw. „0.00%“ an `styles.xml` der Kopie an und setzt sie nur an diesen beiden Zellen (`mitZahlenformat` in `src/export/xmlPatcher.ts`); andere Zellen mit demselben Format bleiben, wie sie sind.
+
+## 2026-10-26 · Übersicht statt PDF für Wertermittler: Zahlen aus dem Protokoll des PDF
+
+- **Entscheidung:** Der Reiter „Übersicht“ (und später die Detailansicht der BV-Kontrollseite) rechnet nicht selbst, sondern nimmt das `Protokoll` des übersichtlichen PDF (`erzeugeWepProtokoll`: gleicher Excel-Export, gleiches Rechenwerk, gleiches `leseProtokoll`). Die Seite zeigt es als HTML.
+- **Grund:** Wertermittler und BV sollen genau dieselben Zahlen sehen wie im Protokoll; eine zweite Rechnung könnte abweichen. Der Export dauert einen Moment, darum rechnet die Übersicht nach einer Änderung kurz verzögert neu (offline, im Browser).

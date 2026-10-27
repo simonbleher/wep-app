@@ -35,8 +35,10 @@ import {
   Sprout,
   Trash2,
   type LucideIcon,
+  ClipboardList,
 } from 'lucide-react'
 import { TeilenDialog } from './TeilenDialog'
+import { Uebersicht } from './Uebersicht'
 import { dupliziereWep, hatBauTeil, type BauteilArt, hatGruenTeil, vorgangsNrVon, wepName, rolleAusTeilen, wepRolle, wepStatus, type Rolle, type Wep, type Position, type BeseitigungsPosition, type Formalien, type WepStatus } from '@/model'
 import { PAPIERKORB_TAGE, ladeKonflikt, loescheWep } from '@/sync/aktionen'
 import type { KonfliktInfo } from '@/sync/types'
@@ -92,7 +94,7 @@ import { leseZahl, zahlDe, zahlFuerEingabe } from '@/gruen/format'
 
 type GruenBereich = 'aussenanlagen' | 'aufwuchs' | 'beseitigung' | 'skizze'
 type BauBereich = 'baulichkeiten' | 'maengel' | 'abwasser' | 'beseitigungBau' | 'skizzeBau' | 'rechner'
-type Bereich = 'formalien' | 'fotos' | GruenBereich | BauBereich
+type Bereich = 'formalien' | 'fotos' | 'uebersicht' | GruenBereich | BauBereich
 type Tab = Bereich | 'export'
 
 type ExportZustand =
@@ -130,6 +132,7 @@ const BEREICHE: { id: Bereich; titel: string; kurz: string; icon: LucideIcon; te
   { id: 'skizze', titel: 'Skizze', kurz: 'Skizze', icon: PencilRuler, teil: 'gruen', titelMitTeil: 'Skizze Grün' },
   { id: 'skizzeBau', titel: 'Skizze Bau', kurz: 'Skizze', icon: Ruler, teil: 'bau', titelMitTeil: 'Skizze Bau' },
   { id: 'rechner', titel: 'Rechner', kurz: 'Rechner', icon: Calculator, teil: 'bau' },
+  { id: 'uebersicht', titel: 'Übersicht', kurz: 'Übersicht', icon: ClipboardList, teil: 'alle' },
 ]
 
 /** Abschnitte, die zur Rolle passen (Reihenfolge wie in BEREICHE). */
@@ -558,6 +561,7 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
             {tab === 'rechner' && bereiche.some((b) => b.id === tab) && <RechnerTab wep={wep} aendere={aendere} profilIndex={profilIndex} />}
             {tab === 'fotos' && <FotosTab wep={wep} aendere={aendere} records={fotoRecords} nachladen={fotoNachladen} />}
             {tab === 'skizze' && <SkizzeTab wep={wep} onSpeichern={speichere} />}
+            {tab === 'uebersicht' && <Uebersicht wep={wep} rolle={rolle} optionen={{ profilIndex }} />}
             {tab === 'export' && (
               <ExportTab
                 wep={wep}
@@ -577,7 +581,7 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
       </main>
 
       {!maskeSichtbar && (
-        <nav className={beides ? 'unten unten-scroll nur-handy' : 'unten nur-handy'} aria-label="Abschnitte">
+        <nav className={beides || bereiche.length > 7 ? 'unten unten-scroll nur-handy' : 'unten nur-handy'} aria-label="Abschnitte">
           {bereiche.map((b) => (
             <button
               key={b.id}
