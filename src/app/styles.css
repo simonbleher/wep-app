@@ -2723,3 +2723,7 @@ input[type='range'] {
     width: 1.75rem;
   }
 }
+
+.entwickler {
+  margin-top: var(--abstand-6);
+}

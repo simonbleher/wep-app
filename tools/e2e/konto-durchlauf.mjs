@@ -133,12 +133,16 @@ try {
   pruefe(true, 'Anleitung öffnet sich aus dem Profil, „Zurück zur App“ führt zur Startseite')
   await seite.getByRole('button', { name: 'Profil und Einstellungen' }).filter({ visible: true }).first().click()
   await seite.getByRole('heading', { name: 'Profil und Einstellungen' }).waitFor()
-  // Standard: ohne Excel – keine Excel-Knöpfe auf der Startseite; für die Excel-Durchläufe unten wird es ausgeschaltet
-  pruefe(await seite.getByLabel('Ohne Excel arbeiten').isChecked(), 'Ohne Excel arbeiten ist standardmäßig an')
+  // Standard: Entwickleroptionen zugeklappt, Excel und PDF aus – keine Excel-Knöpfe auf der Startseite; für die
+  // Excel-Durchläufe unten wird „Mit Excel arbeiten“ eingeschaltet
+  pruefe(!(await seite.getByLabel('Mit Excel arbeiten').isVisible()), 'Entwickleroptionen sind zugeklappt')
+  await seite.getByText('Entwickleroptionen', { exact: true }).click()
+  pruefe(!(await seite.getByLabel('Mit Excel arbeiten').isChecked()) && !(await seite.getByLabel('PDF-Export anzeigen').isChecked()), 'Entwickleroptionen: Excel und PDF standardmäßig aus')
   await seite.getByRole('button', { name: 'Protokolle' }).click()
   pruefe((await seite.getByRole('button', { name: /Neues WEP aus Bau-Excel/ }).count()) === 0, 'Ohne Excel: kein „Neues WEP aus Bau-Excel“ auf der Startseite')
   await seite.getByRole('button', { name: 'Profil und Einstellungen' }).filter({ visible: true }).first().click()
-  await seite.getByLabel('Ohne Excel arbeiten').uncheck()
+  await seite.getByText('Entwickleroptionen', { exact: true }).click()
+  await seite.getByLabel('Mit Excel arbeiten').check()
   await seite.getByRole('button', { name: 'Protokolle' }).click()
 
   // 5. WEP anlegen: Vorgangs-Nr. (vom BV) im Dialog; Name und Anlage aus dem Profil sind vorbelegt
@@ -1223,25 +1227,44 @@ try {
   await seite.getByRole('button', { name: 'Profil und Einstellungen' }).click()
   await seite.getByLabel('Rolle').selectOption('gruen')
 
-  // 11z. Ohne Excel (Standard) wieder an: kein Excel-Export, keine Bau-Excel in den Formalien, PDF bleibt
-  await seite.getByLabel('Ohne Excel arbeiten').check()
+  // 11z. Standard wieder an (Excel aus): kein Excel-Export, keine Bau-Excel in den Formalien, kein PDF – nur „An den BV senden“
+  await seite.getByText('Entwickleroptionen', { exact: true }).click()
+  await seite.getByLabel('Mit Excel arbeiten').uncheck()
   await seite.getByRole('button', { name: 'Protokolle' }).click()
   await seite.getByRole('list', { name: 'Protokolle' }).getByRole('button').first().click()
   await seite.getByLabel(/Kleingartenanlage/).first().waitFor()
   pruefe((await seite.getByText(/Bau-Excel auswählen/).count()) === 0 && (await seite.getByText(/Formalien abgleichen/).count()) === 0, 'Ohne Excel: Formalien ohne Bau-Excel-Bereich')
-  await seite.getByRole('button', { name: 'Export', exact: true }).click()
+  await seite.getByRole('button', { name: 'An den BV', exact: true }).click()
+  await seite.getByRole('heading', { name: 'An den BV senden' }).waitFor()
+  pruefe((await seite.getByRole('button', { name: 'Excel exportieren' }).count()) === 0 && (await seite.getByRole('button', { name: 'PDF übersichtlich' }).count()) === 0, 'Standard: nur „An den BV senden“, kein Excel, kein PDF')
+  // Ohne PDF: Paket mit der WEP-Datei (samt Fotos), keine PDFs
+  await seite.getByRole('button', { name: 'Paket für den BV erstellen' }).click()
+  await seite.getByRole('button', { name: 'Speichern', exact: true }).waitFor({ timeout: 60000 })
+  const paketOhnePdfLaden = seite.waitForEvent('download')
+  await seite.getByRole('button', { name: 'Speichern', exact: true }).click()
+  const paketOhnePdf = await JSZip.loadAsync(readFileSync(await (await paketOhnePdfLaden).path()))
+  const namenOhnePdf = Object.keys(paketOhnePdf.files)
+  pruefe(namenOhnePdf.some((n) => n.endsWith('.wep')) && !namenOhnePdf.some((n) => n.endsWith('.pdf')), 'An den BV (Standard): WEP-Datei im Paket, keine PDFs')
+  // Notfall-Schalter „PDF-Export anzeigen“: PDF wieder da
+  await seite.getByRole('button', { name: 'Protokolle' }).click()
+  await seite.getByRole('button', { name: 'Profil und Einstellungen' }).filter({ visible: true }).first().click()
+  await seite.getByText('Entwickleroptionen', { exact: true }).click()
+  await seite.getByLabel('PDF-Export anzeigen').check()
+  await seite.getByRole('button', { name: 'Protokolle' }).click()
+  await seite.getByRole('list', { name: 'Protokolle' }).getByRole('button').first().click()
+  await seite.getByLabel(/Kleingartenanlage/).first().waitFor()
+  await seite.getByRole('button', { name: 'An den BV', exact: true }).click()
   await seite.getByRole('heading', { name: 'Export als PDF' }).waitFor()
-  pruefe((await seite.getByRole('button', { name: 'Excel exportieren' }).count()) === 0, 'Ohne Excel: kein „Excel exportieren“, das PDF bleibt')
-  // Ohne Excel setzt das PDF den Status „exportiert“ (vorher nur der Excel-Export)
+  // Das PDF setzt den Status „exportiert“
   await seite.getByRole('button', { name: 'Weitere Aktionen' }).click()
   await seite.getByRole('menuitem', { name: /Als fertig markieren/ }).click()
-  await seite.getByText(/ · fertig$/).first().waitFor()
+  await seite.getByText(/ · fertig( · |$)/).first().waitFor()
   const pdfLaden = seite.waitForEvent('download', { timeout: 60000 })
   await seite.getByRole('button', { name: 'PDF übersichtlich' }).click()
   await pdfLaden
-  pruefe(await seite.getByText(/ · exportiert$/).first().waitFor({ timeout: 15000 }).then(() => true, () => false), 'Ohne Excel: nach dem PDF ist das WEP „exportiert“')
+  pruefe(await seite.getByText(/ · exportiert( · |$)/).first().waitFor({ timeout: 15000 }).then(() => true, () => false), 'PDF-Export (Notfall): nach dem PDF ist das WEP „exportiert“')
 
-  // An den BV senden (Stufe A): Paket mit PDFs, WEP-Datei und Fotos zum Ablegen im Synology-Ordner
+  // An den BV senden mit PDF-Export: Paket mit beiden PDFs und der WEP-Datei
   await seite.getByRole('button', { name: 'Paket für den BV erstellen' }).click()
   await seite.getByRole('button', { name: 'Speichern', exact: true }).waitFor({ timeout: 60000 })
   const paketLaden = seite.waitForEvent('download')
@@ -1250,7 +1273,7 @@ try {
   pruefe(/_an-BV\.zip$/.test(paket.suggestedFilename()), 'An den BV: Dateiname endet auf _an-BV.zip')
   const paketZip = await JSZip.loadAsync(readFileSync(await paket.path()))
   const paketNamen = Object.keys(paketZip.files)
-  pruefe(paketNamen.filter((n) => n.endsWith('.pdf')).length === 2 && paketNamen.some((n) => n.endsWith('.wep')), 'An den BV: zwei PDFs und die WEP-Datei im Paket')
+  pruefe(paketNamen.filter((n) => n.endsWith('.pdf')).length === 2 && paketNamen.some((n) => n.endsWith('.wep')), 'An den BV (PDF-Export an): zwei PDFs und die WEP-Datei im Paket')
   pruefe(await seite.getByText(/an BV gesendet/).filter({ visible: true }).first().waitFor({ timeout: 10000 }).then(() => true, () => false), 'An den BV: „an BV gesendet“ mit Datum steht am WEP')
 
   // 12. Keine Skriptfehler

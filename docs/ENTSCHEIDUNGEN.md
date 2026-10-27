@@ -345,3 +345,9 @@
 
 - **Entscheidung:** Der Reiter „Übersicht“ (und später die Detailansicht der BV-Kontrollseite) rechnet nicht selbst, sondern nimmt das `Protokoll` des übersichtlichen PDF (`erzeugeWepProtokoll`: gleicher Excel-Export, gleiches Rechenwerk, gleiches `leseProtokoll`). Die Seite zeigt es als HTML.
 - **Grund:** Wertermittler und BV sollen genau dieselben Zahlen sehen wie im Protokoll; eine zweite Rechnung könnte abweichen. Der Export dauert einen Moment, darum rechnet die Übersicht nach einer Änderung kurz verzögert neu (offline, im Browser).
+
+## 2026-10-26 · Wertermittler ohne PDF, Entwickleroptionen, Paket mit vollständiger WEP-Datei
+
+- **Entscheidung:** Drucken und PDF gibt es nur noch auf der BV-Kontrollseite. Der Export-Reiter der Wertermittler zeigt nur „An den BV senden“. „Mit Excel arbeiten“ und „PDF-Export anzeigen“ stehen in den zugeklappten „Entwickleroptionen“ am Ende des Profils, Standard aus, Erklärtext „nur bei Ausfall“.
+- **Paket:** Die WEP-Datei im Paket enthält jetzt Fotos und (falls vorhanden) die Bau-Excel. Die Kontrollseite braucht beides, um dieselben Zahlen (gleiche Export-Quelle) und die Fotos zu zeigen. Die zusätzlichen JPG-Kopien entfallen (sonst läge jedes Foto doppelt im Paket); PDFs kommen nur mit dem Notfall-Schalter dazu.
+- **Grund:** Ein Protokoll, eine Stelle zum Drucken; Wertermittler sehen ihre Zahlen im Reiter „Übersicht“.
