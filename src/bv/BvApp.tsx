@@ -9,6 +9,7 @@ import { BV_STATUS_TEXT, bvZeilen, leseEingangsDateien, type BvEingang, type BvS
 import { aendereEingang, alleEingaenge, legeAb } from './speicher'
 import { bvQuelle, bvRolle } from './quelle'
 import { BvDetail } from './BvDetail'
+import type { Zugang } from './BvZugang'
 
 type Filter = 'alle' | BvStatus
 
@@ -34,7 +35,7 @@ async function dateienAusZiehen(dt: DataTransfer): Promise<File[]> {
   return dateien
 }
 
-export default function BvApp() {
+export default function BvApp({ zugang }: { zugang?: Zugang } = {}) {
   const [eingaenge, setEingaenge] = useState<BvEingang[]>()
   const [offen, setOffen] = useState<string>()
   const [meldung, setMeldung] = useState<{ text: string[]; alarm?: boolean }>()
@@ -137,6 +138,20 @@ export default function BvApp() {
           <div>
             <h1 className="h1">Kontrollseite BV</h1>
             <p className="neben">Wertermittlungsprotokolle prüfen, als PDF speichern und drucken. Die Daten bleiben in diesem Browser.</p>
+            {zugang && (
+              <p className="neben bv-konto">
+                Angemeldet als {zugang.email || 'Microsoft-Konto'}
+                {zugang.offline ? ' (ohne Netz, letzte Freigabe gilt)' : ''} ·{' '}
+                {zugang.admin && (
+                  <>
+                    <a href="/bv/admin">Freigaben verwalten</a> ·{' '}
+                  </>
+                )}
+                <button type="button" className="textknopf bv-oeffnen" onClick={zugang.abmelden}>
+                  Abmelden
+                </button>
+              </p>
+            )}
           </div>
         </header>
 

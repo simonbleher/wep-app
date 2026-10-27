@@ -371,3 +371,9 @@
 - **Grund:** BV-Mitarbeitende haben Geschäftskonten (für die Kontrollseite und ggf. eigenen Abgleich). Der App-Ordner (`Files.ReadWrite.AppFolder`) gibt es auch in OneDrive for Business. Persönliche Konten dürfen nichts merken – daher kein Umschreiben gespeicherter Anmeldungen.
 - **Versionen:** Native Android-Version und Windows-Hülle steigen: Eine alte Windows-Hülle ließe die neue Anmelde-Adresse nicht zu, ein alter Android-Hintergrunddienst kennt den Tenant nicht. So bekommt eine alte App das neue Web-Paket erst mit dem Programm-Update.
 - **Administratorzustimmung:** Erlaubt eine Organisation keine Selbstzustimmung (AADSTS65001/90094), zeigt die App eine verständliche Meldung; die IT erteilt die Zustimmung einmal für alle.
+
+## 2026-10-27 · Zugang zur BV-Kontrollseite: Freigabe über Pages Function und KV
+
+- **Entscheidung:** /bv verlangt (wenn eingeschaltet) eine Microsoft-Anmeldung und eine Freigabe durch einen Admin. Eine Pages Function prüft das ID-Token serverseitig (Signatur gegen die Microsoft-JWKS, `aud` = Client-ID, `iss` = `https://login.microsoftonline.com/<tid>/v2.0`, `exp`/`nbf`) und hält in einer KV-Bindung nur Anträge und Freigaben; Admins stehen in `BV_ADMINS`. Ein- und ausgeschaltet über `BV_ZUGANG_AKTIV` (nur Produktion), damit Vorschau und lokale Tests ohne Anmeldung laufen. Offline gilt eine bestätigte Freigabe 7 Tage.
+- **Grund:** Die Protokolle liegen weiter nur im Browser des BV-Rechners (kein Server mit WEP-Daten); die Freigabe regelt, wer die Seite überhaupt bedienen darf. ID-Token statt eigener Passwörter: keine Zugangsdaten zu verwalten, Geschäftskonten des BV funktionieren (Ziel 5).
+- **Sitzungsspeicher für die BV-Anmeldung:** Die Seite nutzt MSAL mit `sessionStorage` und nur `openid profile email`, damit die Wertermittler-App im selben Browser (MSAL mit `localStorage`) das BV-Konto nicht als ihr OneDrive-Konto aufgreift; beim nächsten Öffnen meldet `ssoSilent` ohne Klick wieder an.

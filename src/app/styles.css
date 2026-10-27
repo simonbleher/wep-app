@@ -2894,3 +2894,11 @@ input[type='range'] {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+.bv-zugang {
+  display: flex;
+  flex-direction: column;
+  gap: var(--abstand-4);
+  max-width: 640px;
+  padding-top: var(--abstand-7);
+}
