@@ -16,7 +16,7 @@ class AnmeldungAbgelaufen(text: String) : Exception(text)
  */
 object TokenStore {
     private const val DATEI = "wep_anmeldung"
-    private const val AUTHORITY = "https://login.microsoftonline.com/consumers"
+    private const val BASIS = "https://login.microsoftonline.com"
     private const val SCOPE = "openid profile offline_access Files.ReadWrite.AppFolder"
     private const val PUFFER_MS = 2 * 60 * 1000L
 
@@ -27,7 +27,15 @@ object TokenStore {
         val ablauf: Long,
         val name: String,
         val benutzername: String,
+        /**
+         * Tenant des Kontos für die Erneuerung („consumers“ oder Tenant-ID einer Organisation). Anmeldungen von vor der
+         * Umstellung auf alle Microsoft-Konten haben keinen und erneuern wie bisher über „consumers“.
+         */
+        val tenant: String = "consumers",
     )
+
+    private val TENANT_MUSTER = Regex("^[A-Za-z0-9.-]{1,64}$")
+    private fun tenantOderConsumers(t: String?): String = if (t != null && TENANT_MUSTER.matches(t)) t else "consumers"
 
     @Volatile private var prefs: SharedPreferences? = null
 
@@ -60,6 +68,7 @@ object TokenStore {
             ablauf = p.getLong("ablauf", 0),
             name = p.getString("name", "") ?: "",
             benutzername = p.getString("benutzername", "") ?: "",
+            tenant = tenantOderConsumers(p.getString("tenant", null)),
         )
     }
 
@@ -72,6 +81,7 @@ object TokenStore {
             .putLong("ablauf", a.ablauf)
             .putString("name", a.name)
             .putString("benutzername", a.benutzername)
+            .putString("tenant", tenantOderConsumers(a.tenant))
             .apply()
     }
 
@@ -92,7 +102,7 @@ object TokenStore {
             return a.accessToken
         }
         val antwort = Http.postFormular(
-            "$AUTHORITY/oauth2/v2.0/token",
+            "$BASIS/${a.tenant}/oauth2/v2.0/token",
             mapOf(
                 "client_id" to a.clientId,
                 "grant_type" to "refresh_token",
@@ -113,6 +123,7 @@ object TokenStore {
             ablauf = System.currentTimeMillis() + json.optLong("expires_in", 3600) * 1000,
             name = a.name,
             benutzername = a.benutzername,
+            tenant = a.tenant,
         )
         speichere(c, neu)
         return neu.accessToken

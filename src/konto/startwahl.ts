@@ -1,6 +1,7 @@
 // Die Wahl auf dem Login-Bildschirm („mit Konto“ / „ohne Konto“) wird auf dem Gerät
 // gemerkt. Danach startet die App direkt – auch offline.
 import type { Konto, KontoDienst } from './types'
+import { anmeldeFehlerText } from './fehler'
 
 const KEY = 'wep-start-wahl'
 
@@ -24,7 +25,7 @@ export function speichereStartWahl(wahl: StartWahl | null): void {
   }
 }
 
-export type Start = { typ: 'login' } | { typ: 'start'; konto: Konto | null }
+export type Start = { typ: 'login'; fehler?: string } | { typ: 'start'; konto: Konto | null }
 
 /**
  * Entscheidet beim App-Start, ob der Login-Bildschirm kommt.
@@ -45,7 +46,7 @@ export async function ermittleStart(dienst: KontoDienst): Promise<Start> {
       return { typ: 'start', konto }
     }
     return { typ: 'login' }
-  } catch {
-    return wahl === 'konto' ? { typ: 'start', konto: null } : { typ: 'login' }
+  } catch (e) {
+    return wahl === 'konto' ? { typ: 'start', konto: null } : { typ: 'login', fehler: anmeldeFehlerText(e) }
   }
 }

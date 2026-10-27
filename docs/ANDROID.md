@@ -207,7 +207,7 @@ App“.
 - **Anmeldung** (`src/konto/android.ts`, gleiche Schnittstelle wie `web.ts`): Authorization
   Code + PKCE über den System-Browser (Custom Tab), Rücksprung `de.wep.app://auth`
   (Intent-Filter in `AndroidManifest.xml`, `appUrlOpen`). Authority
-  `https://login.microsoftonline.com/consumers`, Scopes `Files.ReadWrite.AppFolder
+  `https://login.microsoftonline.com/common` (Erneuerung im Tenant des Kontos, alte Anmeldungen über `consumers`), Scopes `Files.ReadWrite.AppFolder
   offline_access` (dazu `openid profile` für den Anzeigenamen, wie auch MSAL im Web).
   Die Plattform wird automatisch gewählt (`Capacitor.isNativePlatform()`).
 - **Token nativ**: Token-Tausch und -Erneuerung laufen im eigenen Plugin

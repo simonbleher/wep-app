@@ -3,16 +3,19 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   ANDROID_SCOPES,
   AUTHORITY,
+  CONSUMERS_TID,
   REDIRECT_URI,
   base64url,
   baueAnmeldeUrl,
   erstelleAndroidKontoDienst,
   erzeugePkce,
   kontoAusIdToken,
+  tokenUrl,
   type AndroidAbhaengigkeiten,
   type GespeicherteAnmeldung,
   type TokenAntwort,
 } from './android'
+import { anmeldeFehlerText } from './fehler'
 
 const sha256 = async (d: Uint8Array) => new Uint8Array(await webcrypto.subtle.digest('SHA-256', d as BufferSource))
 
@@ -106,9 +109,10 @@ describe('PKCE', () => {
     expect(p.challenge).not.toBe(p.verifier)
   })
 
-  it('baut die Anmelde-URL mit Authority consumers, Scopes, S256 und Rücksprung', () => {
+  it('baut die Anmelde-URL mit Authority common (alle Microsoft-Konten), Scopes, S256 und Rücksprung', () => {
     const u = new URL(baueAnmeldeUrl({ clientId: 'CID', state: 'ST', challenge: 'CH' }))
     expect(u.origin + u.pathname).toBe(`${AUTHORITY}/oauth2/v2.0/authorize`)
+    expect(AUTHORITY).toBe('https://login.microsoftonline.com/common')
     expect(u.searchParams.get('client_id')).toBe('CID')
     expect(u.searchParams.get('response_type')).toBe('code')
     expect(u.searchParams.get('redirect_uri')).toBe('de.wep.app://auth')
@@ -237,6 +241,44 @@ describe('Android-Konto-Dienst', () => {
     expect(t.anfragen).toHaveLength(1)
     expect(t.anfragen[0].formular).toMatchObject({ grant_type: 'refresh_token', refresh_token: 'R', client_id: 'CID' })
     expect(t.anmeldung()).toMatchObject({ refreshToken: 'R2', accessToken: 'A2', name: 'N', benutzername: 'b' })
+  })
+
+  it('alle Microsoft-Konten: Tenant aus dem id_token merken (persönlich „consumers“, Organisation die Tenant-ID)', async () => {
+    for (const [tid, erwartet] of [
+      [CONSUMERS_TID, 'consumers'],
+      ['0a1b2c3d-1111-2222-3333-444455556666', '0a1b2c3d-1111-2222-3333-444455556666'],
+    ]) {
+      const t = aufbau([TOKEN_OK({ id_token: idToken({ name: 'Erika Musterfrau', preferred_username: 'erika@example.org', tid }) })])
+      const dienst = erstelleAndroidKontoDienst('CID', t.abh)
+      const { fertig, state } = await melde(t, dienst)
+      t.rueckkehr(`${REDIRECT_URI}?code=C&state=${state}`)
+      await fertig
+      expect(t.anmeldung().tenant).toBe(erwartet)
+    }
+  })
+
+  it('erneuert im Tenant des Kontos; alte Anmeldung ohne Tenant wie bisher über „consumers“', async () => {
+    const antwort = () => ({ status: 200, text: JSON.stringify({ access_token: 'A2', expires_in: 3600 }) })
+    const firma = aufbau([antwort()])
+    firma.setzeAnmeldung({ refreshToken: 'R', accessToken: 'A', ablauf: 0, name: 'N', benutzername: 'b', tenant: '0a1b2c3d-1111-2222-3333-444455556666' })
+    await erstelleAndroidKontoDienst('CID', firma.abh).zugriffstoken()
+    expect(firma.anfragen[0].url).toBe('https://login.microsoftonline.com/0a1b2c3d-1111-2222-3333-444455556666/oauth2/v2.0/token')
+    expect(firma.anmeldung().tenant).toBe('0a1b2c3d-1111-2222-3333-444455556666')
+    const alt = aufbau([antwort()])
+    alt.setzeAnmeldung({ refreshToken: 'R', accessToken: 'A', ablauf: 0, name: 'N', benutzername: 'b' })
+    await erstelleAndroidKontoDienst('CID', alt.abh).zugriffstoken()
+    expect(alt.anfragen[0].url).toBe('https://login.microsoftonline.com/consumers/oauth2/v2.0/token')
+    expect(tokenUrl('../x')).toBe('https://login.microsoftonline.com/consumers/oauth2/v2.0/token')
+  })
+
+  it('fehlende Administratorzustimmung (AADSTS65001/90094): verständliche Meldung', async () => {
+    const t = aufbau()
+    const dienst = erstelleAndroidKontoDienst('CID', t.abh)
+    const { fertig, state } = await melde(t, dienst)
+    t.rueckkehr(`${REDIRECT_URI}?error=consent_required&error_description=${encodeURIComponent('AADSTS65001: The user or administrator has not consented')}&state=${state}`)
+    await expect(fertig).rejects.toThrow(/Administratorzustimmung.*AADSTS65001/)
+    expect(anmeldeFehlerText(new Error('AADSTS90094: Admin consent is required'))).toMatch(/IT.*Administratorzustimmung.*AADSTS90094/)
+    expect(anmeldeFehlerText(new Error('Netz weg'))).toBe('Netz weg')
   })
 
   it('behält den alten Refresh-Token, wenn Microsoft keinen neuen liefert', async () => {

@@ -23,8 +23,19 @@ use crate::tresor;
 
 /// So lange wartet die App auf den Rücksprung aus dem Browser.
 const WARTEZEIT: Duration = Duration::from_secs(5 * 60);
-const LOGIN_PREFIX: &str = "https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize?";
-const TOKEN_URL: &str = "https://login.microsoftonline.com/consumers/oauth2/v2.0/token";
+/// Anmeldung über „common“: persönliche Microsoft-Konten und Geschäfts-/Schulkonten.
+const LOGIN_PREFIX: &str = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize?";
+const TOKEN_BASIS: &str = "https://login.microsoftonline.com/";
+const TOKEN_ENDE: &str = "/oauth2/v2.0/token";
+
+/// Nur Microsofts Token-Endpunkt: `…/<tenant>/oauth2/v2.0/token` mit „common“, „consumers“ oder einer Tenant-ID
+/// (Erneuerung im Tenant des Kontos). So bleibt der Befehl kein offener HTTP-Client.
+pub fn ist_token_url(url: &str) -> bool {
+    match url.strip_prefix(TOKEN_BASIS).and_then(|r| r.strip_suffix(TOKEN_ENDE)) {
+        Some(tenant) => !tenant.is_empty() && tenant.len() <= 64 && tenant.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '.'),
+        None => false,
+    }
+}
 
 /// Zustand des Mini-Servers (immer nur eine Anmeldung gleichzeitig).
 #[derive(Default)]
@@ -42,6 +53,8 @@ pub struct Anmeldung {
     pub refresh_token: String,
     pub name: String,
     pub benutzername: String,
+    /// Tenant für die Erneuerung („consumers“ oder Tenant-ID); leer bei Anmeldungen von vor der Umstellung.
+    pub tenant: String,
 }
 
 #[derive(Serialize)]
@@ -191,7 +204,7 @@ pub fn anmeldung_browser(app: tauri::AppHandle, url: String) -> Result<(), Strin
 /// Token-Anfrage an Microsoft (Code-Tausch oder Erneuerung), ohne Origin-Header.
 #[tauri::command]
 pub async fn token_anfrage(url: String, formular: HashMap<String, String>) -> Result<TokenAntwort, String> {
-    if url != TOKEN_URL {
+    if !ist_token_url(&url) {
         return Err("Nur der Microsoft-Token-Endpunkt ist erlaubt".into());
     }
     let antwort = reqwest::Client::new()
@@ -229,6 +242,17 @@ pub fn anmeldung_loeschen() -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn nur_microsoft_token_endpunkte() {
+        assert!(ist_token_url("https://login.microsoftonline.com/common/oauth2/v2.0/token"));
+        assert!(ist_token_url("https://login.microsoftonline.com/consumers/oauth2/v2.0/token"));
+        assert!(ist_token_url("https://login.microsoftonline.com/0a1b2c3d-1111-2222-3333-444455556666/oauth2/v2.0/token"));
+        assert!(!ist_token_url("https://login.microsoftonline.com//oauth2/v2.0/token"));
+        assert!(!ist_token_url("https://login.microsoftonline.com/a/b/oauth2/v2.0/token"));
+        assert!(!ist_token_url("https://evil.example/common/oauth2/v2.0/token"));
+        assert!(!ist_token_url("https://login.microsoftonline.com/common/oauth2/v2.0/token?x=1"));
+    }
 
     #[test]
     fn liest_ziel_aus_get() {

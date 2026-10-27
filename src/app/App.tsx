@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   abmelden,
+  anmeldeFehlerText,
   anmelden,
   kontoVerfuegbar,
   speichereStartWahl,
@@ -44,6 +45,7 @@ export default function App() {
     void startZustand().then((s) => {
       if (!aktiv) return
       setKonto(s.typ === 'start' ? s.konto : null)
+      if (s.typ === 'login' && s.fehler) setFehler(s.fehler)
       setPhase(s.typ === 'login' ? 'login' : 'bereit')
     })
     return () => {
@@ -77,7 +79,7 @@ export default function App() {
       }
     } catch (e) {
       speichereStartWahl(null)
-      setFehler(e instanceof Error ? e.message : String(e))
+      setFehler(anmeldeFehlerText(e))
     }
   }, [])
 
