@@ -1237,6 +1237,7 @@ try {
   await seite.getByRole('button', { name: 'An den BV', exact: true }).click()
   await seite.getByRole('heading', { name: 'An den BV senden' }).waitFor()
   pruefe((await seite.getByRole('button', { name: 'Excel exportieren' }).count()) === 0 && (await seite.getByRole('button', { name: 'PDF übersichtlich' }).count()) === 0, 'Standard: nur „An den BV senden“, kein Excel, kein PDF')
+  pruefe(await seite.getByText('Keine Unterschrift eingerichtet – Profil → Meine Unterschrift.').isVisible(), 'An den BV: Hinweis, wenn keine Unterschrift eingerichtet ist')
   // Ohne PDF: Paket mit der WEP-Datei (samt Fotos), keine PDFs
   await seite.getByRole('button', { name: 'Paket für den BV erstellen' }).click()
   await seite.getByRole('button', { name: 'Speichern', exact: true }).waitFor({ timeout: 60000 })
@@ -1265,6 +1266,7 @@ try {
   await bvSeite.getByRole('heading', { name: 'Bewertung' }).waitFor({ timeout: 30000 })
   const ohneLeer = (t) => t.replace(/[\s\u00a0\u202f]/g, '')
   pruefe(ohneLeer(await bvSeite.locator('.ueb-bewertung .ueb-gesamt').innerText()).includes(ohneLeer(bvGesamt)), `BV-Seite: Gesamtbetrag in Tabelle und Detail gleich (${bvGesamt})`)
+  pruefe(await bvSeite.getByText(/Keine Unterschrift im Paket/).isVisible(), 'BV-Seite: ohne Unterschrift im Paket bleibt das Feld leer (Hinweis)')
   await bvSeite.getByRole('button', { name: 'Rückfrage' }).click()
   const bvPdf = bvSeite.waitForEvent('download', { timeout: 60000 })
   await bvSeite.getByRole('button', { name: 'PDF übersichtlich' }).click()

@@ -29,8 +29,8 @@ export interface ZeichenKontext {
   dok: PDFDocument
   seite: PDFPage
   schriften: Schriften
-  /** Die Unterschrift als eingebettetes Bild (nur wenn bestätigt). */
-  unterschrift?: PDFImage
+  /** Die Unterschriften je Teil als eingebettete Bilder (soweit vorhanden). */
+  unterschriften: { bau?: PDFImage; gruen?: PDFImage }
 }
 
 export interface Haken {

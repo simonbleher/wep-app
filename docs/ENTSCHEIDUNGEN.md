@@ -358,3 +358,9 @@
 - **Grund:** Keine WEP-Daten auf einem Server (Datenschutz, kein Betrieb nötig), sofort vorführbar; Synology bleibt der Transportweg. Gleiche Zahlen wie beim Wertermittler: dieselbe Übersicht-Komponente und dieselbe Export-Quelle (mitgeschickte Bau-Excel, sonst die Vorlage).
 - **Doppelte Vorgangs-Nr.:** Jede Fassung bleibt als eigener Eingang erhalten (Schlüssel: Kennung + Stand); die neueste ist gekennzeichnet, gesperrt oder zusammengeführt wird nichts.
 - **Später (Sitzung B):** Zugang zur Seite nur mit Microsoft-Anmeldung und Freigabe durch den Admin; gespeichert werden auf dem Server dann nur Anträge/Freigaben, keine WEP-Daten.
+
+## 2026-10-27 · Unterschriften im WEP, Format der WEP-Datei bleibt wep-teilen/1
+
+- **Entscheidung:** Die Unterschriften stehen als eigenes Feld am WEP (`unterschriften: { bau?, gruen? }`, PNG als Data-URL). So reisen sie ohne Sonderweg mit beim Teilen, in der Sicherung und im Abgleich; die BV-Kontrollseite setzt sie in beide PDF-Formen. Beim Senden kommt die Unterschrift des Absenders für seinen Teil immer dazu (keine Rückfrage, nur ein Hinweis).
+- **Format:** Das Feld ist optional und rein additiv – die WEP-Datei bleibt `wep-teilen/1` (Erweiterung um `wep.unterschriften`). Ein Sprung auf `wep-teilen/2` hätte ältere Apps die Dateien ablehnen lassen („bitte aktualisieren“), obwohl sie alles andere lesen können; ältere Apps ignorieren das Feld. Gelesen werden nur gültige PNG-Data-URLs bis 350 000 Zeichen, Unbrauchbares fällt still weg.
+- **Grund:** Der BV braucht ein unterschriebenes Protokoll; Bau- und Grün-Wertermittler sind oft verschiedene Personen und unterschreiben je ihren Teil.

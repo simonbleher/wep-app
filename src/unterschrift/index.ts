@@ -34,8 +34,12 @@ export function loescheUnterschrift(speicher: ProfilSpeicher = lokalesProfil): v
  * hinterlegt ist. Läuft offline und ohne Oberfläche.
  */
 export function unterschriftAlsPng(speicher: ProfilSpeicher = lokalesProfil): Uint8Array | null {
-  const url = ladeUnterschriftUrl(speicher)
-  if (!url) return null
+  return pngAusUrl(ladeUnterschriftUrl(speicher))
+}
+
+/** PNG-Bytes aus einer Unterschrift-Data-URL (z. B. `Wep.unterschriften`), `null` bei leerer oder ungültiger Angabe. */
+export function pngAusUrl(url: string | undefined): Uint8Array | null {
+  if (!istUnterschriftUrl(url)) return null
   const roh = atob(url.slice(PNG_VORSPANN.length))
   const bytes = new Uint8Array(roh.length)
   for (let i = 0; i < roh.length; i++) bytes[i] = roh.charCodeAt(i)

@@ -22,13 +22,14 @@ describe('Ohne Excel arbeiten', () => {
     expect(h).not.toContain('Excel')
   })
 
-  it('PDF-Export ist standardmäßig aus (Notfall-Schalter); „An den BV senden“ ohne PDF und ohne Unterschrift', () => {
+  it('PDF-Export ist standardmäßig aus (Notfall-Schalter); „An den BV senden“ ohne PDF, mit Hinweis zur Unterschrift', () => {
     expect(ladeGeraeteEinstellungen().pdfExport).toBe(false)
     const h = render(createElement(AnBvSenden, { wep: neuerWep('2026-001'), rolle: 'gruen', aendere: async () => {} }))
     expect(h).toContain('An den BV senden')
     expect(h).toContain('Kontrollseite')
     expect(h).not.toContain('PDF')
-    expect(h).not.toContain('Unterschrift')
+    expect(h).not.toContain('PDF mit meiner Unterschrift')
+    expect(h).toContain('Keine Unterschrift eingerichtet – Profil → Meine Unterschrift.')
   })
 
   it('Teilen bietet keine Bau-Excel an', () => {

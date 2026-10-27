@@ -2,7 +2,7 @@
  * Übersichtliches PDF aus der exportierten Arbeitsmappe: schlichtes Protokoll im Stil der App statt der Blätter der
  * Vorlage. Zahlen stammen aus denselben Zellen (Rechenwerk der Mappe) wie beim PDF „wie Vorlage“.
  */
-import type { PDFImage, PDFPage } from 'pdf-lib'
+import type { PDFPage } from 'pdf-lib'
 import type { Wep } from '../../model'
 import type { Op } from '../blatt'
 import { Rechenwerk } from '../formeln'
@@ -10,7 +10,7 @@ import { leseMappe } from '../mappe'
 import { fotoSeiten } from '../fotos'
 import { zeichneOps } from '../schreiber'
 import { kodierbar, ladeSchriften, messerAus, type Schriften } from '../schrift'
-import type { PdfOptionen } from '../erzeugen'
+import { unterschriftsBilder, type PdfOptionen } from '../erzeugen'
 import { leseProtokoll, type Protokoll } from './daten'
 import { setzeProtokoll } from './inhalt'
 import { A4, FARBE, RAENDER, Satz, type SeiteU } from './seitenbau'
@@ -68,22 +68,15 @@ export async function erzeugeUebersichtPdf(xlsx: ArrayBuffer | Uint8Array, optio
   if (optionen.titel) dok.setTitle(optionen.titel)
   dok.setCreationDate(new Date())
 
-  let unterschrift: PDFImage | undefined
-  if (optionen.unterschrift && optionen.unterschrift.length) {
-    try {
-      unterschrift = await dok.embedPng(optionen.unterschrift)
-    } catch {
-      unterschrift = undefined
-    }
-  }
+  const unterschriften = await unterschriftsBilder(dok, optionen)
 
   const satz = new Satz(messerAus(schriften))
-  setzeProtokoll(satz, protokoll, { rolle: optionen.rolle, skizzen: optionen.skizzen, mitUnterschrift: Boolean(unterschrift) })
+  setzeProtokoll(satz, protokoll, { rolle: optionen.rolle, skizzen: optionen.skizzen, unterschriften: { bau: Boolean(unterschriften.bau), gruen: Boolean(unterschriften.gruen) } })
 
   for (const si of satz.seiten) {
     const seite = dok.addPage(A4)
     zeichneOps(lib, seite, si.ops as Op[], schriften)
-    for (const h of si.haken) h.zeichne({ lib, dok, seite, schriften, unterschrift })
+    for (const h of si.haken) h.zeichne({ lib, dok, seite, schriften, unterschriften })
   }
 
   const hinweise: string[] = []

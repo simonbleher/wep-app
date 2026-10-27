@@ -6,6 +6,7 @@ import type { Wep } from '@/model'
 import { lokalerStand } from '@/sicherung'
 import { anhangGroessen, erstelleTeilen, groesseText, teilenDateiname } from '@/teilen'
 import { Dialog, Meldung } from './ui'
+import { UnterschriftHinweis, absenderAusProfil } from './UnterschriftHinweis'
 import { useOhneExcel } from './ohneExcel'
 import { kannTeilen, speichereDatei, speicherText, teileDatei } from './dateiSpeichern'
 
@@ -23,7 +24,7 @@ export function TeilenDialog({ wep, appVersion, onSchliessen }: { wep: Wep; appV
     setLaeuft(true)
     setMeldung(undefined)
     try {
-      const d = await erstelleTeilen(lokalerStand, wep.id, { mitFotos: mitFotos && hatFotos, mitBauExcel: mitBau && hatBau, appVersion })
+      const d = await erstelleTeilen(lokalerStand, wep.id, { mitFotos: mitFotos && hatFotos, mitBauExcel: mitBau && hatBau, appVersion, absender: absenderAusProfil() })
       const fehlt = d.fotosOhneDatei + (d.bauExcelOhneDatei ? 1 : 0)
       const zusatz = fehlt
         ? ` ${fehlt === 1 ? 'Eine Datei fehlt' : `${fehlt} Dateien fehlen`} auf diesem Gerät (nur in OneDrive) und ${fehlt === 1 ? 'ist' : 'sind'} nicht enthalten.`
@@ -47,6 +48,7 @@ export function TeilenDialog({ wep, appVersion, onSchliessen }: { wep: Wep; appV
       <p>
         Erzeugt die Datei <strong>{teilenDateiname(wep)}</strong> mit diesem WEP. Wer die App hat, kann sie öffnen und sich zeigen lassen, was neu ist.
       </p>
+      <UnterschriftHinweis wep={wep} />
       <div>
         <label className="schalter-zeile" htmlFor="teilen-fotos">
           <span>

@@ -42,8 +42,13 @@ export interface PdfOptionen {
   skizzen?: PdfSkizzen
   /** Fotos für den Anhang (leer/fehlt: kein Anhang). */
   fotos?: PdfFoto[]
-  /** Unterschrift als PNG (Paket 3); nur setzen, wenn der Wertermittler es beim Erzeugen bestätigt hat. */
+  /** Unterschrift als PNG (Paket 3) für beide Teile; nur setzen, wenn der Wertermittler es beim Erzeugen bestätigt hat. */
   unterschrift?: Uint8Array | null
+  /**
+   * Unterschriften je Teil (PNG), z. B. aus dem Paket für den BV: Bau-Wertermittler und Grün-Wertermittler können
+   * verschiedene Personen sein. Geht vor `unterschrift`; ein fehlender Teil bleibt ohne Unterschrift.
+   */
+  unterschriften?: { bau?: Uint8Array | null; gruen?: Uint8Array | null }
   /** Titel in den Dokument-Eigenschaften. */
   titel?: string
   /** Überschrift über dem Fotoanhang („Parzelle 42 – KGA Testgarten“). */
@@ -117,6 +122,23 @@ interface Feld {
   teil: 'bau' | 'gruen'
 }
 
+/** Unterschriften je Teil als eingebettete Bilder (`unterschriften` vor `unterschrift`); kaputte PNGs bleiben weg. */
+export async function unterschriftsBilder(
+  dok: import('pdf-lib').PDFDocument,
+  o: Pick<PdfOptionen, 'unterschrift' | 'unterschriften'>,
+): Promise<{ bau?: import('pdf-lib').PDFImage; gruen?: import('pdf-lib').PDFImage }> {
+  const bette = async (bytes: Uint8Array | null | undefined) => {
+    if (!bytes?.length) return undefined
+    try {
+      return await dok.embedPng(bytes)
+    } catch {
+      return undefined
+    }
+  }
+  const teil = (t: 'bau' | 'gruen') => (o.unterschriften && t in o.unterschriften ? o.unterschriften[t] : o.unterschriften ? undefined : o.unterschrift)
+  return { bau: await bette(teil('bau')), gruen: await bette(teil('gruen')) }
+}
+
 export function unterschriftsFelder(blatt: Blatt): Feld[] {
   const bereich = blattBereich(blatt)
   const felder: Feld[] = []
@@ -153,14 +175,7 @@ export async function erzeugePdf(xlsx: ArrayBuffer | Uint8Array, optionen: PdfOp
   if (optionen.titel) dok.setTitle(optionen.titel)
   dok.setCreationDate(new Date())
 
-  let unterschrift: Awaited<ReturnType<typeof dok.embedPng>> | undefined
-  if (optionen.unterschrift && optionen.unterschrift.length) {
-    try {
-      unterschrift = await dok.embedPng(optionen.unterschrift)
-    } catch {
-      unterschrift = undefined
-    }
-  }
+  const bilder = await unterschriftsBilder(dok, optionen)
 
   const hinweise: string[] = []
   const ergebnis: PdfBlattErgebnis[] = []
@@ -172,7 +187,7 @@ export async function erzeugePdf(xlsx: ArrayBuffer | Uint8Array, optionen: PdfOp
     const blatt = mappe.blaetter.find((b) => b.name.trim() === name)!
     const blattErg = setzeBlatt(blatt, mappe, rechen, messer)
     ergebnis.push({ blatt: name, seiten: blattErg.seiten, skala: blattErg.skala })
-    const felder = unterschrift ? unterschriftsFelder(blatt).filter((f) => (f.teil === 'bau' ? hatBauTeil : hatGruenTeil)) : []
+    const felder = unterschriftsFelder(blatt).filter((f) => (f.teil === 'bau' ? hatBauTeil : hatGruenTeil) && bilder[f.teil])
 
     for (const si of blattErg.seiten) {
       const seite = dok.addPage([si.breite, si.hoehe])
@@ -188,14 +203,13 @@ export async function erzeugePdf(xlsx: ArrayBuffer | Uint8Array, optionen: PdfOp
         if (r) zeichneGrundriss(lib, seite, schriften, optionen.skizzen.grundriss.daten, optionen.skizzen.grundriss.bauteile, r, optionen.skizzen.grundriss.parzelle)
       }
 
-      // Unterschrift über dem Namen des Wertermittlers
-      if (unterschrift) {
-        for (const f of felder) {
-          const r = si.lage(f.z1, f.s1, f.z2, f.s2)
-          if (!r) continue
-          const rahmen = unterschriftRahmen(r, 30, unterschrift.width / unterschrift.height)
-          seite.drawImage(unterschrift, { x: rahmen.x, y: si.hoehe - rahmen.y - rahmen.h, width: rahmen.w, height: rahmen.h })
-        }
+      // Unterschrift über dem Namen des jeweiligen Wertermittlers
+      for (const f of felder) {
+        const bild = bilder[f.teil]!
+        const r = si.lage(f.z1, f.s1, f.z2, f.s2)
+        if (!r) continue
+        const rahmen = unterschriftRahmen(r, 30, bild.width / bild.height)
+        seite.drawImage(bild, { x: rahmen.x, y: si.hoehe - rahmen.y - rahmen.h, width: rahmen.w, height: rahmen.h })
       }
     }
   }

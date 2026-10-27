@@ -1,12 +1,15 @@
 // WEP teilen: sammelt ein WEP (und auf Wunsch Fotos und Bau-Excel) in einer `.wep`-Datei.
 import JSZip from 'jszip'
-import { vorgangsNrVon, type Wep } from '@/model'
+import { vorgangsNrVon, type Rolle, type Wep } from '@/model'
+import { saubereUnterschriften, unterschriftenFuerDatei, type UnterschriftTeil } from './unterschriften'
 import type { SicherungsQuelle } from '@/sicherung'
 import { TEILEN_ENDUNG, TEILEN_FORMAT, TEILEN_JSON, TEILEN_MIME, type TeilenDatei } from './types'
 
 export interface TeilenOptionen {
   mitFotos: boolean
   mitBauExcel: boolean
+  /** Absender (Profil): Seine Unterschrift kommt für seinen Teil mit (`unterschriftenFuerDatei`). */
+  absender?: { name: string; rolle: Rolle; unterschrift?: string }
   jetzt?: () => string
   appVersion?: string
 }
@@ -14,7 +17,7 @@ export interface TeilenOptionen {
 export interface ErstellteTeilenDatei {
   blob: Blob
   dateiname: string
-  inhalt: { fotos: number; bauExcel: boolean }
+  inhalt: { fotos: number; bauExcel: boolean; unterschriften: UnterschriftTeil[] }
   /** Dateien, die laut WEP dazugehören, aber auf diesem Gerät fehlen (nur in OneDrive) und deshalb nicht mitkommen. */
   fotosOhneDatei: number
   bauExcelOhneDatei: boolean
@@ -82,6 +85,10 @@ export async function erstelleTeilen(quelle: SicherungsQuelle, wepId: string, op
       bauExcelOhneDatei = true
     }
   }
+  // Unterschriften: die mitgereisten und die des Absenders für seinen Teil
+  const unterschriften = opt.absender ? unterschriftenFuerDatei(vorhanden.wep, opt.absender) : saubereUnterschriften(vorhanden.wep.unterschriften)
+  if (unterschriften) wep.unterschriften = unterschriften
+  else delete wep.unterschriften
   const daten: TeilenDatei = {
     format: TEILEN_FORMAT,
     erstelltAm: jetzt,
@@ -96,7 +103,7 @@ export async function erstelleTeilen(quelle: SicherungsQuelle, wepId: string, op
   return {
     blob: new Blob([bytes.slice().buffer], { type: TEILEN_MIME }),
     dateiname: teilenDateiname(wep),
-    inhalt: { fotos: fotoListe.length, bauExcel },
+    inhalt: { fotos: fotoListe.length, bauExcel, unterschriften: (['bau', 'gruen'] as const).filter((t) => unterschriften?.[t]) },
     fotosOhneDatei,
     bauExcelOhneDatei,
   }

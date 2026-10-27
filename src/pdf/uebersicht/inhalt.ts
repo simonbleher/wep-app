@@ -19,8 +19,8 @@ export const SKIZZEN_VERHAELTNIS = 1.3748
 export interface InhaltOptionen {
   rolle: Rolle
   skizzen?: PdfSkizzen
-  /** Die Unterschrift soll über den Namen der Wertermittler stehen. */
-  mitUnterschrift: boolean
+  /** Für welchen Teil eine Unterschrift über dem Namen des Wertermittlers steht. */
+  unterschriften: { bau: boolean; gruen: boolean }
 }
 
 const r = (text: string): { text: string; ausricht: 'r' } => ({ text, ausricht: 'r' })
@@ -221,9 +221,9 @@ function bestaetigung(s: Satz, p: Protokoll, o: InhaltOptionen): void {
   const inhaltBau = p.bauteile.length > 0 || Boolean(p.abwasser.grube || p.abwasser.kanal) || p.beseitigung.some((b) => b.abschnitt === 'bau')
   const inhaltGruen = p.aussenanlagen.length > 0 || p.aufwuchs.length > 0 || p.beseitigung.some((b) => b.abschnitt === 'gruen')
   const personen = [
-    o.rolle !== 'gruen' && (inhaltBau || p.wertermittler.bau) && { rolle: 'Wertermittler Baulichkeiten', name: p.wertermittler.bau },
-    o.rolle !== 'bau' && (inhaltGruen || p.wertermittler.gruen) && { rolle: 'Wertermittler Außenanlagen und Aufwuchs', name: p.wertermittler.gruen },
-  ].filter((x): x is { rolle: string; name: string | undefined } => Boolean(x))
+    o.rolle !== 'gruen' && (inhaltBau || p.wertermittler.bau) && { teil: 'bau' as const, rolle: 'Wertermittler Baulichkeiten', name: p.wertermittler.bau },
+    o.rolle !== 'bau' && (inhaltGruen || p.wertermittler.gruen) && { teil: 'gruen' as const, rolle: 'Wertermittler Außenanlagen und Aufwuchs', name: p.wertermittler.gruen },
+  ].filter((x): x is { teil: 'bau' | 'gruen'; rolle: string; name: string | undefined } => Boolean(x))
   if (!personen.length) return
   s.platz(60 + personen.length * 78)
   s.h1('Bestätigung')
@@ -235,13 +235,14 @@ function bestaetigung(s: Satz, p: Protokoll, o: InhaltOptionen): void {
     s.seite.ops.push({ t: 'text', x: box.x, y: unten - 3, s: ort, groesse: 10, fett: false, kursiv: false, unterstrichen: false, farbe: FARBE.text })
     s.seite.ops.push({ t: 'linie', x1: x2, y1: unten, x2: box.x + BREITE, y2: unten, breite: 0.75, farbe: FARBE.rand })
     s.seite.ops.push({ t: 'text', x: x2, y: unten + 12, s: `${pe.name ? `${pe.name}, ` : ''}${pe.rolle}`, groesse: 9, fett: false, kursiv: false, unterstrichen: false, farbe: FARBE.text2 })
-    if (o.mitUnterschrift) {
+    if (o.unterschriften[pe.teil]) {
       const rahmen = { x: x2, y: unten - 46, w: box.x + BREITE - x2, h: 44 }
       s.haken(rahmen, (k) => {
-        if (!k.unterschrift) return
-        const sch = Math.min(rahmen.h, rahmen.w / (k.unterschrift.width / k.unterschrift.height))
-        const b = sch * (k.unterschrift.width / k.unterschrift.height)
-        k.seite.drawImage(k.unterschrift, { x: rahmen.x + (rahmen.w - b) / 2, y: k.seite.getHeight() - (rahmen.y + rahmen.h) + (rahmen.h - sch) / 2 + 2, width: b, height: sch })
+        const bild = k.unterschriften[pe.teil]
+        if (!bild) return
+        const sch = Math.min(rahmen.h, rahmen.w / (bild.width / bild.height))
+        const b = sch * (bild.width / bild.height)
+        k.seite.drawImage(bild, { x: rahmen.x + (rahmen.w - b) / 2, y: k.seite.getHeight() - (rahmen.y + rahmen.h) + (rahmen.h - sch) / 2 + 2, width: b, height: sch })
       })
     }
   }

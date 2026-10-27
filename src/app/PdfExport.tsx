@@ -52,6 +52,8 @@ export async function erstellePdf(
     profilIndex?: Record<string, number>
     mitFotos?: boolean
     unterschrift?: Uint8Array | null
+    /** Unterschriften je Teil (BV-Kontrollseite: die mitgeschickten aus dem WEP); geht vor `unterschrift`. */
+    unterschriften?: { bau?: Uint8Array | null; gruen?: Uint8Array | null }
     schritt?: (text: string) => void
     /** Basis-Excel; ohne Angabe die dieses Geräts (Bau-Excel am WEP, sonst Vorlage). Die BV-Kontrollseite gibt ihre eigene. */
     quelle?: () => Promise<ExportQuelle>
@@ -99,6 +101,7 @@ export async function erstellePdf(
       },
       fotos,
       unterschrift: opt.unterschrift ?? null,
+      ...(opt.unterschriften ? { unterschriften: opt.unterschriften } : {}),
       titel: `Wertermittlungsprotokoll ${vorgangsNrVon(wep)}`.trim(),
       fotoKopf: [vorgangsNrVon(wep) && `Vorgangs-Nr. ${vorgangsNrVon(wep)}`, f.kleingartenanlage, f.parzelle && `Parzelle ${f.parzelle}`].filter(Boolean).join(' – '),
     },

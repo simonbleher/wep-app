@@ -121,7 +121,7 @@ describe('Teilen: erstellen', () => {
     const mit = await teile(geraetBau(), '2026-001')
     const zip2 = await JSZip.loadAsync(await mit.erstellt.blob.arrayBuffer())
     expect(Object.keys(zip2.files).sort()).toEqual(['bau.xlsx', 'fotos/f1.jpg', 'fotos/f2.jpg', 'wep.json'])
-    expect(mit.erstellt.inhalt).toEqual({ fotos: 2, bauExcel: true })
+    expect(mit.erstellt.inhalt).toEqual({ fotos: 2, bauExcel: true, unterschriften: [] })
   })
 
   it('Dateien, die nur in OneDrive liegen, werden gezählt und brechen nichts ab', async () => {

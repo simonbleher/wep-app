@@ -14,6 +14,7 @@ import { kannTeilen, speichereDatei, speicherText, teileDatei } from './dateiSpe
 import { usePdfExport } from './ohneExcel'
 import { erstellePdf } from './PdfExport'
 import { ICON, Meldung, zeitDe } from './ui'
+import { UnterschriftHinweis, absenderAusProfil } from './UnterschriftHinweis'
 
 type Zustand =
   | { typ: 'idle' }
@@ -47,7 +48,8 @@ export function AnBvSenden({
       const schritt = (s: string) => setZustand({ typ: 'laedt', schritt: s })
       // Die WEP-Datei mit Fotos und Bau-Excel: Daraus rechnet die BV-Kontrollseite dieselben Zahlen wie dieses Gerät
       schritt('WEP-Datei und Fotos …')
-      const wepDatei = await erstelleTeilen(lokalerStand, wep.id, { mitFotos: true, mitBauExcel: true, appVersion: __APP_VERSION__ })
+      // Die Unterschrift des Absenders kommt immer für seinen Teil mit (falls eingerichtet)
+      const wepDatei = await erstelleTeilen(lokalerStand, wep.id, { mitFotos: true, mitBauExcel: true, appVersion: __APP_VERSION__, absender: absenderAusProfil() })
       const hinweise: string[] = []
       const pdfs: { name: string; daten: Blob }[] = []
       if (pdfExport) {
@@ -108,6 +110,7 @@ export function AnBvSenden({
         den Synology-Ordner des BV. Die Geschäftsstelle prüft und druckt das Protokoll auf ihrer Kontrollseite.
         {wep.anBvGesendetAm && ` Zuletzt gesendet am ${zeitDe(wep.anBvGesendetAm)}.`}
       </p>
+      <UnterschriftHinweis wep={wep} />
       {!nr && (
         <Meldung>
           <p>Die Vorgangs-Nr. fehlt noch. Bitte vor dem Senden unter „Formalien“ die Nummer vom BV eintragen.</p>

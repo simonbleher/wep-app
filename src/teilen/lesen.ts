@@ -3,6 +3,7 @@
 import JSZip from 'jszip'
 import { SICHERUNG_FORMAT, SICHERUNG_JSON, type GeleseneSicherung, type SicherungsDatei } from '@/sicherung'
 import { TEILEN_FORMAT, TEILEN_JSON, TEILEN_MAX_BYTES, TeilenFehler, type TeilenDatei } from './types'
+import { saubereUnterschriften } from './unterschriften'
 
 export interface GeleseneTeilen {
   daten: TeilenDatei
@@ -66,7 +67,12 @@ export async function leseTeilen(quelle: Blob | Uint8Array | ArrayBuffer): Promi
   const problem = pruefeWep(daten.wep)
   if (problem) throw new TeilenFehler(`Die WEP-Datei ist beschädigt: ${problem}`)
 
-  const wep = daten.wep
+  // Unterschriften (Erweiterung von wep-teilen/1, optional): nur gültige PNGs übernehmen, Unbrauchbares still weglassen
+  const unterschriften = saubereUnterschriften(daten.wep.unterschriften)
+  const wep = { ...daten.wep }
+  if (unterschriften) wep.unterschriften = unterschriften
+  else delete wep.unterschriften
+  daten = { ...daten, wep }
   const sauber: TeilenDatei = {
     ...daten,
     fotos: Array.isArray(daten.fotos) ? daten.fotos.filter((f) => f && typeof f.id === 'string' && FOTO_ID.test(f.id)) : [],
