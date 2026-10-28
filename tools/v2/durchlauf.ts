@@ -19,6 +19,11 @@ import * as wepListe from '../../functions/api/v2/weps'
 import * as wepEinzeln from '../../functions/api/v2/weps/[id]'
 import * as wepWieder from '../../functions/api/v2/weps/[id]/wiederherstellen'
 import * as wepVerlauf from '../../functions/api/v2/weps/[id]/verlauf'
+import * as wepDateien from '../../functions/api/v2/weps/[id]/dateien'
+import * as wepDatei from '../../functions/api/v2/weps/[id]/dateien/[datei]'
+import { fakeR2 } from '../../functions/_lib/__tests__/fakeR2'
+// @ts-expect-error – JavaScript-Hilfe ohne Typen (gemaltes Testbild, kein echtes Foto)
+import { testFoto } from '../fotos/testbild.mjs'
 import { onRequest as middleware } from '../../functions/api/v2/_middleware'
 import { fuehreAdminAktionAus, ladeKonto } from '../../functions/_lib/v2/konten'
 
@@ -30,7 +35,8 @@ const MS_ID = '11111111-2222-3333-4444-555555555555'
 const TID = '0a1b2c3d-1111-2222-3333-444455556666'
 
 const db = testDb()
-const env = { SERVER_MODUS: 'true', WEP_DB: db, GOOGLE_CLIENT_ID: GOOGLE_ID, GOOGLE_CLIENT_SECRET: 'g', VITE_MS_CLIENT_ID: MS_ID, MS_CLIENT_SECRET: 'm', V2_ADMINS: 'ada@example.org' }
+const r2 = fakeR2()
+const env = { SERVER_MODUS: 'true', WEP_DB: db, WEP_DATEIEN: r2, GOOGLE_CLIENT_ID: GOOGLE_ID, GOOGLE_CLIENT_SECRET: 'g', VITE_MS_CLIENT_ID: MS_ID, MS_CLIENT_SECRET: 'm', V2_ADMINS: 'ada@example.org' }
 
 // ── nachgebaute Anbieter ─────────────────────────────────────────────────────────────────────────────
 const paar = (await crypto.subtle.generateKey({ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, true, ['sign', 'verify'])) as CryptoKeyPair
@@ -62,7 +68,7 @@ globalThis.fetch = (async (eingabe: RequestInfo | URL, init?: RequestInit) => {
 
 // ── Weiterleitung /api/v2/* an die Functions ─────────────────────────────────────────────────────────
 type Modul = Record<string, unknown>
-const ROUTEN: [RegExp, Modul, string?][] = [
+const ROUTEN: [RegExp, Modul, string?, string?][] = [
   [/^\/api\/v2\/status$/, status],
   [/^\/api\/v2\/anmeldung\/([^/]+)\/start$/, start, 'anbieter'],
   [/^\/api\/v2\/anmeldung\/([^/]+)\/zurueck$/, zurueck, 'anbieter'],
@@ -74,6 +80,8 @@ const ROUTEN: [RegExp, Modul, string?][] = [
   [/^\/api\/v2\/weps\/([^/]+)$/, wepEinzeln, 'id'],
   [/^\/api\/v2\/weps\/([^/]+)\/wiederherstellen$/, wepWieder, 'id'],
   [/^\/api\/v2\/weps\/([^/]+)\/verlauf$/, wepVerlauf, 'id'],
+  [/^\/api\/v2\/weps\/([^/]+)\/dateien$/, wepDateien, 'id'],
+  [/^\/api\/v2\/weps\/([^/]+)\/dateien\/([^/]+)$/, wepDatei, 'id', 'datei'],
 ]
 let serverWeg = false
 
@@ -81,15 +89,18 @@ async function beantworte(route: Route) {
   if (serverWeg) return route.abort('internetdisconnected')
   const anfrage = route.request()
   const url = new globalThis.URL(anfrage.url())
-  const treffer = ROUTEN.map(([muster, modul, param]) => ({ m: muster.exec(url.pathname), modul, param })).find((t) => t.m)
+  const treffer = ROUTEN.map(([muster, modul, param, param2]) => ({ m: muster.exec(url.pathname), modul, param, param2 })).find((t) => t.m)
   const methode = anfrage.method()
   const name = `onRequest${methode[0]}${methode.slice(1).toLowerCase()}`
   const handler = treffer?.modul[name] as ((ctx: unknown) => Promise<Response>) | undefined
-  const request = new Request(anfrage.url(), { method: methode, headers: await anfrage.allHeaders(), body: ['GET', 'HEAD'].includes(methode) ? undefined : anfrage.postData() })
+  const request = new Request(anfrage.url(), { method: methode, headers: await anfrage.allHeaders(), body: ['GET', 'HEAD'].includes(methode) ? undefined : anfrage.postDataBuffer() })
+  const params: Record<string, string> = {}
+  if (treffer?.param) params[treffer.param] = decodeURIComponent(treffer.m![1])
+  if (treffer?.param2) params[treffer.param2] = decodeURIComponent(treffer.m![2])
   const antwort = await middleware({
     env,
     next: async () =>
-      handler ? handler({ request, env, params: treffer?.param ? { [treffer.param]: decodeURIComponent(treffer.m![1]) } : {} }) : Response.json({ fehler: 'Nicht gefunden.' }, { status: 404 }),
+      handler ? handler({ request, env, params }) : Response.json({ fehler: 'Nicht gefunden.' }, { status: 404 }),
   })
   const kopf: Record<string, string> = {}
   antwort.headers.forEach((w, k) => k !== 'set-cookie' && k !== 'location' && (kopf[k] = w))
@@ -288,6 +299,27 @@ try {
   await seiteB.getByRole('button', { name: 'Abgleichen' }).filter({ visible: true }).first().click()
   await seiteB.getByText(/2026-0816/).filter({ visible: true }).first().waitFor()
   pruefe(true, 'zweites Gerät bekommt auch das zweite WEP')
+
+  // 10. Foto: auf Gerät A aufgenommen, liegt danach auf dem Server und erscheint auf Gerät B
+  await seite.getByRole('button', { name: /2026-0815/ }).first().click()
+  await seite.getByRole('navigation', { name: 'Abschnitte' }).getByRole('button', { name: 'Fotos' }).click()
+  await seite.locator('input[type=file][aria-label="Fotos aus der Galerie wählen: Gesamtansicht"]').setInputFiles({ name: 'IMG_0001.jpg', mimeType: 'image/jpeg', buffer: testFoto({ breite: 1600, hoehe: 1200, variante: 0 }) })
+  await seite.locator('.foto-kachel').first().waitFor({ timeout: 30000 })
+  await seite.getByRole('button', { name: 'Protokolle' }).first().click()
+  await seite.getByRole('button', { name: 'Abgleichen' }).filter({ visible: true }).first().click()
+  let fotoAufServer = false
+  for (let i = 0; i < 50 && !fotoAufServer; i++) {
+    fotoAufServer = [...r2.daten.keys()].some((k) => /^weps\/[^/]+\/fotos\/.+\.jpg$/.test(k))
+    if (!fotoAufServer) await seite.waitForTimeout(100)
+  }
+  pruefe(fotoAufServer, 'Foto nach dem Abgleich auf dem Server (R2)')
+  await seiteB.getByRole('button', { name: 'Abgleichen' }).filter({ visible: true }).first().click()
+  await seiteB.waitForTimeout(500)
+  await seiteB.getByRole('button', { name: /2026-0815/ }).first().click()
+  await seiteB.getByRole('button', { name: 'Fotos', exact: true }).filter({ visible: true }).first().click()
+  await seiteB.locator('.foto-kachel img').first().waitFor({ timeout: 15000 })
+  pruefe(true, 'zweites Gerät lädt das Foto vom Server')
+  await seiteB.screenshot({ path: `${AUSGABE}/05-foto-vom-server.png` })
   const verlauf = (db.roh.prepare('SELECT aktion FROM verlauf ORDER BY id').all() as { aktion: string }[]).map((v) => v.aktion)
   pruefe(verlauf.filter((a) => a === 'angelegt').length === 2, 'Verlauf: „angelegt“ je WEP')
   await geraetB.close()

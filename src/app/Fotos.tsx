@@ -16,6 +16,7 @@ import {
 } from '@/fotos'
 import type { FotoRecord } from '@/fotos/types'
 import { fotoNetzStatus, ladeFotoAusOneDrive, offeneFotoAnzahl, type FotoNetz } from '@/sync'
+import { ABLAGE, AUS_ABLAGE, serverModus } from '@/server/modus'
 import { aktuellesKonto, kontoVerfuegbar } from '@/konto'
 import { Dialog, ICON, LeerZustand, Meldung, Rueckfrage } from './ui'
 
@@ -407,11 +408,11 @@ export function FotosTab({
   const anzahl = (wep.fotos ?? []).length
   const waehlbar = positionen.filter((p) => !mitFotos.some((m) => m.id === p.id))
 
-  // Upload-Stand nur mit Konto anzeigen (ohne Konto bleibt alles „offen“)
+  // Upload-Stand nur mit Konto (oder im Server-Modus) anzeigen (ohne Konto bleibt alles „offen“)
   useEffect(() => {
     let aktiv = true
     const aktualisiere = async () => {
-      if (!kontoVerfuegbar() || !(await aktuellesKonto())) return aktiv && setOffeneUploads(null)
+      if (!serverModus && (!kontoVerfuegbar() || !(await aktuellesKonto()))) return aktiv && setOffeneUploads(null)
       const n = await offeneFotoAnzahl()
       if (aktiv) setOffeneUploads(n)
     }
@@ -435,17 +436,19 @@ export function FotosTab({
       {offeneUploads !== null && (
         <p className="neben foto-stand" role="status">
           <CloudUpload {...ICON} size={18} />
-          {offeneUploads === 0 ? 'Alle Fotos sind in OneDrive.' : `${offeneUploads} ${offeneUploads === 1 ? 'Foto wartet' : 'Fotos warten'} auf den Upload (nur im WLAN).`}
+          {offeneUploads === 0 ? `Alle Fotos sind ${ABLAGE}.` : `${offeneUploads} ${offeneUploads === 1 ? 'Foto wartet' : 'Fotos warten'} auf den Upload (nur im WLAN).`}
         </p>
       )}
       {nachladen.laeuft && (
         <p className="neben foto-stand" role="status">
-          Lade Fotos aus OneDrive … {nachladen.fertig} von {nachladen.gesamt}
+          Lade Fotos {AUS_ABLAGE} … {nachladen.fertig} von {nachladen.gesamt}
         </p>
       )}
       {!nachladen.laeuft && nachladen.fehlend > 0 && nachladen.netz === 'nur-wlan' && (
         <div className="foto-stand">
-          <p className="neben">{nachladen.fehlend} Fotos sind nur in OneDrive. Sie werden im WLAN geladen.</p>
+          <p className="neben">
+            {nachladen.fehlend} Fotos sind nur {ABLAGE}. Sie werden im WLAN geladen.
+          </p>
           <button type="button" className="knopf" onClick={nachladen.jetztLaden}>
             Jetzt laden
           </button>

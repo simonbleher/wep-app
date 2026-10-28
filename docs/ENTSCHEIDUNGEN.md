@@ -411,3 +411,10 @@
 - **Verlauf:** jeder Zustandswechsel und Anlegen/Löschen/Wiederherstellen; „bearbeitet“ höchstens einmal je Person und Stunde.
 - **Rolle im Profil:** Im Server-Modus vergibt der Admin die Rolle; das Profil übernimmt Bau bzw. Grün (für neue WEPs) und zeigt sie nur an.
 - **Größe:** D1 erlaubt Zeilen bis 2 MB; der Server nimmt WEPs bis 1,9 MB (Fotos und Bau-Excel liegen nicht im WEP).
+
+## 2026-10-28 · v2-Dateien in R2: eigene Schnittstelle je WEP, kein Ordner-Umzug
+
+- **Entscheidung:** Fotos und Bau-Excel liegen in R2 unter `weps/<id>/…` und sind nur über `/api/v2/weps/<id>/dateien/<name>` erreichbar (Rechte wie beim WEP, nur die Namen `foto-<Id>.jpg` und `bau.xlsx`). Der Abgleich der App ist eigens geschrieben (`src/server/dateiAbgleich.ts`), nach den Regeln des OneDrive-Abgleichs, aber ohne Umzug in einen Papierkorb-Ordner: Im Papierkorb und nach „endgültig löschen“ auf dem Gerät bleiben die Dateien beim WEP auf dem Server.
+- **Grund:** Den OneDrive-Foto-Abgleich über einen nachgebauten Ordner-Zugriff wiederzuverwenden hätte bei endgültig gelöschten WEPs Dateien auf dem Server entfernt, die dort nach den Aufbewahrungsregeln bleiben sollen.
+- **Nachladen:** `ladeFotoAusOneDrive`/`ladeBauExcelAusOneDrive` holen im Server-Modus vom Server; so funktionieren Fotos-Ansicht, Bau-Excel und PDF ohne weitere Änderungen.
+- **Unterschriften** bleiben vorerst im WEP selbst (`Wep.unterschriften`, je höchstens 350 000 Zeichen) und reisen mit dem WEP-JSON.

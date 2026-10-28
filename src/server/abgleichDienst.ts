@@ -1,10 +1,15 @@
-// Server-Modus (v2): Abgleich der App mit dem Server – HTTP-Zugriff auf /api/v2/weps, Papierkorb-Aufräumen wie in v1,
-// nie zwei Abgleiche gleichzeitig. Die Regeln stehen in ./abgleich.ts.
+// Server-Modus (v2): Abgleich der App mit dem Server – HTTP-Zugriff auf /api/v2/weps, danach Fotos und Bau-Excel,
+// Papierkorb-Aufräumen wie in v1, nie zwei Abgleiche gleichzeitig. Die Regeln stehen in ./abgleich.ts.
 import type { Wep } from '@/model'
+import { fotoUploadErlaubt } from '@/fotos/netz'
 import { raeumePapierkorbAuf } from '@/sync/aktionen'
-import { syncSpeicher } from '@/sync/speicher'
+import { offeneBauExcel } from '@/sync/bauExcel'
+import { offeneFotos } from '@/sync/fotos'
+import { bauSpeicher, fotoSpeicher, syncSpeicher } from '@/sync/speicher'
 import type { SyncErgebnis } from '@/sync/types'
 import { AbgleichFehler, serverAbgleich, wartendeServerAenderungen, type ServerKopf, type ServerStand, type ServerZugriff } from './abgleich'
+import { serverDateienAbgleichen } from './dateiAbgleich'
+import { httpDateien } from './dateiDienst'
 
 async function rufe<T>(pfad: string, init: RequestInit = {}): Promise<T> {
   const r = await fetch(pfad, {
@@ -35,7 +40,15 @@ export function jetztMitServerAbgleichen(): Promise<SyncErgebnis> {
     laufend = (async () => {
       if (!navigator.onLine) throw new Error('Keine Internetverbindung – Änderungen warten.')
       await raeumePapierkorbAuf()
-      return serverAbgleich({ server: httpZugriff, lokal: syncSpeicher })
+      const erg = await serverAbgleich({ server: httpZugriff, lokal: syncSpeicher })
+      // Fotos und Bau-Excel nach den WEPs: hochgeladen wird erst, wenn das WEP auf dem Server ist
+      try {
+        const d = await serverDateienAbgleichen({ server: httpDateien, lokal: syncSpeicher, fotos: fotoSpeicher, bau: bauSpeicher, uploadErlaubt: fotoUploadErlaubt })
+        erg.fehler.push(...d.fehler)
+      } catch (e) {
+        erg.fehler.push({ wepId: 'Dateien', text: e instanceof Error ? e.message : String(e) })
+      }
+      return erg
     })().finally(() => {
       laufend = undefined
     })
@@ -43,11 +56,17 @@ export function jetztMitServerAbgleichen(): Promise<SyncErgebnis> {
   return laufend
 }
 
+/** Änderungen, die noch auf den Server warten: WEPs, Löschungen, Fotos und Bau-Excel. */
 export async function wartendeAenderungenServer(): Promise<number> {
-  const [weps, korb, metas] = await Promise.all([syncSpeicher.alleWeps(), syncSpeicher.alleImPapierkorb(), syncSpeicher.alleMeta()])
-  return wartendeServerAenderungen(
-    weps,
-    korb.map((e) => e.id),
-    metas,
+  const [weps, korb, metas, fotos, bau] = await Promise.all([syncSpeicher.alleWeps(), syncSpeicher.alleImPapierkorb(), syncSpeicher.alleMeta(), fotoSpeicher.alleRecords(), bauSpeicher.alleRecords()])
+  const aktiv = new Set(weps.map((w) => w.id))
+  return (
+    wartendeServerAenderungen(
+      weps,
+      korb.map((e) => e.id),
+      metas,
+    ) +
+    offeneFotos(fotos, aktiv) +
+    offeneBauExcel(bau, aktiv)
   )
 }

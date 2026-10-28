@@ -6,3 +6,7 @@ export const istServerModus = (env: { VITE_SERVER_MODUS?: string }): boolean => 
 
 /** Server-Modus dieses Builds. */
 export const serverModus: boolean = istServerModus(import.meta.env)
+
+/** Wo Fotos und Bau-Excel außerhalb des Geräts liegen (für Texte der Oberfläche). */
+export const ABLAGE = serverModus ? 'auf dem Server' : 'in OneDrive'
+export const AUS_ABLAGE = serverModus ? 'vom Server' : 'aus OneDrive'
