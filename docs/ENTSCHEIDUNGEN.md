@@ -418,3 +418,12 @@
 - **Grund:** Den OneDrive-Foto-Abgleich über einen nachgebauten Ordner-Zugriff wiederzuverwenden hätte bei endgültig gelöschten WEPs Dateien auf dem Server entfernt, die dort nach den Aufbewahrungsregeln bleiben sollen.
 - **Nachladen:** `ladeFotoAusOneDrive`/`ladeBauExcelAusOneDrive` holen im Server-Modus vom Server; so funktionieren Fotos-Ansicht, Bau-Excel und PDF ohne weitere Änderungen.
 - **Unterschriften** bleiben vorerst im WEP selbst (`Wep.unterschriften`, je höchstens 350 000 Zeichen) und reisen mit dem WEP-JSON.
+
+## 2026-10-28 · v2-Ablauf: ein Zustandsautomat, Teile zusammenführen, Ablauf im WEP
+
+- **Entscheidung:** Zustände `bau_in_arbeit`, `gruen_in_arbeit`, `beim_bv`, `rueckfrage` (mit „an“ und „bei“), `geprueft`. Ein Automat (`src/server/rechte.ts`: `moeglicheAktionen`, `wendeAn`, `schreibrecht`) für Server und App. Schritte gehen nur auf dem aktuellen Stand (Revision) – so wird nur abgegeben, was beim Server angekommen ist.
+- **Rückfrage „beide“** läuft als Kette Bau → Grün → BV (wie die erste Runde), „nur Bau“ geht von Bau direkt zurück an den BV, „nur Grün“ von Grün. Die Notiz bleibt sichtbar, bis wieder beim BV abgegeben ist.
+- **Jeder nur in seinem Teil:** Statt einzelne Felder zu sperren, führt der Server beim Speichern den eigenen Teil in seinen Stand ein (`src/server/teile.ts`). Bau darf den Grün-Teil vorbereiten, solange Grün noch nicht beteiligt ist; danach nicht mehr. Fotos ohne Position gehören zum Bau-Teil, Grün darf neue hinzufügen. Antwortet der Server mit „zusammengeführt“, holt die App den Stand neu.
+- **Ablauf im WEP:** Der Server liefert `Wep.ablauf` (Zustand, Beteiligte mit Namen, offene Rückfrage) mit jedem WEP aus und verwirft, was die App dort mitschickt. So kennt die App Zustand und Rechte auch ohne Netz; jeder Schritt erhöht die Revision, der nächste Abgleich bringt den neuen Zustand.
+- **Oberfläche:** Gesperrt wird über die Reiter: Grün sieht den Bau-Teil nur in der Übersicht, nach der Abgabe bleibt nur die Übersicht. Regelverstöße bleiben Warnungen.
+- **Löschen** nur durch den Besitzer, solange Grün noch nicht beteiligt ist. Danach ist das WEP Teil eines Vorgangs mit zwei Personen.

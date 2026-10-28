@@ -26,6 +26,8 @@ export interface ServerKopf {
   geaendertAm: string
   geaendertVon: string
   geloeschtAm?: string
+  /** Beim Speichern hat der Server nur den eigenen Teil übernommen (Bau/Grün): Stand neu laden. */
+  zusammengefuehrt?: boolean
 }
 
 export interface ServerStand {
@@ -115,13 +117,19 @@ export async function serverAbgleich(opt: ServerAbgleichOptionen): Promise<SyncE
       // Während des Uploads lokal weiter geändert? Dann wartet die neuere Änderung weiter.
       const aktuell = (await lokal.alleMeta()).find((x) => x.id === w.id)
       const nochGleich = !aktuell || aktuell.lokalGeaendertAm === m?.lokalGeaendertAm
-      await lokal.setzeMeta(
-        metaMit(aktuell ?? m, w.id, jetzt(), {
-          serverRev: kopf.rev,
-          letzterSyncAm: nochGleich ? (aktuell?.lokalGeaendertAm ?? jetzt()) : m?.lokalGeaendertAm,
-          serverGeloescht: undefined,
-        }),
-      )
+      if ((kopf.zusammengefuehrt || basisRev === 0) && nochGleich) {
+        // Neu angelegt (der Server setzt den Ablauf) oder nur der eigene Teil übernommen (z. B. Grün): Stand holen
+        const stand = await server.lade(w.id)
+        await lokal.schreibe({ id: w.id, wep: stand.wep, meta: abgeglichen(aktuell ?? m, w.id, stand.kopf.rev, { serverGeloescht: undefined }) })
+      } else {
+        await lokal.setzeMeta(
+          metaMit(aktuell ?? m, w.id, jetzt(), {
+            serverRev: kopf.rev,
+            letzterSyncAm: nochGleich ? (aktuell?.lokalGeaendertAm ?? jetzt()) : m?.lokalGeaendertAm,
+            serverGeloescht: undefined,
+          }),
+        )
+      }
       erg.hochgeladen.push(w.id)
     } catch (e) {
       if (!(e instanceof AbgleichFehler) || !e.stand) throw e

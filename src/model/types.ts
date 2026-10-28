@@ -91,6 +91,22 @@ export interface Wep {
    * unterschriften.ts). Die BV-Kontrollseite setzt sie in beiden PDF-Formen ein.
    */
   unterschriften?: { bau?: string; gruen?: string }
+  /**
+   * Server-Modus (v2): Zustand im Ablauf Bau → Grün → BV, wie ihn der Server zuletzt geliefert hat. Nur der Server
+   * schreibt ihn (beim Speichern verwirft er, was die App mitschickt); fehlt außerhalb des Server-Modus.
+   */
+  ablauf?: WepAblauf
+}
+
+export type WepZustand = 'bau_in_arbeit' | 'gruen_in_arbeit' | 'beim_bv' | 'rueckfrage' | 'geprueft'
+
+/** Ablauf eines WEP auf dem Server (docs/PLAN-V2.md). */
+export interface WepAblauf {
+  zustand: WepZustand
+  bau?: { id: string; name: string }
+  gruen?: { id: string; name: string }
+  /** Offene Rückfrage des BV: an wen, wer gerade dran ist, Notiz. */
+  rueckfrage?: { an: 'bau' | 'gruen' | 'beide'; bei: 'bau' | 'gruen'; notiz: string; am: string; von: string }
 }
 
 /** Angaben zur Bau-Excel am WEP. */
