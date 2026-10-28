@@ -37,6 +37,8 @@ import { metaMit } from './papierkorb'
 import { synchronisiereProfil } from './profil'
 import { bauAufraeumListe, bauSpeicher, exportSpeicher, fotoAufraeumListe, fotoSpeicher, syncSpeicher } from './speicher'
 import type { SyncErgebnis, SyncHinweis } from './types'
+import { serverModus } from '@/server/modus'
+import { ladeBauExcelVomServer, ladeFotoVomServer } from '@/server/dateiDienst'
 
 export type { SyncErgebnis, SyncHinweis } from './types'
 export type { ExportStatus } from './exporte'
@@ -260,15 +262,16 @@ export async function exportFotosNachOneDrive(
 
 export type FotoNetz = 'ok' | 'kein-konto' | 'offline' | 'nur-wlan'
 
-/** Ist OneDrive für die Fotos gerade erreichbar (angemeldet, online, „nur WLAN“ eingehalten)? */
+/** Ist OneDrive (im Server-Modus der Server) für die Fotos gerade erreichbar (angemeldet, online, „nur WLAN“ eingehalten)? */
 export async function fotoNetzStatus(): Promise<FotoNetz> {
-  if (!kontoVerfuegbar() || !(await aktuellesKonto())) return 'kein-konto'
+  if (!serverModus && (!kontoVerfuegbar() || !(await aktuellesKonto()))) return 'kein-konto'
   if (!navigator.onLine) return 'offline'
   return (await fotoUploadErlaubt()) ? 'ok' : 'nur-wlan'
 }
 
-/** Holt eine Bilddatei aus OneDrive: erst aus daten/fotos/, sonst aus dem Papierkorb-Ordner. */
+/** Holt eine Bilddatei aus OneDrive: erst aus daten/fotos/, sonst aus dem Papierkorb-Ordner (Server-Modus: vom Server). */
 export async function ladeFotoAusOneDrive(wepId: string, fotoId: string): Promise<Blob | undefined> {
+  if (serverModus) return ladeFotoVomServer(wepId, fotoId)
   const name = `${fotoId}.jpg`
   for (const ordner of [FOTOS_ORDNER, FOTOS_PAPIERKORB_ORDNER]) {
     try {
@@ -280,8 +283,9 @@ export async function ladeFotoAusOneDrive(wepId: string, fotoId: string): Promis
   return undefined
 }
 
-/** Holt die Bau-Excel eines WEP aus OneDrive: erst aus daten/bau/, sonst aus dem Papierkorb-Ordner. */
+/** Holt die Bau-Excel eines WEP aus OneDrive: erst aus daten/bau/, sonst aus dem Papierkorb-Ordner (Server-Modus: vom Server). */
 export async function ladeBauExcelAusOneDrive(wepId: string): Promise<Blob | undefined> {
+  if (serverModus) return ladeBauExcelVomServer(wepId)
   const name = `${wepId}.xlsx`
   for (const ordner of [BAU_ORDNER, BAU_PAPIERKORB_ORDNER]) {
     try {
