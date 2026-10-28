@@ -38,6 +38,8 @@ import { WepDetail } from './WepDetail'
 import { TeilenOeffnen } from './TeilenOeffnen'
 import { beobachteEingang, holeEingang } from '@/teilen/eingang'
 import { KontenVerwalten } from '@/server/KontenVerwalten'
+import { jetztMitServerAbgleichen } from '@/server/abgleichDienst'
+import { ladeWep } from './db'
 import type { V2Sitzung } from '@/server/V2Tor'
 
 type Ansicht = { typ: 'start' } | { typ: 'detail'; wepId: string } | { typ: 'profil' } | { typ: 'papierkorb' } | { typ: 'konten' }
@@ -143,6 +145,20 @@ export default function App({ v2 }: { v2?: V2Sitzung } = {}) {
     const { profil } = lokalesProfil.lade()
     if (serverRolle && (profil.rolle !== serverRolle || !profil.name.trim())) aendereProfil({ rolle: serverRolle, name: profil.name.trim() || v2?.konto.name || '' })
   }, [kontoId, serverRolle, v2?.konto.name])
+
+  // Server-Modus: Link aus einer Benachrichtigung (?wep=<id>) öffnet das WEP – nach einem Abgleich, falls es noch fehlt
+  useEffect(() => {
+    if (!v2 || phase !== 'bereit') return
+    const url = new URL(window.location.href)
+    const ziel = url.searchParams.get('wep')
+    if (!ziel) return
+    url.searchParams.delete('wep')
+    window.history.replaceState(null, '', url.pathname + url.search + url.hash)
+    void (async () => {
+      if (!(await ladeWep(ziel))) await jetztMitServerAbgleichen().catch(() => undefined)
+      if (await ladeWep(ziel)) setAnsicht({ typ: 'detail', wepId: ziel })
+    })()
+  }, [v2, phase])
 
   // Server-Modus: Anmeldung und Abgleich laufen über den Server (Statuszeile zeigt den Server-Abgleich)
   const verfuegbar = v2 ? true : kontoVerfuegbar()

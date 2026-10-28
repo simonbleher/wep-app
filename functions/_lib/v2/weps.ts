@@ -260,7 +260,21 @@ export async function gruenKonten(db: Db): Promise<{ id: string; name: string; e
  * Ein Schritt im Ablauf (Abgabe, Rückfrage, geprüft, wieder öffnen). Nur auf dem aktuellen Stand (`basisRev`), damit
  * nur abgegeben wird, was beim Server angekommen ist. Steht mit Zustand vorher/nachher und Notiz im Verlauf.
  */
-export async function fuehreAktionAus(db: Db, konto: Konto, id: string, eingabe: { aktion?: unknown; basisRev?: unknown; [k: string]: unknown }, jetzt = Date.now()): Promise<Ergebnis<ServerWepKopf>> {
+/** Was nach einem Schritt weitergegeben wird (Benachrichtigungen, Paket 5). */
+export interface NachSchritt {
+  aktion: AblaufAktion['aktion']
+  wep: { id: string; vorgangsNr: string; anlage: string; parzelle: string; bauKonto: string | null; gruenKonto: string | null }
+  rueckfrageAn: 'bau' | 'gruen' | 'beide' | null
+}
+
+export async function fuehreAktionAus(
+  db: Db,
+  konto: Konto,
+  id: string,
+  eingabe: { aktion?: unknown; basisRev?: unknown; [k: string]: unknown },
+  jetzt = Date.now(),
+  nachSchritt?: (n: NachSchritt) => Promise<void>,
+): Promise<Ergebnis<ServerWepKopf>> {
   const z = await ladeZeile(db, id)
   if (!z || !darfLesen(rechteKopf(z), konto)) return fehler(404, 'WEP nicht gefunden.')
   if (eingabe.basisRev !== z.rev) return fehlerMitStand(db, 409, 'Das WEP auf dem Server ist neuer als hier – bitte erst abgleichen.', z)
@@ -294,5 +308,11 @@ export async function fuehreAktionAus(db: Db, konto: Konto, id: string, eingabe:
     .run()
   if (r.meta.changes !== 1) return fehlerMitStand(db, 409, 'Das WEP wurde inzwischen geändert.', await ladeZeile(db, id))
   await verlauf(db, { wepId: id, kontoId: konto.id, aktion: aktion.aktion, notiz: erg.notiz, vorher: z.zustand, nachher: k.zustand }, jetzt)
-  return { ok: true, wert: kopfVon((await ladeZeile(db, id))!) }
+  const neu = (await ladeZeile(db, id))!
+  await nachSchritt?.({
+    aktion: aktion.aktion,
+    wep: { id, vorgangsNr: neu.vorgangs_nr, anlage: neu.anlage, parzelle: neu.parzelle, bauKonto: neu.bau_konto, gruenKonto: neu.gruen_konto },
+    rueckfrageAn: neu.rueckfrage_an,
+  })
+  return { ok: true, wert: kopfVon(neu) }
 }

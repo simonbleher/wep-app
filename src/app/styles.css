@@ -2996,3 +2996,17 @@ input[type='range'] {
   gap: var(--abstand-2);
   font-size: var(--schrift-klein);
 }
+
+/* Server-Modus (v2): „Neu für dich“ */
+.neu-fuer-dich {
+  border: var(--linie) solid var(--farbe-akzent);
+  border-radius: var(--radius);
+  padding: var(--abstand-3) var(--abstand-4);
+  background: var(--farbe-akzent-hell);
+}
+
+.neu-fuer-dich .gruppenkopf {
+  display: flex;
+  align-items: center;
+  gap: var(--abstand-2);
+}

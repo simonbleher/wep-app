@@ -93,6 +93,17 @@ export function BvServerApp({ sitzung }: { sitzung: V2Sitzung }) {
     void laden()
   }, [laden])
 
+  // Link aus einer Benachrichtigung (/bv?wep=<id>): das WEP gleich öffnen
+  useEffect(() => {
+    if (!liste) return
+    const url = new URL(window.location.href)
+    const ziel = url.searchParams.get('wep')
+    if (!ziel) return
+    url.searchParams.delete('wep')
+    window.history.replaceState(null, '', url.pathname + url.search + url.hash)
+    if (liste.some((e) => e.kopf.id === ziel)) setOffen(ziel)
+  }, [liste])
+
   const offenesWep = liste?.find((e) => e.kopf.id === offen)
   if (offenesWep)
     return (

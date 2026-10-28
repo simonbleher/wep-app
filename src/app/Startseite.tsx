@@ -18,6 +18,7 @@ import { HauptSeitenleiste, ICON, Laedt, LeerZustand, Meldung, StatusMarke, Teil
 import { serverModus } from '@/server/modus'
 import { gemerktesKonto } from '@/server/api'
 import { ZustandMarke } from '@/server/AbgabeBereich'
+import { NeuFuerDich } from '@/server/NeuFuerDich'
 
 /** Server-Modus (v2): Neue WEPs legt der Bau-Wertermittler an (Beginn des Ablaufs). */
 const darfNeuesWep = () => !serverModus || Boolean(gemerktesKonto()?.rollen.includes('bau'))
@@ -111,6 +112,12 @@ export function Startseite({ konto, verfuegbar, onProfil, onOeffnen, onPapierkor
   const status = <StatusZeile konto={konto} verfuegbar={verfuegbar} abgleich={abgleich} />
   const neuErlaubt = darfNeuesWep()
 
+  /** „Neu für dich“: ist das WEP noch nicht auf dem Gerät, erst abgleichen. */
+  async function oeffneNachricht(wepId: string) {
+    if (!weps.some((w) => w.id === wepId)) await abgleich.abgleichen()
+    onOeffnen(wepId)
+  }
+
   return (
     <div className="rahmen">
       <HauptSeitenleiste aktiv="protokolle" onProtokolle={() => undefined} onPapierkorb={onPapierkorb} onProfil={onProfil} fuss={verfuegbar ? status : undefined} />
@@ -142,6 +149,7 @@ export function Startseite({ konto, verfuegbar, onProfil, onOeffnen, onPapierkor
           </div>
         </header>
         {!neuErlaubt && <p className="neben block">Neue WEPs legt der Bau-Wertermittler an; abgegebene WEPs erscheinen hier nach dem Abgleich.</p>}
+        {serverModus && <NeuFuerDich onOeffnen={(id) => void oeffneNachricht(id)} />}
 
         <div className="nur-handy block">
           {status}
