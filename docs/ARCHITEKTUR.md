@@ -58,6 +58,7 @@ genutzt. Alles unten zu Rollen-Sync, Bau-Teil und BV-OneDrive ist Zielbild für 
 | sync      | #sync         | `src/sync/`                          |
 | bau       | (später)      | `src/bau/`                           |
 | bv        | –             | `src/bv/` (BV-Kontrollseite unter `/bv`, eigene IndexedDB `wep-bv`) |
+| server    | –             | `src/server/`, `functions/api/v2/`, `functions/_lib/` (v2: Server-Modus hinter `VITE_SERVER_MODUS`/`SERVER_MODUS`, docs/PLAN-V2.md) |
 | gemeinsam | –             | `src/model/` (nur per PR mit Begründung, betrifft alle) |
 
 ## Datenmodell (Entwurf, wird in `src/model/` verbindlich)
