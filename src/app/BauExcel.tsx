@@ -26,6 +26,7 @@ import type { BauExcelRecord } from '@/bauexcel/types'
 import type { BauFormalien } from '@/export/bauExcelLesen'
 import { parzelleAusBauExcel, setzeParzelle } from '@/parzelle'
 import { fotoNetzStatus, ladeBauExcelAusOneDrive, type FotoNetz } from '@/sync'
+import { ABLAGE, AUS_ABLAGE } from '@/server/modus'
 import { Dialog, ICON, Meldung, Rueckfrage } from './ui'
 
 export const BAU_EXCEL_ACCEPT = '.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -138,9 +139,9 @@ function kb(bytes: number): string {
 export function bauStatusText(bauExcel: BauExcel, stand: BauStand, nachladen: BauNachladeStand): string {
   const r = stand.record
   const lokal = !!r && r.hatDatei && !r.geloescht && r.version === bauExcel.version
-  if (lokal) return r.hochgeladen ? 'auf diesem Gerät · in OneDrive' : 'auf diesem Gerät · wartet auf Upload'
-  if (nachladen.laeuft) return 'wird aus OneDrive geladen …'
-  if (nachladen.veraltet) return 'noch nicht auf diesem Gerät · in OneDrive liegt noch die alte Fassung'
+  if (lokal) return r.hochgeladen ? `auf diesem Gerät · ${ABLAGE}` : 'auf diesem Gerät · wartet auf Upload'
+  if (nachladen.laeuft) return `wird ${AUS_ABLAGE} geladen …`
+  if (nachladen.veraltet) return `noch nicht auf diesem Gerät · ${ABLAGE} liegt noch die alte Fassung`
   if (nachladen.netz === 'nur-wlan') return 'noch nicht auf diesem Gerät · wird im WLAN geladen'
   if (nachladen.netz === 'kein-konto') return 'noch nicht auf diesem Gerät · nur mit OneDrive-Konto ladbar'
   if (nachladen.netz === 'offline') return 'noch nicht auf diesem Gerät · wird mit Netz geladen'
@@ -609,7 +610,7 @@ export function BauExcelBereich({
       {frage === 'austauschen' && (
         <Rueckfrage
           titel="Bau-Excel austauschen?"
-          text={`Die bisherige Bau-Excel „${wep.bauExcel?.name ?? ''}“ wird durch die neue Datei ersetzt, auch in OneDrive und auf deinen anderen Geräten. Danach werden die Formalien noch einmal verglichen.`}
+          text={`Die bisherige Bau-Excel „${wep.bauExcel?.name ?? ''}“ wird durch die neue Datei ersetzt, auch ${ABLAGE} und auf deinen anderen Geräten. Danach werden die Formalien noch einmal verglichen.`}
           bestaetigen="Datei wählen"
           onAbbrechen={() => setFrage(null)}
           onBestaetigen={oeffneAuswahl}
@@ -618,7 +619,7 @@ export function BauExcelBereich({
       {frage === 'entfernen' && (
         <Rueckfrage
           titel="Bau-Excel entfernen?"
-          text={`Die Datei „${wep.bauExcel?.name ?? ''}“ wird vom WEP gelöst und in OneDrive gelöscht. Die bereits übernommenen Formalien bleiben. Der Export nimmt dann die leere Vorlage.`}
+          text={`Die Datei „${wep.bauExcel?.name ?? ''}“ wird vom WEP gelöst und ${ABLAGE} gelöscht. Die bereits übernommenen Formalien bleiben. Der Export nimmt dann die leere Vorlage.`}
           bestaetigen="Entfernen"
           onAbbrechen={() => setFrage(null)}
           onBestaetigen={() => void entferne()}

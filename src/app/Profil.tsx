@@ -4,6 +4,9 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { BookOpen, ChevronLeft } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
 import type { Konto } from '@/konto'
+import { ServerKontoAbschnitt } from '@/server/ServerKontoAbschnitt'
+import { serverModus } from '@/server/modus'
+import type { V2Sitzung } from '@/server/V2Tor'
 import {
   ROLLEN,
   aendereProfil,
@@ -31,9 +34,12 @@ interface Props {
   onZurueck: () => void
   onAnmelden: () => void
   onAbmelden: () => void
+  /** Server-Modus (v2): Konto des Servers statt OneDrive-Anmeldung. */
+  v2?: V2Sitzung
+  onKontenVerwalten?: () => void
 }
 
-export function Profil({ konto, verfuegbar, onZurueck, onAnmelden, onAbmelden }: Props) {
+export function Profil({ konto, verfuegbar, onZurueck, onAnmelden, onAbmelden, v2, onKontenVerwalten }: Props) {
   const id = useId()
   const [profil, setProfil] = useState<ProfilDaten>(() => lokalesProfil.lade().profil)
   const [nurWlan, setNurWlan] = useState(() => ladeGeraeteEinstellungen().nurWlan)
@@ -91,7 +97,7 @@ export function Profil({ konto, verfuegbar, onZurueck, onAnmelden, onAbmelden }:
         </header>
         {/* Anleitung liegt als eigene Seite unter public/anleitung/ (auch offline, siehe vite.config.ts). Gleiches Fenster,
             damit es auch in der Android- und Windows-App funktioniert; dort führt „Zurück zur App“ hierher zurück. */}
-        <a className="knopf knopf-breit" href={`${import.meta.env.BASE_URL}anleitung/index.html`} style={{ marginBottom: 24, color: 'inherit', textDecoration: 'none' }}>
+        <a className="knopf knopf-breit" href={`${import.meta.env.BASE_URL}${serverModus ? 'anleitung-v2' : 'anleitung'}/index.html`} style={{ marginBottom: 24, color: 'inherit', textDecoration: 'none' }}>
           <BookOpen {...ICON} />
           Anleitung
         </a>
@@ -112,23 +118,29 @@ export function Profil({ konto, verfuegbar, onZurueck, onAnmelden, onAbmelden }:
               onChange={(e) => aendern({ name: e.target.value })}
             />
           </div>
-          <div className="feld">
-            <label className="label" htmlFor={`${id}-rolle`}>
-              Rolle
-            </label>
-            <select
-              id={`${id}-rolle`}
-              className="eingabe"
-              value={profil.rolle}
-              onChange={(e) => aendern({ rolle: e.target.value as Rolle })}
-            >
-              {ROLLEN.map((r) => (
-                <option key={r.wert} value={r.wert}>
-                  {r.text}
-                </option>
-              ))}
-            </select>
-          </div>
+          {v2 ? (
+            <p className="neben">
+              Rolle als Wertermittler: {v2.konto.rollen.includes('bau') ? 'Bau' : v2.konto.rollen.includes('gruen') ? 'Grün' : 'keine'} – vergibt der Admin.
+            </p>
+          ) : (
+            <div className="feld">
+              <label className="label" htmlFor={`${id}-rolle`}>
+                Rolle
+              </label>
+              <select
+                id={`${id}-rolle`}
+                className="eingabe"
+                value={profil.rolle}
+                onChange={(e) => aendern({ rolle: e.target.value as Rolle })}
+              >
+                {ROLLEN.map((r) => (
+                  <option key={r.wert} value={r.wert}>
+                    {r.text}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <p className="neben">
             {konto
               ? 'Name und Rolle werden mit deinen anderen Geräten abgeglichen.'
@@ -188,33 +200,37 @@ export function Profil({ konto, verfuegbar, onZurueck, onAnmelden, onAbmelden }:
 
         <Sicherung id={`${id}-sicherung`} appVersion={__APP_VERSION__} />
 
-        <section className="abschnitt" aria-labelledby={`${id}-konto`}>
-          <h2 className="gruppenkopf" id={`${id}-konto`}>
-            Konto
-          </h2>
-          {konto ? (
-            <>
-              <p>Angemeldet als {konto.benutzername || konto.name}</p>
-              <div className="knopf-reihe">
-                <button type="button" className="knopf" onClick={onAbmelden}>
-                  Abmelden
-                </button>
-              </div>
-            </>
-          ) : verfuegbar ? (
-            <>
-              <p>Nicht angemeldet. Die WEPs liegen nur auf diesem Gerät.</p>
-              <div className="knopf-reihe">
-                <button type="button" className="knopf" onClick={onAnmelden}>
-                  Mit Microsoft anmelden
-                </button>
-              </div>
-              <p className="neben">Beim ersten Abgleich werden die vorhandenen WEPs hochgeladen.</p>
-            </>
-          ) : (
-            <p>Die Anmeldung ist in dieser Installation nicht eingerichtet.</p>
-          )}
-        </section>
+        {v2 ? (
+          <ServerKontoAbschnitt sitzung={v2} onKontenVerwalten={() => onKontenVerwalten?.()} />
+        ) : (
+          <section className="abschnitt" aria-labelledby={`${id}-konto`}>
+            <h2 className="gruppenkopf" id={`${id}-konto`}>
+              Konto
+            </h2>
+            {konto ? (
+              <>
+                <p>Angemeldet als {konto.benutzername || konto.name}</p>
+                <div className="knopf-reihe">
+                  <button type="button" className="knopf" onClick={onAbmelden}>
+                    Abmelden
+                  </button>
+                </div>
+              </>
+            ) : verfuegbar ? (
+              <>
+                <p>Nicht angemeldet. Die WEPs liegen nur auf diesem Gerät.</p>
+                <div className="knopf-reihe">
+                  <button type="button" className="knopf" onClick={onAnmelden}>
+                    Mit Microsoft anmelden
+                  </button>
+                </div>
+                <p className="neben">Beim ersten Abgleich werden die vorhandenen WEPs hochgeladen.</p>
+              </>
+            ) : (
+              <p>Die Anmeldung ist in dieser Installation nicht eingerichtet.</p>
+            )}
+          </section>
+        )}
 
         {nativ && <Synchronisierung id={`${id}-sync`} />}
         {nativ && fehlersuche && <Fehlersuche />}

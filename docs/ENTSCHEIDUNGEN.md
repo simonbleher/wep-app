@@ -391,3 +391,58 @@
 - **Speicherort:** D1 und R2 mit Jurisdiktion EU (nur beim Anlegen wählbar). Taucht der EU-Bucket in der Pages-Bindung nicht auf, kommt die Bindung über `wrangler.toml` (Entscheidung in Paket 1).
 - **Anmeldung (Rahmen für Paket 1):** serverseitiger OIDC-Ablauf mit Client-Geheimnis für Google und Microsoft (Microsoft: zusätzliche Plattform „Web“ an der bestehenden Registrierung; die SPA-Anmeldung von v1 bleibt ohne Geheimnis). Sitzungen als Zufalls-Token, in D1 nur der Hash.
 - **Service Worker:** Seitenaufrufe unter `/api/` werden nicht mehr auf die App umgeleitet (sonst landen `/api/v2/status` und die Anmelde-Rücksprünge in der App statt bei der Function). Für v1 ohne Wirkung, dort werden `/api/`-Adressen nur per `fetch` aufgerufen.
+
+## 2026-10-28 · v2-Anmeldung: serverseitiges OIDC, Sitzung als Cookie, Konten in D1
+
+- **Entscheidung:** Anmeldung über den Server mit Authorization Code + PKCE und Client-Geheimnis (Google, Microsoft `common`). `state` liegt 10 Minuten in D1 und muss zu einem Cookie des Browsers passen, der die Anmeldung begonnen hat (keine untergeschobenen Anmeldungen); `nonce` steht im ID-Token. Das ID-Token wird trotz direkter TLS-Verbindung gegen die Schlüssel des Anbieters geprüft (dieselbe Prüfung wie bei der BV-Kontrollseite, `pruefeSignatur` in `functions/_lib/idToken.ts`).
+- **Konten:** Google über `sub`, Microsoft über `tid:oid` (wie bei der BV-Kontrollseite). Name und E-Mail werden bei jeder Anmeldung aufgefrischt. Erste Admins über `V2_ADMINS`: nur bestätigte Adressen – Google mit `email_verified`, Microsoft `preferred_username` (Anmeldeadresse bzw. UPN auf einer bestätigten Domain des Tenants); der Microsoft-Anspruch `email` ist unbestätigt und zählt nicht.
+- **Sitzung:** zufälliges Token (32 Byte) im Cookie `wep_sitzung` (HttpOnly, Secure, SameSite=Lax, 30 Tage), in D1 nur der SHA-256-Hash. Sperren und Löschen beenden alle Sitzungen des Kontos sofort. Schreibende Anfragen verlangen zusätzlich einen passenden `Origin`. Für die Apps (anderer Ursprung) nimmt der Server dasselbe Token auch als `Authorization: Bearer`.
+- **Rollen:** `bau` | `gruen` (nie beides), `bv`, `admin`; der Server prüft jede Änderung. Ein Admin kann sich selbst weder sperren noch löschen noch die Admin-Rolle nehmen (niemand sperrt sich versehentlich aus).
+- **Migrationen:** `migrations/NNNN_*.sql`, eingespielt über die D1-Konsole (kein `wrangler.toml` nötig, solange die Bindungen im Dashboard stehen); `schema_stand` + `/api/v2/status` zeigen, ob alles eingespielt ist. Tests nutzen `node:sqlite` mit denselben Dateien.
+- **Offline:** Die App merkt sich das zuletzt bestätigte Konto (`localStorage`) und startet ohne Netz damit; die erste Anmeldung auf einem Gerät braucht Netz.
+- **Admin-Seite in der App** (Profil → Konten verwalten) statt eigener Unterseite: dieselbe Anmeldung, offline-fähige Hülle.
+
+## 2026-10-28 · v2-WEPs: Revision statt Zeitstempel, eigener Abgleich, gemeinsame Rechte
+
+- **Entscheidung:** Ein WEP liegt als JSON (Format wie v1) in D1 mit einer Revision. Gespeichert wird nur mit der Revision, auf der die Änderung beruht; sonst antwortet der Server mit 409 und seinem Stand. Der Abgleich der App (`src/server/abgleich.ts`) baut darauf auf, nutzt aber die lokalen Bausteine von v1 weiter (IndexedDB, Sync-Metadaten um `serverRev`/`serverGeloescht` ergänzt, Papierkorb, Konflikt-Anzeige und -Entscheidung).
+- **Grund:** Der OneDrive-Abgleich arbeitet mit Dateien und eTags und ist auf einen Nutzer zugeschnitten; mit Revisionen prüft der Server jede Änderung selbst (Rechte, Zustand) und Konflikte sind eindeutig erkennbar. Für die Nutzer sieht ein Konflikt aus wie in v1 („auf zwei Geräten geändert“, neuere Fassung gilt, andere sichtbar).
+- **Rechte an einer Stelle:** `src/server/rechte.ts` ohne Abhängigkeiten, von den Functions mitgebündelt und in der App genutzt. BV und Admin sehen WEPs erst ab der Abgabe an den BV – Entwürfe gehen nur die Beteiligten etwas an.
+- **Papierkorb:** Löschen legt das WEP auch auf dem Server in den Papierkorb (nur der Besitzer, nur in Bearbeitung). „Endgültig löschen“ wirkt nur auf dem Gerät; endgültiges Löschen auf dem Server folgt den Aufbewahrungsregeln des BV (vor echten Daten zu klären).
+- **Verlauf:** jeder Zustandswechsel und Anlegen/Löschen/Wiederherstellen; „bearbeitet“ höchstens einmal je Person und Stunde.
+- **Rolle im Profil:** Im Server-Modus vergibt der Admin die Rolle; das Profil übernimmt Bau bzw. Grün (für neue WEPs) und zeigt sie nur an.
+- **Größe:** D1 erlaubt Zeilen bis 2 MB; der Server nimmt WEPs bis 1,9 MB (Fotos und Bau-Excel liegen nicht im WEP).
+
+## 2026-10-28 · v2-Dateien in R2: eigene Schnittstelle je WEP, kein Ordner-Umzug
+
+- **Entscheidung:** Fotos und Bau-Excel liegen in R2 unter `weps/<id>/…` und sind nur über `/api/v2/weps/<id>/dateien/<name>` erreichbar (Rechte wie beim WEP, nur die Namen `foto-<Id>.jpg` und `bau.xlsx`). Der Abgleich der App ist eigens geschrieben (`src/server/dateiAbgleich.ts`), nach den Regeln des OneDrive-Abgleichs, aber ohne Umzug in einen Papierkorb-Ordner: Im Papierkorb und nach „endgültig löschen“ auf dem Gerät bleiben die Dateien beim WEP auf dem Server.
+- **Grund:** Den OneDrive-Foto-Abgleich über einen nachgebauten Ordner-Zugriff wiederzuverwenden hätte bei endgültig gelöschten WEPs Dateien auf dem Server entfernt, die dort nach den Aufbewahrungsregeln bleiben sollen.
+- **Nachladen:** `ladeFotoAusOneDrive`/`ladeBauExcelAusOneDrive` holen im Server-Modus vom Server; so funktionieren Fotos-Ansicht, Bau-Excel und PDF ohne weitere Änderungen.
+- **Unterschriften** bleiben vorerst im WEP selbst (`Wep.unterschriften`, je höchstens 350 000 Zeichen) und reisen mit dem WEP-JSON.
+
+## 2026-10-28 · v2-Ablauf: ein Zustandsautomat, Teile zusammenführen, Ablauf im WEP
+
+- **Entscheidung:** Zustände `bau_in_arbeit`, `gruen_in_arbeit`, `beim_bv`, `rueckfrage` (mit „an“ und „bei“), `geprueft`. Ein Automat (`src/server/rechte.ts`: `moeglicheAktionen`, `wendeAn`, `schreibrecht`) für Server und App. Schritte gehen nur auf dem aktuellen Stand (Revision) – so wird nur abgegeben, was beim Server angekommen ist.
+- **Rückfrage „beide“** läuft als Kette Bau → Grün → BV (wie die erste Runde), „nur Bau“ geht von Bau direkt zurück an den BV, „nur Grün“ von Grün. Die Notiz bleibt sichtbar, bis wieder beim BV abgegeben ist.
+- **Jeder nur in seinem Teil:** Statt einzelne Felder zu sperren, führt der Server beim Speichern den eigenen Teil in seinen Stand ein (`src/server/teile.ts`). Bau darf den Grün-Teil vorbereiten, solange Grün noch nicht beteiligt ist; danach nicht mehr. Fotos ohne Position gehören zum Bau-Teil, Grün darf neue hinzufügen. Antwortet der Server mit „zusammengeführt“, holt die App den Stand neu.
+- **Ablauf im WEP:** Der Server liefert `Wep.ablauf` (Zustand, Beteiligte mit Namen, offene Rückfrage) mit jedem WEP aus und verwirft, was die App dort mitschickt. So kennt die App Zustand und Rechte auch ohne Netz; jeder Schritt erhöht die Revision, der nächste Abgleich bringt den neuen Zustand.
+- **Oberfläche:** Gesperrt wird über die Reiter: Grün sieht den Bau-Teil nur in der Übersicht, nach der Abgabe bleibt nur die Übersicht. Regelverstöße bleiben Warnungen.
+- **Löschen** nur durch den Besitzer, solange Grün noch nicht beteiligt ist. Danach ist das WEP Teil eines Vorgangs mit zwei Personen.
+
+## 2026-10-28 · v2-Kontrollseite: dieselbe Ansicht, Daten vom Server, Schritte statt Status
+
+- **Entscheidung:** `/bv` zeigt im Server-Modus die abgegebenen WEPs vom Server (Rolle BV oder Admin). Die Status „neu / geprüft / Rückfrage“ der Datei-Kontrollseite werden zu Schritten im Ablauf (Rückfrage mit Ziel und Notiz, geprüft, wieder öffnen mit Begründung), die der Server prüft und im Verlauf festhält. Übersicht, Skizzen, Fotos, PDF und Drucken sind dieselben Bausteine wie in v1.
+- **Grund:** Der Zustand eines WEP soll an einer Stelle stehen (Server) und für Wertermittler und BV gleich aussehen; lokale Notizen im Browser des BV gingen an den Wertermittlern vorbei.
+- **Ohne Netz:** Die Kontrollseite im Server-Modus braucht Netz; sie hält keine eigene Kopie (die Datei-Kontrollseite von v1 bleibt dafür ohne Schalter erhalten).
+- **Profil je Person:** Meldet sich auf einem Gerät eine andere Person an, werden Name, Unterschrift und eigene Baupreisindex-Werte des Profils zurückgesetzt, damit nichts in fremde WEPs gerät. Bei der Abgabe kommt die eigene Unterschrift für den eigenen Teil ins WEP.
+
+## 2026-10-28 · v2-Benachrichtigungen: in der App immer, per Mail sparsam
+
+- **Entscheidung:** Jeder Schritt im Ablauf legt Benachrichtigungen in D1 an (Empfänger in `functions/_lib/v2/benachrichtigungen.ts`: an Grün → Grün, an den BV → alle BV-Konten, Rückfrage → wer gefragt ist, geprüft/wieder geöffnet → beide Wertermittler; nie die Person selbst). Die App zeigt sie als „Neu für dich“; eine Mail über Resend geht nur, wenn Resend eingerichtet ist und das Konto Mails nicht abgeschaltet hat.
+- **Datensparsam:** Mails enthalten nur Vorgangs-Nr., Anlage, Parzelle und einen Link in die App (Anmeldung nötig). Keine Namen von Pächtern oder Wertermittlern, keine Beträge – die Mails liegen bei fremden Mail-Anbietern.
+- **Zuverlässigkeit:** Mails gehen nach der Antwort raus (`waitUntil`), damit die Abgabe nicht auf Resend wartet; ein Fehler steht bei der Benachrichtigung (`mail = 'fehler'`), der Schritt bleibt gültig. In der App ist die Benachrichtigung in jedem Fall da.
+
+## 2026-10-28 · Anleitung v2 als eigene Seite, eine Testumgebung für Durchlauf und Bilder
+
+- **Entscheidung:** Die Anleitung für den Server-Modus ist eine eigene Seite (`public/anleitung-v2/`, PDF `docs/anleitung-v2/Anleitung_WEP-App_v2.pdf`). Die App verlinkt sie nur in Builds mit `VITE_SERVER_MODUS`; der Service Worker hält sie nur dort offline vor. Die Anleitung von v1 bleibt unverändert, bis Simon umstellt (dann ersetzt v2 sie).
+- **Grund:** v1-Nutzer sollen keine Kapitel über Konten und Abgaben sehen, die es für sie noch nicht gibt; ihre Geräte laden die Bilder der v2-Anleitung nicht.
+- **Eine Testumgebung:** `tools/v2/umgebung.ts` startet die gebaute App mit den echten Functions (SQLite statt D1, R2-Ersatz) und nachgebauter Anmeldung bei Google/Microsoft und Resend. Der Durchlauf (`npm run v2:durchlauf`) und die Bildschirmfotos (`npm run anleitung:v2`) nutzen sie gemeinsam – die Bilder zeigen genau das, was der Durchlauf prüft.

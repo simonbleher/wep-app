@@ -88,6 +88,10 @@ import { berechneAbschnittSumme } from '@/gruen/summen'
 import { Capacitor } from '@capacitor/core'
 import { speichereDatei, speicherText } from './dateiSpeichern'
 import { leseZahl, zahlDe, zahlFuerEingabe } from '@/gruen/format'
+import { serverModus } from '@/server/modus'
+import { serverSicht } from '@/server/ablaufDienst'
+import { AbgabeBereich, ZustandMarke } from '@/server/AbgabeBereich'
+import { ZUSTAND_TEXT } from '@/server/rechte'
 
 // ---------------------------------------------------------------------------
 // Typen
@@ -139,6 +143,19 @@ const BEREICHE: { id: Bereich; titel: string; kurz: string; icon: LucideIcon; te
 /** Abschnitte, die zur Rolle passen (Reihenfolge wie in BEREICHE). */
 export function bereicheFuerRolle(rolle: Rolle): typeof BEREICHE {
   return BEREICHE.filter((b) => b.teil === 'alle' || (b.teil === 'gruen' ? hatGruenTeil(rolle) : hatBauTeil(rolle)))
+}
+
+/**
+ * Server-Modus (v2): sichtbare Abschnitte nach dem, was ich gerade darf – Bau seinen Teil, Grün nur den Grün-Teil (den
+ * Bau-Teil sieht Grün in der Übersicht), nach der Abgabe nur noch die Übersicht. Sonst nach der Rolle.
+ */
+function sichtbareBereiche(wep: Wep, rolle: Rolle): typeof BEREICHE {
+  if (!serverModus) return bereicheFuerRolle(rolle)
+  const recht = serverSicht(wep).recht
+  if (recht === 'alles') return bereicheFuerRolle(rolle)
+  if (recht === 'bau') return BEREICHE.filter((b) => b.teil === 'bau' || b.teil === 'alle')
+  if (recht === 'gruen') return BEREICHE.filter((b) => b.teil === 'gruen' || b.id === 'fotos' || b.id === 'uebersicht')
+  return BEREICHE.filter((b) => b.id === 'uebersicht')
 }
 
 /** Titel eines Abschnitts; bei „Grün + Bau“ mit Teil, wo sonst zwei gleich hießen. */
@@ -226,6 +243,21 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
     return installiereSchnittstelle({ holeWep: () => wepRef.current!, zeigeSkizze: () => wechsle('skizze'), zeigeListe: (liste) => wechsle(liste === 'beseitigung' ? 'beseitigung' : liste) })
   }, [wepId, geladen, wechsle])
 
+  // Server-Modus: Ist der offene Abschnitt nicht (mehr) erlaubt (z. B. nach der Abgabe), den ersten erlaubten zeigen
+  useEffect(() => {
+    if (!wep || !serverModus) return
+    const erlaubt = sichtbareBereiche(wep, wepRolle(wep, profilRolle))
+    if (tab !== 'export' && !erlaubt.some((b) => b.id === tab)) setTab(erlaubt[0].id)
+  }, [wep, tab, profilRolle])
+
+  const neuLaden = useCallback(() => {
+    void ladeWep(wepId).then((w) => {
+      if (!w) return
+      wepRef.current = w
+      setWep(w)
+    })
+  }, [wepId])
+
   const oeffneMaske = useCallback((m: Maske) => {
     setMaske(m)
     window.scrollTo(0, 0)
@@ -252,8 +284,17 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
 
   const titel = wepTitel(wep)
   const rolle = wepRolle(wep, profilRolle)
-  const bereiche = bereicheFuerRolle(rolle)
+  const bereiche = sichtbareBereiche(wep, rolle)
   const beides = rolle === 'beides'
+  const sicht = serverModus ? serverSicht(wep) : undefined
+  const zustand = wep.ablauf?.zustand ?? 'bau_in_arbeit'
+  // Menü „⋯“: im Server-Modus ohne Status und Teilen (der Ablauf ersetzt beides), Löschen/Duplizieren nach Recht
+  const menue = {
+    onStatus: sicht ? undefined : (st: WepStatus) => void setzeStatus(st),
+    onDuplizieren: !sicht || sicht.darfAnlegen ? () => void duplizieren() : undefined,
+    onTeilen: sicht ? undefined : () => setTeilenOffen(true),
+    onLoeschen: !sicht || sicht.darfLoeschen ? () => setLoeschFrage(true) : undefined,
+  }
   // Schaltet den Grün- oder Bau-Teil für dieses WEP (die Rolle steht immer am WEP)
   function setzeTeil(teil: 'gruen' | 'bau', an: boolean) {
     const neu = rolleAusTeilen(teil === 'gruen' ? an : hatGruenTeil(rolle), teil === 'bau' ? an : hatBauTeil(rolle))
@@ -360,11 +401,11 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
             </span>
             <span className="sl-status">
               <TeilMarke rolle={rolle} />
-              <StatusMarke status={wepStatus(wep)} />
+              {serverModus ? <ZustandMarke zustand={zustand} /> : <StatusMarke status={wepStatus(wep)} />}
             </span>
             {wep.anBvGesendetAm && <span className="neben">an BV gesendet {datumDe(wep.anBvGesendetAm.slice(0, 10))}</span>}
           </div>
-          <WepMenue status={wepStatus(wep)} onStatus={(st) => void setzeStatus(st)} onDuplizieren={() => void duplizieren()} onTeilen={() => setTeilenOffen(true)} onLoeschen={() => setLoeschFrage(true)} />
+          <WepMenue status={wepStatus(wep)} {...menue} />
         </div>
         <nav className="sl-nav">
           {bereiche.map((b) => {
@@ -382,7 +423,12 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
           })}
         </nav>
         <nav className="sl-nav sl-trenner">
-          <SlEintrag icon={ohneExcel ? Send : FileSpreadsheet} text={ohneExcel ? 'An den BV senden' : 'Export'} aktiv={tab === 'export'} onClick={() => wechsle('export')} />
+          <SlEintrag
+            icon={serverModus || ohneExcel ? Send : FileSpreadsheet}
+            text={serverModus ? 'Abgabe' : ohneExcel ? 'An den BV senden' : 'Export'}
+            aktiv={tab === 'export'}
+            onClick={() => wechsle('export')}
+          />
         </nav>
       </aside>
 
@@ -482,7 +528,12 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
           <>
             <Kopf
               titel={titel}
-              unter={[wep.formalien.kleingartenanlage.trim(), TEIL_TEXT[rolle], wepStatus(wep), wep.anBvGesendetAm ? `an BV gesendet ${datumDe(wep.anBvGesendetAm.slice(0, 10))}` : ''].filter(Boolean).join(' · ')}
+              unter={(serverModus
+                ? [wep.formalien.kleingartenanlage.trim(), ZUSTAND_TEXT[zustand]]
+                : [wep.formalien.kleingartenanlage.trim(), TEIL_TEXT[rolle], wepStatus(wep), wep.anBvGesendetAm ? `an BV gesendet ${datumDe(wep.anBvGesendetAm.slice(0, 10))}` : '']
+              )
+                .filter(Boolean)
+                .join(' · ')}
               links={zurueckKnopf}
               rechts={
                 <>
@@ -492,9 +543,9 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
                     aria-current={tab === 'export' ? 'page' : undefined}
                     onClick={() => wechsle('export')}
                   >
-                    {ohneExcel ? 'An den BV' : 'Export'}
+                    {serverModus ? 'Abgabe' : ohneExcel ? 'An den BV' : 'Export'}
                   </button>
-                  <WepMenue status={wepStatus(wep)} onStatus={(st) => void setzeStatus(st)} onDuplizieren={() => void duplizieren()} onTeilen={() => setTeilenOffen(true)} onLoeschen={() => setLoeschFrage(true)} />
+                  <WepMenue status={wepStatus(wep)} {...menue} />
                 </>
               }
             />
@@ -563,7 +614,8 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
             {tab === 'fotos' && <FotosTab wep={wep} aendere={aendere} records={fotoRecords} nachladen={fotoNachladen} />}
             {tab === 'skizze' && <SkizzeTab wep={wep} onSpeichern={speichere} />}
             {tab === 'uebersicht' && <Uebersicht wep={wep} rolle={rolle} optionen={{ profilIndex }} />}
-            {tab === 'export' && (
+            {tab === 'export' && serverModus && <AbgabeBereich wep={wep} onGeaendert={neuLaden} />}
+            {tab === 'export' && !serverModus && (
               <ExportTab
                 wep={wep}
                 onSpeichern={speichere}
@@ -626,10 +678,11 @@ function WepMenue({
   onLoeschen,
 }: {
   status: WepStatus
-  onStatus: (status: WepStatus) => void
-  onDuplizieren: () => void
-  onTeilen: () => void
-  onLoeschen: () => void
+  /** Fehlt ein Eintrag (z. B. im Server-Modus), erscheint er nicht im Menü. */
+  onStatus?: (status: WepStatus) => void
+  onDuplizieren?: () => void
+  onTeilen?: () => void
+  onLoeschen?: () => void
 }) {
   const [offen, setOffen] = useState(false)
   const id = useId()
@@ -641,6 +694,7 @@ function WepMenue({
     return () => window.removeEventListener('keydown', taste)
   }, [offen])
 
+  if (!onStatus && !onDuplizieren && !onTeilen && !onLoeschen) return null
   return (
     <div className="menue-anker">
       <button
@@ -658,7 +712,7 @@ function WepMenue({
         <>
           <button type="button" className="menue-hintergrund" aria-hidden="true" tabIndex={-1} onClick={() => setOffen(false)} />
           <ul className="menue" role="menu" id={id}>
-            {status !== 'fertig' && (
+            {onStatus && status !== 'fertig' && (
               <li role="none">
                 <button
                   type="button"
@@ -675,7 +729,7 @@ function WepMenue({
                 </button>
               </li>
             )}
-            {status !== 'in Arbeit' && (
+            {onStatus && status !== 'in Arbeit' && (
               <li role="none">
                 <button
                   type="button"
@@ -692,48 +746,54 @@ function WepMenue({
                 </button>
               </li>
             )}
-            <li role="none">
-              <button
-                type="button"
-                role="menuitem"
-                className="menue-eintrag"
-                onClick={() => {
-                  setOffen(false)
-                  onDuplizieren()
-                }}
-              >
-                <CopyPlus {...ICON} />
-                Duplizieren
-              </button>
-            </li>
-            <li role="none">
-              <button
-                type="button"
-                role="menuitem"
-                className="menue-eintrag"
-                onClick={() => {
-                  setOffen(false)
-                  onTeilen()
-                }}
-              >
-                <Share2 {...ICON} />
-                Teilen …
-              </button>
-            </li>
-            <li role="none">
-              <button
-                type="button"
-                role="menuitem"
-                className="menue-eintrag menue-gefahr"
-                onClick={() => {
-                  setOffen(false)
-                  onLoeschen()
-                }}
-              >
-                <Trash2 {...ICON} />
-                In den Papierkorb …
-              </button>
-            </li>
+            {onDuplizieren && (
+              <li role="none">
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="menue-eintrag"
+                  onClick={() => {
+                    setOffen(false)
+                    onDuplizieren()
+                  }}
+                >
+                  <CopyPlus {...ICON} />
+                  Duplizieren
+                </button>
+              </li>
+            )}
+            {onTeilen && (
+              <li role="none">
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="menue-eintrag"
+                  onClick={() => {
+                    setOffen(false)
+                    onTeilen()
+                  }}
+                >
+                  <Share2 {...ICON} />
+                  Teilen …
+                </button>
+              </li>
+            )}
+            {onLoeschen && (
+              <li role="none">
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="menue-eintrag menue-gefahr"
+                  onClick={() => {
+                    setOffen(false)
+                    onLoeschen()
+                  }}
+                >
+                  <Trash2 {...ICON} />
+                  In den Papierkorb …
+                </button>
+              </li>
+            )}
           </ul>
         </>
       )}

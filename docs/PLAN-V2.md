@@ -100,8 +100,9 @@ Die Entscheidungen fallen im jeweiligen Paket und landen in docs/ENTSCHEIDUNGEN.
   - **Browser:** Cookie `HttpOnly; Secure; SameSite=Lax`.
   - **Android und Windows** (anderer Ursprung): Die App übernimmt die Anmeldung über einen Einmal-Code und schickt
     das Token als `Authorization: Bearer`. Das klärt Paket 1. Bis dahin funktioniert der Server-Modus im Browser.
-- **Datenbank:** SQL-Migrationen im Ordner `migrations/` (`0001_….sql`, …). Eingespielt werden sie mit
-  `wrangler d1 migrations apply`. Tests laufen mit einer SQLite-Attrappe derselben Schnittstelle, ohne Cloudflare-Konto.
+- **Datenbank:** SQL-Migrationen im Ordner `migrations/` (`0001_….sql`, …). Simon spielt sie über die D1-Konsole
+  ein (docs/V2-EINRICHTUNG.md). Jede trägt ihre Nummer in `schema_stand` ein, und `/api/v2/status` zeigt den Stand.
+  Tests laufen mit SQLite aus Node (`node:sqlite`) und denselben Migrationen, ohne Cloudflare-Konto.
 - **WEP-Speicherung:**
   - Das WEP liegt als JSON (Format wie in v1) mit Revision (`rev`) in D1. Dazu kommen getrennte Spalten für die
     Abfragen: Zustand, Bau-Konto, Grün-Konto, Vorgangs-Nr., Anlage, Parzelle.
@@ -136,6 +137,7 @@ Die Entscheidungen fallen im jeweiligen Paket und landen in docs/ENTSCHEIDUNGEN.
 1. **Server-Grundgerüst:** D1/R2-Schema mit Migrationen, Functions, Anmeldung mit Google und Microsoft,
    Sitzungen, Freigabe, Admin-Seite.
 2. **WEPs auf dem Server:** offline-fähig speichern und abgleichen, Rechteprüfung, Verlauf.
+   - 2b: Fotos und Bau-Excel in R2 (eigener PR). Unterschriften bleiben vorerst im WEP-JSON.
 3. **Ablauf:** Zustände, Abgabe Bau → Grün mit Auswahl, Grün bearbeitet nur den Grün-Teil, Abgabe an den BV, Sperren.
 4. **BV-Kontrollseite mit Server-Daten:** Rückfrage mit Auswahl, geprüft und gesperrt, Wiederöffnen mit Begründung.
 5. **Benachrichtigungen** in der App und per Resend.

@@ -73,6 +73,10 @@ export interface SyncMeta {
   konflikt?: KonfliktInfo
   /** Konflikt-Kopien in daten/, die beim nächsten Abgleich gelöscht werden. */
   aufraeumen?: string[]
+  /** Server-Modus (v2): Revision auf dem Server beim letzten Abgleich (src/server/abgleich.ts). */
+  serverRev?: number
+  /** Server-Modus (v2): Die Löschung ist auf dem Server angekommen. */
+  serverGeloescht?: boolean
 }
 
 /** Eine Datei im OneDrive-App-Ordner. */

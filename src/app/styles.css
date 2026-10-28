@@ -2912,3 +2912,101 @@ input[type='range'] {
   text-align: center;
   border-bottom: var(--linie) solid var(--farbe-linie);
 }
+
+/* Server-Modus (v2): Anmeldung über Links, Konten verwalten */
+.login a.knopf {
+  text-decoration: none;
+}
+
+.konto-zeile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--abstand-2);
+  padding: var(--abstand-4) 0;
+  border-bottom: var(--linie) solid var(--farbe-linie);
+}
+
+.konto-kopf {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--abstand-3);
+  align-items: baseline;
+}
+
+.konto-status {
+  font-size: var(--schrift-klein);
+  white-space: nowrap;
+}
+
+.konto-status-wartet {
+  font-weight: var(--gewicht-fett);
+}
+
+.konto-status-gesperrt {
+  color: var(--farbe-warnung);
+}
+
+.konto-rollen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--abstand-3) var(--abstand-5);
+  align-items: end;
+}
+
+.konto-rollen label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--abstand-1);
+}
+
+.konto-rollen .konto-haken {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--abstand-2);
+  min-height: var(--beruehr-min);
+}
+
+/* Server-Modus: Statuszeile des Abgleichs darf umbrechen (die gleichnamige Status-Marke ist einzeilig) */
+.status.status-server {
+  white-space: normal;
+}
+
+/* Server-Modus (v2): Zustand im Ablauf und Verlauf */
+.status.zustand {
+  display: inline-flex;
+}
+
+.zustand-beim_bv,
+.zustand-geprueft {
+  border-color: var(--farbe-akzent);
+  color: var(--farbe-akzent);
+}
+
+.zustand-rueckfrage {
+  border-color: var(--farbe-warnung);
+  color: var(--farbe-warnung);
+}
+
+.verlauf {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--abstand-2);
+  font-size: var(--schrift-klein);
+}
+
+/* Server-Modus (v2): „Neu für dich“ */
+.neu-fuer-dich {
+  border: var(--linie) solid var(--farbe-akzent);
+  border-radius: var(--radius);
+  padding: var(--abstand-3) var(--abstand-4);
+  background: var(--farbe-akzent-hell);
+}
+
+.neu-fuer-dich .gruppenkopf {
+  display: flex;
+  align-items: center;
+  gap: var(--abstand-2);
+}

@@ -12,6 +12,24 @@ import {
 } from '@/konto'
 import { ladeUpdateDienst } from './updateModul'
 import { setzeAbgleichZurueck } from '@/sync'
+import { aendereProfil, lokalesProfil } from '@/profil'
+
+/** Server-Modus: Zu welchem Konto gehört das Profil dieses Geräts (Name, Unterschrift)? */
+const PROFIL_VON = 'wep-v2-profil-konto'
+function profilVon(): string | null {
+  try {
+    return localStorage.getItem(PROFIL_VON)
+  } catch {
+    return null
+  }
+}
+function merkeProfilVon(id: string): void {
+  try {
+    localStorage.setItem(PROFIL_VON, id)
+  } catch {
+    /* ohne Speicher wird beim nächsten Start erneut zurückgesetzt */
+  }
+}
 import { LoginBildschirm } from './LoginBildschirm'
 import { Papierkorb } from './Papierkorb'
 import { Profil } from './Profil'
@@ -19,13 +37,18 @@ import { Startseite } from './Startseite'
 import { WepDetail } from './WepDetail'
 import { TeilenOeffnen } from './TeilenOeffnen'
 import { beobachteEingang, holeEingang } from '@/teilen/eingang'
+import { KontenVerwalten } from '@/server/KontenVerwalten'
+import { jetztMitServerAbgleichen } from '@/server/abgleichDienst'
+import { ladeWep } from './db'
+import type { V2Sitzung } from '@/server/V2Tor'
 
-type Ansicht = { typ: 'start' } | { typ: 'detail'; wepId: string } | { typ: 'profil' } | { typ: 'papierkorb' }
+type Ansicht = { typ: 'start' } | { typ: 'detail'; wepId: string } | { typ: 'profil' } | { typ: 'papierkorb' } | { typ: 'konten' }
 
 /** lade = Start wird gerade geklärt, login = Login-Bildschirm, bereit = App läuft. */
 type Phase = 'lade' | 'login' | 'bereit'
 
-export default function App() {
+/** `v2`: Server-Modus (docs/PLAN-V2.md) – angemeldet über den Server, kein OneDrive-Sync, kein Microsoft-Login der App. */
+export default function App({ v2 }: { v2?: V2Sitzung } = {}) {
   const [ansicht, setAnsicht] = useState<Ansicht>({ typ: 'start' })
   const [phase, setPhase] = useState<Phase>('lade')
   const [konto, setKonto] = useState<Konto | null>(null)
@@ -42,6 +65,11 @@ export default function App() {
 
   useEffect(() => {
     let aktiv = true
+    if (v2) {
+      // Server-Modus: die Anmeldung hat V2Tor erledigt; OneDrive bleibt aus. v2 gilt für die ganze Laufzeit.
+      setPhase('bereit')
+      return
+    }
     void startZustand().then((s) => {
       if (!aktiv) return
       setKonto(s.typ === 'start' ? s.konto : null)
@@ -104,6 +132,37 @@ export default function App() {
     }
   }, [])
 
+  // Server-Modus: die Rolle (Bau oder Grün) vergibt der Admin; sie gilt im Profil und für neue WEPs
+  const serverRolle = v2?.konto.rollen.includes('bau') ? 'bau' : v2?.konto.rollen.includes('gruen') ? 'gruen' : undefined
+  const kontoId = v2?.konto.id
+  useEffect(() => {
+    if (!kontoId) return
+    // Andere Person auf diesem Gerät: Name, Unterschrift und eigene Baupreisindex-Werte gehören zur vorigen Person
+    if (profilVon() !== kontoId) {
+      aendereProfil({ name: v2?.konto.name ?? '', unterschrift: undefined, baupreisindex: undefined })
+      merkeProfilVon(kontoId)
+    }
+    const { profil } = lokalesProfil.lade()
+    if (serverRolle && (profil.rolle !== serverRolle || !profil.name.trim())) aendereProfil({ rolle: serverRolle, name: profil.name.trim() || v2?.konto.name || '' })
+  }, [kontoId, serverRolle, v2?.konto.name])
+
+  // Server-Modus: Link aus einer Benachrichtigung (?wep=<id>) öffnet das WEP – nach einem Abgleich, falls es noch fehlt
+  useEffect(() => {
+    if (!v2 || phase !== 'bereit') return
+    const url = new URL(window.location.href)
+    const ziel = url.searchParams.get('wep')
+    if (!ziel) return
+    url.searchParams.delete('wep')
+    window.history.replaceState(null, '', url.pathname + url.search + url.hash)
+    void (async () => {
+      if (!(await ladeWep(ziel))) await jetztMitServerAbgleichen().catch(() => undefined)
+      if (await ladeWep(ziel)) setAnsicht({ typ: 'detail', wepId: ziel })
+    })()
+  }, [v2, phase])
+
+  // Server-Modus: Anmeldung und Abgleich laufen über den Server (Statuszeile zeigt den Server-Abgleich)
+  const verfuegbar = v2 ? true : kontoVerfuegbar()
+
   if (phase === 'lade') return <div className="app" aria-busy="true" />
   if (phase === 'login') {
     return (
@@ -119,7 +178,7 @@ export default function App() {
         <Startseite
           key={`start-${eingespielt}`}
           konto={konto}
-          verfuegbar={kontoVerfuegbar()}
+          verfuegbar={verfuegbar}
           onOeffnen={(wepId) => setAnsicht({ typ: 'detail', wepId })}
           onProfil={() => setAnsicht({ typ: 'profil' })}
           onPapierkorb={() => setAnsicht({ typ: 'papierkorb' })}
@@ -128,7 +187,7 @@ export default function App() {
       ) : ansicht.typ === 'papierkorb' ? (
         <Papierkorb
           konto={konto}
-          verfuegbar={kontoVerfuegbar()}
+          verfuegbar={verfuegbar}
           onZurueck={() => setAnsicht({ typ: 'start' })}
           onProfil={() => setAnsicht({ typ: 'profil' })}
           onOeffnen={(wepId) => setAnsicht({ typ: 'detail', wepId })}
@@ -136,11 +195,15 @@ export default function App() {
       ) : ansicht.typ === 'profil' ? (
         <Profil
           konto={konto}
-          verfuegbar={kontoVerfuegbar()}
+          verfuegbar={verfuegbar}
           onZurueck={() => setAnsicht({ typ: 'start' })}
           onAnmelden={() => void melden()}
           onAbmelden={() => void abmelden_()}
+          v2={v2}
+          onKontenVerwalten={() => setAnsicht({ typ: 'konten' })}
         />
+      ) : ansicht.typ === 'konten' ? (
+        v2 && <KontenVerwalten ich={v2.konto} onZurueck={() => setAnsicht({ typ: 'profil' })} onProfil={() => setAnsicht({ typ: 'profil' })} />
       ) : (
         <WepDetail
           key={`${ansicht.wepId}-${eingespielt}`}

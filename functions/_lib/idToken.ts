@@ -4,7 +4,7 @@
 
 export const JWKS_URL = 'https://login.microsoftonline.com/common/discovery/v2.0/keys'
 /** Erlaubte Uhrabweichung zwischen Microsoft und Cloudflare. */
-const SPIEL_S = 300
+export const SPIEL_S = 300
 
 export interface Jwk {
   kid: string
@@ -51,24 +51,7 @@ export async function pruefeIdToken(
   token: string,
   opt: { clientId: string; schluessel: (neu: boolean) => Promise<Jwk[]>; jetztS?: number },
 ): Promise<GeprueftesToken> {
-  const teile = token.split('.')
-  if (teile.length !== 3) throw new TokenFehler('Kein JWT')
-  let kopf: Record<string, unknown>
-  let inhalt: Record<string, unknown>
-  try {
-    kopf = json(teile[0])
-    inhalt = json(teile[1])
-  } catch {
-    throw new TokenFehler('Token nicht lesbar')
-  }
-  if (kopf.alg !== 'RS256') throw new TokenFehler('Falscher Algorithmus')
-  const kid = text(kopf.kid)
-  let jwk = (await opt.schluessel(false)).find((k) => k.kid === kid)
-  if (!jwk) jwk = (await opt.schluessel(true)).find((k) => k.kid === kid)
-  if (!jwk) throw new TokenFehler('Unbekannter Schlüssel')
-  const key = await crypto.subtle.importKey('jwk', { kty: 'RSA', n: jwk.n, e: jwk.e, alg: 'RS256', ext: true }, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify'])
-  const ok = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, b64url(teile[2]) as BufferSource, new TextEncoder().encode(`${teile[0]}.${teile[1]}`) as BufferSource)
-  if (!ok) throw new TokenFehler('Signatur ungültig')
+  const { inhalt } = await pruefeSignatur(token, opt.schluessel)
 
   const jetzt = opt.jetztS ?? Math.floor(Date.now() / 1000)
   if (!opt.clientId || inhalt.aud !== opt.clientId) throw new TokenFehler('Token ist nicht für diese App')
@@ -86,4 +69,30 @@ export async function pruefeIdToken(
     name: text(inhalt.name).slice(0, 200),
     email: (text(inhalt.preferred_username) || text(inhalt.email)).slice(0, 200),
   }
+}
+
+/**
+ * Zerlegt ein JWT und prüft die RS256-Signatur gegen die JWKS (`schluessel(true)` = frisch geladen, wenn die `kid`
+ * unbekannt ist). Ansprüche (`aud`, `iss`, `exp` …) prüft der Aufrufer. Wirft `TokenFehler`.
+ */
+export async function pruefeSignatur(token: string, schluessel: (neu: boolean) => Promise<Jwk[]>): Promise<{ kopf: Record<string, unknown>; inhalt: Record<string, unknown> }> {
+  const teile = token.split('.')
+  if (teile.length !== 3) throw new TokenFehler('Kein JWT')
+  let kopf: Record<string, unknown>
+  let inhalt: Record<string, unknown>
+  try {
+    kopf = json(teile[0])
+    inhalt = json(teile[1])
+  } catch {
+    throw new TokenFehler('Token nicht lesbar')
+  }
+  if (kopf.alg !== 'RS256') throw new TokenFehler('Falscher Algorithmus')
+  const kid = text(kopf.kid)
+  let jwk = (await schluessel(false)).find((k) => k.kid === kid)
+  if (!jwk) jwk = (await schluessel(true)).find((k) => k.kid === kid)
+  if (!jwk) throw new TokenFehler('Unbekannter Schlüssel')
+  const key = await crypto.subtle.importKey('jwk', { kty: 'RSA', n: jwk.n, e: jwk.e, alg: 'RS256', ext: true }, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify'])
+  const ok = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, b64url(teile[2]) as BufferSource, new TextEncoder().encode(`${teile[0]}.${teile[1]}`) as BufferSource)
+  if (!ok) throw new TokenFehler('Signatur ungültig')
+  return { kopf, inhalt }
 }

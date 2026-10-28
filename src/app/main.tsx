@@ -8,6 +8,7 @@ import { istWindowsApp } from '@/windows/plattform'
 import { wendeKontrastAn } from '@/profil'
 import { serverModus } from '@/server/modus'
 import { VorschauBand } from '@/server/VorschauBand'
+import { V2Tor } from '@/server/V2Tor'
 import '@/design/tokens.css'
 import './styles.css'
 
@@ -48,6 +49,8 @@ createRoot(container).render(
       <Suspense fallback={<div className="app" aria-busy="true" />}>
         <BvApp />
       </Suspense>
+    ) : serverModus ? (
+      <V2Tor>{(sitzung) => <App v2={sitzung} />}</V2Tor>
     ) : (
       <App />
     )}
