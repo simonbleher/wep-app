@@ -466,3 +466,10 @@
 - **Entscheidung:** Testphase: Simon ist Verantwortlicher; Umstellung auf BV mit AV-Vertrag (V2-7). Bis dahin nennen `/datenschutz` und `/nutzungsbedingungen` Simon Bleher als Verantwortlichen (nur E-Mail, keine Anschrift), oben steht der Hinweis auf die Testphase mit erfundenen Daten. Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO. Testkonten und Testdaten werden auf Anfrage sofort, spätestens zum Ende der Testphase gelöscht.
 - **Zugriffsprotokoll:** Im Code gibt es keine automatische Löschung. Die Seite nennt 90 Tage als Höchstdauer, die Löschung erfolgt vorerst von Hand. Eine automatische Bereinigung ist ein eigenes Paket.
 - **Offen:** nur Cloudflare-DPA und Resend-Vertrag (als sachliche Angabe markiert). „Entwurf – rechtlich noch nicht geprüft“ bleibt.
+
+## 2026-10-28 · Rechtsseiten: Auftragsverarbeitungsverträge geprüft, Drittlandübermittlung
+
+- **Entscheidung:** DPA Cloudflare v6.4 (03.04.2026) und Resend (31.12.2025) geprüft am 28.10.2026. Beide gelten mit den Nutzungsbedingungen des Anbieters, mit EU-Standardvertragsklauseln und Zertifizierung nach dem EU-US Data Privacy Framework. Die Platzhalter „[BITTE ERGÄNZEN]“ in den Rechtsseiten entfallen.
+- **Resend:** Sitz USA. Ohne eigene Absenderdomain läuft der Versand über die Infrastruktur in den USA, mit eigener Domain über Region EU (Irland).
+- **Neu:** Abschnitt „Übermittlung in Drittländer“ (Cloudflare, Resend, Google, Microsoft; D1/R2 bleiben EU). Rechtsgrundlage ergänzt: Zugriffsprotokoll und Verbindungsdaten nach Art. 6 Abs. 1 lit. f DSGVO.
+- **Stil:** „der Betreiber“ statt „wir“. „Entwurf – rechtlich noch nicht geprüft“ bleibt.
