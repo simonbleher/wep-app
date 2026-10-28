@@ -4,6 +4,8 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { BookOpen, ChevronLeft } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
 import type { Konto } from '@/konto'
+import { ServerKontoAbschnitt } from '@/server/ServerKontoAbschnitt'
+import type { V2Sitzung } from '@/server/V2Tor'
 import {
   ROLLEN,
   aendereProfil,
@@ -31,9 +33,12 @@ interface Props {
   onZurueck: () => void
   onAnmelden: () => void
   onAbmelden: () => void
+  /** Server-Modus (v2): Konto des Servers statt OneDrive-Anmeldung. */
+  v2?: V2Sitzung
+  onKontenVerwalten?: () => void
 }
 
-export function Profil({ konto, verfuegbar, onZurueck, onAnmelden, onAbmelden }: Props) {
+export function Profil({ konto, verfuegbar, onZurueck, onAnmelden, onAbmelden, v2, onKontenVerwalten }: Props) {
   const id = useId()
   const [profil, setProfil] = useState<ProfilDaten>(() => lokalesProfil.lade().profil)
   const [nurWlan, setNurWlan] = useState(() => ladeGeraeteEinstellungen().nurWlan)
@@ -188,33 +193,37 @@ export function Profil({ konto, verfuegbar, onZurueck, onAnmelden, onAbmelden }:
 
         <Sicherung id={`${id}-sicherung`} appVersion={__APP_VERSION__} />
 
-        <section className="abschnitt" aria-labelledby={`${id}-konto`}>
-          <h2 className="gruppenkopf" id={`${id}-konto`}>
-            Konto
-          </h2>
-          {konto ? (
-            <>
-              <p>Angemeldet als {konto.benutzername || konto.name}</p>
-              <div className="knopf-reihe">
-                <button type="button" className="knopf" onClick={onAbmelden}>
-                  Abmelden
-                </button>
-              </div>
-            </>
-          ) : verfuegbar ? (
-            <>
-              <p>Nicht angemeldet. Die WEPs liegen nur auf diesem Gerät.</p>
-              <div className="knopf-reihe">
-                <button type="button" className="knopf" onClick={onAnmelden}>
-                  Mit Microsoft anmelden
-                </button>
-              </div>
-              <p className="neben">Beim ersten Abgleich werden die vorhandenen WEPs hochgeladen.</p>
-            </>
-          ) : (
-            <p>Die Anmeldung ist in dieser Installation nicht eingerichtet.</p>
-          )}
-        </section>
+        {v2 ? (
+          <ServerKontoAbschnitt sitzung={v2} onKontenVerwalten={() => onKontenVerwalten?.()} />
+        ) : (
+          <section className="abschnitt" aria-labelledby={`${id}-konto`}>
+            <h2 className="gruppenkopf" id={`${id}-konto`}>
+              Konto
+            </h2>
+            {konto ? (
+              <>
+                <p>Angemeldet als {konto.benutzername || konto.name}</p>
+                <div className="knopf-reihe">
+                  <button type="button" className="knopf" onClick={onAbmelden}>
+                    Abmelden
+                  </button>
+                </div>
+              </>
+            ) : verfuegbar ? (
+              <>
+                <p>Nicht angemeldet. Die WEPs liegen nur auf diesem Gerät.</p>
+                <div className="knopf-reihe">
+                  <button type="button" className="knopf" onClick={onAnmelden}>
+                    Mit Microsoft anmelden
+                  </button>
+                </div>
+                <p className="neben">Beim ersten Abgleich werden die vorhandenen WEPs hochgeladen.</p>
+              </>
+            ) : (
+              <p>Die Anmeldung ist in dieser Installation nicht eingerichtet.</p>
+            )}
+          </section>
+        )}
 
         {nativ && <Synchronisierung id={`${id}-sync`} />}
         {nativ && fehlersuche && <Fehlersuche />}
