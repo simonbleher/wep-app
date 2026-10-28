@@ -181,6 +181,8 @@ Die vorhandene Registrierung **WEP-App** bekommt **zusätzlich** die Plattform �
    - Für `V2_ADMINS` zählen nur bestätigte Adressen: bei Google mit bestätigter E-Mail, bei
      Microsoft die Anmeldeadresse.
    - Alle anderen Konten warten nach der ersten Anmeldung auf deine Freigabe.
+5. **Anleitung für die Tester:** In der Vorschau-App unter Profil → Anleitung (oder
+   `docs/anleitung-v2/Anleitung_WEP-App_v2.pdf`) – Ablauf Bau → Grün → BV mit Bildern.
 
 **Hinweis zur Adresse:** Anmelden klappt später nur unter `main.wep-pankow.pages.dev`. Die
 Einzel-Adressen pro Bereitstellung (`<kennung>.wep-pankow.pages.dev`) stehen bei Google und

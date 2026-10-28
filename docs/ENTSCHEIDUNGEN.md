@@ -440,3 +440,9 @@
 - **Entscheidung:** Jeder Schritt im Ablauf legt Benachrichtigungen in D1 an (Empfänger in `functions/_lib/v2/benachrichtigungen.ts`: an Grün → Grün, an den BV → alle BV-Konten, Rückfrage → wer gefragt ist, geprüft/wieder geöffnet → beide Wertermittler; nie die Person selbst). Die App zeigt sie als „Neu für dich“; eine Mail über Resend geht nur, wenn Resend eingerichtet ist und das Konto Mails nicht abgeschaltet hat.
 - **Datensparsam:** Mails enthalten nur Vorgangs-Nr., Anlage, Parzelle und einen Link in die App (Anmeldung nötig). Keine Namen von Pächtern oder Wertermittlern, keine Beträge – die Mails liegen bei fremden Mail-Anbietern.
 - **Zuverlässigkeit:** Mails gehen nach der Antwort raus (`waitUntil`), damit die Abgabe nicht auf Resend wartet; ein Fehler steht bei der Benachrichtigung (`mail = 'fehler'`), der Schritt bleibt gültig. In der App ist die Benachrichtigung in jedem Fall da.
+
+## 2026-10-28 · Anleitung v2 als eigene Seite, eine Testumgebung für Durchlauf und Bilder
+
+- **Entscheidung:** Die Anleitung für den Server-Modus ist eine eigene Seite (`public/anleitung-v2/`, PDF `docs/anleitung-v2/Anleitung_WEP-App_v2.pdf`). Die App verlinkt sie nur in Builds mit `VITE_SERVER_MODUS`; der Service Worker hält sie nur dort offline vor. Die Anleitung von v1 bleibt unverändert, bis Simon umstellt (dann ersetzt v2 sie).
+- **Grund:** v1-Nutzer sollen keine Kapitel über Konten und Abgaben sehen, die es für sie noch nicht gibt; ihre Geräte laden die Bilder der v2-Anleitung nicht.
+- **Eine Testumgebung:** `tools/v2/umgebung.ts` startet die gebaute App mit den echten Functions (SQLite statt D1, R2-Ersatz) und nachgebauter Anmeldung bei Google/Microsoft und Resend. Der Durchlauf (`npm run v2:durchlauf`) und die Bildschirmfotos (`npm run anleitung:v2`) nutzen sie gemeinsam – die Bilder zeigen genau das, was der Durchlauf prüft.

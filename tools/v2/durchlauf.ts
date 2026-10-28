@@ -1,159 +1,23 @@
-// Durchlauf v2 im echten Browser (Chromium) gegen den echten Server-Code: Die App wird mit VITE_SERVER_MODUS=true
-// gebaut; Anfragen an /api/v2/* beantworten die Pages Functions aus functions/ mit einer SQLite-Datenbank (dieselben
-// Migrationen wie D1). Google und Microsoft sind nachgebaut (Anmeldeseite leitet sofort zurück, Token mit Testschlüssel).
-// Erfundene Konten: Ada Admin (Google, V2_ADMINS), Max Mustermann (Microsoft), Bert Bauer (Google, Bau).
+// Durchlauf v2 im echten Browser (Chromium) gegen den echten Server-Code (Umgebung: tools/v2/umgebung.ts) – der ganze
+// Weg mit drei Testkonten Bau (Bert), Grün (Erika) und BV (Bea), dazu Admin (Ada) und ein gesperrtes Konto (Max):
+// Anmeldung und Freigabe, WEPs auf zwei Geräten, ohne Netz, Fotos, Abgabe Bau → Grün → BV, Rückfrage an Grün und an
+// beide, geprüft, wieder geöffnet, Benachrichtigungen in der App und per Mail. Alle Namen und Daten sind erfunden.
 //
 // Start: npm run v2:durchlauf
-import { execFileSync, spawn } from 'node:child_process'
-import { existsSync, readdirSync } from 'node:fs'
-import { chromium, type Page, type Route } from 'playwright'
-import { testDb } from '../../functions/_lib/__tests__/sqliteDb'
-import * as status from '../../functions/api/v2/status'
-import * as start from '../../functions/api/v2/anmeldung/[anbieter]/start'
-import * as zurueck from '../../functions/api/v2/anmeldung/[anbieter]/zurueck'
-import * as ich from '../../functions/api/v2/ich'
-import * as abmelden from '../../functions/api/v2/abmelden'
-import * as konten from '../../functions/api/v2/admin/konten'
-import * as konto from '../../functions/api/v2/admin/konten/[id]'
-import * as wepListe from '../../functions/api/v2/weps'
-import * as wepEinzeln from '../../functions/api/v2/weps/[id]'
-import * as wepWieder from '../../functions/api/v2/weps/[id]/wiederherstellen'
-import * as wepVerlauf from '../../functions/api/v2/weps/[id]/verlauf'
-import * as wepDateien from '../../functions/api/v2/weps/[id]/dateien'
-import * as wepAktion from '../../functions/api/v2/weps/[id]/aktion'
-import * as gruenKontenListe from '../../functions/api/v2/konten/gruen'
-import * as benListe from '../../functions/api/v2/benachrichtigungen'
-import * as benGelesen from '../../functions/api/v2/benachrichtigungen/gelesen'
-import * as wepDatei from '../../functions/api/v2/weps/[id]/dateien/[datei]'
-import { fakeR2 } from '../../functions/_lib/__tests__/fakeR2'
+import type { Page } from 'playwright'
 // @ts-expect-error – JavaScript-Hilfe ohne Typen (gemaltes Testbild, kein echtes Foto)
 import { testFoto } from '../fotos/testbild.mjs'
-import { onRequest as middleware } from '../../functions/api/v2/_middleware'
 import { fuehreAdminAktionAus, ladeKonto } from '../../functions/_lib/v2/konten'
+import { starteV2Umgebung } from './umgebung'
 
-const PORT = 4183
-const URL = `http://localhost:${PORT}/`
 const AUSGABE = 'dist-e2e-v2'
-const GOOGLE_ID = 'durchlauf.apps.googleusercontent.com'
-const MS_ID = '11111111-2222-3333-4444-555555555555'
-const TID = '0a1b2c3d-1111-2222-3333-444455556666'
+const u = await starteV2Umgebung({ port: 4183, ausgabe: AUSGABE })
+const { URL, db, r2, mails, anmelden } = u
 
-const db = testDb()
-const r2 = fakeR2()
-const env = { SERVER_MODUS: 'true', WEP_DB: db, WEP_DATEIEN: r2, RESEND_API_KEY: 're_durchlauf', MAIL_ABSENDER: 'WEP-App <wep@mail.example.org>', GOOGLE_CLIENT_ID: GOOGLE_ID, GOOGLE_CLIENT_SECRET: 'g', VITE_MS_CLIENT_ID: MS_ID, MS_CLIENT_SECRET: 'm', V2_ADMINS: 'ada@example.org' }
-
-// ── nachgebaute Anbieter ─────────────────────────────────────────────────────────────────────────────
-const paar = (await crypto.subtle.generateKey({ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, true, ['sign', 'verify'])) as CryptoKeyPair
-const oeffentlich = (await crypto.subtle.exportKey('jwk', paar.publicKey)) as { n: string; e: string }
-const b64 = (b: Uint8Array) => Buffer.from(b).toString('base64url')
-async function signiere(inhalt: object) {
-  const kopf = b64(new TextEncoder().encode(JSON.stringify({ alg: 'RS256', kid: 'k1', typ: 'JWT' })))
-  const koerper = b64(new TextEncoder().encode(JSON.stringify(inhalt)))
-  return `${kopf}.${koerper}.${b64(new Uint8Array(await crypto.subtle.sign('RSASSA-PKCS1-v1_5', paar.privateKey, new TextEncoder().encode(`${kopf}.${koerper}`))))}`
-}
-const PERSONEN = {
-  ada: { anbieter: 'google', claims: { iss: 'https://accounts.google.com', aud: GOOGLE_ID, sub: 'ada-1', email: 'ada@example.org', email_verified: true, name: 'Ada Admin' } },
-  max: { anbieter: 'microsoft', claims: { iss: `https://login.microsoftonline.com/${TID}/v2.0`, aud: MS_ID, tid: TID, oid: 'max-1', preferred_username: 'max@bv.example', name: 'Max Mustermann' } },
-  bert: { anbieter: 'google', claims: { iss: 'https://accounts.google.com', aud: GOOGLE_ID, sub: 'bert-1', email: 'bert@example.org', email_verified: true, name: 'Bert Bauer' } },
-  erika: { anbieter: 'google', claims: { iss: 'https://accounts.google.com', aud: GOOGLE_ID, sub: 'erika-1', email: 'erika@example.org', email_verified: true, name: 'Erika Musterfrau' } },
-  bea: { anbieter: 'microsoft', claims: { iss: `https://login.microsoftonline.com/${TID}/v2.0`, aud: MS_ID, tid: TID, oid: 'bea-1', preferred_username: 'bea@bv.example', name: 'Bea BV' } },
-} as const
-let wer: keyof typeof PERSONEN = 'ada'
-const codes = new Map<string, string>() // code → nonce
-
-const mails: { to: string[]; subject: string; text: string }[] = []
-const echtesFetch = globalThis.fetch
-globalThis.fetch = (async (eingabe: RequestInfo | URL, init?: RequestInit) => {
-  const url = String(eingabe instanceof Request ? eingabe.url : eingabe)
-  if (url === 'https://api.resend.com/emails') {
-    mails.push(JSON.parse(String(init?.body)))
-    return Response.json({ id: `mail-${mails.length}` })
-  }
-  if (url.includes('/certs') || url.includes('/discovery/v2.0/keys')) return Response.json({ keys: [{ kid: 'k1', kty: 'RSA', n: oeffentlich.n, e: oeffentlich.e }] })
-  if (url.startsWith('https://oauth2.googleapis.com/token') || url.startsWith('https://login.microsoftonline.com/common/oauth2/v2.0/token')) {
-    const code = new URLSearchParams(String(init?.body)).get('code') ?? ''
-    return Response.json({ id_token: await signiere({ ...PERSONEN[wer].claims, nonce: codes.get(code), exp: Math.floor(Date.now() / 1000) + 3600 }) })
-  }
-  return echtesFetch(eingabe, init)
-}) as typeof fetch
-
-// ── Weiterleitung /api/v2/* an die Functions ─────────────────────────────────────────────────────────
-type Modul = Record<string, unknown>
-const ROUTEN: [RegExp, Modul, string?, string?][] = [
-  [/^\/api\/v2\/status$/, status],
-  [/^\/api\/v2\/anmeldung\/([^/]+)\/start$/, start, 'anbieter'],
-  [/^\/api\/v2\/anmeldung\/([^/]+)\/zurueck$/, zurueck, 'anbieter'],
-  [/^\/api\/v2\/ich$/, ich],
-  [/^\/api\/v2\/abmelden$/, abmelden],
-  [/^\/api\/v2\/admin\/konten$/, konten],
-  [/^\/api\/v2\/admin\/konten\/([^/]+)$/, konto, 'id'],
-  [/^\/api\/v2\/weps$/, wepListe],
-  [/^\/api\/v2\/weps\/([^/]+)$/, wepEinzeln, 'id'],
-  [/^\/api\/v2\/weps\/([^/]+)\/wiederherstellen$/, wepWieder, 'id'],
-  [/^\/api\/v2\/weps\/([^/]+)\/verlauf$/, wepVerlauf, 'id'],
-  [/^\/api\/v2\/weps\/([^/]+)\/dateien$/, wepDateien, 'id'],
-  [/^\/api\/v2\/weps\/([^/]+)\/aktion$/, wepAktion, 'id'],
-  [/^\/api\/v2\/konten\/gruen$/, gruenKontenListe],
-  [/^\/api\/v2\/benachrichtigungen$/, benListe],
-  [/^\/api\/v2\/benachrichtigungen\/gelesen$/, benGelesen],
-  [/^\/api\/v2\/weps\/([^/]+)\/dateien\/([^/]+)$/, wepDatei, 'id', 'datei'],
-]
-let serverWeg = false
-
-async function beantworte(route: Route) {
-  if (serverWeg) return route.abort('internetdisconnected')
-  const anfrage = route.request()
-  const url = new globalThis.URL(anfrage.url())
-  const treffer = ROUTEN.map(([muster, modul, param, param2]) => ({ m: muster.exec(url.pathname), modul, param, param2 })).find((t) => t.m)
-  const methode = anfrage.method()
-  const name = `onRequest${methode[0]}${methode.slice(1).toLowerCase()}`
-  const handler = treffer?.modul[name] as ((ctx: unknown) => Promise<Response>) | undefined
-  const request = new Request(anfrage.url(), { method: methode, headers: await anfrage.allHeaders(), body: ['GET', 'HEAD'].includes(methode) ? undefined : anfrage.postDataBuffer() })
-  const params: Record<string, string> = {}
-  if (treffer?.param) params[treffer.param] = decodeURIComponent(treffer.m![1])
-  if (treffer?.param2) params[treffer.param2] = decodeURIComponent(treffer.m![2])
-  const antwort = await middleware({
-    env,
-    next: async () =>
-      handler ? handler({ request, env, params }) : Response.json({ fehler: 'Nicht gefunden.' }, { status: 404 }),
-  })
-  const kopf: Record<string, string> = {}
-  antwort.headers.forEach((w, k) => k !== 'set-cookie' && k !== 'location' && (kopf[k] = w))
-  const cookies = antwort.headers.getSetCookie()
-  if (cookies.length) kopf['set-cookie'] = cookies.join('\n')
-  const ort = antwort.headers.get('location')
-  // Playwright fängt das Ziel einer Weiterleitung nicht mehr ab – daher leitet eine kleine Seite selbst weiter
-  if (ort) return weiterleiten(route, ort, kopf)
-  await route.fulfill({ status: antwort.status, headers: kopf, body: Buffer.from(await antwort.arrayBuffer()) })
-}
-
-function weiterleiten(route: Route, ziel: string, kopf: Record<string, string> = {}) {
-  return route.fulfill({ status: 200, headers: { ...kopf, 'content-type': 'text/html' }, body: `<!doctype html><script>location.replace(${JSON.stringify(ziel)})</script>` })
-}
-
-/** Anmeldeseite des Anbieters: merkt die nonce zum Code und leitet sofort zurück. */
-async function anbieterSeite(route: Route) {
-  const url = new globalThis.URL(route.request().url())
-  const code = `code-${codes.size + 1}`
-  codes.set(code, url.searchParams.get('nonce') ?? '')
-  const ziel = new globalThis.URL(url.searchParams.get('redirect_uri')!)
-  ziel.searchParams.set('code', code)
-  ziel.searchParams.set('state', url.searchParams.get('state') ?? '')
-  await weiterleiten(route, ziel.toString())
-}
-
-// ── Prüfungen ────────────────────────────────────────────────────────────────────────────────────────
 let fehler = 0
 function pruefe(ok: boolean, text: string) {
   console.log(`${ok ? 'ok ' : 'FEHLER'} ${text}`)
   if (!ok) fehler++
-}
-
-function chromiumPfad() {
-  const basis = process.env.PLAYWRIGHT_BROWSERS_PATH ?? '/opt/pw-browsers'
-  const kandidaten = [`${basis}/chromium/chrome-linux/chrome`]
-  for (const d of existsSync(basis) ? readdirSync(basis) : []) if (d.startsWith('chromium-')) kandidaten.push(`${basis}/${d}/chrome-linux/chrome`)
-  return kandidaten.find((p) => existsSync(p))
 }
 
 async function neuesWep(seite: Page, nr: string) {
@@ -163,21 +27,9 @@ async function neuesWep(seite: Page, nr: string) {
   await dlg.getByRole('button', { name: 'Anlegen' }).click()
   await seite.getByLabel(/Kleingartenanlage/).first().waitFor()
 }
-
-async function anmelden(seite: Page, person: keyof typeof PERSONEN) {
-  wer = person
-  await seite.getByRole('link', { name: PERSONEN[person].anbieter === 'google' ? 'Mit Google anmelden' : 'Mit Microsoft anmelden' }).click()
-}
-
-execFileSync('npx', ['vite', 'build', '--outDir', AUSGABE], { stdio: 'inherit', env: { ...process.env, NODE_ENV: 'production', VITE_SERVER_MODUS: 'true', VITE_MS_CLIENT_ID: MS_ID } })
-const server = spawn('npx', ['vite', 'preview', '--outDir', AUSGABE, '--port', String(PORT), '--strictPort'], { stdio: 'ignore' })
-await new Promise((r) => setTimeout(r, 2500))
-const browser = await chromium.launch({ executablePath: chromiumPfad() })
 const skriptFehler: string[] = []
 try {
-  const kontext = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' })
-  await kontext.route('**/api/v2/**', beantworte)
-  await kontext.route(/^https:\/\/(accounts\.google\.com\/o\/oauth2|login\.microsoftonline\.com\/common\/oauth2\/v2\.0\/authorize)/, anbieterSeite)
+  const kontext = await u.neuerKontext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' })
   const seite = await kontext.newPage()
   seite.on('pageerror', (e) => skriptFehler.push(String(e)))
 
@@ -207,6 +59,14 @@ try {
   pruefe(await seite.getByText('Angemeldet als Ada Admin (ada@example.org) über Google').isVisible(), 'Profil: angemeldet über Google')
   pruefe(await seite.getByText('Rollen: Admin').isVisible(), 'Profil: Rolle Admin')
   pruefe((await seite.getByRole('button', { name: 'Mit Microsoft anmelden' }).count()) === 0, 'Profil: keine OneDrive-Anmeldung im Server-Modus')
+  // Anleitung v2 (eigene Seite public/anleitung-v2/), „Zurück zur App“ führt zurück
+  await seite.getByRole('link', { name: 'Anleitung' }).click()
+  await seite.getByRole('heading', { name: 'Überblick: wer macht was' }).waitFor()
+  pruefe((await seite.locator('img').evaluateAll((bilder) => bilder.filter((b) => !(b as HTMLImageElement).complete || (b as HTMLImageElement).naturalWidth === 0).length)) === 0, 'Anleitung v2: öffnet sich aus dem Profil, alle Bilder geladen')
+  await seite.getByRole('link', { name: /Zurück zur App/ }).click()
+  await seite.getByRole('heading', { name: 'Protokolle' }).waitFor()
+  await seite.getByRole('button', { name: 'Profil und Einstellungen' }).filter({ visible: true }).first().click()
+  await seite.getByRole('heading', { name: 'Profil und Einstellungen' }).waitFor()
 
   // 4. Mail-Benachrichtigung abschalten (bleibt auf dem Server)
   const mail = seite.getByLabel('Benachrichtigungen per E-Mail')
@@ -247,12 +107,12 @@ try {
   pruefe((await seite.getByRole('button', { name: 'Konten verwalten' }).count()) === 0, 'Max: keine Konten-Verwaltung (kein Admin)')
 
   // 7. Ohne Verbindung zum Server: Start mit dem zuletzt bestätigten Konto
-  serverWeg = true
+  u.setzeServerWeg(true)
   await seite.reload()
   await seite.getByRole('heading', { name: 'Protokolle' }).waitFor()
   await seite.getByRole('button', { name: 'Profil und Einstellungen' }).filter({ visible: true }).first().click()
   pruefe(await seite.getByText(/Ohne Verbindung zum Server/).isVisible(), 'ohne Netz: App startet mit gemerktem Konto')
-  serverWeg = false
+  u.setzeServerWeg(false)
 
   // 8. Gesperrt: Sitzung endet, neue Anmeldung wird abgewiesen
   const adaId = (db.roh.prepare("SELECT id FROM konten WHERE email = 'ada@example.org'").get() as { id: string }).id
@@ -291,9 +151,7 @@ try {
   pruefe(true, 'Statuszeile: mit dem Server abgeglichen')
   pruefe(await seite.locator('.zeile', { hasText: '2026-0815' }).getByText('Bau', { exact: true }).isVisible(), 'neues WEP ist ein Bau-WEP (Rolle vom Server)')
 
-  const geraetB = await browser.newContext({ viewport: { width: 1200, height: 900 }, serviceWorkers: 'block' })
-  await geraetB.route('**/api/v2/**', beantworte)
-  await geraetB.route(/^https:\/\/(accounts\.google\.com\/o\/oauth2|login\.microsoftonline\.com\/common\/oauth2\/v2\.0\/authorize)/, anbieterSeite)
+  const geraetB = await u.neuerKontext({ viewport: { width: 1200, height: 900 }, serviceWorkers: 'block' })
   const seiteB = await geraetB.newPage()
   seiteB.on('pageerror', (e) => skriptFehler.push(String(e)))
   await seiteB.goto(URL)
@@ -303,12 +161,12 @@ try {
   pruefe(true, 'zweites Gerät (Tablet): WEP vom Server ist da')
   await seiteB.screenshot({ path: `${AUSGABE}/04-zweites-geraet.png` })
 
-  serverWeg = true
+  u.setzeServerWeg(true)
   await neuesWep(seite, '2026-0816')
   await seite.getByRole('button', { name: 'Protokolle' }).first().click()
   await seite.getByText(/1 Änderung wartet auf den Server/).filter({ visible: true }).first().waitFor()
   pruefe(true, 'ohne Server: neues WEP wartet („1 Änderung wartet auf den Server“)')
-  serverWeg = false
+  u.setzeServerWeg(false)
   await seite.getByRole('button', { name: 'Abgleichen' }).filter({ visible: true }).first().click()
   pruefe(await aufServer(2), 'Server wieder da: wartende Änderung hochgeladen')
   await seiteB.getByRole('button', { name: 'Abgleichen' }).filter({ visible: true }).first().click()
@@ -338,9 +196,7 @@ try {
 
   // 11. Ablauf: Bert gibt an Erika (Grün) ab, Erika bearbeitet nur den Grün-Teil und gibt an den BV ab
   const zustandVon = (nr: string) => (db.roh.prepare('SELECT zustand FROM weps WHERE vorgangs_nr = ?').get(nr) as { zustand: string }).zustand
-  const erikaKontext = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' })
-  await erikaKontext.route('**/api/v2/**', beantworte)
-  await erikaKontext.route(/^https:\/\/(accounts\.google\.com\/o\/oauth2|login\.microsoftonline\.com\/common\/oauth2\/v2\.0\/authorize)/, anbieterSeite)
+  const erikaKontext = await u.neuerKontext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' })
   const seiteE = await erikaKontext.newPage()
   seiteE.on('pageerror', (e) => skriptFehler.push(String(e)))
   await seiteE.goto(URL)
@@ -404,9 +260,7 @@ try {
   pruefe(true, 'Bau: Liste zeigt „beim BV“')
 
   // 12. BV-Kontrollseite mit Server-Daten: Rückfrage an Grün, Grün gibt wieder ab, geprüft, wieder öffnen
-  const beaKontext = await browser.newContext({ viewport: { width: 1280, height: 900 }, serviceWorkers: 'block', acceptDownloads: true })
-  await beaKontext.route('**/api/v2/**', beantworte)
-  await beaKontext.route(/^https:\/\/(accounts\.google\.com\/o\/oauth2|login\.microsoftonline\.com\/common\/oauth2\/v2\.0\/authorize)/, anbieterSeite)
+  const beaKontext = await u.neuerKontext({ viewport: { width: 1280, height: 900 }, serviceWorkers: 'block', acceptDownloads: true })
   const seiteV = await beaKontext.newPage()
   seiteV.on('pageerror', (e) => skriptFehler.push(String(e)))
   await seiteV.goto(`${URL}bv`)
@@ -466,6 +320,33 @@ try {
   pruefe(zustandVon('2026-0815') === 'beim_bv', 'BV: mit Begründung wieder geöffnet')
   const notizen = (db.roh.prepare("SELECT v.aktion, v.notiz FROM verlauf v JOIN weps w ON w.id = v.wep_id WHERE w.vorgangs_nr = '2026-0815' AND v.notiz IS NOT NULL ORDER BY v.id").all() as { aktion: string; notiz: string }[]).map((v) => `${v.aktion}: ${v.notiz}`)
   pruefe(notizen.join(' | ') === 'rueckfrage: Hecke an der Straße fehlt | wiederoeffnen: Betrag Laube korrigieren', `Verlauf mit Notizen: ${notizen.join(' | ')}`)
+
+  // 13. Rückfrage an beide: erst Bau (weitergeben an Grün), dann Grün (an den BV)
+  await seiteV.getByRole('group', { name: 'Rückfrage an' }).getByRole('button', { name: 'Bau und Grün' }).click()
+  await seiteV.getByLabel(/Notiz \(was soll geklärt werden/).fill('Baujahr der Laube und Hecke prüfen')
+  await seiteV.getByRole('button', { name: 'Rückfrage senden' }).click()
+  await seiteV.getByRole('alertdialog').getByRole('button', { name: 'Senden' }).click()
+  await seiteV.getByText('Rückfrage gesendet.').waitFor()
+  await seite.getByRole('button', { name: 'Abgleichen' }).filter({ visible: true }).first().click()
+  await seite.locator('ul[aria-label="Protokolle"] .zeile', { hasText: '2026-0815' }).getByText('Rückfrage').waitFor()
+  await seite.getByRole('button', { name: /2026-0815/ }).first().click()
+  await seite.getByRole('navigation', { name: 'Abschnitte' }).getByRole('button', { name: 'Baulichkeiten' }).waitFor()
+  const navBauRueckfrage = await seite.getByRole('navigation', { name: 'Abschnitte' }).getByRole('button').allTextContents()
+  pruefe(navBauRueckfrage.some((t) => /Bauten/.test(t)) && !navBauRueckfrage.some((t) => /Aufwuchs/.test(t)), `Bau bei der Rückfrage: wieder sein Teil, nicht der Grün-Teil (${navBauRueckfrage.join(', ')})`)
+  await seite.getByRole('button', { name: 'Abgabe' }).filter({ visible: true }).first().click()
+  pruefe(await seite.getByText(/Rückfrage vom BV.*Baujahr der Laube und Hecke prüfen/).first().isVisible(), 'Bau sieht die Rückfrage mit Notiz')
+  await seite.getByRole('button', { name: 'An Erika Musterfrau weitergeben' }).click()
+  await seite.getByRole('alertdialog').getByRole('button', { name: 'Abgeben' }).click()
+  await seite.getByText('An Erika Musterfrau abgegeben.').waitFor()
+  pruefe(zustandVon('2026-0815') === 'rueckfrage', 'Rückfrage „beide“: nach Bau weiter bei Grün (Zustand bleibt Rückfrage)')
+  await seiteE.getByRole('button', { name: 'Protokolle' }).first().click()
+  await seiteE.getByRole('button', { name: 'Abgleichen' }).filter({ visible: true }).first().click()
+  await seiteE.getByRole('button', { name: /2026-0815/ }).first().click()
+  await seiteE.getByRole('button', { name: 'Abgabe' }).filter({ visible: true }).first().click()
+  await seiteE.getByRole('button', { name: 'An den BV abgeben' }).click()
+  await seiteE.getByRole('alertdialog').getByRole('button', { name: 'Abgeben' }).click()
+  await seiteE.getByText('An den BV abgegeben.').waitFor()
+  pruefe(zustandVon('2026-0815') === 'beim_bv', 'Rückfrage „beide“: Grün gibt an den BV ab')
   await beaKontext.close()
   await erikaKontext.close()
   const verlauf = (db.roh.prepare('SELECT aktion FROM verlauf ORDER BY id').all() as { aktion: string }[]).map((v) => v.aktion)
@@ -476,8 +357,7 @@ try {
   pruefe(['konto_angelegt', 'anmeldung', 'abmeldung', 'admin_freigeben', 'admin_rollen', 'admin_sperren'].every((a) => protokoll.includes(a)), 'Zugriffsprotokoll enthält Anmeldungen und Admin-Aktionen')
   pruefe(skriptFehler.length === 0, `keine Skriptfehler im Browser ${skriptFehler.join(' | ')}`)
 } finally {
-  await browser.close()
-  server.kill()
+  await u.schliessen()
 }
 if (fehler) {
   console.error(`${fehler} Prüfung(en) fehlgeschlagen`)

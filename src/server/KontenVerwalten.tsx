@@ -117,7 +117,7 @@ function KontoZeile({ konto, selbst, onAktion, onLoeschen }: { konto: ServerKont
       <div className="konto-rollen">
         <label htmlFor={`${id}-wm`}>
           Wertermittler
-          <select id={`${id}-wm`} className="feld" value={wertermittler} onChange={(e) => setzeRollen(e.target.value as Wertermittler, zusatz('bv'), zusatz('admin'))}>
+          <select id={`${id}-wm`} className="eingabe" value={wertermittler} onChange={(e) => setzeRollen(e.target.value as Wertermittler, zusatz('bv'), zusatz('admin'))}>
             <option value="">keiner</option>
             <option value="bau">{ROLLEN_TEXT.bau}</option>
             <option value="gruen">{ROLLEN_TEXT.gruen}</option>
