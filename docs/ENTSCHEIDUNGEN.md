@@ -460,3 +460,9 @@
 - **Grund:** Google verlangt für die OAuth-Veröffentlichung öffentliche Seiten ohne Anmeldung. Statisches HTML ist offline lesbar und unabhängig vom Server-Modus.
 - **Inhalt:** Aus dem Code und PLAN-V2.md abgeleitet. Verantwortlicher ist der BV, Simon Bleher Auftragsverarbeiter (AV-Vertrag in Vorbereitung); Kontakt nur per E-Mail, keine Wohnanschrift. Alles, was der BV festlegen muss (Anschrift, Datenschutzbeauftragter, Rechtsgrundlage, Löschfristen, Haftung), steht als „[BITTE ERGÄNZEN]“. Löschfristen für WEPs und Zugriffsprotokoll stehen in PLAN-V2.md noch nicht und bleiben offen.
 - **Status:** Entwurf, rechtlich nicht geprüft; vor echten Daten zwingend prüfen lassen (PLAN-V2.md, „Datenschutz“).
+
+## 2026-10-28 · Rechtsseiten in der Testphase: Simon ist Verantwortlicher
+
+- **Entscheidung:** Testphase: Simon ist Verantwortlicher; Umstellung auf BV mit AV-Vertrag (V2-7). Bis dahin nennen `/datenschutz` und `/nutzungsbedingungen` Simon Bleher als Verantwortlichen (nur E-Mail, keine Anschrift), oben steht der Hinweis auf die Testphase mit erfundenen Daten. Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO. Testkonten und Testdaten werden auf Anfrage sofort, spätestens zum Ende der Testphase gelöscht.
+- **Zugriffsprotokoll:** Im Code gibt es keine automatische Löschung. Die Seite nennt 90 Tage als Höchstdauer, die Löschung erfolgt vorerst von Hand. Eine automatische Bereinigung ist ein eigenes Paket.
+- **Offen:** nur Cloudflare-DPA und Resend-Vertrag (als sachliche Angabe markiert). „Entwurf – rechtlich noch nicht geprüft“ bleibt.
