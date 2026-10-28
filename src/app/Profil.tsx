@@ -117,23 +117,29 @@ export function Profil({ konto, verfuegbar, onZurueck, onAnmelden, onAbmelden, v
               onChange={(e) => aendern({ name: e.target.value })}
             />
           </div>
-          <div className="feld">
-            <label className="label" htmlFor={`${id}-rolle`}>
-              Rolle
-            </label>
-            <select
-              id={`${id}-rolle`}
-              className="eingabe"
-              value={profil.rolle}
-              onChange={(e) => aendern({ rolle: e.target.value as Rolle })}
-            >
-              {ROLLEN.map((r) => (
-                <option key={r.wert} value={r.wert}>
-                  {r.text}
-                </option>
-              ))}
-            </select>
-          </div>
+          {v2 ? (
+            <p className="neben">
+              Rolle als Wertermittler: {v2.konto.rollen.includes('bau') ? 'Bau' : v2.konto.rollen.includes('gruen') ? 'Grün' : 'keine'} – vergibt der Admin.
+            </p>
+          ) : (
+            <div className="feld">
+              <label className="label" htmlFor={`${id}-rolle`}>
+                Rolle
+              </label>
+              <select
+                id={`${id}-rolle`}
+                className="eingabe"
+                value={profil.rolle}
+                onChange={(e) => aendern({ rolle: e.target.value as Rolle })}
+              >
+                {ROLLEN.map((r) => (
+                  <option key={r.wert} value={r.wert}>
+                    {r.text}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <p className="neben">
             {konto
               ? 'Name und Rolle werden mit deinen anderen Geräten abgeglichen.'

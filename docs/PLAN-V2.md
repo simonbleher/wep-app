@@ -137,6 +137,7 @@ Die Entscheidungen fallen im jeweiligen Paket und landen in docs/ENTSCHEIDUNGEN.
 1. **Server-Grundgerüst:** D1/R2-Schema mit Migrationen, Functions, Anmeldung mit Google und Microsoft,
    Sitzungen, Freigabe, Admin-Seite.
 2. **WEPs auf dem Server:** offline-fähig speichern und abgleichen, Rechteprüfung, Verlauf.
+   - 2b: Fotos und Bau-Excel in R2 (eigener PR).
 3. **Ablauf:** Zustände, Abgabe Bau → Grün mit Auswahl, Grün bearbeitet nur den Grün-Teil, Abgabe an den BV, Sperren.
 4. **BV-Kontrollseite mit Server-Daten:** Rückfrage mit Auswahl, geprüft und gesperrt, Wiederöffnen mit Begründung.
 5. **Benachrichtigungen** in der App und per Resend.

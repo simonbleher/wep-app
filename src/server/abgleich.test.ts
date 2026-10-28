@@ -1,0 +1,253 @@
+// @vitest-environment node
+// Server-Modus (v2): Abgleich gegen die echte Server-Logik (functions/_lib/v2/weps.ts mit SQLite und denselben
+// Migrationen wie D1). Zwei Geräte desselben Bau-Wertermittlers und weitere Konten; nur erfundene Daten.
+import { describe, expect, it } from 'vitest'
+import { neuerWep, type Wep } from '@/model'
+import { FakeLokal, Uhr } from '@/sync/testHilfen'
+import * as regeln from '@/sync/papierkorb'
+import { testDb } from '../../functions/_lib/__tests__/sqliteDb'
+import type { Konto, Rolle } from '../../functions/_lib/v2/konten'
+import { ladeWep, lesbareWeps, setzePapierkorb, speichereWep, type Ergebnis } from '../../functions/_lib/v2/weps'
+import { AbgleichFehler, serverAbgleich, wartendeServerAenderungen, type ServerKopf, type ServerStand, type ServerZugriff } from './abgleich'
+
+type TestDb = ReturnType<typeof testDb>
+
+function konto(db: TestDb, id: string, name: string, rollen: Rolle[]): Konto {
+  const zeit = '2026-10-28T08:00:00.000Z'
+  db.roh.prepare("INSERT INTO konten (id, anbieter, subjekt, email, name, status, rollen, erstellt_am, geaendert_am) VALUES (?, 'google', ?, ?, ?, 'freigegeben', ?, ?, ?)").run(id, id, `${id}@example.org`, name, rollen.join(','), zeit, zeit)
+  return { id, anbieter: 'google', email: `${id}@example.org`, name, status: 'freigegeben', rollen, mailBenachrichtigung: true, erstelltAm: zeit, geaendertAm: zeit }
+}
+
+/** Server-Zugriff eines Kontos direkt auf die Server-Logik (wie die Functions, ohne HTTP). */
+function zugriff(db: TestDb, k: Konto, uhr: Uhr): ServerZugriff & { offline: boolean } {
+  const z = {
+    offline: false,
+    pruefe() {
+      if (z.offline) throw new TypeError('Failed to fetch')
+    },
+    ergebnis<T>(e: Ergebnis<T>): T {
+      if (e.ok) return e.wert
+      throw new AbgleichFehler(e.fehler, e.status, e.stand as ServerStand | undefined)
+    },
+    async liste() {
+      z.pruefe()
+      return (await lesbareWeps(db, k)) as ServerKopf[]
+    },
+    async lade(id: string) {
+      z.pruefe()
+      return z.ergebnis(await ladeWep(db, k, id)) as ServerStand
+    },
+    async speichere(wep: Wep, basisRev: number) {
+      z.pruefe()
+      return z.ergebnis(await speichereWep(db, k, wep.id, { wep, basisRev }, Date.parse(uhr.jetzt()))) as ServerKopf
+    },
+    async loesche(id: string, basisRev: number) {
+      z.pruefe()
+      return z.ergebnis(await setzePapierkorb(db, k, id, true, basisRev, Date.parse(uhr.jetzt()))) as ServerKopf
+    },
+    async stelleWiederHer(id: string) {
+      z.pruefe()
+      return z.ergebnis(await setzePapierkorb(db, k, id, false, undefined, Date.parse(uhr.jetzt()))) as ServerKopf
+    },
+  }
+  return z
+}
+
+function testWep(id: string, anlage = 'KGA Musterwiese'): Wep {
+  const w = neuerWep(id)
+  w.formalien.kleingartenanlage = anlage
+  w.formalien.vorgangsNr = `NR-${id}`
+  return w
+}
+
+function aufbau() {
+  const db = testDb()
+  const uhr = new Uhr()
+  const bert = konto(db, 'bau-1', 'Bert Bauer', ['bau'])
+  const geraet = (k: Konto) => {
+    const lokal = new FakeLokal()
+    const server = zugriff(db, k, uhr)
+    return { lokal, server, abgleich: () => serverAbgleich({ server, lokal, jetzt: uhr.jetzt }), kontext: { jetzt: uhr.jetzt(), geraet: 'test' } }
+  }
+  return { db, uhr, bert, geraet, a: geraet(bert), b: geraet(bert) }
+}
+
+const anlage = (l: FakeLokal, id: string) => l.weps.get(id)?.formalien.kleingartenanlage
+
+describe('Abgleich mit dem Server', () => {
+  it('neues WEP wird hochgeladen und kommt auf dem zweiten Gerät an; Änderungen laufen in beide Richtungen', async () => {
+    const { uhr, a, b } = aufbau()
+    await a.lokal.speichereWep(testWep('w1'), uhr.vor(1))
+    expect(wartendeServerAenderungen(await a.lokal.alleWeps(), [], await a.lokal.alleMeta())).toBe(1)
+    expect((await a.abgleich()).hochgeladen).toEqual(['w1'])
+    expect(wartendeServerAenderungen(await a.lokal.alleWeps(), [], await a.lokal.alleMeta())).toBe(0)
+    expect((await b.abgleich()).heruntergeladen).toEqual(['w1'])
+    expect(anlage(b.lokal, 'w1')).toBe('KGA Musterwiese')
+
+    await b.lokal.speichereWep(testWep('w1', 'KGA Seeblick'), uhr.vor(5))
+    expect((await b.abgleich()).hochgeladen).toEqual(['w1'])
+    expect((await a.abgleich()).heruntergeladen).toEqual(['w1'])
+    expect(anlage(a.lokal, 'w1')).toBe('KGA Seeblick')
+    // nichts mehr zu tun
+    const leer = await a.abgleich()
+    expect([...leer.hochgeladen, ...leer.heruntergeladen, ...leer.konflikte]).toEqual([])
+  })
+
+  it('offline weiterarbeiten: Änderungen warten und gehen beim nächsten Abgleich hoch', async () => {
+    const { uhr, a, b } = aufbau()
+    await a.lokal.speichereWep(testWep('w1'), uhr.vor(1))
+    await a.abgleich()
+    a.server.offline = true
+    await a.lokal.speichereWep(testWep('w1', 'KGA Offline'), uhr.vor(2))
+    await expect(a.abgleich()).rejects.toThrow(/Failed to fetch/)
+    expect(anlage(a.lokal, 'w1')).toBe('KGA Offline')
+    a.server.offline = false
+    expect((await a.abgleich()).hochgeladen).toEqual(['w1'])
+    await b.abgleich()
+    expect(anlage(b.lokal, 'w1')).toBe('KGA Offline')
+  })
+
+  it('auf zwei Geräten geändert: die neuere Änderung gilt, die andere bleibt als Fassung sichtbar – in beide Richtungen', async () => {
+    const { uhr, a, b } = aufbau()
+    await a.lokal.speichereWep(testWep('w1'), uhr.vor(1))
+    await a.abgleich()
+    await b.abgleich()
+    await b.lokal.speichereWep(testWep('w1', 'KGA Gerät B (älter)'), uhr.vor(1))
+    await a.lokal.speichereWep(testWep('w1', 'KGA Gerät A (neuer)'), uhr.vor(1))
+    await a.abgleich() // A zuerst auf dem Server
+    const e = await b.abgleich() // B ist älter → Server gewinnt, B behält seine Fassung als Konflikt
+    expect(e.konflikte.map((k) => k.wepId)).toEqual(['w1'])
+    expect(anlage(b.lokal, 'w1')).toBe('KGA Gerät A (neuer)')
+    expect(b.lokal.meta.get('w1')?.konflikt).toMatchObject({ art: 'zwei-geraete', fassung: { formalien: { kleingartenanlage: 'KGA Gerät B (älter)' } } })
+    // B wählt die eigene Fassung → wird hochgeladen und kommt bei A an
+    await regeln.loeseKonflikt(b.lokal, 'w1', 'andere', { jetzt: uhr.vor(1), geraet: 'B' })
+    expect((await b.abgleich()).hochgeladen).toEqual(['w1'])
+    await a.abgleich()
+    expect(anlage(a.lokal, 'w1')).toBe('KGA Gerät B (älter)')
+
+    // umgekehrt: das lokale Gerät ist neuer → es gilt, die Fassung des Servers bleibt sichtbar
+    await a.lokal.speichereWep(testWep('w1', 'KGA A2 (älter)'), uhr.vor(1))
+    await a.abgleich()
+    await b.lokal.speichereWep(testWep('w1', 'KGA B2 (neuer)'), uhr.vor(1)) // B hat A2 noch nicht
+    const e2 = await b.abgleich()
+    expect(e2.hochgeladen).toEqual(['w1'])
+    expect(e2.konflikte).toHaveLength(1)
+    expect(b.lokal.meta.get('w1')?.konflikt?.fassung?.formalien.kleingartenanlage).toBe('KGA A2 (älter)')
+    await a.abgleich()
+    expect(anlage(a.lokal, 'w1')).toBe('KGA B2 (neuer)')
+  })
+
+  it('Löschen gilt überall (Papierkorb); Wiederherstellen ebenso; „endgültig“ nur auf diesem Gerät', async () => {
+    const { db, uhr, a, b, bert } = aufbau()
+    await a.lokal.speichereWep(testWep('w1'), uhr.vor(1))
+    await a.abgleich()
+    await b.abgleich()
+    await regeln.loescheWep(a.lokal, 'w1', { jetzt: uhr.vor(1), geraet: 'A' })
+    expect(wartendeServerAenderungen([], ['w1'], await a.lokal.alleMeta())).toBe(1)
+    await a.abgleich()
+    expect(wartendeServerAenderungen([], ['w1'], await a.lokal.alleMeta())).toBe(0)
+    expect((await lesbareWeps(db, bert))[0].geloeschtAm).toBeTruthy()
+    expect((await b.abgleich()).geloescht).toEqual(['w1'])
+    expect(b.lokal.korb.has('w1')).toBe(true)
+
+    await regeln.stelleWiederHer(b.lokal, 'w1', { jetzt: uhr.vor(1), geraet: 'B' })
+    expect((await b.abgleich()).wiederhergestellt).toEqual(['w1'])
+    expect((await lesbareWeps(db, bert))[0].geloeschtAm).toBeUndefined()
+    await a.abgleich()
+    expect(a.lokal.weps.has('w1')).toBe(true)
+
+    await regeln.loescheWep(a.lokal, 'w1', { jetzt: uhr.vor(1), geraet: 'A' })
+    await regeln.loescheEndgueltig(a.lokal, 'w1', uhr.vor(1))
+    expect((await a.abgleich()).bereinigt).toEqual(['w1'])
+    expect(a.lokal.meta.has('w1')).toBe(false)
+    expect((await lesbareWeps(db, bert))[0].geloeschtAm).toBeTruthy() // bleibt auf dem Server im Papierkorb
+    await a.abgleich()
+    expect(a.lokal.weps.has('w1')).toBe(false) // kommt nicht wieder
+  })
+
+  it('auf dem anderen Gerät gelöscht, hier noch geändert: nicht still löschen, sondern fragen; „behalten“ holt es zurück', async () => {
+    const { db, uhr, a, b, bert } = aufbau()
+    await a.lokal.speichereWep(testWep('w1'), uhr.vor(1))
+    await a.abgleich()
+    await b.abgleich()
+    await regeln.loescheWep(a.lokal, 'w1', { jetzt: uhr.vor(1), geraet: 'A' })
+    await a.abgleich()
+    await b.lokal.speichereWep(testWep('w1', 'KGA noch geändert'), uhr.vor(1))
+    const e = await b.abgleich()
+    expect(e.konflikte.map((k) => k.wepId)).toEqual(['w1'])
+    expect(b.lokal.meta.get('w1')?.konflikt).toMatchObject({ art: 'geloescht-geaendert', geloeschtWo: 'anderes-geraet' })
+    expect(b.lokal.weps.has('w1')).toBe(true)
+    // erneuter Abgleich ändert nichts, solange nicht entschieden ist
+    expect((await b.abgleich()).konflikte).toEqual([])
+    await regeln.loeseKonflikt(b.lokal, 'w1', 'diese', { jetzt: uhr.vor(1), geraet: 'B' })
+    const e2 = await b.abgleich()
+    expect(e2.wiederhergestellt).toEqual(['w1'])
+    expect(e2.hochgeladen).toEqual(['w1'])
+    const s = await lesbareWeps(db, bert)
+    expect(s[0].geloeschtAm).toBeUndefined()
+    await a.abgleich()
+    expect(anlage(a.lokal, 'w1')).toBe('KGA noch geändert')
+  })
+
+  it('hier gelöscht, auf dem Server inzwischen geändert: WEP kommt zurück und es wird gefragt; „doch löschen“ löscht überall', async () => {
+    const { db, uhr, a, b, bert } = aufbau()
+    await a.lokal.speichereWep(testWep('w1'), uhr.vor(1))
+    await a.abgleich()
+    await b.abgleich()
+    await regeln.loescheWep(b.lokal, 'w1', { jetzt: uhr.vor(1), geraet: 'B' })
+    await a.lokal.speichereWep(testWep('w1', 'KGA geändert auf A'), uhr.vor(1))
+    await a.abgleich()
+    const e = await b.abgleich()
+    expect(e.konflikte.map((k) => k.wepId)).toEqual(['w1'])
+    expect(b.lokal.meta.get('w1')?.konflikt).toMatchObject({ art: 'geloescht-geaendert', geloeschtWo: 'hier' })
+    expect(anlage(b.lokal, 'w1')).toBe('KGA geändert auf A')
+    await regeln.loeseKonflikt(b.lokal, 'w1', 'andere', { jetzt: uhr.vor(1), geraet: 'B' })
+    await b.abgleich()
+    expect((await lesbareWeps(db, bert))[0].geloeschtAm).toBeTruthy()
+  })
+
+  it('Rechte: Grün-Wertermittler kann kein WEP anlegen (bleibt lokal mit Hinweis); fremde WEPs kommen nicht an', async () => {
+    const { db, uhr, a } = aufbau()
+    const erika = konto(db, 'gruen-1', 'Erika Musterfrau', ['gruen'])
+    const g = (() => {
+      const lokal = new FakeLokal()
+      const server = zugriff(db, erika, uhr)
+      return { lokal, abgleich: () => serverAbgleich({ server, lokal, jetzt: uhr.jetzt }) }
+    })()
+    await a.lokal.speichereWep(testWep('w1'), uhr.vor(1))
+    await a.abgleich()
+    await g.lokal.speichereWep(testWep('g1'), uhr.vor(1))
+    const e = await g.abgleich()
+    expect(e.fehler).toEqual([expect.objectContaining({ wepId: 'g1', text: expect.stringMatching(/Bau-Wertermittler/) })])
+    expect(g.lokal.weps.has('w1')).toBe(false)
+    expect(g.lokal.weps.has('g1')).toBe(true)
+  })
+
+  it('gesperrtes WEP (z. B. schon beim BV): der Stand des Servers gilt, die eigene Änderung bleibt als Fassung sichtbar', async () => {
+    const { db, uhr, a } = aufbau()
+    await a.lokal.speichereWep(testWep('w1'), uhr.vor(1))
+    await a.abgleich()
+    db.roh.prepare("UPDATE weps SET zustand = 'beim_bv', rev = rev + 1 WHERE id = 'w1'").run()
+    await a.lokal.speichereWep(testWep('w1', 'KGA zu spät'), uhr.vor(1))
+    const e = await a.abgleich()
+    expect(e.konflikte[0].text).toMatch(/gesperrt/)
+    expect(anlage(a.lokal, 'w1')).toBe('KGA Musterwiese')
+    expect(a.lokal.meta.get('w1')?.konflikt?.fassung?.formalien.kleingartenanlage).toBe('KGA zu spät')
+    expect(wartendeServerAenderungen(await a.lokal.alleWeps(), [], await a.lokal.alleMeta())).toBe(0)
+  })
+
+  it('Änderung während des Uploads geht nicht verloren (wartet weiter)', async () => {
+    const { uhr, a } = aufbau()
+    await a.lokal.speichereWep(testWep('w1'), uhr.vor(1))
+    const speichere = a.server.speichere
+    a.server.speichere = async (wep, rev) => {
+      const k = await speichere(wep, rev)
+      await a.lokal.speichereWep(testWep('w1', 'KGA während des Uploads'), uhr.vor(1))
+      return k
+    }
+    await a.abgleich()
+    a.server.speichere = speichere
+    expect(wartendeServerAenderungen(await a.lokal.alleWeps(), [], await a.lokal.alleMeta())).toBe(1)
+    expect((await a.abgleich()).hochgeladen).toEqual(['w1'])
+  })
+})

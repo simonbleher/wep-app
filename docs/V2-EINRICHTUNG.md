@@ -50,7 +50,7 @@ Die Namen müssen genau so geschrieben sein.
 
 ### Tabellen einspielen (Migrationen)
 
-Die Tabellen stehen im Repo unter `migrations/` (`0001_konten.sql`, später `0002_…`). Jede Datei
+Die Tabellen stehen im Repo unter `migrations/` (`0001_konten.sql`, `0002_weps.sql`, …). Jede Datei
 wird **genau einmal und in der Reihenfolge der Nummern** eingespielt:
 
 1. Dashboard → **D1** → `wep-v2-vorschau` → Reiter **Konsole** (*Console*).
