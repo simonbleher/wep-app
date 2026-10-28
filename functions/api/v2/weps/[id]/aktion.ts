@@ -1,12 +1,13 @@
 // POST /api/v2/weps/<id>/aktion { aktion, basisRev, … } – Schritt im Ablauf:
 //   an_gruen { gruenKonto }  · an_bv  · rueckfrage { an: bau|gruen|beide, notiz }  · geprueft { notiz? }
 //   wiederoeffnen { begruendung }
-// Nur auf dem aktuellen Stand (basisRev); wer was darf, steht in src/server/rechte.ts.
+// Nur auf dem aktuellen Stand (basisRev); wer was darf, steht in src/server/rechte.ts. Danach gehen die Benachrichtigungen raus.
 import { jsonAntwort } from '../../../../_lib/serverModus'
 import { datenbank, freigegebenesKonto, fremdeHerkunft, NICHT_EINGERICHTET, type V2Kontext } from '../../../../_lib/v2/kontext'
 import { fuehreAktionAus } from '../../../../_lib/v2/weps'
+import { benachrichtige } from '../../../../_lib/v2/benachrichtigungen'
 
-export const onRequestPost = async ({ request, env, params }: V2Kontext<'id'>): Promise<Response> => {
+export const onRequestPost = async ({ request, env, params, waitUntil }: V2Kontext<'id'>): Promise<Response> => {
   const db = datenbank(env)
   if (!db) return NICHT_EINGERICHTET()
   const fremd = fremdeHerkunft(request)
@@ -14,6 +15,12 @@ export const onRequestPost = async ({ request, env, params }: V2Kontext<'id'>): 
   const konto = await freigegebenesKonto(db, request)
   if (konto instanceof Response) return konto
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>
-  const e = await fuehreAktionAus(db, konto, params.id, body)
+  // Benachrichtigungen (App und Mail): Mails nach der Antwort verschicken, damit die Abgabe nicht wartet
+  const origin = new URL(request.url).origin
+  const e = await fuehreAktionAus(db, konto, params.id, body, Date.now(), async (n) => {
+    const arbeit = benachrichtige(db, env, { ...n, ausloeser: konto.id, origin }).catch((err) => console.error('Benachrichtigung:', err))
+    if (waitUntil) waitUntil(arbeit)
+    else await arbeit
+  })
   return e.ok ? jsonAntwort(200, { kopf: e.wert }) : jsonAntwort(e.status, { fehler: e.fehler, ...(e.stand ? { stand: e.stand } : {}) })
 }

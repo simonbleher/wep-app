@@ -22,6 +22,8 @@ import * as wepVerlauf from '../../functions/api/v2/weps/[id]/verlauf'
 import * as wepDateien from '../../functions/api/v2/weps/[id]/dateien'
 import * as wepAktion from '../../functions/api/v2/weps/[id]/aktion'
 import * as gruenKontenListe from '../../functions/api/v2/konten/gruen'
+import * as benListe from '../../functions/api/v2/benachrichtigungen'
+import * as benGelesen from '../../functions/api/v2/benachrichtigungen/gelesen'
 import * as wepDatei from '../../functions/api/v2/weps/[id]/dateien/[datei]'
 import { fakeR2 } from '../../functions/_lib/__tests__/fakeR2'
 // @ts-expect-error – JavaScript-Hilfe ohne Typen (gemaltes Testbild, kein echtes Foto)
@@ -38,7 +40,7 @@ const TID = '0a1b2c3d-1111-2222-3333-444455556666'
 
 const db = testDb()
 const r2 = fakeR2()
-const env = { SERVER_MODUS: 'true', WEP_DB: db, WEP_DATEIEN: r2, GOOGLE_CLIENT_ID: GOOGLE_ID, GOOGLE_CLIENT_SECRET: 'g', VITE_MS_CLIENT_ID: MS_ID, MS_CLIENT_SECRET: 'm', V2_ADMINS: 'ada@example.org' }
+const env = { SERVER_MODUS: 'true', WEP_DB: db, WEP_DATEIEN: r2, RESEND_API_KEY: 're_durchlauf', MAIL_ABSENDER: 'WEP-App <wep@mail.example.org>', GOOGLE_CLIENT_ID: GOOGLE_ID, GOOGLE_CLIENT_SECRET: 'g', VITE_MS_CLIENT_ID: MS_ID, MS_CLIENT_SECRET: 'm', V2_ADMINS: 'ada@example.org' }
 
 // ── nachgebaute Anbieter ─────────────────────────────────────────────────────────────────────────────
 const paar = (await crypto.subtle.generateKey({ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, true, ['sign', 'verify'])) as CryptoKeyPair
@@ -59,9 +61,14 @@ const PERSONEN = {
 let wer: keyof typeof PERSONEN = 'ada'
 const codes = new Map<string, string>() // code → nonce
 
+const mails: { to: string[]; subject: string; text: string }[] = []
 const echtesFetch = globalThis.fetch
 globalThis.fetch = (async (eingabe: RequestInfo | URL, init?: RequestInit) => {
   const url = String(eingabe instanceof Request ? eingabe.url : eingabe)
+  if (url === 'https://api.resend.com/emails') {
+    mails.push(JSON.parse(String(init?.body)))
+    return Response.json({ id: `mail-${mails.length}` })
+  }
   if (url.includes('/certs') || url.includes('/discovery/v2.0/keys')) return Response.json({ keys: [{ kid: 'k1', kty: 'RSA', n: oeffentlich.n, e: oeffentlich.e }] })
   if (url.startsWith('https://oauth2.googleapis.com/token') || url.startsWith('https://login.microsoftonline.com/common/oauth2/v2.0/token')) {
     const code = new URLSearchParams(String(init?.body)).get('code') ?? ''
@@ -87,6 +94,8 @@ const ROUTEN: [RegExp, Modul, string?, string?][] = [
   [/^\/api\/v2\/weps\/([^/]+)\/dateien$/, wepDateien, 'id'],
   [/^\/api\/v2\/weps\/([^/]+)\/aktion$/, wepAktion, 'id'],
   [/^\/api\/v2\/konten\/gruen$/, gruenKontenListe],
+  [/^\/api\/v2\/benachrichtigungen$/, benListe],
+  [/^\/api\/v2\/benachrichtigungen\/gelesen$/, benGelesen],
   [/^\/api\/v2\/weps\/([^/]+)\/dateien\/([^/]+)$/, wepDatei, 'id', 'datei'],
 ]
 let serverWeg = false
@@ -360,10 +369,23 @@ try {
   const navBau = seite.getByRole('navigation', { name: 'Abschnitte' })
   pruefe((await navBau.getByRole('button').allTextContents()).join('|') === 'Übersicht', 'Bau: nach der Abgabe nur die Übersicht')
 
-  await seiteE.getByRole('button', { name: 'Abgleichen' }).filter({ visible: true }).first().click()
-  await seiteE.getByText(/2026-0815/).filter({ visible: true }).first().waitFor()
-  pruefe(await seiteE.locator('.zeile', { hasText: '2026-0815' }).getByText('Grün in Arbeit').isVisible(), 'Grün: WEP ist da, Zustand „Grün in Arbeit“')
-  await seiteE.getByRole('button', { name: /2026-0815/ }).first().click()
+  // Benachrichtigung: Mail an Erika (nur Vorgangs-Nr., Anlage, Parzelle, Link) und „Neu für dich“ in der App
+  const mailErika = mails.find((m) => m.to.includes('erika@example.org'))
+  pruefe(Boolean(mailErika?.subject.includes('2026-0815 – an dich abgegeben')) && /\?wep=/.test(mailErika?.text ?? '') && !/Bert|€/.test(mailErika?.text ?? ''), 'Mail an Grün: Vorgangs-Nr., Link, keine Namen oder Beträge')
+  await seiteE.reload()
+  await seiteE.getByRole('heading', { name: /Neu für dich \(1\)/ }).waitFor()
+  await seiteE.screenshot({ path: `${AUSGABE}/06b-neu-fuer-dich.png` })
+  await seiteE.getByRole('button', { name: /2026-0815 – an dich abgegeben/ }).click()
+  await seiteE.getByRole('button', { name: 'Abgabe' }).filter({ visible: true }).first().waitFor()
+  pruefe(true, 'Grün: „Neu für dich“ öffnet das WEP (vorher abgeglichen)')
+  await seiteE.getByRole('button', { name: 'Protokolle' }).first().click()
+  await seiteE.locator('ul[aria-label="Protokolle"] .zeile', { hasText: '2026-0815' }).getByText('Grün in Arbeit').waitFor()
+  pruefe(true, 'Grün: WEP ist da, Zustand „Grün in Arbeit“')
+  pruefe((await seiteE.getByRole('heading', { name: /Neu für dich/ }).count()) === 0, 'Grün: Benachrichtigung ist gelesen')
+  // Link aus der Mail öffnet das WEP direkt
+  await seiteE.goto(new globalThis.URL(/Öffnen: (\S+)/.exec(mailErika!.text)![1].replace(/^https?:\/\/[^/]+/, URL.replace(/\/$/, ''))).toString())
+  await seiteE.getByRole('button', { name: 'Abgabe' }).filter({ visible: true }).first().waitFor()
+  pruefe(!seiteE.url().includes('wep='), 'Link aus der Mail öffnet das WEP (Adresse bereinigt)')
   const navGruen = await seiteE.getByRole('navigation', { name: 'Abschnitte' }).getByRole('button').allTextContents()
   pruefe(!navGruen.some((t) => /Formalien|Bauten|Mängel/.test(t)) && navGruen.some((t) => /Aufwuchs/.test(t)) && navGruen.some((t) => /Übersicht/.test(t)), `Grün: nur Grün-Teil und Übersicht (${navGruen.join(', ')})`)
   await seiteE.getByRole('button', { name: 'Abgabe' }).filter({ visible: true }).first().click()
@@ -378,7 +400,7 @@ try {
   pruefe(verlaufAblauf.join(' ') === 'angelegt→bau_in_arbeit an_gruen→gruen_in_arbeit an_bv→beim_bv', `Verlauf mit Zuständen: ${verlaufAblauf.join(' ')}`)
   await seite.getByRole('button', { name: 'Protokolle' }).first().click()
   await seite.getByRole('button', { name: 'Abgleichen' }).filter({ visible: true }).first().click()
-  await seite.locator('.zeile', { hasText: '2026-0815' }).getByText('beim BV').waitFor()
+  await seite.locator('ul[aria-label="Protokolle"] .zeile', { hasText: '2026-0815' }).getByText('beim BV').waitFor()
   pruefe(true, 'Bau: Liste zeigt „beim BV“')
 
   // 12. BV-Kontrollseite mit Server-Daten: Rückfrage an Grün, Grün gibt wieder ab, geprüft, wieder öffnen
@@ -389,6 +411,7 @@ try {
   seiteV.on('pageerror', (e) => skriptFehler.push(String(e)))
   await seiteV.goto(`${URL}bv`)
   await anmelden(seiteV, 'bea')
+  pruefe(!mails.some((m) => m.to.includes('bea@bv.example')), 'BV-Mail erst, wenn das Konto die Rolle BV hat')
   await seiteV.getByRole('heading', { name: 'Wartet auf Freigabe' }).waitFor()
   pruefe(seiteV.url().endsWith('/bv'), 'BV: nach der Anmeldung zurück auf /bv')
   const beaId = (db.roh.prepare("SELECT id FROM konten WHERE email = 'bea@bv.example'").get() as { id: string }).id
@@ -417,7 +440,7 @@ try {
 
   await seiteE.getByRole('button', { name: 'Protokolle' }).first().click()
   await seiteE.getByRole('button', { name: 'Abgleichen' }).filter({ visible: true }).first().click()
-  await seiteE.locator('.zeile', { hasText: '2026-0815' }).getByText('Rückfrage').waitFor()
+  await seiteE.locator('ul[aria-label="Protokolle"] .zeile', { hasText: '2026-0815' }).getByText('Rückfrage').waitFor()
   await seiteE.getByRole('button', { name: /2026-0815/ }).first().click()
   await seiteE.getByRole('button', { name: 'Abgabe' }).filter({ visible: true }).first().click()
   pruefe(await seiteE.getByText(/Hecke an der Straße fehlt/).isVisible(), 'Grün: sieht die Rückfrage mit Notiz')
@@ -425,6 +448,8 @@ try {
   await seiteE.getByRole('alertdialog').getByRole('button', { name: 'Abgeben' }).click()
   await seiteE.getByText('An den BV abgegeben.').waitFor()
   pruefe(zustandVon('2026-0815') === 'beim_bv', 'Grün gibt nach der Rückfrage wieder an den BV ab')
+  pruefe(mails.some((m) => m.to.includes('erika@example.org') && m.subject.includes('Rückfrage vom BV')), 'Mail an Grün zur Rückfrage')
+  pruefe(mails.some((m) => m.to.includes('bea@bv.example') && m.subject.includes('an den BV abgegeben') && m.text.includes('/bv?wep=')), 'Mail an den BV mit Link zur Kontrollseite')
 
   await seiteV.getByRole('button', { name: 'Alle WEPs' }).click()
   await seiteV.getByRole('button', { name: 'Neu laden' }).click()

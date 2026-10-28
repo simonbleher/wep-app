@@ -434,3 +434,9 @@
 - **Grund:** Der Zustand eines WEP soll an einer Stelle stehen (Server) und für Wertermittler und BV gleich aussehen; lokale Notizen im Browser des BV gingen an den Wertermittlern vorbei.
 - **Ohne Netz:** Die Kontrollseite im Server-Modus braucht Netz; sie hält keine eigene Kopie (die Datei-Kontrollseite von v1 bleibt dafür ohne Schalter erhalten).
 - **Profil je Person:** Meldet sich auf einem Gerät eine andere Person an, werden Name, Unterschrift und eigene Baupreisindex-Werte des Profils zurückgesetzt, damit nichts in fremde WEPs gerät. Bei der Abgabe kommt die eigene Unterschrift für den eigenen Teil ins WEP.
+
+## 2026-10-28 · v2-Benachrichtigungen: in der App immer, per Mail sparsam
+
+- **Entscheidung:** Jeder Schritt im Ablauf legt Benachrichtigungen in D1 an (Empfänger in `functions/_lib/v2/benachrichtigungen.ts`: an Grün → Grün, an den BV → alle BV-Konten, Rückfrage → wer gefragt ist, geprüft/wieder geöffnet → beide Wertermittler; nie die Person selbst). Die App zeigt sie als „Neu für dich“; eine Mail über Resend geht nur, wenn Resend eingerichtet ist und das Konto Mails nicht abgeschaltet hat.
+- **Datensparsam:** Mails enthalten nur Vorgangs-Nr., Anlage, Parzelle und einen Link in die App (Anmeldung nötig). Keine Namen von Pächtern oder Wertermittlern, keine Beträge – die Mails liegen bei fremden Mail-Anbietern.
+- **Zuverlässigkeit:** Mails gehen nach der Antwort raus (`waitUntil`), damit die Abgabe nicht auf Resend wartet; ein Fehler steht bei der Benachrichtigung (`mail = 'fehler'`), der Schritt bleibt gültig. In der App ist die Benachrichtigung in jedem Fall da.

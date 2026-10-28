@@ -8,6 +8,8 @@ export interface V2Kontext<P extends string = never> {
   request: Request
   env: V2Umgebung
   params: Record<P, string>
+  /** Cloudflare: Arbeit nach der Antwort zu Ende führen (z. B. Mails verschicken). */
+  waitUntil?: (p: Promise<unknown>) => void
 }
 
 export const datenbank = (env: V2Umgebung): Db | undefined => (env.WEP_DB as Db | undefined) ?? undefined
