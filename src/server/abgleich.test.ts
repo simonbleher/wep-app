@@ -7,7 +7,7 @@ import { FakeLokal, Uhr } from '@/sync/testHilfen'
 import * as regeln from '@/sync/papierkorb'
 import { testDb } from '../../functions/_lib/__tests__/sqliteDb'
 import type { Konto, Rolle } from '../../functions/_lib/v2/konten'
-import { ladeWep, lesbareWeps, setzePapierkorb, speichereWep, type Ergebnis } from '../../functions/_lib/v2/weps'
+import { fuehreAktionAus, ladeWep, lesbareWeps, setzePapierkorb, speichereWep, type Ergebnis } from '../../functions/_lib/v2/weps'
 import { AbgleichFehler, serverAbgleich, wartendeServerAenderungen, type ServerKopf, type ServerStand, type ServerZugriff } from './abgleich'
 
 type TestDb = ReturnType<typeof testDb>
@@ -249,5 +249,39 @@ describe('Abgleich mit dem Server', () => {
     a.server.speichere = speichere
     expect(wartendeServerAenderungen(await a.lokal.alleWeps(), [], await a.lokal.alleMeta())).toBe(1)
     expect((await a.abgleich()).hochgeladen).toEqual(['w1'])
+  })
+})
+
+describe('Ablauf mit zwei Personen (Paket 3)', () => {
+  it('Bau gibt an Grün ab: Grün bekommt das WEP mit Ablauf, ändert nur den Grün-Teil; Bau sieht es danach, ist aber gesperrt', async () => {
+    const { db, uhr, a: bauGeraet, bert } = aufbau()
+    const erika = konto(db, 'gruen-1', 'Erika Musterfrau', ['gruen'])
+    const lokal = new FakeLokal()
+    const g = { lokal, abgleich: () => serverAbgleich({ server: zugriff(db, erika, uhr), lokal, jetzt: uhr.jetzt }) }
+
+    await bauGeraet.lokal.speichereWep(testWep('w1'), uhr.vor(1))
+    await bauGeraet.abgleich()
+    expect(bauGeraet.lokal.weps.get('w1')?.ablauf).toMatchObject({ zustand: 'bau_in_arbeit', bau: { name: 'Bert Bauer' } }) // nach dem Anlegen geholt
+    expect(await g.abgleich()).toMatchObject({ heruntergeladen: [] }) // Entwurf: Grün sieht nichts
+
+    const rev = bauGeraet.lokal.meta.get('w1')!.serverRev!
+    expect(await fuehreAktionAus(db, bert, 'w1', { aktion: 'an_gruen', gruenKonto: 'gruen-1', basisRev: rev })).toMatchObject({ ok: true })
+    expect((await g.abgleich()).heruntergeladen).toEqual(['w1'])
+    const gw = g.lokal.weps.get('w1')!
+    expect(gw.ablauf).toMatchObject({ zustand: 'gruen_in_arbeit', gruen: { name: 'Erika Musterfrau' } })
+
+    // Grün ändert Grün-Teil und (versehentlich) die Anlage: nur der Grün-Teil kommt an, der Stand wird neu geholt
+    await g.lokal.speichereWep({ ...gw, gruen: { ...gw.gruen, beschreibungAufwuchs: 'Obstwiese' }, formalien: { ...gw.formalien, kleingartenanlage: 'KGA falsch' } }, uhr.vor(1))
+    expect((await g.abgleich()).hochgeladen).toEqual(['w1'])
+    expect(g.lokal.weps.get('w1')?.formalien.kleingartenanlage).toBe('KGA Musterwiese')
+    expect(g.lokal.weps.get('w1')?.gruen.beschreibungAufwuchs).toBe('Obstwiese')
+
+    // Bau gleicht ab: bekommt Grüns Teil; eine eigene Änderung danach ist gesperrt und bleibt als Fassung sichtbar
+    await bauGeraet.abgleich()
+    expect(bauGeraet.lokal.weps.get('w1')?.gruen.beschreibungAufwuchs).toBe('Obstwiese')
+    await bauGeraet.lokal.speichereWep({ ...bauGeraet.lokal.weps.get('w1')!, formalien: { ...testWep('w1').formalien, parzelle: '99' } }, uhr.vor(1))
+    const e = await bauGeraet.abgleich()
+    expect(e.konflikte[0]?.text).toMatch(/gesperrt/)
+    expect(bauGeraet.lokal.weps.get('w1')?.formalien.parzelle).toBe('')
   })
 })

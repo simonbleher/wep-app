@@ -15,6 +15,12 @@ import { NeuesWepDialog } from './VorgangsNr'
 import { legeWepAusBauExcelAn } from '@/bauexcel/neu'
 import { StatusZeile, useAbgleich } from './SyncLeiste'
 import { HauptSeitenleiste, ICON, Laedt, LeerZustand, Meldung, StatusMarke, TeilMarke, datumDe } from './ui'
+import { serverModus } from '@/server/modus'
+import { gemerktesKonto } from '@/server/api'
+import { ZustandMarke } from '@/server/AbgabeBereich'
+
+/** Server-Modus (v2): Neue WEPs legt der Bau-Wertermittler an (Beginn des Ablaufs). */
+const darfNeuesWep = () => !serverModus || Boolean(gemerktesKonto()?.rollen.includes('bau'))
 
 interface Props {
   /** Angemeldetes Konto oder null („ohne Konto“). */
@@ -103,6 +109,7 @@ export function Startseite({ konto, verfuegbar, onProfil, onOeffnen, onPapierkor
   const gefiltert = suchbegriff.trim() !== '' || filter !== 'alle'
 
   const status = <StatusZeile konto={konto} verfuegbar={verfuegbar} abgleich={abgleich} />
+  const neuErlaubt = darfNeuesWep()
 
   return (
     <div className="rahmen">
@@ -126,19 +133,24 @@ export function Startseite({ konto, verfuegbar, onProfil, onOeffnen, onPapierkor
                 Neues WEP aus Bau-Excel
               </button>
             )}
-            <button type="button" className="knopf knopf-primaer" onClick={() => setNeuDialog(true)}>
-              <Plus {...ICON} />
-              Neues WEP
-            </button>
+            {neuErlaubt && (
+              <button type="button" className="knopf knopf-primaer" onClick={() => setNeuDialog(true)}>
+                <Plus {...ICON} />
+                Neues WEP
+              </button>
+            )}
           </div>
         </header>
+        {!neuErlaubt && <p className="neben block">Neue WEPs legt der Bau-Wertermittler an; abgegebene WEPs erscheinen hier nach dem Abgleich.</p>}
 
         <div className="nur-handy block">
           {status}
-          <button type="button" className="knopf knopf-primaer knopf-breit" onClick={() => setNeuDialog(true)}>
-            <Plus {...ICON} />
-            Neues WEP
-          </button>
+          {neuErlaubt && (
+            <button type="button" className="knopf knopf-primaer knopf-breit" onClick={() => setNeuDialog(true)}>
+              <Plus {...ICON} />
+              Neues WEP
+            </button>
+          )}
           {!ohneExcel && (
             <button type="button" className="knopf knopf-breit" onClick={() => bauEingabe.current?.click()}>
               <FileSpreadsheet {...ICON} />
@@ -210,13 +222,16 @@ export function Startseite({ konto, verfuegbar, onProfil, onOeffnen, onPapierkor
                 </button>
               )}
             </div>
-            <div className="segmente status-filter" role="group" aria-label="Nach Status filtern">
-              {(['alle', ...WEP_STATUS] as const).map((f) => (
-                <button key={f} type="button" className="segment" aria-pressed={f === filter} onClick={() => setFilter(f)}>
-                  {f === 'alle' ? 'Alle' : f.charAt(0).toUpperCase() + f.slice(1)}
-                </button>
-              ))}
-            </div>
+            {/* Im Server-Modus zeigt der Zustand im Ablauf, wo ein WEP steht; der Status von v1 entfällt */}
+            {!serverModus && (
+              <div className="segmente status-filter" role="group" aria-label="Nach Status filtern">
+                {(['alle', ...WEP_STATUS] as const).map((f) => (
+                  <button key={f} type="button" className="segment" aria-pressed={f === filter} onClick={() => setFilter(f)}>
+                    {f === 'alle' ? 'Alle' : f.charAt(0).toUpperCase() + f.slice(1)}
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="listen-kopf">
               <p className="neben" role="status" data-testid="listen-anzahl">
                 {gefiltert ? `${sichtbar.length} von ${weps.length} Protokollen` : weps.length === 1 ? '1 Protokoll' : `${weps.length} Protokolle`}
@@ -259,7 +274,7 @@ export function Startseite({ konto, verfuegbar, onProfil, onOeffnen, onPapierkor
                     </span>
                     {konflikte.has(wep.id) && <span className="status status-konflikt">Konflikt</span>}
                     <TeilMarke rolle={wepRolle(wep, profilRolle)} />
-                    <StatusMarke status={wepStatus(wep)} />
+                    {serverModus ? <ZustandMarke zustand={wep.ablauf?.zustand ?? 'bau_in_arbeit'} /> : <StatusMarke status={wepStatus(wep)} />}
                     <ChevronRight {...ICON} className="chevron" />
                   </button>
                 </li>

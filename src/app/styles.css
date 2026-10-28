@@ -2970,3 +2970,29 @@ input[type='range'] {
 .status.status-server {
   white-space: normal;
 }
+
+/* Server-Modus (v2): Zustand im Ablauf und Verlauf */
+.status.zustand {
+  display: inline-flex;
+}
+
+.zustand-beim_bv,
+.zustand-geprueft {
+  border-color: var(--farbe-akzent);
+  color: var(--farbe-akzent);
+}
+
+.zustand-rueckfrage {
+  border-color: var(--farbe-warnung);
+  color: var(--farbe-warnung);
+}
+
+.verlauf {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--abstand-2);
+  font-size: var(--schrift-klein);
+}

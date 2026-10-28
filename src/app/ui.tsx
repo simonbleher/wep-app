@@ -156,17 +156,19 @@ export function Dialog({
   )
 }
 
-/** Rückfrage vor dem Löschen: „Abbrechen“ (vorfokussiert) und der rote Knopf. */
+/** Rückfrage vor dem Löschen: „Abbrechen“ (vorfokussiert) und der rote Knopf (`gefahr={false}`: grüner Knopf, z. B. Abgabe). */
 export function Rueckfrage({
   titel,
   text,
   bestaetigen = 'Löschen',
+  gefahr = true,
   onAbbrechen,
   onBestaetigen,
 }: {
   titel: string
   text: string
   bestaetigen?: string
+  gefahr?: boolean
   onAbbrechen: () => void
   onBestaetigen: () => void
 }) {
@@ -177,7 +179,7 @@ export function Rueckfrage({
         <button type="button" className="knopf" autoFocus onClick={onAbbrechen}>
           Abbrechen
         </button>
-        <button type="button" className="knopf knopf-gefahr" onClick={onBestaetigen}>
+        <button type="button" className={gefahr ? 'knopf knopf-gefahr' : 'knopf knopf-primaer'} onClick={onBestaetigen}>
           {bestaetigen}
         </button>
       </div>

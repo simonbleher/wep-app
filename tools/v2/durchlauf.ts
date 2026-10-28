@@ -20,6 +20,8 @@ import * as wepEinzeln from '../../functions/api/v2/weps/[id]'
 import * as wepWieder from '../../functions/api/v2/weps/[id]/wiederherstellen'
 import * as wepVerlauf from '../../functions/api/v2/weps/[id]/verlauf'
 import * as wepDateien from '../../functions/api/v2/weps/[id]/dateien'
+import * as wepAktion from '../../functions/api/v2/weps/[id]/aktion'
+import * as gruenKontenListe from '../../functions/api/v2/konten/gruen'
 import * as wepDatei from '../../functions/api/v2/weps/[id]/dateien/[datei]'
 import { fakeR2 } from '../../functions/_lib/__tests__/fakeR2'
 // @ts-expect-error – JavaScript-Hilfe ohne Typen (gemaltes Testbild, kein echtes Foto)
@@ -51,6 +53,7 @@ const PERSONEN = {
   ada: { anbieter: 'google', claims: { iss: 'https://accounts.google.com', aud: GOOGLE_ID, sub: 'ada-1', email: 'ada@example.org', email_verified: true, name: 'Ada Admin' } },
   max: { anbieter: 'microsoft', claims: { iss: `https://login.microsoftonline.com/${TID}/v2.0`, aud: MS_ID, tid: TID, oid: 'max-1', preferred_username: 'max@bv.example', name: 'Max Mustermann' } },
   bert: { anbieter: 'google', claims: { iss: 'https://accounts.google.com', aud: GOOGLE_ID, sub: 'bert-1', email: 'bert@example.org', email_verified: true, name: 'Bert Bauer' } },
+  erika: { anbieter: 'google', claims: { iss: 'https://accounts.google.com', aud: GOOGLE_ID, sub: 'erika-1', email: 'erika@example.org', email_verified: true, name: 'Erika Musterfrau' } },
 } as const
 let wer: keyof typeof PERSONEN = 'ada'
 const codes = new Map<string, string>() // code → nonce
@@ -81,6 +84,8 @@ const ROUTEN: [RegExp, Modul, string?, string?][] = [
   [/^\/api\/v2\/weps\/([^/]+)\/wiederherstellen$/, wepWieder, 'id'],
   [/^\/api\/v2\/weps\/([^/]+)\/verlauf$/, wepVerlauf, 'id'],
   [/^\/api\/v2\/weps\/([^/]+)\/dateien$/, wepDateien, 'id'],
+  [/^\/api\/v2\/weps\/([^/]+)\/aktion$/, wepAktion, 'id'],
+  [/^\/api\/v2\/konten\/gruen$/, gruenKontenListe],
   [/^\/api\/v2\/weps\/([^/]+)\/dateien\/([^/]+)$/, wepDatei, 'id', 'datei'],
 ]
 let serverWeg = false
@@ -320,6 +325,59 @@ try {
   await seiteB.locator('.foto-kachel img').first().waitFor({ timeout: 15000 })
   pruefe(true, 'zweites Gerät lädt das Foto vom Server')
   await seiteB.screenshot({ path: `${AUSGABE}/05-foto-vom-server.png` })
+
+  // 11. Ablauf: Bert gibt an Erika (Grün) ab, Erika bearbeitet nur den Grün-Teil und gibt an den BV ab
+  const zustandVon = (nr: string) => (db.roh.prepare('SELECT zustand FROM weps WHERE vorgangs_nr = ?').get(nr) as { zustand: string }).zustand
+  const erikaKontext = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' })
+  await erikaKontext.route('**/api/v2/**', beantworte)
+  await erikaKontext.route(/^https:\/\/(accounts\.google\.com\/o\/oauth2|login\.microsoftonline\.com\/common\/oauth2\/v2\.0\/authorize)/, anbieterSeite)
+  const seiteE = await erikaKontext.newPage()
+  seiteE.on('pageerror', (e) => skriptFehler.push(String(e)))
+  await seiteE.goto(URL)
+  await anmelden(seiteE, 'erika')
+  await seiteE.getByRole('heading', { name: 'Wartet auf Freigabe' }).waitFor()
+  const erikaId = (db.roh.prepare("SELECT id FROM konten WHERE email = 'erika@example.org'").get() as { id: string }).id
+  await fuehreAdminAktionAus(db, ada, (await ladeKonto(db, erikaId))!, { aktion: 'freigeben' })
+  await fuehreAdminAktionAus(db, ada, (await ladeKonto(db, erikaId))!, { aktion: 'rollen', rollen: ['gruen'] })
+  await seiteE.getByRole('button', { name: 'Erneut prüfen' }).click()
+  await seiteE.getByRole('heading', { name: 'Protokolle' }).waitFor()
+  pruefe((await seiteE.getByRole('button', { name: 'Neues WEP', exact: true }).count()) === 0, 'Grün: kein „Neues WEP“ (legt der Bau-Wertermittler an)')
+  pruefe((await seiteE.getByText(/2026-0815/).count()) === 0, 'Grün sieht Berts Entwurf nicht')
+
+  await seite.getByRole('button', { name: /2026-0815/ }).first().click()
+  await seite.getByRole('button', { name: 'Abgabe' }).filter({ visible: true }).first().click()
+  await seite.getByRole('heading', { name: 'Abgabe' }).waitFor()
+  await seite.getByLabel('Grün-Wertermittler').selectOption({ label: 'Erika Musterfrau' })
+  await seite.screenshot({ path: `${AUSGABE}/06-abgabe-an-gruen.png`, fullPage: true })
+  await seite.getByRole('button', { name: 'An Grün abgeben' }).click()
+  await seite.getByRole('alertdialog').getByRole('button', { name: 'Abgeben' }).click()
+  await seite.getByText('An Erika Musterfrau abgegeben.').waitFor()
+  pruefe(zustandVon('2026-0815') === 'gruen_in_arbeit', 'Server: nach der Abgabe „gruen_in_arbeit“')
+  pruefe(await seite.getByText(/Das WEP ist abgegeben\. Du kannst es nur noch lesen/).isVisible(), 'Bau: nach der Abgabe nur noch lesen')
+  const navBau = seite.getByRole('navigation', { name: 'Abschnitte' })
+  pruefe((await navBau.getByRole('button').allTextContents()).join('|') === 'Übersicht', 'Bau: nach der Abgabe nur die Übersicht')
+
+  await seiteE.getByRole('button', { name: 'Abgleichen' }).filter({ visible: true }).first().click()
+  await seiteE.getByText(/2026-0815/).filter({ visible: true }).first().waitFor()
+  pruefe(await seiteE.locator('.zeile', { hasText: '2026-0815' }).getByText('Grün in Arbeit').isVisible(), 'Grün: WEP ist da, Zustand „Grün in Arbeit“')
+  await seiteE.getByRole('button', { name: /2026-0815/ }).first().click()
+  const navGruen = await seiteE.getByRole('navigation', { name: 'Abschnitte' }).getByRole('button').allTextContents()
+  pruefe(!navGruen.some((t) => /Formalien|Bauten|Mängel/.test(t)) && navGruen.some((t) => /Aufwuchs/.test(t)) && navGruen.some((t) => /Übersicht/.test(t)), `Grün: nur Grün-Teil und Übersicht (${navGruen.join(', ')})`)
+  await seiteE.getByRole('button', { name: 'Abgabe' }).filter({ visible: true }).first().click()
+  await seiteE.getByRole('button', { name: 'An den BV abgeben' }).click()
+  await seiteE.getByRole('alertdialog').getByRole('button', { name: 'Abgeben' }).click()
+  await seiteE.getByText('An den BV abgegeben.').waitFor()
+  pruefe(zustandVon('2026-0815') === 'beim_bv', 'Server: nach Grüns Abgabe „beim_bv“')
+  await seiteE.screenshot({ path: `${AUSGABE}/07-an-bv-abgegeben.png`, fullPage: true })
+  const verlaufAblauf = (db.roh.prepare("SELECT v.aktion, v.zustand_nachher AS nachher FROM verlauf v JOIN weps w ON w.id = v.wep_id WHERE w.vorgangs_nr = '2026-0815' ORDER BY v.id").all() as { aktion: string; nachher: string | null }[])
+    .filter((v) => v.nachher)
+    .map((v) => `${v.aktion}→${v.nachher}`)
+  pruefe(verlaufAblauf.join(' ') === 'angelegt→bau_in_arbeit an_gruen→gruen_in_arbeit an_bv→beim_bv', `Verlauf mit Zuständen: ${verlaufAblauf.join(' ')}`)
+  await seite.getByRole('button', { name: 'Protokolle' }).first().click()
+  await seite.getByRole('button', { name: 'Abgleichen' }).filter({ visible: true }).first().click()
+  await seite.locator('.zeile', { hasText: '2026-0815' }).getByText('beim BV').waitFor()
+  pruefe(true, 'Bau: Liste zeigt „beim BV“')
+  await erikaKontext.close()
   const verlauf = (db.roh.prepare('SELECT aktion FROM verlauf ORDER BY id').all() as { aktion: string }[]).map((v) => v.aktion)
   pruefe(verlauf.filter((a) => a === 'angelegt').length === 2, 'Verlauf: „angelegt“ je WEP')
   await geraetB.close()
