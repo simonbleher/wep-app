@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Anleitung WEP-App (v2)</title>
+<style>
+  :root {
+    --gruen: #2e6640;
+    --gruen-dunkel: #234f31;
+    --gruen-hell: #e7efe9;
+    --text: #1d1f1e;
+    --text-2: #5a605c;
+    --linie: #d9ddd9;
+    --hinweis: #fff6e0;
+    --hinweis-rand: #e0b84a;
+    --flaeche: #ffffff;
+    --grund: #f6f7f5;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--grund);
+    color: var(--text);
+    font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  main { max-width: 860px; margin: 0 auto; padding: 0 16px 48px; }
+  .zurueck {
+    display: block;
+    background: var(--gruen-dunkel);
+    color: #fff;
+    padding: 10px 16px;
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .titel {
+    background: var(--gruen);
+    color: #fff;
+    padding: 48px 24px 40px;
+    text-align: center;
+  }
+  .titel h1 { margin: 0 0 6px; font-size: 34px; letter-spacing: -0.5px; }
+  .titel p { margin: 0; font-size: 17px; opacity: 0.92; }
+  .titel .stand { margin-top: 14px; font-size: 13px; opacity: 0.8; }
+  nav.inhalt {
+    background: var(--flaeche);
+    border: 1px solid var(--linie);
+    border-radius: 14px;
+    padding: 18px 22px;
+    margin: 24px 0;
+  }
+  nav.inhalt h2 { margin: 0 0 8px; font-size: 18px; }
+  nav.inhalt ol { margin: 0; padding-left: 22px; columns: 2; column-gap: 32px; }
+  nav.inhalt li { margin: 3px 0; break-inside: avoid; }
+  nav.inhalt a { color: var(--gruen); text-decoration: none; }
+  section.kapitel {
+    background: var(--flaeche);
+    border: 1px solid var(--linie);
+    border-radius: 14px;
+    padding: 22px 24px;
+    margin: 20px 0;
+  }
+  section.kapitel > h2 {
+    margin: 0 0 4px;
+    font-size: 23px;
+    color: var(--gruen-dunkel);
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+  }
+  .nr {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 30px;
+    height: 30px;
+    border-radius: 15px;
+    background: var(--gruen);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+  }
+  .unter { color: var(--text-2); margin: 0 0 14px; }
+  h3 { font-size: 17px; margin: 18px 0 6px; }
+  .schritt { display: grid; grid-template-columns: 1fr 210px; gap: 22px; align-items: start; margin: 14px 0; }
+  .schritt.ohne-bild { grid-template-columns: 1fr; }
+  .schritt.quer { grid-template-columns: 1fr; }
+  .schritt.quer img { border-radius: 8px; }
+  .schritt figure { margin: 0; }
+  .schritt img {
+    width: 100%;
+    border: 1px solid var(--linie);
+    border-radius: 18px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+    background: #fff;
+  }
+  figcaption { font-size: 12.5px; color: var(--text-2); text-align: center; margin-top: 6px; }
+  ol.schritte, ul.punkte { margin: 6px 0; padding-left: 22px; }
+  ol.schritte li, ul.punkte li { margin: 5px 0; }
+  .knopf {
+    display: inline-block;
+    padding: 0 7px;
+    border: 1px solid var(--gruen);
+    border-radius: 6px;
+    color: var(--gruen-dunkel);
+    font-weight: 600;
+    font-size: 0.92em;
+    white-space: nowrap;
+  }
+  .tipp, .achtung {
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin: 12px 0;
+    font-size: 15px;
+  }
+  .tipp { background: var(--gruen-hell); border-left: 4px solid var(--gruen); }
+  .achtung { background: var(--hinweis); border-left: 4px solid var(--hinweis-rand); }
+  .tipp b:first-child, .achtung b:first-child { margin-right: 4px; }
+  .ablauf { display: flex; gap: 8px; flex-wrap: wrap; align-items: stretch; margin: 12px 0 4px; }
+  .ablauf div {
+    flex: 1 1 150px;
+    background: var(--gruen-hell);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 14.5px;
+  }
+  .ablauf div b { display: block; color: var(--gruen-dunkel); }
+  dl.fragen dt { font-weight: 700; margin-top: 12px; }
+  dl.fragen dd { margin: 3px 0 0; color: var(--text); }
+  footer { text-align: center; color: var(--text-2); font-size: 13px; margin-top: 28px; }
+  @media (max-width: 640px) {
+    .titel h1 { font-size: 28px; }
+    nav.inhalt ol { columns: 1; }
+    .schritt { grid-template-columns: 1fr; }
+    .schritt figure { max-width: 260px; margin: 0 auto; }
+    .schritt.quer figure { max-width: none; }
+    section.kapitel { padding: 18px 16px; }
+  }
+  @media print {
+    @page { size: A4; margin: 14mm 14mm 16mm; }
+    body { background: #fff; font-size: 10.5pt; }
+    main { max-width: none; padding: 0; }
+    .titel { padding: 26mm 10mm 18mm; border-radius: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .titel h1 { font-size: 30pt; }
+    nav.inhalt { break-after: page; }
+    section.kapitel { border: none; padding: 0; margin: 0 0 8mm; break-inside: auto; }
+    section.kapitel > h2 { break-after: avoid; }
+    .schritt { grid-template-columns: 1fr 48mm; break-inside: avoid; }
+    .schritt.quer { grid-template-columns: 1fr; }
+    .schritt img { box-shadow: none; }
+    .tipp, .achtung, .ablauf div, .nr, .knopf { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    a { color: inherit; text-decoration: none; }
+    .nur-bildschirm { display: none; }
+  }
+</style>
+</head>
+<body>
+<a class="zurueck nur-bildschirm" href="../">‹ Zurück zur App</a>
+<header class="titel">
+  <h1>WEP-App mit Konten</h1>
+  <p>Anleitung für Wertermittler und den Bezirksverband Pankow – Ablauf Bau → Grün → BV</p>
+  <p class="stand">Stand Oktober 2026 · Vorschau (v2) · Alle Namen und Daten in den Bildern sind erfunden.</p>
+</header>
+<main>
+
+<div class="achtung"><b>Vorschau:</b> Diese Fassung der App läuft zunächst nur unter <i>main.wep-pankow.pages.dev</i> zum Ausprobieren. Bitte dort <b>nur erfundene Testdaten</b> eingeben – keine echten Namen, Anschriften oder Protokolle.</div>
+
+<nav class="inhalt" aria-label="Inhalt">
+  <h2>Inhalt</h2>
+  <ol>
+    <li><a href="#ueberblick">Überblick: wer macht was</a></li>
+    <li><a href="#anmelden">Anmelden und Freigabe</a></li>
+    <li><a href="#admin">Für Admins: Konten und Rollen</a></li>
+    <li><a href="#bau">Bau: anlegen und an Grün abgeben</a></li>
+    <li><a href="#gruen">Grün: Grün-Teil und Abgabe an den BV</a></li>
+    <li><a href="#bv">BV: prüfen, Rückfrage, geprüft</a></li>
+    <li><a href="#rueckfrage">Eine Rückfrage beantworten</a></li>
+    <li><a href="#neu">Benachrichtigungen</a></li>
+    <li><a href="#offline">Ohne Netz und auf mehreren Geräten</a></li>
+    <li><a href="#fragen">Häufige Fragen</a></li>
+  </ol>
+</nav>
+
+<section class="kapitel" id="ueberblick">
+  <h2><span class="nr">1</span> Überblick: wer macht was</h2>
+  <p class="unter">Jedes WEP geht seinen festen Weg. An jedem WEP sind immer zwei Personen beteiligt: ein Bau- und ein Grün-Wertermittler.</p>
+  <div class="ablauf">
+    <div><b>1. Bau in Arbeit</b>Der Bau-Wertermittler legt das WEP an und erfasst Formalien, Baulichkeiten, Mängel, Abwasser und Skizze Bau.</div>
+    <div><b>2. An Grün</b>Er wählt den Grün-Wertermittler aus einer Liste und gibt ab. Danach kann er nur noch lesen.</div>
+    <div><b>3. Grün in Arbeit</b>Der Grün-Wertermittler erfasst Außenanlagen, Aufwuchs, Beseitigung, Skizze und Fotos – nur den Grün-Teil.</div>
+    <div><b>4. Beim BV</b>Grün gibt an den BV ab. Jetzt ist das WEP für beide gesperrt.</div>
+    <div><b>5. Geprüft</b>Der BV prüft, druckt und markiert es als geprüft – oder stellt eine Rückfrage.</div>
+  </div>
+  <p>Gesperrt wird nur über diesen Ablauf. Preise und Hinweise funktionieren wie gewohnt: Die App schlägt Werte nach der Richtlinie vor, Sie können jeden Wert überschreiben, Regelverstöße erscheinen als Hinweis.</p>
+  <div class="tipp"><b>Rollen:</b> Ein Wertermittler-Konto ist entweder <b>Bau</b> oder <b>Grün</b>. Dazu gibt es die Rollen <b>BV</b> (Geschäftsstelle) und <b>Admin</b> (vergibt die Rollen). Die Rolle sehen Sie im Profil.</div>
+</section>
+
+<section class="kapitel" id="anmelden">
+  <h2><span class="nr">2</span> Anmelden und Freigabe</h2>
+  <p class="unter">Einmal anmelden – danach startet die App direkt, auch ohne Netz.</p>
+  <div class="schritt">
+    <div>
+      <h3>Mit Google oder Microsoft anmelden</h3>
+      <ol class="schritte">
+        <li>App öffnen und <span class="knopf">Mit Google anmelden</span> oder <span class="knopf">Mit Microsoft anmelden</span> wählen. Ein privates oder ein dienstliches Konto geht beides.</li>
+        <li>Beim ersten Mal entsteht Ihr Konto. Es <b>wartet auf Freigabe</b> durch einen Admin.</li>
+        <li>Sobald Sie freigegeben sind und eine Rolle haben, tippen Sie auf <span class="knopf">Erneut prüfen</span>.</li>
+      </ol>
+      <div class="tipp"><b>Ohne Netz:</b> Für die erste Anmeldung auf einem Gerät braucht es Netz. Danach startet die App auch ohne Netz mit Ihrem Konto.</div>
+    </div>
+    <figure><img src="bilder/01-anmelden.jpg" alt="Anmeldebildschirm mit „Mit Google anmelden“ und „Mit Microsoft anmelden“"><figcaption>Anmelden</figcaption></figure>
+  </div>
+  <div class="schritt">
+    <div>
+      <h3>Wartet auf Freigabe</h3>
+      <p>Diese Seite sehen Sie, bis ein Admin Ihr Konto freigegeben hat. Melden Sie sich beim Admin, wenn es länger dauert.</p>
+    </div>
+    <figure><img src="bilder/02-wartet.jpg" alt="Hinweis „Wartet auf Freigabe“"><figcaption>Wartet auf Freigabe</figcaption></figure>
+  </div>
+</section>
+
+<section class="kapitel" id="admin">
+  <h2><span class="nr">3</span> Für Admins: Konten und Rollen</h2>
+  <div class="schritt">
+    <div>
+      <p>Unter <i>Profil → Konten verwalten</i> stehen alle Konten, wartende zuerst.</p>
+      <ul class="punkte">
+        <li><span class="knopf">Freigeben</span>, <span class="knopf">Sperren</span> (beendet sofort alle Sitzungen), <span class="knopf">Löschen</span>.</li>
+        <li><b>Wertermittler:</b> keiner, Bau oder Grün – nie beides.</li>
+        <li><b>BV</b> und <b>Admin</b> kommen bei Bedarf dazu.</li>
+        <li>Ihr eigenes Konto können Sie nicht sperren oder löschen und sich nicht die Admin-Rolle nehmen.</li>
+      </ul>
+      <p>Jede Änderung steht im Zugriffsprotokoll des Servers.</p>
+    </div>
+    <figure><img src="bilder/03-konten.jpg" alt="Konten verwalten mit Freigeben, Rollen und Sperren"><figcaption>Konten verwalten</figcaption></figure>
+  </div>
+</section>
+
+<section class="kapitel" id="bau">
+  <h2><span class="nr">4</span> Bau: anlegen und an Grün abgeben</h2>
+  <div class="schritt">
+    <div>
+      <h3>WEP anlegen und erfassen</h3>
+      <ol class="schritte">
+        <li><span class="knopf">Neues WEP</span> und die Vorgangs-Nr. vom BV eingeben (nur Bau-Wertermittler legen WEPs an).</li>
+        <li>Formalien, Baulichkeiten, Mängel, Abwasser und Skizze Bau erfassen – wie gewohnt.</li>
+        <li>Die Liste zeigt bei jedem WEP den <b>Zustand</b>, z. B. „Bau in Arbeit“. Die Zeile oben zeigt, ob alles beim Server ist.</li>
+      </ol>
+    </div>
+    <figure><img src="bilder/04-liste-bau.jpg" alt="Liste der Protokolle mit Zustand und Abgleich"><figcaption>Liste mit Zustand</figcaption></figure>
+  </div>
+  <div class="schritt">
+    <div>
+      <h3>An Grün abgeben</h3>
+      <ol class="schritte">
+        <li>Im WEP den Reiter <span class="knopf">Abgabe</span> öffnen.</li>
+        <li>Den <b>Grün-Wertermittler</b> aus der Liste wählen.</li>
+        <li><span class="knopf">An Grün abgeben</span> und bestätigen.</li>
+      </ol>
+      <p>Die App gleicht vorher ab: Abgegeben wird nur, was beim Server angekommen ist. Ohne Netz geht die Abgabe nicht – Ihre Änderungen bleiben auf dem Gerät, bis wieder Netz da ist.</p>
+      <p>Ihre <b>Unterschrift</b> aus dem Profil kommt dabei für den Bau-Teil ins WEP. Danach können Sie das WEP nur noch lesen (Reiter „Übersicht“).</p>
+    </div>
+    <figure><img src="bilder/05-abgabe-an-gruen.jpg" alt="Reiter Abgabe mit Auswahl des Grün-Wertermittlers"><figcaption>Abgabe an Grün</figcaption></figure>
+  </div>
+</section>
+
+<section class="kapitel" id="gruen">
+  <h2><span class="nr">5</span> Grün: Grün-Teil und Abgabe an den BV</h2>
+  <div class="schritt">
+    <div>
+      <h3>Das WEP kommt bei Ihnen an</h3>
+      <p>Auf der Startseite erscheint es unter <b>Neu für dich</b>. Antippen öffnet das WEP; die App holt es dafür vom Server.</p>
+    </div>
+    <figure><img src="bilder/06-neu-fuer-dich.jpg" alt="Neu für dich: WEP an dich abgegeben"><figcaption>Neu für dich</figcaption></figure>
+  </div>
+  <div class="schritt">
+    <div>
+      <h3>Nur den Grün-Teil bearbeiten</h3>
+      <p>Sie sehen die Reiter Außenanlagen, Aufwuchs, Beseitigung Grün, Fotos und Skizze Grün. Den Bau-Teil sehen Sie im Reiter <b>Übersicht</b> – nur lesend.</p>
+      <p>Die Formalien legt der Bau-Wertermittler fest. Steht dort etwas Falsches, sagen Sie ihm Bescheid.</p>
+    </div>
+    <figure><img src="bilder/07-gruen-teil.jpg" alt="Reiter Aufwuchs mit Positionen"><figcaption>Grün-Teil</figcaption></figure>
+  </div>
+  <div class="schritt">
+    <div>
+      <h3>An den BV abgeben</h3>
+      <p>Im Reiter <span class="knopf">Abgabe</span> auf <span class="knopf">An den BV abgeben</span> und bestätigen. Ihre Unterschrift kommt für den Grün-Teil ins WEP. Danach ist das WEP für Bau und Grün gesperrt.</p>
+      <p>Unten steht der <b>Verlauf</b>: wer wann was getan hat.</p>
+    </div>
+    <figure><img src="bilder/08-an-den-bv.jpg" alt="Reiter Abgabe mit „An den BV abgeben“ und Verlauf"><figcaption>Abgabe an den BV</figcaption></figure>
+  </div>
+</section>
+
+<section class="kapitel" id="bv">
+  <h2><span class="nr">6</span> BV: prüfen, Rückfrage, geprüft</h2>
+  <p class="unter">Die Kontrollseite liegt unter <i>/bv</i> (z. B. <i>main.wep-pankow.pages.dev/bv</i>) und ist für Konten mit der Rolle BV.</p>
+  <div class="schritt quer">
+    <figure><img src="bilder/09-bv-liste.jpg" alt="Kontrollseite: Tabelle der abgegebenen WEPs"><figcaption>Abgegebene WEPs</figcaption></figure>
+  </div>
+  <ul class="punkte">
+    <li>Die Tabelle zeigt alle abgegebenen WEPs mit Vorgangs-Nr., Anlage, Parzelle, Unterpächter, Wertermittlern, Datum, Gesamtbetrag und Zustand. Entwürfe der Wertermittler sehen Sie nicht.</li>
+    <li>Filtern nach <i>Zu prüfen</i>, <i>Rückfrage</i>, <i>Geprüft</i>; <span class="knopf">Neu laden</span> holt den neuesten Stand.</li>
+  </ul>
+  <div class="schritt quer">
+    <figure><img src="bilder/10-bv-detail.jpg" alt="Detail mit Rückfrage an Grün, PDF und Drucken"><figcaption>Prüfen und Rückfrage</figcaption></figure>
+  </div>
+  <ul class="punkte">
+    <li><span class="knopf">PDF übersichtlich</span>, <span class="knopf">PDF wie Vorlage</span> und <span class="knopf">Drucken</span> – mit den Unterschriften der Wertermittler.</li>
+    <li><b>Rückfrage:</b> an Bau, Grün oder beide wählen, in der Notiz schreiben, was geklärt werden soll, und <span class="knopf">Rückfrage senden</span>. Bei „beide“ bearbeitet zuerst Bau, dann Grün.</li>
+    <li><span class="knopf">Geprüft</span> sperrt das WEP dauerhaft. Wieder öffnen geht nur mit Begründung; sie steht im Verlauf.</li>
+  </ul>
+</section>
+
+<section class="kapitel" id="rueckfrage">
+  <h2><span class="nr">7</span> Eine Rückfrage beantworten</h2>
+  <div class="schritt">
+    <div>
+      <ol class="schritte">
+        <li>Die Rückfrage erscheint unter <b>Neu für dich</b> und im WEP (Zustand „Rückfrage“) mit der Notiz des BV.</li>
+        <li>Nur wer gefragt ist, kann wieder bearbeiten – jeder seinen Teil.</li>
+        <li>Danach wieder abgeben: Bau gibt an Grün weiter, wenn beide gefragt sind; sonst geht es direkt an den BV.</li>
+      </ol>
+    </div>
+    <figure><img src="bilder/11-rueckfrage.jpg" alt="Abgabe mit Rückfrage des BV"><figcaption>Rückfrage</figcaption></figure>
+  </div>
+</section>
+
+<section class="kapitel" id="neu">
+  <h2><span class="nr">8</span> Benachrichtigungen</h2>
+  <div class="schritt">
+    <div>
+      <ul class="punkte">
+        <li><b>In der App:</b> „Neu für dich“ auf der Startseite – abgegebene WEPs, Rückfragen, geprüfte WEPs.</li>
+        <li><b>Per E-Mail:</b> eine kurze Nachricht mit Vorgangs-Nr., Anlage, Parzelle und einem Link in die App. Namen von Pächtern und Beträge stehen nie in der Mail.</li>
+        <li>Die E-Mails schalten Sie unter <i>Profil → Konto → Benachrichtigungen per E-Mail</i> ab. In der App sehen Sie die Benachrichtigungen trotzdem.</li>
+      </ul>
+    </div>
+    <figure><img src="bilder/12-profil-konto.jpg" alt="Profil mit Konto, Rollen und Schalter für E-Mails"><figcaption>Profil: Konto</figcaption></figure>
+  </div>
+</section>
+
+<section class="kapitel" id="offline">
+  <h2><span class="nr">9</span> Ohne Netz und auf mehreren Geräten</h2>
+  <ul class="punkte">
+    <li>Sie arbeiten immer auf dem Gerät. Jede Änderung ist sofort gespeichert – auch ohne Netz.</li>
+    <li>Mit Netz gleicht die App mit dem Server ab: beim Öffnen, wenn das Netz zurückkommt, und jede Minute. Die Zeile oben zeigt, wie viele Änderungen noch warten.</li>
+    <li>Fotos gehen auf den Server, sobald das WEP dort ist („nur WLAN“ im Profil gilt auch hier).</li>
+    <li>Auf zwei Geräten gleichzeitig geändert? Die neuere Fassung gilt, die andere bleibt sichtbar, bis Sie entschieden haben – wie bisher.</li>
+    <li>Melden Sie sich auf einem Gerät mit einem anderen Konto an, setzt die App Name und Unterschrift im Profil zurück.</li>
+  </ul>
+</section>
+
+<section class="kapitel" id="fragen">
+  <h2><span class="nr">10</span> Häufige Fragen</h2>
+  <dl class="fragen">
+    <dt>Ich sehe kein „Neues WEP“.</dt>
+    <dd>Neue WEPs legt der Bau-Wertermittler an. Haben Sie die Rolle Grün, kommen die WEPs nach der Abgabe zu Ihnen.</dd>
+    <dt>Ich habe nach der Abgabe noch etwas vergessen.</dt>
+    <dd>Bitten Sie den BV um eine Rückfrage an Ihren Teil. Dann können Sie wieder bearbeiten.</dd>
+    <dt>Die Abgabe klappt nicht: „noch nicht beim Server“.</dt>
+    <dd>Warten Sie, bis Netz da ist, und tippen Sie auf „Abgleichen“. Abgegeben wird erst, wenn Ihr Stand beim Server ist.</dd>
+    <dt>Wo sind meine Daten?</dt>
+    <dd>Auf Ihrem Gerät und auf dem Server des Projekts (Cloudflare, Speicherort EU). In der Vorschau bitte nur Testdaten.</dd>
+  </dl>
+</section>
+
+<footer>WEP-App mit Konten (Vorschau v2) · Wertermittlungsprotokoll für den Bezirksverband Pankow</footer>
+</main>
+</body>
+</html>

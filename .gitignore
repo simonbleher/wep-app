@@ -16,6 +16,8 @@ dev-dist/
 /tools/ki-test/ausgaben/
 dist-e2e/
 dist-e2e-v2/
+dist-e2e-v2-anleitung/
+dist-e2e-v2-anleitung-beispiel.json
 
 # Prüfberichte von tools/pruef-weps (enthalten Personendaten aus echten WEPs)
 pruefbericht.*
@@ -23,6 +25,7 @@ __pycache__/
 .pytest_cache/
 # Bildschirmfotos der Anleitung (Quelle, 2× Handy); npm run anleitung erzeugt sie neu, eingecheckt sind die JPGs in public/anleitung/
 /docs/anleitung/bilder/
+/docs/anleitung-v2/bilder/
 # Build-Zwischenstände von tsc -b
 /dist-tsnode/
 *.tsbuildinfo

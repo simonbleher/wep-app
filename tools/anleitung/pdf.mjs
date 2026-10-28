@@ -2,14 +2,14 @@
 // - public/anleitung/index.html + bilder/*.jpg (in der App unter Profil → Anleitung, auch offline),
 // - docs/anleitung/Anleitung_WEP-App.pdf (A4, zum Verteilen und Drucken).
 // Aufruf: node tools/anleitung/pdf.mjs (nach tools/anleitung/screenshots.mjs; npm run anleitung macht beides).
+// Anleitung v2: node tools/anleitung/pdf.mjs docs/anleitung-v2 public/anleitung-v2 Anleitung_WEP-App_v2.pdf (npm run anleitung:v2).
 import { execFileSync } from 'node:child_process'
 import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { chromium } from 'playwright'
 
-const QUELLE = 'docs/anleitung'
-const APP = 'public/anleitung'
+const [QUELLE = 'docs/anleitung', APP = 'public/anleitung', PDF = 'Anleitung_WEP-App.pdf'] = process.argv.slice(2)
 
 function chromiumPfad() {
   const basis = process.env.PLAYWRIGHT_BROWSERS_PATH ?? '/opt/pw-browsers'
@@ -35,7 +35,7 @@ try {
   const seite = await browser.newPage()
   await seite.goto(pathToFileURL(resolve(APP, 'index.html')).href, { waitUntil: 'networkidle' })
   await seite.pdf({
-    path: join(QUELLE, 'Anleitung_WEP-App.pdf'),
+    path: join(QUELLE, PDF),
     format: 'A4',
     printBackground: true,
     displayHeaderFooter: true,
@@ -44,7 +44,7 @@ try {
       '<div style="width:100%;font:8pt system-ui,sans-serif;color:#777;padding:0 14mm;display:flex;justify-content:space-between"><span>Anleitung WEP-App</span><span>Seite <span class="pageNumber"></span> von <span class="totalPages"></span></span></div>',
     margin: { top: '14mm', bottom: '16mm', left: '0', right: '0' },
   })
-  console.log(`${QUELLE}/Anleitung_WEP-App.pdf, ${APP}/`)
+  console.log(`${QUELLE}/${PDF}, ${APP}/`)
 } finally {
   await browser.close()
 }

@@ -118,8 +118,10 @@ export default defineConfig({
       workbox: {
         // Offline-Precaching aller gebauten Assets
         globPatterns: ['**/*.{js,css,html,svg,png,jpg,ico,webmanifest,xlsx}'],
+        // Die Anleitung v2 (Server-Modus) nur in Builds mit Schalter offline vorhalten; v1-Geräte laden sie nicht
+        globIgnores: process.env.VITE_SERVER_MODUS === 'true' ? [] : ['anleitung-v2/**'],
         // Die Anleitung (public/anleitung/) ist eine eigene Seite, nicht die App; /api/ sind Functions (z. B. v2-Anmeldung)
-        navigateFallbackDenylist: [/^\/anleitung\//, /^\/api\//],
+        navigateFallbackDenylist: [/^\/anleitung\//, /^\/anleitung-v2\//, /^\/api\//],
       },
     }),
   ],

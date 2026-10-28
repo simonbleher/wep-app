@@ -5,6 +5,7 @@ import { BookOpen, ChevronLeft } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
 import type { Konto } from '@/konto'
 import { ServerKontoAbschnitt } from '@/server/ServerKontoAbschnitt'
+import { serverModus } from '@/server/modus'
 import type { V2Sitzung } from '@/server/V2Tor'
 import {
   ROLLEN,
@@ -96,7 +97,7 @@ export function Profil({ konto, verfuegbar, onZurueck, onAnmelden, onAbmelden, v
         </header>
         {/* Anleitung liegt als eigene Seite unter public/anleitung/ (auch offline, siehe vite.config.ts). Gleiches Fenster,
             damit es auch in der Android- und Windows-App funktioniert; dort führt „Zurück zur App“ hierher zurück. */}
-        <a className="knopf knopf-breit" href={`${import.meta.env.BASE_URL}anleitung/index.html`} style={{ marginBottom: 24, color: 'inherit', textDecoration: 'none' }}>
+        <a className="knopf knopf-breit" href={`${import.meta.env.BASE_URL}${serverModus ? 'anleitung-v2' : 'anleitung'}/index.html`} style={{ marginBottom: 24, color: 'inherit', textDecoration: 'none' }}>
           <BookOpen {...ICON} />
           Anleitung
         </a>
