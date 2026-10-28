@@ -76,7 +76,7 @@ describe('Benachrichtigungen', () => {
     const m = mails[0]
     expect(m.from).toBe('WEP-App <wep@mail.example.org>')
     expect(m.to).toEqual(['gruen-1@example.org'])
-    expect(m.subject).toBe('WEP 2026-0815 – an dich abgegeben')
+    expect(m.subject).toBe('WEP 2026-0815 – Bau-WEP an dich abgegeben')
     expect(m.text).toContain('Vorgangs-Nr.: 2026-0815')
     expect(m.text).toContain('Anlage: KGA Musterwiese')
     expect(m.text).toContain('Parzelle: 12')

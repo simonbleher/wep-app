@@ -31,7 +31,17 @@ export interface WepKopf {
   /** Bei einer Rückfrage: an wen sie ging und wer gerade dran ist. */
   rueckfrageAn?: 'bau' | 'gruen' | 'beide' | null
   rueckfrageBei?: 'bau' | 'gruen' | null
+  /** Eigenes Grün-WEP, das in ein Bau-WEP zusammengeführt wurde (Kennung des Bau-WEP): für niemanden mehr in der Liste. */
+  zusammengefuehrtIn?: string | null
+  /** Bau-WEP, in das Grün sein eigenes WEP zusammengeführt hat (Kennung des Grün-WEP). */
+  zusammengefuehrtAus?: string | null
 }
+
+/**
+ * Eigenes Grün-WEP: angelegt von Grün, ohne Bau-Konto (wie in v1 möglich). Grün bearbeitet dort alles außer dem Bau-Teil
+ * und führt es später mit einem Bau-WEP zusammen oder gibt es ohne Bau an den BV ab.
+ */
+export const istGruenWep = (kopf: WepKopf): boolean => !kopf.bauKonto && Boolean(kopf.gruenKonto)
 
 /** Ab der Abgabe an den BV sieht der BV (und ein Admin) das WEP; vorher nur die Beteiligten. */
 const BEIM_BV_ODER_SPAETER: Zustand[] = ['beim_bv', 'rueckfrage', 'geprueft']
@@ -40,38 +50,81 @@ export const istBeteiligt = (kopf: WepKopf, konto: RechteKonto) => kopf.bauKonto
 const istBv = (konto: RechteKonto) => konto.rollen.includes('bv')
 
 export function darfLesen(kopf: WepKopf, konto: RechteKonto): boolean {
+  if (kopf.zusammengefuehrtIn) return false
   if (istBeteiligt(kopf, konto)) return true
   if (kopf.geloeschtAm) return false
   return BEIM_BV_ODER_SPAETER.includes(kopf.zustand) && (istBv(konto) || konto.rollen.includes('admin'))
 }
 
-/** Neue WEPs legt der Bau-Wertermittler an (Beginn des Ablaufs). */
-export const darfAnlegen = (konto: RechteKonto) => konto.rollen.includes('bau')
+/** Neue WEPs legen Bau (Bau-WEP, Beginn des Ablaufs) und Grün (eigenes Grün-WEP, wie in v1) an. */
+export const darfAnlegen = (konto: RechteKonto) => konto.rollen.includes('bau') || konto.rollen.includes('gruen')
+
+/** Wer ein neues WEP anlegt, wird Besitzer: mit Rolle Bau als Bau, mit Rolle Grün als Grün (die Rollen schließen sich aus). */
+export function neuerKopf(konto: RechteKonto): WepKopf | null {
+  if (konto.rollen.includes('bau')) return { zustand: 'bau_in_arbeit', bauKonto: konto.id, gruenKonto: null }
+  if (konto.rollen.includes('gruen')) return { zustand: 'gruen_in_arbeit', bauKonto: null, gruenKonto: konto.id }
+  return null
+}
 
 /**
  * Teil des WEP, den eine Person gerade ändern darf:
  * - 'alles': Bau, solange noch kein Grün-Wertermittler beteiligt ist (der Grün-Teil darf vorbereitet werden)
  * - 'bau': Bau, wenn Grün beteiligt ist – alles außer dem Grün-Teil
  * - 'gruen': Grün – nur der Grün-Teil (Außenanlagen, Aufwuchs, Beseitigung, Grün-Skizze, Fotos zum Grün-Teil)
+ * - 'ohne_bau': Grün im eigenen Grün-WEP – alles außer dem Bau-Teil (Formalien, Grün-Teil, Fotos, Parzelle)
  * - null: nur lesen
  */
-export type Schreibrecht = 'alles' | 'bau' | 'gruen' | null
+export type Schreibrecht = 'alles' | 'bau' | 'gruen' | 'ohne_bau' | null
 
 export function schreibrecht(kopf: WepKopf, konto: RechteKonto): Schreibrecht {
-  if (kopf.geloeschtAm) return null
+  if (kopf.geloeschtAm || kopf.zusammengefuehrtIn) return null
   const bau = kopf.bauKonto === konto.id && konto.rollen.includes('bau')
   const gruen = kopf.gruenKonto === konto.id && konto.rollen.includes('gruen')
+  const gruenTeil: Schreibrecht = istGruenWep(kopf) ? 'ohne_bau' : 'gruen'
   if (kopf.zustand === 'bau_in_arbeit' && bau) return kopf.gruenKonto ? 'bau' : 'alles'
-  if (kopf.zustand === 'gruen_in_arbeit' && gruen) return 'gruen'
+  if (kopf.zustand === 'gruen_in_arbeit' && gruen) return gruenTeil
   if (kopf.zustand === 'rueckfrage') {
     if (kopf.rueckfrageBei === 'bau' && bau) return 'bau'
-    if (kopf.rueckfrageBei === 'gruen' && gruen) return 'gruen'
+    if (kopf.rueckfrageBei === 'gruen' && gruen) return gruenTeil
   }
   return null
 }
 
-/** In den Papierkorb legen und zurückholen: nur der Besitzer, solange das WEP bei ihm in Bearbeitung ist und Grün noch nicht beteiligt ist. */
-export const darfLoeschen = (kopf: WepKopf, konto: RechteKonto) => kopf.zustand === 'bau_in_arbeit' && kopf.bauKonto === konto.id && !kopf.gruenKonto
+/**
+ * In den Papierkorb legen und zurückholen: nur der Besitzer, solange das WEP bei ihm in Bearbeitung ist – Bau, solange
+ * Grün noch nicht beteiligt ist; Grün bei seinem eigenen Grün-WEP.
+ */
+export const darfLoeschen = (kopf: WepKopf, konto: RechteKonto) =>
+  !kopf.zusammengefuehrtIn &&
+  ((kopf.zustand === 'bau_in_arbeit' && kopf.bauKonto === konto.id && !kopf.gruenKonto) ||
+    (kopf.zustand === 'gruen_in_arbeit' && istGruenWep(kopf) && kopf.gruenKonto === konto.id))
+
+// ---------------------------------------------------------------------------
+// Eigenes Grün-WEP mit einem abgegebenen Bau-WEP zusammenführen
+// ---------------------------------------------------------------------------
+
+export type ZusammenfuehrenPruefung = { ok: true } | { ok: false; status: number; fehler: string }
+
+/**
+ * Zusammenführen: nur das Grün-Konto, an das das Bau-WEP abgegeben wurde, nur mit einem eigenen, offenen Grün-WEP und
+ * nur, solange das Bau-WEP bei Grün in Arbeit ist (nicht an den BV abgegeben). Ein Bau-WEP wird höchstens einmal
+ * zusammengeführt (vorher rückgängig machen).
+ */
+export function pruefeZusammenfuehren(bau: WepKopf, gruen: WepKopf, konto: RechteKonto): ZusammenfuehrenPruefung {
+  const nein = (status: number, fehler: string): ZusammenfuehrenPruefung => ({ ok: false, status, fehler })
+  if (!konto.rollen.includes('gruen')) return nein(403, 'Zusammenführen kann nur ein Grün-Wertermittler.')
+  if (!bau.bauKonto || bau.gruenKonto !== konto.id || bau.geloeschtAm) return nein(403, 'Das Bau-WEP ist nicht an dich abgegeben.')
+  if (bau.zustand !== 'gruen_in_arbeit') return nein(409, 'Zusammenführen geht nur, solange das Bau-WEP bei dir in Arbeit ist.')
+  if (bau.zusammengefuehrtAus) return nein(409, 'Das Bau-WEP ist schon mit einem deiner WEPs zusammengeführt.')
+  if (!istGruenWep(gruen) || gruen.gruenKonto !== konto.id) return nein(403, 'Zusammenführen geht nur mit deinen eigenen WEPs.')
+  if (gruen.geloeschtAm || gruen.zusammengefuehrtIn) return nein(409, 'Dein WEP liegt im Papierkorb oder ist schon zusammengeführt.')
+  if (gruen.zustand !== 'gruen_in_arbeit') return nein(409, 'Dein WEP ist schon an den BV abgegeben.')
+  return { ok: true }
+}
+
+/** Rückgängig: dasselbe Grün-Konto, solange das Bau-WEP noch bei Grün in Arbeit ist. */
+export const darfZusammenfuehrungZuruecknehmen = (bau: WepKopf, konto: RechteKonto) =>
+  Boolean(bau.zusammengefuehrtAus) && bau.zustand === 'gruen_in_arbeit' && bau.gruenKonto === konto.id && konto.rollen.includes('gruen') && !bau.geloeschtAm
 
 // ---------------------------------------------------------------------------
 // Ablauf: Abgabe Bau → Grün → BV, Rückfrage, geprüft, wieder öffnen
@@ -96,7 +149,7 @@ export const AKTION_TEXT: Record<AblaufAktionName, string> = {
 
 /** Welche Schritte die Person jetzt machen kann (für die Knöpfe der Oberfläche; der Server prüft mit `wendeAn`). */
 export function moeglicheAktionen(kopf: WepKopf, konto: RechteKonto): AblaufAktionName[] {
-  if (kopf.geloeschtAm) return []
+  if (kopf.geloeschtAm || kopf.zusammengefuehrtIn) return []
   const bau = kopf.bauKonto === konto.id && konto.rollen.includes('bau')
   const gruen = kopf.gruenKonto === konto.id && konto.rollen.includes('gruen')
   const r: AblaufAktionName[] = []
@@ -137,6 +190,7 @@ export function wendeAn(kopf: WepKopf, konto: RechteKonto, a: AblaufAktion, grue
       const notiz = text(a.notiz)
       if (!notiz) return { ok: false, status: 400, fehler: 'Bitte in der Notiz schreiben, was geklärt werden soll.' }
       if (!['bau', 'gruen', 'beide'].includes(a.an)) return { ok: false, status: 400, fehler: 'Bitte wählen, an wen die Rückfrage geht.' }
+      if (istGruenWep(kopf) && a.an !== 'gruen') return { ok: false, status: 400, fehler: 'Das WEP hat keinen Bau-Teil – die Rückfrage geht an Grün.' }
       return { ok: true, kopf: { ...kopf, zustand: 'rueckfrage', rueckfrageAn: a.an, rueckfrageBei: a.an === 'gruen' ? 'gruen' : 'bau' }, notiz }
     }
     case 'geprueft':

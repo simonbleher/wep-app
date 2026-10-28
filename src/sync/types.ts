@@ -77,6 +77,13 @@ export interface SyncMeta {
   serverRev?: number
   /** Server-Modus (v2): Die Löschung ist auf dem Server angekommen. */
   serverGeloescht?: boolean
+  /**
+   * Server-Modus (v2): Grün hat sein eigenes WEP `aus` in dieses Bau-WEP zusammengeführt (lokal, auch ohne Netz). Der
+   * Abgleich übergibt es dem Server; bis dahin lässt es sich hier zurücknehmen (`vorher` = Bau-WEP davor).
+   */
+  zusammenfuehrung?: { aus: string; felder: string[]; am: string; vorher: Wep }
+  /** Server-Modus (v2): Dieses eigene WEP ist (lokal) in das Bau-WEP mit dieser Kennung zusammengeführt – nicht mehr in der Liste. */
+  zusammengefuehrtIn?: string
 }
 
 /** Eine Datei im OneDrive-App-Ordner. */

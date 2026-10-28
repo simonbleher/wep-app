@@ -89,8 +89,9 @@ import { Capacitor } from '@capacitor/core'
 import { speichereDatei, speicherText } from './dateiSpeichern'
 import { leseZahl, zahlDe, zahlFuerEingabe } from '@/gruen/format'
 import { serverModus } from '@/server/modus'
-import { serverSicht } from '@/server/ablaufDienst'
+import { serverSicht, zustandVon } from '@/server/ablaufDienst'
 import { AbgabeBereich, ZustandMarke } from '@/server/AbgabeBereich'
+import { AnnahmeHinweis } from '@/server/Zusammenfuehren'
 import { ZUSTAND_TEXT } from '@/server/rechte'
 
 // ---------------------------------------------------------------------------
@@ -147,7 +148,8 @@ export function bereicheFuerRolle(rolle: Rolle): typeof BEREICHE {
 
 /**
  * Server-Modus (v2): sichtbare Abschnitte nach dem, was ich gerade darf – Bau seinen Teil, Grün nur den Grün-Teil (den
- * Bau-Teil sieht Grün in der Übersicht), nach der Abgabe nur noch die Übersicht. Sonst nach der Rolle.
+ * Bau-Teil sieht Grün in der Übersicht), im eigenen Grün-WEP alles außer dem Bau-Teil, nach der Abgabe nur noch die
+ * Übersicht. Sonst nach der Rolle.
  */
 function sichtbareBereiche(wep: Wep, rolle: Rolle): typeof BEREICHE {
   if (!serverModus) return bereicheFuerRolle(rolle)
@@ -155,6 +157,8 @@ function sichtbareBereiche(wep: Wep, rolle: Rolle): typeof BEREICHE {
   if (recht === 'alles') return bereicheFuerRolle(rolle)
   if (recht === 'bau') return BEREICHE.filter((b) => b.teil === 'bau' || b.teil === 'alle')
   if (recht === 'gruen') return BEREICHE.filter((b) => b.teil === 'gruen' || b.id === 'fotos' || b.id === 'uebersicht')
+  // Eigenes Grün-WEP: wie ein Grün-WEP in v1 (Formalien, Grün-Teil, Fotos, Übersicht)
+  if (recht === 'ohne_bau') return bereicheFuerRolle('gruen')
   return BEREICHE.filter((b) => b.id === 'uebersicht')
 }
 
@@ -287,7 +291,7 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
   const bereiche = sichtbareBereiche(wep, rolle)
   const beides = rolle === 'beides'
   const sicht = serverModus ? serverSicht(wep) : undefined
-  const zustand = wep.ablauf?.zustand ?? 'bau_in_arbeit'
+  const zustand = zustandVon(wep)
   // Menü „⋯“: im Server-Modus ohne Status und Teilen (der Ablauf ersetzt beides), Löschen/Duplizieren nach Recht
   const menue = {
     onStatus: sicht ? undefined : (st: WepStatus) => void setzeStatus(st),
@@ -549,6 +553,8 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
                 </>
               }
             />
+
+            {serverModus && <AnnahmeHinweis wep={wep} onGeaendert={neuLaden} />}
 
             {konflikt && (
               <KonfliktHinweis

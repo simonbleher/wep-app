@@ -30,6 +30,8 @@ export const httpZugriff: ServerZugriff = {
   speichere: async (wep: Wep, basisRev: number) => (await rufe<{ kopf: ServerKopf }>(pfad(wep.id), { method: 'PUT', body: JSON.stringify({ wep, basisRev }) })).kopf,
   loesche: async (id, basisRev) => (await rufe<{ kopf: ServerKopf }>(pfad(id), { method: 'DELETE', body: JSON.stringify({ basisRev }) })).kopf,
   stelleWiederHer: async (id) => (await rufe<{ kopf: ServerKopf }>(`${pfad(id)}/wiederherstellen`, { method: 'POST' })).kopf,
+  fuehreZusammen: async (wep, basisRev, aus, felder) =>
+    (await rufe<{ kopf: ServerKopf }>(`${pfad(wep.id)}/zusammenfuehren`, { method: 'POST', body: JSON.stringify({ wep, basisRev, aus, felder }) })).kopf,
 }
 
 let laufend: Promise<SyncErgebnis> | undefined

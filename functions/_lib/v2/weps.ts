@@ -2,8 +2,20 @@
 // seinem Teil (Bau/Grün), Ablauf Bau → Grün → BV, Papierkorb, Verlauf. Rechte und Ablauf stehen in src/server/rechte.ts,
 // das Zusammenführen der Teile in src/server/teile.ts (beides gemeinsam mit der App).
 import type { Wep, WepAblauf } from '../../../src/model/types'
-import { AKTION_TEXT, darfAnlegen, darfLesen, darfLoeschen, schreibrecht, wendeAn, type AblaufAktion, type WepKopf, type Zustand } from '../../../src/server/rechte'
-import { mitEigenemTeil, ohneServerFelder } from '../../../src/server/teile'
+import {
+  AKTION_TEXT,
+  darfLesen,
+  darfLoeschen,
+  darfZusammenfuehrungZuruecknehmen,
+  neuerKopf,
+  pruefeZusammenfuehren,
+  schreibrecht,
+  wendeAn,
+  type AblaufAktion,
+  type WepKopf,
+  type Zustand,
+} from '../../../src/server/rechte'
+import { mitEigenemTeil, ohneServerFelder, zusammenfuehrungAufServer } from '../../../src/server/teile'
 import { jetztIso, type Db } from './db'
 import type { Konto } from './konten'
 
@@ -30,6 +42,8 @@ export interface WepZeile {
   rueckfrage_notiz: string | null
   rueckfrage_am: string | null
   rueckfrage_von: string | null
+  zusammengefuehrt_in: string | null
+  zusammengefuehrt_aus: string | null
 }
 
 /** Kopf eines WEP für Listen und Abgleich (ohne Inhalt). */
@@ -70,6 +84,8 @@ const rechteKopf = (z: WepZeile): WepKopf => ({
   geloeschtAm: z.geloescht_am,
   rueckfrageAn: z.rueckfrage_an,
   rueckfrageBei: z.rueckfrage_bei,
+  zusammengefuehrtIn: z.zusammengefuehrt_in,
+  zusammengefuehrtAus: z.zusammengefuehrt_aus,
 })
 
 async function namen(db: Db, ids: (string | null)[]): Promise<Map<string, string>> {
@@ -88,10 +104,17 @@ async function ablaufVon(db: Db, z: WepZeile): Promise<WepAblauf> {
   const person = (id: string | null) => (id ? { id, name: n.get(id) ?? 'gelöschtes Konto' } : undefined)
   const bau = person(z.bau_konto)
   const gruen = person(z.gruen_konto)
+  const zf = z.zusammengefuehrt_aus
+    ? await db
+        .prepare('SELECT w.vorgangs_nr AS nr, f.am AS am FROM zusammenfuehrungen f LEFT JOIN weps w ON w.id = f.gruen_id WHERE f.bau_id = ?')
+        .bind(z.id)
+        .first<{ nr: string | null; am: string }>()
+    : null
   return {
     zustand: z.zustand,
     ...(bau ? { bau } : {}),
     ...(gruen ? { gruen } : {}),
+    ...(z.zusammengefuehrt_aus && zf ? { zusammengefuehrtAus: { id: z.zusammengefuehrt_aus, vorgangsNr: zf.nr ?? '', am: zf.am } } : {}),
     ...(z.zustand === 'rueckfrage' && z.rueckfrage_an && z.rueckfrage_bei
       ? { rueckfrage: { an: z.rueckfrage_an, bei: z.rueckfrage_bei, notiz: z.rueckfrage_notiz ?? '', am: z.rueckfrage_am ?? '', von: (z.rueckfrage_von && n.get(z.rueckfrage_von)) || 'BV' } }
       : {}),
@@ -156,7 +179,7 @@ async function merkeBearbeitung(db: Db, wepId: string, kontoId: string, jetzt: n
 }
 
 /**
- * Speichert ein WEP. Neu: nur mit Rolle Bau (wird Besitzer). Vorhanden: nur mit Schreibrecht und passender Revision
+ * Speichert ein WEP. Neu: mit Rolle Bau (Bau-WEP) oder Grün (eigenes Grün-WEP); wer anlegt, wird Besitzer. Vorhanden: nur mit Schreibrecht und passender Revision
  * (`basisRev` = Revision, auf der die Änderung beruht); sonst 409 mit dem Stand des Servers.
  */
 export async function speichereWep(db: Db, konto: Konto, id: string, eingabe: { wep?: unknown; basisRev?: unknown }, jetzt = Date.now()): Promise<Ergebnis<ServerWepKopf>> {
@@ -170,14 +193,15 @@ export async function speichereWep(db: Db, konto: Konto, id: string, eingabe: { 
     const daten = JSON.stringify(appWep)
     if (new TextEncoder().encode(daten).length > MAX_WEP_BYTES) return fehler(413, 'Das WEP ist zu groß für den Server (Unterschriften oder Skizzen verkleinern).')
     const spalten = spaltenVon(appWep)
-    if (!darfAnlegen(konto)) return fehler(403, 'Neue WEPs legt der Bau-Wertermittler an.')
+    const neu = neuerKopf(konto)
+    if (!neu) return fehler(403, 'Neue WEPs legen die Wertermittler Bau und Grün an.')
     await db
       .prepare(
-        "INSERT INTO weps (id, rev, daten, zustand, bau_konto, vorgangs_nr, anlage, parzelle, erstellt_am, erstellt_von, geaendert_am, geaendert_von) VALUES (?, 1, ?, 'bau_in_arbeit', ?, ?, ?, ?, ?, ?, ?, ?)",
+        'INSERT INTO weps (id, rev, daten, zustand, bau_konto, gruen_konto, vorgangs_nr, anlage, parzelle, erstellt_am, erstellt_von, geaendert_am, geaendert_von) VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       )
-      .bind(id, daten, konto.id, ...spalten, zeit, konto.id, zeit, konto.id)
+      .bind(id, daten, neu.zustand, neu.bauKonto ?? null, neu.gruenKonto ?? null, ...spalten, zeit, konto.id, zeit, konto.id)
       .run()
-    await verlauf(db, { wepId: id, kontoId: konto.id, aktion: 'angelegt', nachher: 'bau_in_arbeit' }, jetzt)
+    await verlauf(db, { wepId: id, kontoId: konto.id, aktion: 'angelegt', nachher: neu.zustand }, jetzt)
     return { ok: true, wert: kopfVon((await ladeZeile(db, id))!) }
   }
 
@@ -285,6 +309,15 @@ export async function fuehreAktionAus(
   const k = erg.kopf
   const zeit = jetztIso(jetzt)
   let daten = z.daten
+  if (aktion.aktion === 'an_bv' && !z.bau_konto) {
+    // Eigenes Grün-WEP ohne Bau: der Name des Grün-Wertermittlers steht in den Formalien (Zelle E13)
+    const w = JSON.parse(z.daten) as Wep
+    if (!w.formalien.wertermittlerAussenAufwuchs?.trim()) {
+      const n = await namen(db, [z.gruen_konto])
+      w.formalien = { ...w.formalien, wertermittlerAussenAufwuchs: n.get(z.gruen_konto ?? '') ?? '' }
+      daten = JSON.stringify(w)
+    }
+  }
   if (aktion.aktion === 'an_gruen' && !z.gruen_konto) {
     // Ab jetzt hat das WEP beide Teile; die Namen der Wertermittler stehen in den Formalien (Zellen E12/E13)
     const w = JSON.parse(z.daten) as Wep
@@ -315,4 +348,90 @@ export async function fuehreAktionAus(
     rueckfrageAn: neu.rueckfrage_an,
   })
   return { ok: true, wert: kopfVon(neu) }
+}
+
+// ---------------------------------------------------------------------------
+// Eigenes Grün-WEP mit einem abgegebenen Bau-WEP zusammenführen (und zurücknehmen)
+// ---------------------------------------------------------------------------
+
+/** Ergebnis des Zusammenführens: Kopf des Bau-WEP und die Fotos, deren Dateien vom Grün-WEP kopiert werden müssen. */
+export interface ZusammenfuehrenErgebnis {
+  kopf: ServerWepKopf
+  gruenId: string
+  fotoIds: string[]
+}
+
+/**
+ * Führt das eigene Grün-WEP `eingabe.aus` in das Bau-WEP `bauId` zusammen. Die App schickt das zusammengeführte WEP
+ * (`eingabe.wep`, Grün-Teil aus dem eigenen WEP) und die Stammdaten-Felder, die Grün aus dem eigenen WEP übernimmt
+ * (`eingabe.felder`). Der Bau-Teil bleibt, wie er auf dem Server steht. Das Grün-WEP wird nicht gelöscht, sondern als
+ * „zusammengeführt in <Bau-WEP>“ markiert und verschwindet aus allen Listen. Nur auf dem aktuellen Stand (`basisRev`).
+ */
+export async function fuehreZusammen(
+  db: Db,
+  konto: Konto,
+  bauId: string,
+  eingabe: { aus?: unknown; wep?: unknown; basisRev?: unknown; felder?: unknown },
+  jetzt = Date.now(),
+): Promise<Ergebnis<ZusammenfuehrenErgebnis>> {
+  const z = await ladeZeile(db, bauId)
+  if (!z || !darfLesen(rechteKopf(z), konto)) return fehler(404, 'WEP nicht gefunden.')
+  const gruenId = typeof eingabe.aus === 'string' ? eingabe.aus : ''
+  const g = gruenId ? await ladeZeile(db, gruenId) : null
+  if (!g || (g.gruen_konto !== konto.id && !darfLesen(rechteKopf(g), konto))) return fehler(404, 'Dein WEP wurde nicht gefunden.')
+  const pruefung = pruefeZusammenfuehren(rechteKopf(z), rechteKopf(g), konto)
+  if (!pruefung.ok) return pruefung.status === 403 || pruefung.status === 409 ? fehlerMitStand(db, pruefung.status, pruefung.fehler, z) : fehler(pruefung.status, pruefung.fehler)
+  if (eingabe.basisRev !== z.rev) return fehlerMitStand(db, 409, 'Das Bau-WEP wurde inzwischen geändert.', z)
+  const roh = eingabe.wep as Wep | undefined
+  if (!roh || typeof roh !== 'object' || roh.id !== bauId) return fehler(400, 'Das zusammengeführte WEP fehlt oder passt nicht zur Adresse.')
+  const felder = Array.isArray(eingabe.felder) ? eingabe.felder.filter((f): f is string => typeof f === 'string') : []
+  const vorher = JSON.parse(z.daten) as Wep
+  const neu = zusammenfuehrungAufServer(vorher, JSON.parse(g.daten) as Wep, ohneServerFelder(roh), felder)
+  const daten = JSON.stringify(neu)
+  if (new TextEncoder().encode(daten).length > MAX_WEP_BYTES) return fehler(413, 'Das WEP ist zu groß für den Server (Unterschriften oder Skizzen verkleinern).')
+  const zeit = jetztIso(jetzt)
+  const r = await db
+    .prepare('UPDATE weps SET daten = ?, rev = rev + 1, vorgangs_nr = ?, anlage = ?, parzelle = ?, zusammengefuehrt_aus = ?, geaendert_am = ?, geaendert_von = ? WHERE id = ? AND rev = ?')
+    .bind(daten, ...spaltenVon(neu), gruenId, zeit, konto.id, bauId, z.rev)
+    .run()
+  if (r.meta.changes !== 1) return fehlerMitStand(db, 409, 'Das Bau-WEP wurde inzwischen geändert.', await ladeZeile(db, bauId))
+  await db.batch([
+    db.prepare('INSERT OR REPLACE INTO zusammenfuehrungen (bau_id, gruen_id, konto_id, am, bau_vorher) VALUES (?, ?, ?, ?, ?)').bind(bauId, gruenId, konto.id, zeit, z.daten),
+    db.prepare('UPDATE weps SET zusammengefuehrt_in = ?, rev = rev + 1, geaendert_am = ?, geaendert_von = ? WHERE id = ?').bind(bauId, zeit, konto.id, gruenId),
+  ])
+  const nr = (w: WepZeile) => w.vorgangs_nr || 'ohne Vorgangs-Nr.'
+  await verlauf(db, { wepId: bauId, kontoId: konto.id, aktion: 'zusammengefuehrt', notiz: `mit dem eigenen WEP ${nr(g)}${felder.length ? `; übernommene Stammdaten: ${felder.join(', ')}` : ''}` }, jetzt)
+  await verlauf(db, { wepId: gruenId, kontoId: konto.id, aktion: 'zusammengefuehrt_in', notiz: `in das Bau-WEP ${nr(z)}` }, jetzt)
+  // Fotodateien, die zum Grün-WEP gehören, liegen in R2 noch dort: der Endpunkt kopiert sie zum Bau-WEP
+  const vorhanden = new Set((vorher.fotos ?? []).map((f) => f.id))
+  const fotoIds = (neu.fotos ?? []).map((f) => f.id).filter((id) => !vorhanden.has(id))
+  return { ok: true, wert: { kopf: { ...kopfVon((await ladeZeile(db, bauId))!), zusammengefuehrt: true }, gruenId, fotoIds } }
+}
+
+/**
+ * Nimmt das Zusammenführen zurück: Das Bau-WEP bekommt den Stand von vor dem Zusammenführen, das eigene Grün-WEP taucht
+ * wieder auf (so, wie es beim Zusammenführen war). Nur durch dasselbe Grün-Konto und nur, solange das Bau-WEP bei Grün
+ * in Arbeit ist (nicht an den BV abgegeben).
+ */
+export async function nimmZusammenfuehrungZurueck(db: Db, konto: Konto, bauId: string, eingabe: { basisRev?: unknown }, jetzt = Date.now()): Promise<Ergebnis<ServerWepKopf>> {
+  const z = await ladeZeile(db, bauId)
+  if (!z || !darfLesen(rechteKopf(z), konto)) return fehler(404, 'WEP nicht gefunden.')
+  if (!darfZusammenfuehrungZuruecknehmen(rechteKopf(z), konto)) return fehlerMitStand(db, 403, 'Das Zusammenführen kann nur Grün zurücknehmen, solange das WEP bei Grün in Arbeit ist.', z)
+  if (eingabe.basisRev !== z.rev) return fehlerMitStand(db, 409, 'Das Bau-WEP wurde inzwischen geändert – bitte erst abgleichen.', z)
+  const f = await db.prepare('SELECT * FROM zusammenfuehrungen WHERE bau_id = ?').bind(bauId).first<{ gruen_id: string; bau_vorher: string }>()
+  if (!f) return fehler(409, 'Der Stand vor dem Zusammenführen fehlt.')
+  const vorher = JSON.parse(f.bau_vorher) as Wep
+  const zeit = jetztIso(jetzt)
+  const r = await db
+    .prepare('UPDATE weps SET daten = ?, rev = rev + 1, vorgangs_nr = ?, anlage = ?, parzelle = ?, zusammengefuehrt_aus = NULL, geaendert_am = ?, geaendert_von = ? WHERE id = ? AND rev = ?')
+    .bind(f.bau_vorher, ...spaltenVon(vorher), zeit, konto.id, bauId, z.rev)
+    .run()
+  if (r.meta.changes !== 1) return fehlerMitStand(db, 409, 'Das Bau-WEP wurde inzwischen geändert.', await ladeZeile(db, bauId))
+  await db.batch([
+    db.prepare('UPDATE weps SET zusammengefuehrt_in = NULL, rev = rev + 1, geaendert_am = ?, geaendert_von = ? WHERE id = ?').bind(zeit, konto.id, f.gruen_id),
+    db.prepare('DELETE FROM zusammenfuehrungen WHERE bau_id = ?').bind(bauId),
+  ])
+  await verlauf(db, { wepId: bauId, kontoId: konto.id, aktion: 'zusammenfuehrung_zurueck' }, jetzt)
+  await verlauf(db, { wepId: f.gruen_id, kontoId: konto.id, aktion: 'zusammenfuehrung_zurueck' }, jetzt)
+  return { ok: true, wert: kopfVon((await ladeZeile(db, bauId))!) }
 }

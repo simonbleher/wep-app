@@ -27,6 +27,15 @@ const bauStand: Wep = {
   fotos: [],
   formalien: { ...beispiel.formalien, unterpaechter: 'Paula Pächterin', auftraggeber: 'Paula Pächterin', wertermittlerBaulichkeiten: '', wertermittlerAussenAufwuchs: '' },
 }
+// Grün hat (wie in v1) schon ein eigenes WEP mit dem Grün-Teil angelegt – ohne Bau-Teil
+const { bau: _bau, grundriss: _grundriss, bauExcel: _bauExcel, ...ohneBau } = beispiel
+const eigenesGruen: Wep = {
+  ...ohneBau,
+  id: 'eigen-gruen-1',
+  rolle: 'gruen',
+  fotos: [],
+  formalien: { ...beispiel.formalien, unterpaechter: 'Paula Pächterin', auftraggeber: 'Paula Pächterin', wertermittlerBaulichkeiten: '', wertermittlerAussenAufwuchs: 'Erika Musterfrau' },
+}
 
 const u = await starteV2Umgebung({ port: 4199, ausgabe: AUSGABE })
 const { URL, db, anmelden, freigeben } = u
@@ -72,7 +81,9 @@ try {
   await freigeben('erika@example.org', ['gruen'])
   await freigeben('bea@bv.example', ['bv'])
 
-  // 3. Bau: WEP liegt auf dem Server (hier direkt angelegt), Liste mit Zustand, Abgabe an Grün
+  // 3. Bau: WEP liegt auf dem Server (hier direkt angelegt), Liste mit Zustand, Abgabe an Grün; Grün hat ein eigenes WEP
+  const erika = (await ladeKonto(db, kontoId('erika@example.org')))!
+  await speichereWep(db, erika, eigenesGruen.id, { wep: eigenesGruen, basisRev: 0 })
   const bert = (await ladeKonto(db, kontoId('bert@example.org')))!
   await speichereWep(db, bert, beispiel.id, { wep: bauStand, basisRev: 0 })
   await s1.getByRole('button', { name: 'Erneut prüfen' }).click()
@@ -89,19 +100,26 @@ try {
   await s1.getByText('An Erika Musterfrau abgegeben.').waitFor()
   if (zustand() !== 'gruen_in_arbeit') throw new Error('Abgabe an Grün fehlgeschlagen')
 
-  // 4. Grün: Neu für dich, Grün-Teil erfassen (hier vom Beispiel übernommen), an den BV abgeben
+  // 4. Grün: Neu für dich, mit dem eigenen WEP zusammenführen (Grün-Teil kommt daraus), an den BV abgeben
   const kg = await u.neuerKontext(handy)
   const sg = await kg.newPage()
   await sg.goto(URL)
   await anmelden(sg, 'erika')
   await sg.getByRole('heading', { name: /Neu für dich/ }).waitFor()
   await bild(sg, '06-neu-fuer-dich')
-  const erika = (await ladeKonto(db, kontoId('erika@example.org')))!
-  const rev = (db.roh.prepare('SELECT rev FROM weps WHERE id = ?').get(beispiel.id) as { rev: number }).rev
-  const serverStand = JSON.parse((db.roh.prepare('SELECT daten FROM weps WHERE id = ?').get(beispiel.id) as { daten: string }).daten) as Wep
-  await speichereWep(db, erika, beispiel.id, { wep: { ...serverStand, gruen: beispiel.gruen, skizze: beispiel.skizze }, basisRev: rev })
-  await sg.getByRole('button', { name: /2026-152 – an dich abgegeben/ }).click()
+  await sg.getByRole('button', { name: /2026-152 – Bau-WEP an dich abgegeben/ }).click()
   await sg.getByRole('button', { name: 'Abgabe' }).filter({ visible: true }).first().waitFor()
+  const annahme = sg.getByRole('note').filter({ hasText: 'Bau-WEP für dich' })
+  await annahme.waitFor()
+  await bild(sg, '13-annahme')
+  await annahme.getByRole('button', { name: 'Mit meinem WEP zusammenführen …' }).click()
+  const dlg = sg.getByRole('dialog', { name: 'Mit eigenem WEP zusammenführen' })
+  await dlg.getByText(/Was wird übernommen/).waitFor()
+  await bild(sg, '14-zusammenfuehren', true)
+  await dlg.getByRole('button', { name: 'Zusammenführen' }).click()
+  await dlg.waitFor({ state: 'detached' })
+  for (let i = 0; i < 100 && !(db.roh.prepare('SELECT zusammengefuehrt_in FROM weps WHERE id = ?').get(eigenesGruen.id) as { zusammengefuehrt_in: string | null }).zusammengefuehrt_in; i++) await sg.waitForTimeout(100)
+  if (!JSON.parse((db.roh.prepare('SELECT daten FROM weps WHERE id = ?').get(beispiel.id) as { daten: string }).daten).gruen.aufwuchs.length) throw new Error('Zusammenführen fehlgeschlagen')
   await sg.getByRole('navigation', { name: 'Abschnitte' }).getByRole('button', { name: 'Aufwuchs' }).click()
   await sg.getByRole('heading', { name: 'Aufwuchs' }).first().waitFor()
   await bild(sg, '07-gruen-teil')

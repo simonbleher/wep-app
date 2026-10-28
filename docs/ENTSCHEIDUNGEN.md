@@ -478,3 +478,12 @@
 
 - **Entscheidung:** Eigener Abschnitt 6 „Google-Nutzerdaten“ (Anker `#google-nutzerdaten`) mit englischer Kurzfassung „Google user data“ und dem Limited-Use-Satz samt Link zur Google API Services User Data Policy.
 - **Grund:** Die Google-OAuth-Veröffentlichung verlangt diese Angaben. Inhalt entspricht dem Code: nur `openid email profile`, kein Zugriff auf weitere Google-Dienste.
+
+## 2026-10-28 · v2: Grün legt eigene WEPs an und führt sie mit dem Bau-WEP zusammen
+
+- **Entscheidung:** Korrektur am v2-Ablauf (Simon): Grün legt wie in v1 eigene WEPs an (Besitzer Grün, ohne Bau-Konto, `gruen_in_arbeit`, Schreibrecht `ohne_bau`). Ein an Grün abgegebenes Bau-WEP kann Grün mit einem eigenen offenen WEP zusammenführen oder ohne eigenes WEP weiterarbeiten. Ergebnis ist immer das Bau-WEP; das Grün-WEP bleibt auf dem Server, markiert als `zusammengefuehrt_in` (Migration `0005_gruen_zusammenfuehren.sql`), und verschwindet aus allen Listen. Ein Grün-WEP ohne Bau darf direkt an den BV (nur Rückfrage als Warnung).
+- **Grund:** Grün ist oft vor Bau auf der Parzelle; in v1 ging das auch. Kennung, Verlauf und Abgabe des Bau-WEP bleiben so erhalten.
+- **Wie:** Die App rechnet das Zusammenführen selbst (`src/server/zusammenfuehren.ts`: Formalien-Abgleich aus der Bau-Excel, „Grundlage übernehmen“ der Grün-Skizze, Fotos lokal kopiert wie beim Umnummerieren), damit es ohne Netz geht; der Abgleich gibt es danach an den Server (`POST /api/v2/weps/<id>/zusammenfuehren`). Der Server nimmt den Bau-Teil immer aus seinem Stand und Stammdaten nur für die gewählten Felder aus dem Grün-WEP (`zusammenfuehrungAufServer`), kopiert die Fotodateien in R2 und schreibt den Verlauf in beide WEPs.
+- **Rückgängig:** solange das Bau-WEP bei Grün in Arbeit ist. Der Stand des Bau-WEP vor dem Zusammenführen liegt in einer eigenen Tabelle (`zusammenfuehrungen`, wegen der Zeilengröße in D1). Änderungen am Grün-Teil nach dem Zusammenführen gehen dabei verloren (die App sagt das vorher).
+- **Stammdaten:** Bau gilt; in der Vorschau sind im Bau-WEP leere Felder und „Wertermittler Außenanlagen & Aufwuchs“ zum Übernehmen vorgewählt, andere Unterschiede nicht. Die Parzelle (Form) gehört zum Bau-Teil und wird nur als Hinweis verglichen.
+

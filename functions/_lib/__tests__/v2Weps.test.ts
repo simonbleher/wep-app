@@ -1,4 +1,4 @@
-// v2 Paket 2: WEPs auf dem Server – Anlegen nur mit Rolle Bau, Speichern mit Revision (409 mit Serverstand), Lesen nur
+// v2 Paket 2: WEPs auf dem Server – Anlegen mit Rolle Bau oder Grün, Speichern mit Revision (409 mit Serverstand), Lesen nur
 // für Beteiligte (BV/Admin erst ab der Abgabe), Papierkorb nur für den Besitzer, Verlauf.
 import { describe, expect, it } from 'vitest'
 import { darfLesen, schreibrecht, type RechteKonto } from '../../../src/server/rechte'
@@ -60,11 +60,13 @@ describe('Rechte (gemeinsam mit der App)', () => {
 })
 
 describe('WEPs speichern und lesen', () => {
-  it('Bau legt an (wird Besitzer, rev 1, Verlauf „angelegt“); Grün und BV können nicht anlegen', async () => {
+  it('Bau legt an (wird Besitzer, rev 1, Verlauf „angelegt“); Grün legt ein eigenes Grün-WEP an; BV kann nicht anlegen', async () => {
     const { db, bau, gruen, bv } = await aufbau()
     const e = await speichereWep(db, bau, 'w1', { wep: wep('w1'), basisRev: 0 })
     expect(e).toMatchObject({ ok: true, wert: { id: 'w1', rev: 1, zustand: 'bau_in_arbeit', bauKonto: 'bau-1', vorgangsNr: '2026-0815', anlage: 'KGA Musterwiese', parzelle: '12' } })
-    expect(await speichereWep(db, gruen, 'w2', { wep: wep('w2'), basisRev: 0 })).toMatchObject({ ok: false, status: 403 })
+    const g = await speichereWep(db, gruen, 'w2', { wep: wep('w2'), basisRev: 0 })
+    expect(g).toMatchObject({ ok: true, wert: { zustand: 'gruen_in_arbeit', bauKonto: null, gruenKonto: 'gruen-1' } })
+    expect((await lesbareWeps(db, bau)).map((x) => x.id)).toEqual(['w1']) // Bau sieht das Grün-WEP nicht
     expect(await speichereWep(db, bv, 'w3', { wep: wep('w3'), basisRev: 0 })).toMatchObject({ ok: false, status: 403 })
     expect(await speichereWep(db, bau, 'w4', { wep: wep('anders'), basisRev: 0 })).toMatchObject({ ok: false, status: 400 })
     const v = await ladeVerlauf(db, bau, 'w1')

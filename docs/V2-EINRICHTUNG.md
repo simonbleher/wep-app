@@ -52,7 +52,7 @@ Die Namen müssen genau so geschrieben sein.
 
 ### Tabellen einspielen (Migrationen)
 
-Die Tabellen stehen im Repo unter `migrations/` (`0001_konten.sql`, `0002_weps.sql`, `0003_ablauf.sql`, `0004_benachrichtigungen.sql`, …). Jede Datei
+Die Tabellen stehen im Repo unter `migrations/` (`0001_konten.sql`, `0002_weps.sql`, `0003_ablauf.sql`, `0004_benachrichtigungen.sql`, `0005_gruen_zusammenfuehren.sql`, …). Jede Datei
 wird **genau einmal und in der Reihenfolge der Nummern** eingespielt:
 
 1. Dashboard → **D1** → `wep-v2` → Reiter **Konsole** (*Console*).
@@ -174,7 +174,7 @@ Windows-App arbeiten vorerst weiter wie v1 mit OneDrive und melden sich darüber
 2. Im Browser öffnen: `https://wep-pankow.pages.dev/api/v2/status`. Erwartet wird etwa:
 
    ```json
-   {"serverModus":true,"einrichtung":{"datenbank":true,"dateien":true,"google":true,"microsoft":true,"mail":true,"admins":true},"schema":{"stand":4,"erwartet":4}}
+   {"serverModus":true,"einrichtung":{"datenbank":true,"dateien":true,"google":true,"microsoft":true,"mail":true,"admins":true},"schema":{"stand":5,"erwartet":5}}
    ```
 
    - Steht dort `false`, fehlt der Teil oder ist falsch geschrieben (siehe Tabelle oben).

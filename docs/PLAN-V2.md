@@ -45,7 +45,7 @@ Der Server erzwingt die Zustände, nicht nur die Oberfläche.
 | Zustand | Wer bearbeitet | Wer liest |
 |---|---|---|
 | `bau_in_arbeit` | Bau (Besitzer) | Bau |
-| `gruen_in_arbeit` | Grün, **nur** den Grün-Teil | Bau, Grün (Bau-Teil nur in der „Übersicht“) |
+| `gruen_in_arbeit` | Grün, **nur** den Grün-Teil (im eigenen Grün-WEP alles außer dem Bau-Teil) | Bau, Grün (Bau-Teil nur in der „Übersicht“); eigenes Grün-WEP nur Grün |
 | `beim_bv` | niemand | Bau, Grün, BV |
 | `rueckfrage` | die vom BV gewählte(n) Person(en) | Bau, Grün, BV |
 | `geprueft` | niemand | Bau, Grün, BV |
@@ -60,6 +60,38 @@ Der Server erzwingt die Zustände, nicht nur die Oberfläche.
   - Sie geben danach erneut ab: Bau → Grün → BV, oder direkt an den BV, wenn nur ein Teil zurückging.
 - **geprueft:** Das WEP ist dauerhaft gesperrt. Nur BV oder Admin können es mit Begründung wieder öffnen; das wird protokolliert.
 - Jeder Zustandswechsel kommt mit Zeit, Person und Notiz in den **Verlauf** des WEP.
+
+#### Grün legt selbst an und führt zusammen (Korrektur vom 28.10.2026)
+
+Wie in v1 kann Grün auch ohne Bau ein WEP anlegen. Ablauf:
+
+1. Bau legt ein WEP an (Besitzer Bau, `bau_in_arbeit`).
+2. Grün legt unabhängig ein **eigenes Grün-WEP** an (Besitzer Grün, kein Bau-Konto, `gruen_in_arbeit`). Grün bearbeitet dort
+   alles außer dem Bau-Teil (Formalien, Grün-Teil, Fotos, Unterschrift Grün, Grün-Skizze). Bau sieht es nicht.
+3. Bau gibt sein WEP an einen Grün-Wertermittler ab (wie bisher).
+4. Grün nimmt das Bau-WEP an: **mit eigenem WEP zusammenführen** (Vorschlag nach Vorgangs-Nr., sonst Anlage + Parzelle;
+   Auswahl aus allen eigenen offenen WEPs) oder **ohne eigenes WEP weiterarbeiten** (wie bisher).
+5. Zusammenführen:
+   - Ergebnis ist das Bau-WEP (Kennung, Verlauf und Abgabe bleiben), Zustand weiter `gruen_in_arbeit`.
+   - Bau-Teil, Parzelle, Bau-Excel vom Bau-WEP; Grün-Teil, Grün-Skizze, Unterschrift Grün, Fotos an Grün-Positionen und
+     allgemeine Fotos aus dem Grün-WEP (Fotodateien kopiert der Server in R2).
+   - Stammdaten: Bau gilt. Unterschiede und im Bau-WEP leere Felder zeigt die Vorschau; Grün übernimmt je Feld den eigenen
+     Wert (leere Felder und der eigene Name als Grün-Wertermittler sind vorgewählt). Nur Hinweise, nichts gesperrt.
+   - Skizze: Die Grün-Elemente kommen auf die Bau-Skizze als Grundlage (wie „Grundlage übernehmen“). Ohne Bau-Grundlage
+     gezeichnet → Hinweis „Lage der Grün-Elemente zur Laube prüfen“.
+   - Vorschau vor dem Zusammenführen; rückgängig, solange nicht an den BV abgegeben (Bau-WEP wie vorher, eigenes WEP so
+     wie beim Zusammenführen).
+   - Das Grün-WEP wird nicht gelöscht, sondern als „zusammengeführt in <Bau-WEP>“ markiert und verschwindet aus allen
+     Listen; Verlauf in beiden WEPs.
+   - Offline: lokal sofort, der Server übernimmt beim Abgleich (erst das eigene WEP hoch, dann das Zusammenführen). An den
+     BV abgeben erst, wenn der Server den Stand hat.
+6. Grün gibt an den BV ab (wie bisher).
+7. Eigenes Grün-WEP ohne Bau darf Grün direkt an den BV abgeben – mit Rückfrage „Kein Bau-Teil – bewusst ohne Bau
+   abgeben?“. Rückfragen des BV gehen dann nur an Grün.
+
+Rechte (Server, `src/server/rechte.ts`): Schreibrecht `ohne_bau` im eigenen Grün-WEP; Zusammenführen nur durch das
+Grün-Konto, an das abgegeben wurde, nur mit eigenen offenen WEPs (`pruefeZusammenfuehren`); Bau sieht danach weiter nur
+lesend, Grün-Eigenes bleibt für Bau unsichtbar, bis es zusammengeführt ist.
 
 ### 3. Benachrichtigungen
 

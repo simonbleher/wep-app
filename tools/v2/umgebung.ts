@@ -22,6 +22,8 @@ import * as wepVerlauf from '../../functions/api/v2/weps/[id]/verlauf'
 import * as wepDateien from '../../functions/api/v2/weps/[id]/dateien'
 import * as wepDatei from '../../functions/api/v2/weps/[id]/dateien/[datei]'
 import * as wepAktion from '../../functions/api/v2/weps/[id]/aktion'
+import * as wepZusammen from '../../functions/api/v2/weps/[id]/zusammenfuehren'
+import * as wepZurueck from '../../functions/api/v2/weps/[id]/zusammenfuehren-zuruecknehmen'
 import * as gruenKontenListe from '../../functions/api/v2/konten/gruen'
 import * as benListe from '../../functions/api/v2/benachrichtigungen'
 import * as benGelesen from '../../functions/api/v2/benachrichtigungen/gelesen'
@@ -65,6 +67,8 @@ const ROUTEN: [RegExp, Modul, string?, string?][] = [
   [/^\/api\/v2\/weps\/([^/]+)\/dateien$/, wepDateien, 'id'],
   [/^\/api\/v2\/weps\/([^/]+)\/dateien\/([^/]+)$/, wepDatei, 'id', 'datei'],
   [/^\/api\/v2\/weps\/([^/]+)\/aktion$/, wepAktion, 'id'],
+  [/^\/api\/v2\/weps\/([^/]+)\/zusammenfuehren$/, wepZusammen, 'id'],
+  [/^\/api\/v2\/weps\/([^/]+)\/zusammenfuehren-zuruecknehmen$/, wepZurueck, 'id'],
   [/^\/api\/v2\/konten\/gruen$/, gruenKontenListe],
   [/^\/api\/v2\/benachrichtigungen$/, benListe],
   [/^\/api\/v2\/benachrichtigungen\/gelesen$/, benGelesen],

@@ -7,21 +7,33 @@ import { ICON, Meldung, Rueckfrage, zeitDe } from '@/app/ui'
 import { speichereWep } from '@/app/db'
 import { lokalesProfil } from '@/profil'
 import { istUnterschriftUrl } from '@/unterschrift'
-import { fuehreSchrittAus, ladeGruenKonten, ladeVerlauf, serverSicht, type GruenKonto, type VerlaufEintrag } from './ablaufDienst'
+import { fuehreSchrittAus, istEigenesGruenWep, ladeGruenKonten, ladeVerlauf, serverSicht, zustandVon, type GruenKonto, type VerlaufEintrag } from './ablaufDienst'
+import { ZusammenfuehrenStand } from './Zusammenfuehren'
 import { AKTION_TEXT, ZUSTAND_TEXT, type AblaufAktion, type Zustand } from './rechte'
 
 export function ZustandMarke({ zustand }: { zustand: Zustand }) {
   return <span className={`status zustand zustand-${zustand}`}>{ZUSTAND_TEXT[zustand]}</span>
 }
 
-const VERLAUF_TEXT: Record<string, string> = { ...AKTION_TEXT, angelegt: 'angelegt', bearbeitet: 'bearbeitet', geloescht: 'in den Papierkorb gelegt', wiederhergestellt: 'wiederhergestellt' }
+const VERLAUF_TEXT: Record<string, string> = {
+  ...AKTION_TEXT,
+  angelegt: 'angelegt',
+  bearbeitet: 'bearbeitet',
+  geloescht: 'in den Papierkorb gelegt',
+  wiederhergestellt: 'wiederhergestellt',
+  zusammengefuehrt: 'mit eigenem Grün-WEP zusammengeführt',
+  zusammengefuehrt_in: 'in ein Bau-WEP zusammengeführt',
+  zusammenfuehrung_zurueck: 'Zusammenführen rückgängig gemacht',
+}
 const TEIL = { bau: 'Bau', gruen: 'Grün', beide: 'Bau und Grün' } as const
 
 export function AbgabeBereich({ wep, onGeaendert }: { wep: Wep; onGeaendert: () => void }) {
   const id = useId()
   const sicht = serverSicht(wep)
   const a = wep.ablauf
-  const zustand: Zustand = a?.zustand ?? 'bau_in_arbeit'
+  const zustand: Zustand = zustandVon(wep)
+  // Eigenes Grün-WEP: kein Bau-Teil, Grün gibt selbst an den BV ab (mit Rückfrage „bewusst ohne Bau?“)
+  const ohneBau = istEigenesGruenWep(wep)
   const ersteAbgabeAnGruen = sicht.aktionen.includes('an_gruen') && !a?.gruen
   const [gruenKonten, setGruenKonten] = useState<GruenKonto[]>()
   const [gruen, setGruen] = useState('')
@@ -47,7 +59,7 @@ export function AbgabeBereich({ wep, onGeaendert }: { wep: Wep; onGeaendert: () 
   const gruenName = gruenKonten?.find((k) => k.id === gruen)?.name ?? a?.gruen?.name ?? ''
 
   // Bei der Abgabe kommt die eigene Unterschrift (Profil) für den eigenen Teil ins WEP – wie beim Paket für den BV in v1
-  const teil = sicht.recht === 'gruen' ? 'gruen' : 'bau'
+  const teil = sicht.recht === 'gruen' || sicht.recht === 'ohne_bau' ? 'gruen' : 'bau'
   const unterschrift = lokalesProfil.lade().profil.unterschrift
 
   async function ausfuehren(schritt: AblaufAktion) {
@@ -80,11 +92,11 @@ export function AbgabeBereich({ wep, onGeaendert }: { wep: Wep; onGeaendert: () 
         <dl className="werte">
           <div>
             <dt>Bau</dt>
-            <dd>{a?.bau?.name ?? 'du (noch nicht auf dem Server)'}</dd>
+            <dd>{ohneBau ? 'kein Bau-Teil (eigenes Grün-WEP)' : (a?.bau?.name ?? 'du (noch nicht auf dem Server)')}</dd>
           </div>
           <div>
             <dt>Grün</dt>
-            <dd>{a?.gruen?.name ?? 'noch nicht abgegeben'}</dd>
+            <dd>{a?.gruen?.name ?? (ohneBau ? 'du (noch nicht auf dem Server)' : 'noch nicht abgegeben')}</dd>
           </div>
         </dl>
         {a?.rueckfrage && (
@@ -97,6 +109,8 @@ export function AbgabeBereich({ wep, onGeaendert }: { wep: Wep; onGeaendert: () 
           </Meldung>
         )}
       </section>
+
+      <ZusammenfuehrenStand wep={wep} onGeaendert={onGeaendert} />
 
       <section className="abschnitt" aria-labelledby={`${id}-schritte`}>
         <h2 className="gruppenkopf" id={`${id}-schritte`}>
@@ -177,13 +191,13 @@ export function AbgabeBereich({ wep, onGeaendert }: { wep: Wep; onGeaendert: () 
 
       {frage && (
         <Rueckfrage
-          titel={frage.aktion === 'an_bv' ? 'An den BV abgeben?' : `An ${gruenName || 'Grün'} abgeben?`}
+          titel={frage.aktion === 'an_bv' ? (ohneBau ? 'Kein Bau-Teil – bewusst ohne Bau abgeben?' : 'An den BV abgeben?') : `An ${gruenName || 'Grün'} abgeben?`}
           text={
             frage.aktion === 'an_bv'
-              ? 'Danach kann niemand mehr am WEP arbeiten, bis der BV es prüft oder eine Rückfrage stellt.'
+              ? `${ohneBau ? 'Dieses WEP hat keinen Bau-Teil (kein Bau-Wertermittler beteiligt). ' : ''}Danach kann niemand mehr am WEP arbeiten, bis der BV es prüft oder eine Rückfrage stellt.`
               : `Danach kannst du das WEP nur noch lesen. ${gruenName || 'Grün'} bearbeitet den Grün-Teil und gibt an den BV ab.`
           }
-          bestaetigen="Abgeben"
+          bestaetigen={frage.aktion === 'an_bv' && ohneBau ? 'Ohne Bau abgeben' : 'Abgeben'}
           gefahr={false}
           onAbbrechen={() => setFrage(undefined)}
           onBestaetigen={() => void ausfuehren(frage)}

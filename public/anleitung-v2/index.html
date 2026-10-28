@@ -160,11 +160,11 @@
 <header class="titel">
   <h1>WEP-App mit Konten</h1>
   <p>Anleitung für Wertermittler und den Bezirksverband Pankow – Ablauf Bau → Grün → BV</p>
-  <p class="stand">Stand Oktober 2026 · Vorschau (v2) · Alle Namen und Daten in den Bildern sind erfunden.</p>
+  <p class="stand">Stand Oktober 2026 · v2 · Alle Namen und Daten in den Bildern sind erfunden.</p>
 </header>
 <main>
 
-<div class="achtung"><b>Vorschau:</b> Diese Fassung der App läuft zunächst nur unter <i>main.wep-pankow.pages.dev</i> zum Ausprobieren. Bitte dort <b>nur erfundene Testdaten</b> eingeben – keine echten Namen, Anschriften oder Protokolle.</div>
+<div class="achtung"><b>Nur Testdaten:</b> Bis der Vertrag mit dem BV steht, bitte <b>nur erfundene Testdaten</b> eingeben – keine echten Namen, Anschriften oder Protokolle.</div>
 
 <nav class="inhalt" aria-label="Inhalt">
   <h2>Inhalt</h2>
@@ -173,7 +173,7 @@
     <li><a href="#anmelden">Anmelden und Freigabe</a></li>
     <li><a href="#admin">Für Admins: Konten und Rollen</a></li>
     <li><a href="#bau">Bau: anlegen und an Grün abgeben</a></li>
-    <li><a href="#gruen">Grün: Grün-Teil und Abgabe an den BV</a></li>
+    <li><a href="#gruen">Grün: eigenes WEP, Zusammenführen, Abgabe an den BV</a></li>
     <li><a href="#bv">BV: prüfen, Rückfrage, geprüft</a></li>
     <li><a href="#rueckfrage">Eine Rückfrage beantworten</a></li>
     <li><a href="#neu">Benachrichtigungen</a></li>
@@ -184,11 +184,11 @@
 
 <section class="kapitel" id="ueberblick">
   <h2><span class="nr">1</span> Überblick: wer macht was</h2>
-  <p class="unter">Jedes WEP geht seinen festen Weg. An jedem WEP sind immer zwei Personen beteiligt: ein Bau- und ein Grün-Wertermittler.</p>
+  <p class="unter">Jedes WEP geht seinen festen Weg. In der Regel sind zwei Personen beteiligt: ein Bau- und ein Grün-Wertermittler. Grün kann – wie bisher – auch selbst ein WEP anlegen und es später mit dem WEP von Bau zusammenführen.</p>
   <div class="ablauf">
     <div><b>1. Bau in Arbeit</b>Der Bau-Wertermittler legt das WEP an und erfasst Formalien, Baulichkeiten, Mängel, Abwasser und Skizze Bau.</div>
     <div><b>2. An Grün</b>Er wählt den Grün-Wertermittler aus einer Liste und gibt ab. Danach kann er nur noch lesen.</div>
-    <div><b>3. Grün in Arbeit</b>Der Grün-Wertermittler erfasst Außenanlagen, Aufwuchs, Beseitigung, Skizze und Fotos – nur den Grün-Teil.</div>
+    <div><b>3. Grün in Arbeit</b>Der Grün-Wertermittler erfasst Außenanlagen, Aufwuchs, Beseitigung, Skizze und Fotos – nur den Grün-Teil. Hat er schon ein eigenes WEP, führt er es mit dem Bau-WEP zusammen.</div>
     <div><b>4. Beim BV</b>Grün gibt an den BV ab. Jetzt ist das WEP für beide gesperrt.</div>
     <div><b>5. Geprüft</b>Der BV prüft, druckt und markiert es als geprüft – oder stellt eine Rückfrage.</div>
   </div>
@@ -266,13 +266,38 @@
 </section>
 
 <section class="kapitel" id="gruen">
-  <h2><span class="nr">5</span> Grün: Grün-Teil und Abgabe an den BV</h2>
+  <h2><span class="nr">5</span> Grün: eigenes WEP, Zusammenführen, Abgabe an den BV</h2>
+  <div class="schritt">
+    <div>
+      <h3>Eigenes WEP anlegen (wie bisher)</h3>
+      <p>Mit <span class="knopf">Neues WEP</span> legen Sie ein eigenes WEP an – zum Beispiel, wenn Sie vor dem Bau-Wertermittler auf der Parzelle sind. Sie erfassen dort Formalien, Außenanlagen, Aufwuchs, Beseitigung, Fotos und die Grün-Skizze. Den Bau-Teil gibt es in Ihrem WEP nicht.</p>
+      <p>Der Bau-Wertermittler sieht Ihr eigenes WEP nicht.</p>
+    </div>
+  </div>
   <div class="schritt">
     <div>
       <h3>Das WEP kommt bei Ihnen an</h3>
       <p>Auf der Startseite erscheint es unter <b>Neu für dich</b>. Antippen öffnet das WEP; die App holt es dafür vom Server.</p>
     </div>
-    <figure><img src="bilder/06-neu-fuer-dich.jpg" alt="Neu für dich: WEP an dich abgegeben"><figcaption>Neu für dich</figcaption></figure>
+    <figure><img src="bilder/06-neu-fuer-dich.jpg" alt="Neu für dich: Bau-WEP an dich abgegeben"><figcaption>Neu für dich</figcaption></figure>
+  </div>
+  <div class="schritt">
+    <div>
+      <h3>Mit Ihrem eigenen WEP zusammenführen – oder ohne</h3>
+      <p>Haben Sie eigene offene WEPs, fragt die App beim abgegebenen Bau-WEP: <b>Mit meinem WEP zusammenführen</b> oder <b>Ohne eigenes WEP weiterarbeiten</b>. Passende WEPs (gleiche Vorgangs-Nr., sonst gleiche Anlage und Parzelle) stehen oben; Sie können aber jedes Ihrer offenen WEPs wählen.</p>
+      <p>Ohne eigenes WEP erfassen Sie den Grün-Teil direkt im Bau-WEP.</p>
+    </div>
+    <figure><img src="bilder/13-annahme.jpg" alt="Hinweis: Bau-WEP für dich – mit deinem eigenen WEP zusammenführen?"><figcaption>Annehmen</figcaption></figure>
+  </div>
+  <div class="schritt">
+    <div>
+      <h3>Vorschau: was übernommen wird</h3>
+      <p>Vor dem Zusammenführen zeigt die App, was aus Ihrem WEP kommt: Positionen, Grün-Skizze, Fotos und Ihre Unterschrift. Der Bau-Teil bleibt, wie der Bau-Wertermittler ihn erfasst hat.</p>
+      <p><b>Stammdaten</b> (Vorgangs-Nr., Anlage, Parzelle, Pächter …): Es gilt das Bau-WEP. Wo sich die Werte unterscheiden oder im Bau-WEP etwas fehlt, kreuzen Sie an, ob Ihr Wert übernommen wird.</p>
+      <p>Ihre Grün-Elemente kommen auf die Bau-Skizze. Haben Sie ohne Bau-Grundlage gezeichnet, prüfen Sie danach die Lage zur Laube.</p>
+      <p>Danach gibt es <b>ein</b> WEP – das Bau-WEP. Ihr eigenes WEP verschwindet aus der Liste. Rückgängig machen geht im Reiter <span class="knopf">Abgabe</span>, solange Sie nicht an den BV abgegeben haben. Zusammenführen geht auch ohne Netz; der Server übernimmt es beim nächsten Abgleich.</p>
+    </div>
+    <figure><img src="bilder/14-zusammenfuehren.jpg" alt="Dialog Mit eigenem WEP zusammenführen mit Vorschau und Stammdaten"><figcaption>Zusammenführen</figcaption></figure>
   </div>
   <div class="schritt">
     <div>
@@ -287,6 +312,7 @@
       <h3>An den BV abgeben</h3>
       <p>Im Reiter <span class="knopf">Abgabe</span> auf <span class="knopf">An den BV abgeben</span> und bestätigen. Ihre Unterschrift kommt für den Grün-Teil ins WEP. Danach ist das WEP für Bau und Grün gesperrt.</p>
       <p>Unten steht der <b>Verlauf</b>: wer wann was getan hat.</p>
+      <p><b>Eigenes WEP ohne Bau</b> (reine Grün-Wertermittlung): Sie können es direkt an den BV abgeben. Die App fragt nach: „Kein Bau-Teil – bewusst ohne Bau abgeben?“</p>
     </div>
     <figure><img src="bilder/08-an-den-bv.jpg" alt="Reiter Abgabe mit „An den BV abgeben“ und Verlauf"><figcaption>Abgabe an den BV</figcaption></figure>
   </div>
@@ -355,7 +381,9 @@
   <h2><span class="nr">10</span> Häufige Fragen</h2>
   <dl class="fragen">
     <dt>Ich sehe kein „Neues WEP“.</dt>
-    <dd>Neue WEPs legt der Bau-Wertermittler an. Haben Sie die Rolle Grün, kommen die WEPs nach der Abgabe zu Ihnen.</dd>
+    <dd>Neue WEPs legen die Wertermittler Bau und Grün an. Hat Ihr Konto noch keine dieser Rollen, fragen Sie den Admin.</dd>
+    <dt>Ich habe aus Versehen zusammengeführt.</dt>
+    <dd>Im Reiter „Abgabe“ auf „Zusammenführen rückgängig machen“ – solange das WEP nicht beim BV ist. Was Sie seither am Grün-Teil geändert haben, geht dabei verloren.</dd>
     <dt>Ich habe nach der Abgabe noch etwas vergessen.</dt>
     <dd>Bitten Sie den BV um eine Rückfrage an Ihren Teil. Dann können Sie wieder bearbeiten.</dd>
     <dt>Die Abgabe klappt nicht: „noch nicht beim Server“.</dt>
@@ -365,7 +393,7 @@
   </dl>
 </section>
 
-<footer>WEP-App mit Konten (Vorschau v2) · Wertermittlungsprotokoll für den Bezirksverband Pankow · <a href="../datenschutz.html">Datenschutzerklärung</a> · <a href="../nutzungsbedingungen.html">Nutzungsbedingungen</a></footer>
+<footer>WEP-App mit Konten (v2) · Wertermittlungsprotokoll für den Bezirksverband Pankow · <a href="../datenschutz.html">Datenschutzerklärung</a> · <a href="../nutzungsbedingungen.html">Nutzungsbedingungen</a></footer>
 </main>
 </body>
 </html>

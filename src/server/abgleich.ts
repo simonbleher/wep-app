@@ -13,6 +13,10 @@
 //   „andere Fassung“ sichtbar.
 // - „Endgültig löschen“ entfernt das WEP nur auf diesem Gerät; auf dem Server bleibt es im Papierkorb
 //   (Aufbewahrungsregeln des BV, docs/PLAN-V2.md).
+// - Zusammenführen (Grün: eigenes WEP → abgegebenes Bau-WEP) geht auch ohne Netz: Das Bau-WEP trägt die Vormerkung
+//   (`SyncMeta.zusammenfuehrung`), das eigene WEP ist nur ausgeblendet. Beim Abgleich wird zuerst das eigene WEP
+//   hochgeladen, dann übernimmt der Server das Zusammenführen; danach verschwindet das eigene WEP von diesem Gerät.
+//   Lehnt der Server ab (z. B. schon an den BV abgegeben), gilt sein Stand, das eigene WEP ist wieder in der Liste.
 import type { Wep } from '@/model'
 import { metaMit, papierkorbMeta } from '@/sync/papierkorb'
 import type { KonfliktInfo, LokalSpeicher, SyncErgebnis, SyncMeta } from '@/sync/types'
@@ -53,6 +57,8 @@ export interface ServerZugriff {
   speichere(wep: Wep, basisRev: number): Promise<ServerKopf>
   loesche(id: string, basisRev: number): Promise<ServerKopf>
   stelleWiederHer(id: string): Promise<ServerKopf>
+  /** Eigenes Grün-WEP `aus` in das Bau-WEP `wep.id` zusammenführen (src/server/zusammenfuehren.ts). */
+  fuehreZusammen(wep: Wep, basisRev: number, aus: string, felder: readonly string[]): Promise<ServerKopf>
 }
 
 export interface ServerAbgleichOptionen {
@@ -162,11 +168,50 @@ export async function serverAbgleich(opt: ServerAbgleichOptionen): Promise<SyncE
     erg.konflikte.push({ wepId: w.id, text: wo === 'hier' ? 'Hier gelöscht, auf dem Server aber noch geändert.' : 'Auf dem Server gelöscht, hier aber noch geändert.' })
   }
 
-  // 1. Aktive WEPs dieses Geräts
-  for (const w of weps) {
+  /** Vorgemerktes Zusammenführen an den Server geben (das eigene WEP ist in dieser Runde schon hochgeladen). */
+  async function zusammenfuehren(w: Wep, m: SyncMeta, s: ServerKopf) {
+    const z = m.zusammenfuehrung!
+    const eigenes = async (felder: Partial<SyncMeta>) => {
+      const gm = (await lokal.alleMeta()).find((x) => x.id === z.aus)
+      if (gm) await lokal.setzeMeta(metaMit(gm, z.aus, jetzt(), felder))
+    }
+    let kopf: ServerKopf
+    try {
+      // Der Bau-Teil kommt immer vom Server; deshalb genügt die Revision aus der Liste dieser Runde
+      kopf = await server.fuehreZusammen(w, s.rev, z.aus, z.felder)
+    } catch (e) {
+      if (!(e instanceof AbgleichFehler) || e.status < 400 || e.status >= 500) throw e
+      // Abgelehnt: der Stand des Servers gilt, das Zusammengeführte bleibt als andere Fassung sichtbar, das eigene WEP kommt zurück
+      const stand = e.stand ?? (await server.lade(w.id))
+      const konflikt: KonfliktInfo = { art: 'zwei-geraete', erkanntAm: jetzt(), geraet: stand.kopf.geaendertVon, fassung: w, fassungGeaendertAm: m.lokalGeaendertAm, kopien: [] }
+      await lokal.schreibe({ id: w.id, wep: stand.wep, meta: abgeglichen(m, w.id, stand.kopf.rev, { zusammenfuehrung: undefined, konflikt }) })
+      await eigenes({ zusammengefuehrtIn: undefined })
+      erg.fehler.push({ wepId: w.id, text: `Zusammenführen nicht möglich: ${e.message} Dein eigenes WEP ist wieder in der Liste.` })
+      return
+    }
+    const aktuell = (await lokal.alleMeta()).find((x) => x.id === w.id)
+    if (!aktuell || aktuell.lokalGeaendertAm === m.lokalGeaendertAm) {
+      const stand = await server.lade(w.id)
+      await lokal.schreibe({ id: w.id, wep: stand.wep, meta: abgeglichen(aktuell ?? m, w.id, stand.kopf.rev, { zusammenfuehrung: undefined }) })
+    } else {
+      // Während des Abgleichs hier weiter geändert: die Änderung wartet weiter (nächste Runde, wie jede Änderung am Grün-Teil)
+      await lokal.setzeMeta(metaMit(aktuell, w.id, jetzt(), { serverRev: kopf.rev, zusammenfuehrung: undefined }))
+    }
+    // Das eigene WEP ist auf dem Server „zusammengeführt“ und für niemanden mehr sichtbar: von diesem Gerät entfernen
+    await lokal.schreibe({ id: z.aus, wep: null, meta: null })
+    erg.hochgeladen.push(w.id)
+  }
+
+  // 1. Aktive WEPs dieses Geräts – vorgemerktes Zusammenführen zuletzt (das eigene WEP muss vorher auf dem Server sein)
+  const reihenfolge = [...weps].sort((x, y) => Number(Boolean(metaVon.get(x.id)?.zusammenfuehrung)) - Number(Boolean(metaVon.get(y.id)?.zusammenfuehrung)))
+  for (const w of reihenfolge) {
     const m = metaVon.get(w.id)
     const s = kopfVon.get(w.id)
     try {
+      if (m?.zusammenfuehrung && s && !s.geloeschtAm) {
+        await zusammenfuehren(w, m, s)
+        continue
+      }
       if (!s) {
         if (m?.serverRev === undefined) await hochladen(w, m, 0)
         else if (!wartetAufUpload(m)) {
