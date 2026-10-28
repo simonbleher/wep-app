@@ -197,6 +197,8 @@ Microsoft-Konto (dem, mit dem du auch OneDrive nutzt).
    ist bei privaten Konten nicht nötig – du stimmst beim ersten Verbinden selbst zu.
 7. **Kein** geheimer Clientschlüssel und **kein** Zertifikat anlegen – eine
    Browser-App braucht das nicht (Anmeldung per Authorization Code + PKCE).
+   Ausnahme ab v2: Der Server (Server-Modus) bekommt zusätzlich die Plattform „Web“ mit
+   eigenem Geheimnis, siehe docs/V2-EINRICHTUNG.md. Die App selbst bleibt ohne Geheimnis.
 
 ## Alle Microsoft-Konten (persönlich und Geschäfts-/Schulkonto)
 

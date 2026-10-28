@@ -2902,3 +2902,13 @@ input[type='range'] {
   max-width: 640px;
   padding-top: var(--abstand-7);
 }
+
+/* Server-Modus (v2, docs/PLAN-V2.md): Hinweis-Band, nur in Vorschau-Builds mit VITE_SERVER_MODUS=true */
+.vorschau-band {
+  padding: calc(env(safe-area-inset-top, 0px) + 4px) 16px 4px;
+  background: var(--farbe-akzent-hell);
+  color: var(--farbe-text);
+  font-size: var(--schrift-klein);
+  text-align: center;
+  border-bottom: var(--linie) solid var(--farbe-linie);
+}

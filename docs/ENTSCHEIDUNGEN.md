@@ -383,3 +383,11 @@
 - **Entscheidung:** Das Feld „Standard-Kleingartenanlage“ (Vorbelegung neuer WEPs) entfällt ganz. Die Anlage wird je WEP in den Formalien gewählt.
 - **Grund:** Wunsch von Simon. Die Anlage ist je WEP verschieden; eine Vorbelegung kann unbemerkt falsch stehen bleiben.
 - **Alte Daten:** Ein gespeichertes `standardAnlage` wird beim Laden des Profils verworfen; ältere Apps, die es noch in `daten/profil.json` schreiben, stören nicht (das Feld wird nicht gelesen). Das Profil-Format bleibt `wep-profil/1`.
+
+## 2026-10-28 · v2 hinter einem Schalter auf main
+
+- **Entscheidung:** v2 (Server, Konten mit Rollen, Abgabe-Ablauf) entsteht auf `main` hinter `VITE_SERVER_MODUS` (Build, Web) und `SERVER_MODUS` (Functions). Beide sind nur bei genau `true` an, zuerst nur in der Cloudflare-Umgebung Vorschau (`main.wep-pankow.pages.dev`). Ohne Schalter antwortet `/api/v2/*` mit 404 und die App verhält sich wie v1.
+- **Grund:** `main` muss jederzeit über „Version freigeben“ freigebbar bleiben, Fehlerbehebungen für v1 laufen parallel weiter. Ein langlebiger v2-Branch würde ständig mit main kollidieren.
+- **Speicherort:** D1 und R2 mit Jurisdiktion EU (nur beim Anlegen wählbar). Taucht der EU-Bucket in der Pages-Bindung nicht auf, kommt die Bindung über `wrangler.toml` (Entscheidung in Paket 1).
+- **Anmeldung (Rahmen für Paket 1):** serverseitiger OIDC-Ablauf mit Client-Geheimnis für Google und Microsoft (Microsoft: zusätzliche Plattform „Web“ an der bestehenden Registrierung; die SPA-Anmeldung von v1 bleibt ohne Geheimnis). Sitzungen als Zufalls-Token, in D1 nur der Hash.
+- **Service Worker:** Seitenaufrufe unter `/api/` werden nicht mehr auf die App umgeleitet (sonst landen `/api/v2/status` und die Anmelde-Rücksprünge in der App statt bei der Function). Für v1 ohne Wirkung, dort werden `/api/`-Adressen nur per `fetch` aufgerufen.

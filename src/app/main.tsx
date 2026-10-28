@@ -6,6 +6,8 @@ import { registerSW } from 'virtual:pwa-register'
 import App from './App'
 import { istWindowsApp } from '@/windows/plattform'
 import { wendeKontrastAn } from '@/profil'
+import { serverModus } from '@/server/modus'
+import { VorschauBand } from '@/server/VorschauBand'
 import '@/design/tokens.css'
 import './styles.css'
 
@@ -41,6 +43,7 @@ const istBvSeite = /^\/bv(\/|$)/.test(window.location.pathname)
 
 createRoot(container).render(
   <StrictMode>
+    {serverModus && <VorschauBand />}
     {istBvSeite ? (
       <Suspense fallback={<div className="app" aria-busy="true" />}>
         <BvApp />
