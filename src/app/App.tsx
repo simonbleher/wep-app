@@ -13,6 +13,23 @@ import {
 import { ladeUpdateDienst } from './updateModul'
 import { setzeAbgleichZurueck } from '@/sync'
 import { aendereProfil, lokalesProfil } from '@/profil'
+
+/** Server-Modus: Zu welchem Konto gehört das Profil dieses Geräts (Name, Unterschrift)? */
+const PROFIL_VON = 'wep-v2-profil-konto'
+function profilVon(): string | null {
+  try {
+    return localStorage.getItem(PROFIL_VON)
+  } catch {
+    return null
+  }
+}
+function merkeProfilVon(id: string): void {
+  try {
+    localStorage.setItem(PROFIL_VON, id)
+  } catch {
+    /* ohne Speicher wird beim nächsten Start erneut zurückgesetzt */
+  }
+}
 import { LoginBildschirm } from './LoginBildschirm'
 import { Papierkorb } from './Papierkorb'
 import { Profil } from './Profil'
@@ -115,11 +132,17 @@ export default function App({ v2 }: { v2?: V2Sitzung } = {}) {
 
   // Server-Modus: die Rolle (Bau oder Grün) vergibt der Admin; sie gilt im Profil und für neue WEPs
   const serverRolle = v2?.konto.rollen.includes('bau') ? 'bau' : v2?.konto.rollen.includes('gruen') ? 'gruen' : undefined
+  const kontoId = v2?.konto.id
   useEffect(() => {
-    if (!serverRolle) return
+    if (!kontoId) return
+    // Andere Person auf diesem Gerät: Name, Unterschrift und eigene Baupreisindex-Werte gehören zur vorigen Person
+    if (profilVon() !== kontoId) {
+      aendereProfil({ name: v2?.konto.name ?? '', unterschrift: undefined, baupreisindex: undefined })
+      merkeProfilVon(kontoId)
+    }
     const { profil } = lokalesProfil.lade()
-    if (profil.rolle !== serverRolle || !profil.name.trim()) aendereProfil({ rolle: serverRolle, name: profil.name.trim() || v2?.konto.name || '' })
-  }, [serverRolle, v2?.konto.name])
+    if (serverRolle && (profil.rolle !== serverRolle || !profil.name.trim())) aendereProfil({ rolle: serverRolle, name: profil.name.trim() || v2?.konto.name || '' })
+  }, [kontoId, serverRolle, v2?.konto.name])
 
   // Server-Modus: Anmeldung und Abgleich laufen über den Server (Statuszeile zeigt den Server-Abgleich)
   const verfuegbar = v2 ? true : kontoVerfuegbar()

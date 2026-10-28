@@ -3,7 +3,7 @@
 // „Drucken“. Nur lesend – am WEP selbst ändert der BV nichts.
 import { useEffect, useId, useMemo, useState } from 'react'
 import { ChevronLeft, FileText, FileType, Printer, Trash2 } from 'lucide-react'
-import { hatBauTeil, hatGruenTeil, vorgangsNrVon, wepName } from '@/model'
+import { hatBauTeil, hatGruenTeil, vorgangsNrVon, wepName, type Rolle, type Wep } from '@/model'
 import { fotoDateiNamen, positionsListe } from '@/fotos/benennung'
 import { lageVon, skizzeMitParzelle } from '@/parzelle'
 import { skizzeAlsPng } from '@/skizze/skizzePng'
@@ -39,15 +39,15 @@ function useBildUrl(erzeuge: () => Promise<Blob | undefined>, deps: unknown[]): 
   return url
 }
 
-function Skizzen({ e }: { e: BvEingang }) {
-  const rolle = bvRolle(e)
-  const gruen = hatGruenTeil(rolle) ? skizzeMitParzelle(e.wep) : undefined
-  const bau = hatBauTeil(rolle) && (e.wep.grundriss?.teile.length || lageVon(e.wep)) ? e.wep.grundriss : undefined
+/** Skizzen Bau und Grün als Bilder (auch für die Kontrollseite im Server-Modus). `schluessel` ändert sich mit dem Stand. */
+export function Skizzen({ wep, rolle, schluessel }: { wep: Wep; rolle: Rolle; schluessel: string }) {
+  const gruen = hatGruenTeil(rolle) ? skizzeMitParzelle(wep) : undefined
+  const bau = hatBauTeil(rolle) && (wep.grundriss?.teile.length || lageVon(wep)) ? wep.grundriss : undefined
   const bauUrl = useBildUrl(
-    async () => (hatBauTeil(rolle) ? grundrissAlsPng(bau ?? { teile: [] }, e.wep.bau?.bauteile ?? [], lageVon(e.wep), 1200, SKIZZEN_VERHAELTNIS) : undefined),
-    [e.id],
+    async () => (hatBauTeil(rolle) ? grundrissAlsPng(bau ?? { teile: [] }, wep.bau?.bauteile ?? [], lageVon(wep), 1200, SKIZZEN_VERHAELTNIS) : undefined),
+    [schluessel],
   )
-  const gruenUrl = useBildUrl(async () => (gruen?.elemente.length ? skizzeAlsPng(gruen) : undefined), [e.id])
+  const gruenUrl = useBildUrl(async () => (gruen?.elemente.length ? skizzeAlsPng(gruen) : undefined), [schluessel])
   if (!bauUrl && !gruenUrl) return null
   return (
     <section className="ueb-abschnitt bv-skizzen">
@@ -68,8 +68,8 @@ function Skizzen({ e }: { e: BvEingang }) {
   )
 }
 
-function Foto({ e, fotoId, titel }: { e: BvEingang; fotoId: string; titel: string }) {
-  const url = useBildUrl(() => ladeFoto(e.id, fotoId), [e.id, fotoId])
+function Foto({ lade, schluessel, fotoId, titel }: { lade: FotoLaden; schluessel: string; fotoId: string; titel: string }) {
+  const url = useBildUrl(() => lade(fotoId), [schluessel, fotoId])
   return (
     <figure className="bv-foto">
       {url ? <img src={url} alt={titel} loading="lazy" /> : <div className="bv-foto-leer" />}
@@ -78,23 +78,26 @@ function Foto({ e, fotoId, titel }: { e: BvEingang; fotoId: string; titel: strin
   )
 }
 
-function Fotos({ e }: { e: BvEingang }) {
+type FotoLaden = (fotoId: string) => Promise<Blob | undefined>
+
+/** Fotos mit Position und Text. `fotoIds`: nur diese (fehlt = alle im WEP); `lade` holt die Bilddatei. */
+export function Fotos({ wep, fotoIds, lade, schluessel }: { wep: Wep; fotoIds?: string[]; lade: FotoLaden; schluessel: string }) {
   const liste = useMemo(() => {
-    const namen = positionsListe(e.wep)
-    return fotoDateiNamen(e.wep)
-      .filter(({ foto }) => e.fotoIds.includes(foto.id))
+    const namen = positionsListe(wep)
+    return fotoDateiNamen(wep)
+      .filter(({ foto }) => !fotoIds || fotoIds.includes(foto.id))
       .map(({ foto, nr }) => ({
         id: foto.id,
         titel: [nr ? `${nr}. ${namen.find((p) => p.nr === nr)?.name ?? ''}` : 'Parzelle allgemein', foto.text?.trim()].filter(Boolean).join(' – '),
       }))
-  }, [e])
+  }, [wep, fotoIds])
   if (!liste.length) return null
   return (
     <section className="ueb-abschnitt">
       <h2 className="ueb-h2">Fotos ({liste.length})</h2>
       <div className="bv-fotos">
         {liste.map((f) => (
-          <Foto key={f.id} e={e} fotoId={f.id} titel={f.titel} />
+          <Foto key={f.id} lade={lade} schluessel={schluessel} fotoId={f.id} titel={f.titel} />
         ))}
       </div>
     </section>
@@ -236,8 +239,8 @@ export function BvDetail({
         hinweis={`Stand beim Wertermittler: ${zeitDe(e.stand)}${e.appVersion ? ` · App ${e.appVersion}` : ''}`}
         unten={
           <>
-            <Skizzen e={e} />
-            <Fotos e={e} />
+            <Skizzen wep={e.wep} rolle={rolle} schluessel={e.id} />
+            <Fotos wep={e.wep} fotoIds={e.fotoIds} lade={(fotoId) => ladeFoto(e.id, fotoId)} schluessel={e.id} />
           </>
         }
       />
