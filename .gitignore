@@ -15,6 +15,7 @@ dev-dist/
 # Rohantworten des KI-Testlaufs
 /tools/ki-test/ausgaben/
 dist-e2e/
+dist-e2e-v2/
 
 # Prüfberichte von tools/pruef-weps (enthalten Personendaten aus echten WEPs)
 pruefbericht.*

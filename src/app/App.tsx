@@ -19,13 +19,16 @@ import { Startseite } from './Startseite'
 import { WepDetail } from './WepDetail'
 import { TeilenOeffnen } from './TeilenOeffnen'
 import { beobachteEingang, holeEingang } from '@/teilen/eingang'
+import { KontenVerwalten } from '@/server/KontenVerwalten'
+import type { V2Sitzung } from '@/server/V2Tor'
 
-type Ansicht = { typ: 'start' } | { typ: 'detail'; wepId: string } | { typ: 'profil' } | { typ: 'papierkorb' }
+type Ansicht = { typ: 'start' } | { typ: 'detail'; wepId: string } | { typ: 'profil' } | { typ: 'papierkorb' } | { typ: 'konten' }
 
 /** lade = Start wird gerade geklärt, login = Login-Bildschirm, bereit = App läuft. */
 type Phase = 'lade' | 'login' | 'bereit'
 
-export default function App() {
+/** `v2`: Server-Modus (docs/PLAN-V2.md) – angemeldet über den Server, kein OneDrive-Sync, kein Microsoft-Login der App. */
+export default function App({ v2 }: { v2?: V2Sitzung } = {}) {
   const [ansicht, setAnsicht] = useState<Ansicht>({ typ: 'start' })
   const [phase, setPhase] = useState<Phase>('lade')
   const [konto, setKonto] = useState<Konto | null>(null)
@@ -42,6 +45,11 @@ export default function App() {
 
   useEffect(() => {
     let aktiv = true
+    if (v2) {
+      // Server-Modus: die Anmeldung hat V2Tor erledigt; OneDrive bleibt aus. v2 gilt für die ganze Laufzeit.
+      setPhase('bereit')
+      return
+    }
     void startZustand().then((s) => {
       if (!aktiv) return
       setKonto(s.typ === 'start' ? s.konto : null)
@@ -104,6 +112,9 @@ export default function App() {
     }
   }, [])
 
+  // Server-Modus: kein OneDrive, daher keine Abgleich-Anzeige und keine Microsoft-Anmeldung der App
+  const verfuegbar = v2 ? false : kontoVerfuegbar()
+
   if (phase === 'lade') return <div className="app" aria-busy="true" />
   if (phase === 'login') {
     return (
@@ -119,7 +130,7 @@ export default function App() {
         <Startseite
           key={`start-${eingespielt}`}
           konto={konto}
-          verfuegbar={kontoVerfuegbar()}
+          verfuegbar={verfuegbar}
           onOeffnen={(wepId) => setAnsicht({ typ: 'detail', wepId })}
           onProfil={() => setAnsicht({ typ: 'profil' })}
           onPapierkorb={() => setAnsicht({ typ: 'papierkorb' })}
@@ -128,7 +139,7 @@ export default function App() {
       ) : ansicht.typ === 'papierkorb' ? (
         <Papierkorb
           konto={konto}
-          verfuegbar={kontoVerfuegbar()}
+          verfuegbar={verfuegbar}
           onZurueck={() => setAnsicht({ typ: 'start' })}
           onProfil={() => setAnsicht({ typ: 'profil' })}
           onOeffnen={(wepId) => setAnsicht({ typ: 'detail', wepId })}
@@ -136,11 +147,15 @@ export default function App() {
       ) : ansicht.typ === 'profil' ? (
         <Profil
           konto={konto}
-          verfuegbar={kontoVerfuegbar()}
+          verfuegbar={verfuegbar}
           onZurueck={() => setAnsicht({ typ: 'start' })}
           onAnmelden={() => void melden()}
           onAbmelden={() => void abmelden_()}
+          v2={v2}
+          onKontenVerwalten={() => setAnsicht({ typ: 'konten' })}
         />
+      ) : ansicht.typ === 'konten' ? (
+        v2 && <KontenVerwalten ich={v2.konto} onZurueck={() => setAnsicht({ typ: 'profil' })} onProfil={() => setAnsicht({ typ: 'profil' })} />
       ) : (
         <WepDetail
           key={`${ansicht.wepId}-${eingespielt}`}

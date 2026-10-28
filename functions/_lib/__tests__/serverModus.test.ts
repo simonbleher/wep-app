@@ -1,6 +1,9 @@
 // v2-Schalter auf dem Server: ohne SERVER_MODUS gibt es /api/v2/ nicht; der Status zeigt nur ja/nein.
+import { readdirSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { einrichtung, istServerModus } from '../serverModus'
+import { einrichtung, istServerModus, SCHEMA_ERWARTET } from '../serverModus'
+import { testDb } from './sqliteDb'
 import { onRequest as middleware } from '../../api/v2/_middleware'
 import { onRequestGet as status } from '../../api/v2/status'
 
@@ -27,9 +30,18 @@ describe('Server-Modus (Functions)', () => {
     expect(JSON.parse(text)).toEqual({
       serverModus: true,
       einrichtung: { datenbank: true, dateien: false, google: true, microsoft: false, mail: false, admins: false },
+      schema: { stand: 0, erwartet: SCHEMA_ERWARTET },
     })
     expect(text).not.toContain('geheim')
     expect(text).not.toContain('googleusercontent')
     expect(einrichtung({}).datenbank).toBe(false)
+  })
+
+  it('Schema-Stand: mit allen Migrationen genau der erwartete Stand, ohne Datenbank null', async () => {
+    const mit = await (await status({ env: { SERVER_MODUS: 'true', WEP_DB: testDb() } })).json()
+    expect(mit.schema).toEqual({ stand: SCHEMA_ERWARTET, erwartet: SCHEMA_ERWARTET })
+    expect((await (await status({ env: {} })).json()).schema.stand).toBeNull()
+    // eine neue Migration muss SCHEMA_ERWARTET mitziehen
+    expect(readdirSync(join(__dirname, '../../../migrations')).filter((d) => d.endsWith('.sql'))).toHaveLength(SCHEMA_ERWARTET)
   })
 })

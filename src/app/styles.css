@@ -2912,3 +2912,56 @@ input[type='range'] {
   text-align: center;
   border-bottom: var(--linie) solid var(--farbe-linie);
 }
+
+/* Server-Modus (v2): Anmeldung über Links, Konten verwalten */
+.login a.knopf {
+  text-decoration: none;
+}
+
+.konto-zeile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--abstand-2);
+  padding: var(--abstand-4) 0;
+  border-bottom: var(--linie) solid var(--farbe-linie);
+}
+
+.konto-kopf {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--abstand-3);
+  align-items: baseline;
+}
+
+.konto-status {
+  font-size: var(--schrift-klein);
+  white-space: nowrap;
+}
+
+.konto-status-wartet {
+  font-weight: var(--gewicht-fett);
+}
+
+.konto-status-gesperrt {
+  color: var(--farbe-warnung);
+}
+
+.konto-rollen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--abstand-3) var(--abstand-5);
+  align-items: end;
+}
+
+.konto-rollen label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--abstand-1);
+}
+
+.konto-rollen .konto-haken {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--abstand-2);
+  min-height: var(--beruehr-min);
+}

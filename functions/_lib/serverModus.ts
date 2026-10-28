@@ -37,5 +37,23 @@ export function einrichtung(env: V2Umgebung) {
   }
 }
 
+/** Höchste Migration in migrations/ – so weit muss die Datenbank eingespielt sein. */
+export const SCHEMA_ERWARTET = 1
+
+interface SchemaDb {
+  prepare(sql: string): { first<T>(): Promise<T | null> }
+}
+
+/** Eingespielter Stand der Datenbank (0 = noch keine Tabellen, undefined = keine Datenbank). */
+export async function schemaStand(env: V2Umgebung): Promise<number | undefined> {
+  const db = env.WEP_DB as SchemaDb | undefined
+  if (!db) return undefined
+  try {
+    return (await db.prepare('SELECT max(nummer) AS n FROM schema_stand').first<{ n: number | null }>())?.n ?? 0
+  } catch {
+    return 0
+  }
+}
+
 export const jsonAntwort = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' } })

@@ -30,6 +30,7 @@
     "beta4-paket3:export-bild": "vite-node --config tools/ki-test/vite.config.ts tools/beta4-paket3/export-bild.ts --",
     "anleitung": "VITE_MS_CLIENT_ID=00000000-0000-0000-0000-000000000000 vite build --outDir dist-e2e && node tools/anleitung/screenshots.mjs && node tools/anleitung/pdf.mjs",
     "e2e": "VITE_MS_CLIENT_ID=00000000-0000-0000-0000-000000000000 vite build --outDir dist-e2e && node tools/e2e/konto-durchlauf.mjs",
+    "v2:durchlauf": "vite-node --config tools/ki-test/vite.config.ts tools/v2/durchlauf.ts",
     "umbau:screenshots": "VITE_MS_CLIENT_ID=00000000-0000-0000-0000-000000000000 vite build --outDir dist-e2e && node tools/umbau/screenshots.mjs",
     "icons": "node tools/icons/erzeuge-icons.mjs",
     "icons:windows": "node tools/icons/erzeuge-windows-icons.mjs",

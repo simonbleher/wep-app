@@ -48,7 +48,20 @@ Die Namen müssen genau so geschrieben sein.
    - **Variablenname:** `WEP_DB`
    - **D1-Datenbank:** `wep-v2-vorschau`
 
-Die Tabellen legt Paket 1 an (Migrationen). Wie sie eingespielt werden, steht dann hier.
+### Tabellen einspielen (Migrationen)
+
+Die Tabellen stehen im Repo unter `migrations/` (`0001_konten.sql`, später `0002_…`). Jede Datei
+wird **genau einmal und in der Reihenfolge der Nummern** eingespielt:
+
+1. Dashboard → **D1** → `wep-v2-vorschau` → Reiter **Konsole** (*Console*).
+2. Den ganzen Inhalt der nächsten Datei aus `migrations/` (auf GitHub öffnen → **Raw** → alles
+   kopieren) einfügen → **Ausführen** (*Execute*).
+3. Prüfen: `https://main.wep-pankow.pages.dev/api/v2/status` zeigt unter `schema` den Stand.
+   `"stand"` muss gleich `"erwartet"` sein. Ist `stand` kleiner, fehlt die nächste Datei. Eine Datei
+   ein zweites Mal einspielen schlägt fehl („table … already exists“); das schadet nicht.
+
+Wer die Kommandozeile mag, nimmt stattdessen
+`npx wrangler d1 execute wep-v2-vorschau --remote --file=migrations/0001_konten.sql`.
 
 ## 2. Dateispeicher (R2) mit Speicherort EU
 
@@ -152,7 +165,7 @@ Die vorhandene Registrierung **WEP-App** bekommt **zusätzlich** die Plattform �
 2. Im Browser öffnen: `https://main.wep-pankow.pages.dev/api/v2/status`. Erwartet wird etwa:
 
    ```json
-   {"serverModus":true,"einrichtung":{"datenbank":true,"dateien":true,"google":true,"microsoft":true,"mail":true,"admins":true}}
+   {"serverModus":true,"einrichtung":{"datenbank":true,"dateien":true,"google":true,"microsoft":true,"mail":true,"admins":true},"schema":{"stand":1,"erwartet":1}}
    ```
 
    - Steht dort `false`, fehlt der Teil oder ist falsch geschrieben (siehe Tabelle oben).
@@ -160,7 +173,14 @@ Die vorhandene Registrierung **WEP-App** bekommt **zusätzlich** die Plattform �
    - Die Seite zeigt **nie** Werte oder Geheimnisse, nur ja oder nein.
 3. Die Vorschau-App (`https://main.wep-pankow.pages.dev`) zeigt oben das Band
    „v2-Vorschau – nur Testdaten“. Fehlt es, fehlt `VITE_SERVER_MODUS=true`
-   oder der neue Build. **Sonst verhält sie sich in Paket 0 noch genau wie v1.**
+   oder der neue Build.
+4. **Erste Anmeldung (ab Paket 1):** In der Vorschau-App „Mit Google anmelden“ oder „Mit Microsoft
+   anmelden“ mit der Adresse aus `V2_ADMINS`. Du landest direkt in der App und bist Admin.
+   - Unter **Profil → Konten verwalten** gibst du weitere Konten frei und vergibst Rollen
+     (Wertermittler Bau **oder** Grün, dazu BV und Admin).
+   - Für `V2_ADMINS` zählen nur bestätigte Adressen: bei Google mit bestätigter E-Mail, bei
+     Microsoft die Anmeldeadresse.
+   - Alle anderen Konten warten nach der ersten Anmeldung auf deine Freigabe.
 
 **Hinweis zur Adresse:** Anmelden klappt später nur unter `main.wep-pankow.pages.dev`. Die
 Einzel-Adressen pro Bereitstellung (`<kennung>.wep-pankow.pages.dev`) stehen bei Google und
