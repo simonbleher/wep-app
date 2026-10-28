@@ -35,6 +35,14 @@ describe('Datenschutz und Nutzungsbedingungen', () => {
     expect(nb).toContain('werden diese Bedingungen angepasst (der BV übernimmt dann den Einsatz der App)')
   })
 
+  it('haben den Abschnitt Google-Nutzerdaten mit Limited-Use-Satz und englischer Fassung', () => {
+    expect(ds).toContain('id="google-nutzerdaten"')
+    expect(ds).toContain('entspricht der <a href="https://developers.google.com/terms/api-services-user-data-policy"')
+    expect(ds).toContain('einschließlich der Anforderungen zur eingeschränkten Nutzung (Limited Use)')
+    expect(ds).toContain('<h3>Google user data</h3>')
+    expect(ds).toContain('Limited Use requirements')
+  })
+
   it('sprechen nicht von „wir“', () => {
     for (const html of [ds, nb]) expect(html).not.toMatch(/\b[Ww]ir\b/)
     expect(ds).toContain('Berliner Beauftragte für Datenschutz und Informationsfreiheit')
@@ -43,7 +51,7 @@ describe('Datenschutz und Nutzungsbedingungen', () => {
   it('brauchen keine Anmeldung, kein Skript und keine externen Dateien (offline lesbar)', () => {
     for (const html of [ds, nb]) {
       expect(html).not.toMatch(/<script/i)
-      expect(html).not.toMatch(/(src|href)="https?:\/\/(?!www\.datenschutz-berlin\.de|www\.cloudflare\.com\/gdpr\/subprocessors\/)/)
+      expect(html).not.toMatch(/(src|href)="https?:\/\/(?!www\.datenschutz-berlin\.de|www\.cloudflare\.com\/gdpr\/subprocessors\/|developers\.google\.com\/terms\/api-services-user-data-policy)/)
     }
   })
 

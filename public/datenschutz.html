@@ -68,7 +68,26 @@
 <h2>5. Anmeldung über Google oder Microsoft</h2>
 <p>Die Anmeldung läuft über OpenID Connect mit Google oder Microsoft. Es werden nur die Berechtigungen <code>openid</code>, <code>email</code> und <code>profile</code> angefragt, also Ihre Kennung, E-Mail-Adresse und Ihr Name. Die App erhält keinen Zugriff auf Ihre E-Mails, Dateien, Kontakte oder Kalender. Ihr Passwort sehen weder die App noch der Betreiber. Beim Anbieter gelten dessen eigene Datenschutzhinweise.</p>
 
-<h2>6. Wer die Daten bekommt</h2>
+<h2 id="google-nutzerdaten">6. Google-Nutzerdaten</h2>
+<p>Wenn Sie sich mit Google anmelden, erhält die App nur diese Daten aus Ihrem Google-Konto (Bereiche <code>openid</code>, <code>email</code>, <code>profile</code>):</p>
+<ul>
+<li>die Google-Kontokennung (<code>sub</code>),</li>
+<li>Ihre E-Mail-Adresse,</li>
+<li>Ihren Namen.</li>
+</ul>
+<p><strong>Wozu:</strong> ausschließlich zur Anmeldung und zur Anzeige Ihres Namens in der App. Die App hat keinen Zugriff auf Gmail, Google Drive, Kontakte oder Kalender.</p>
+<p><strong>Keine Weitergabe:</strong> Die Daten werden nicht an Dritte weitergegeben und nicht verkauft. Es gibt keine Werbung, und die Daten werden nicht zum Training von KI-Modellen verwendet.</p>
+<p><strong>Speicherung und Löschung:</strong> Die Daten liegen in Cloudflare D1 mit Speicherort EU. Die Löschung Ihres Kontos können Sie jederzeit per E-Mail an <a href="mailto:simon@bleher.name">simon@bleher.name</a> verlangen.</p>
+<p>Die Nutzung von Informationen, die über Google-APIs empfangen werden, entspricht der <a href="https://developers.google.com/terms/api-services-user-data-policy" rel="noopener">Google API Services User Data Policy</a>, einschließlich der Anforderungen zur eingeschränkten Nutzung (Limited Use).</p>
+
+<div lang="en">
+<h3>Google user data</h3>
+<p>If you sign in with Google, the app receives only your Google account identifier (<code>sub</code>), your email address and your name (scopes <code>openid</code>, <code>email</code>, <code>profile</code>). They are used solely to sign you in and to show your name in the app. The app has no access to Gmail, Google Drive, contacts or calendar.</p>
+<p>The data is not shared with third parties, not sold, not used for advertising and not used to train AI models. It is stored in Cloudflare D1 (EU). You can ask for your account to be deleted at any time by email to <a href="mailto:simon@bleher.name">simon@bleher.name</a>.</p>
+<p>The use of information received from Google APIs adheres to the <a href="https://developers.google.com/terms/api-services-user-data-policy" rel="noopener">Google API Services User Data Policy</a>, including the Limited Use requirements.</p>
+</div>
+
+<h2>7. Wer die Daten bekommt</h2>
 <ul>
 <li><strong>Cloudflare, Inc.</strong> hostet die App und die Datenbank (Pages, Functions, D1, R2) als Auftragsverarbeiter. Datenbank und Dateispeicher sind auf den Speicherort EU eingestellt. Beim Aufruf verarbeitet Cloudflare technisch notwendige Verbindungsdaten (z. B. IP-Adresse). Grundlage ist das Data Processing Addendum von Cloudflare (Version 6.4 vom 03.04.2026), das Teil der Cloudflare-Nutzungsbedingungen ist, mit EU-Standardvertragsklauseln und Zertifizierung nach dem EU-US Data Privacy Framework. Unterauftragsverarbeiter: <a href="https://www.cloudflare.com/gdpr/subprocessors/" rel="noopener">https://www.cloudflare.com/gdpr/subprocessors/</a></li>
 <li><strong>Resend, Inc. (USA)</strong> verschickt die E-Mail-Benachrichtigungen als Auftragsverarbeiter. Solange keine eigene Absenderdomain eingerichtet ist, werden Mails über die Infrastruktur von Resend in den USA versendet; mit eigener Domain Region EU (Irland). Dorthin gehen Ihre E-Mail-Adresse und der Inhalt der Mail: Vorgangs-Nr., Anlage, Parzelle und ein Link. Keine Pächternamen, keine Beträge. Sie können die Mails in Ihrem Profil je Konto abschalten. Grundlage ist das Data Processing Addendum von Resend (Stand 31.12.2025), das mit den Resend-Nutzungsbedingungen gilt, mit EU-Standardvertragsklauseln und Zertifizierung nach dem EU-US Data Privacy Framework. Die Verarbeitung erfolgt überwiegend in den USA.</li>
@@ -77,19 +96,19 @@
 </ul>
 <p>Eine Weitergabe zu Werbezwecken findet nicht statt.</p>
 
-<h2>7. Übermittlung in Drittländer</h2>
+<h2>8. Übermittlung in Drittländer</h2>
 <p>Cloudflare, Resend, Google und Microsoft sind Unternehmen mit Sitz in den USA. Übermittlungen dorthin können erfolgen. Sie stützen sich auf das EU-US Data Privacy Framework beziehungsweise auf die Standardvertragsklauseln des jeweiligen Anbieters. Die Datenbank (D1) und der Dateispeicher (R2) bleiben auf dem Speicherort EU.</p>
 
-<h2>8. Android- und Windows-App (Version 1)</h2>
+<h2>9. Android- und Windows-App (Version 1)</h2>
 <p>In den bisherigen Apps für Android und Windows liegen die Daten auf Ihrem Gerät. Wenn Sie sich mit Microsoft anmelden, werden sie über Ihr eigenes OneDrive zwischen Ihren Geräten abgeglichen. Dieser Abgleich läuft zwischen Ihrem Gerät und Ihrem Microsoft-Konto; der Betreiber erhält diese Daten nicht. Sie können die App auch ohne Konto nur auf einem Gerät nutzen.</p>
 
-<h2>9. Rechtsgrundlage</h2>
+<h2>10. Rechtsgrundlage</h2>
 <ul>
 <li><strong>Konto und WEP-Daten:</strong> In der Testphase ist die Rechtsgrundlage Art. 6 Abs. 1 lit. b DSGVO: Das Konto wird auf Wunsch der Testnutzer bereitgestellt.</li>
 <li><strong>Zugriffsprotokoll und technisch notwendige Verbindungsdaten:</strong> Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse an Sicherheit und Missbrauchsschutz).</li>
 </ul>
 
-<h2>10. Speicherdauer und Löschung</h2>
+<h2>11. Speicherdauer und Löschung</h2>
 <ul>
 <li><strong>Testkonten und Testdaten</strong> (Konto, WEPs, Fotos, Unterschriften, Dateien) werden auf Anfrage per E-Mail sofort gelöscht, spätestens zum Ende der Testphase.</li>
 <li><strong>Sitzungen</strong> laufen nach 30 Tagen ab. Beim Abmelden werden sie beendet. Beim Sperren oder Löschen eines Kontos durch einen Admin werden alle Sitzungen des Kontos beendet.</li>
@@ -97,7 +116,7 @@
 <li><strong>Lokale Daten</strong> auf Ihrem Gerät können Sie jederzeit selbst löschen (in der App oder in den Browser-Einstellungen unter „Websitedaten“).</li>
 </ul>
 
-<h2>11. Ihre Rechte</h2>
+<h2>12. Ihre Rechte</h2>
 <p>Sie haben nach der DSGVO das Recht auf</p>
 <ul>
 <li>Auskunft über die zu Ihnen gespeicherten Daten,</li>
@@ -110,10 +129,10 @@
 <p>Wenden Sie sich dazu per E-Mail an <a href="mailto:simon@bleher.name">simon@bleher.name</a>.</p>
 <p>Sie können sich außerdem bei einer Aufsichtsbehörde beschweren. Zuständig ist die <strong>Berliner Beauftragte für Datenschutz und Informationsfreiheit</strong>, Alt-Moabit 59–61, 10555 Berlin, <a href="https://www.datenschutz-berlin.de" rel="noopener">www.datenschutz-berlin.de</a>.</p>
 
-<h2>12. Sicherheit</h2>
+<h2>13. Sicherheit</h2>
 <p>Die Verbindung zur App ist verschlüsselt (HTTPS). Anmelde-Tokens werden nur als Hash gespeichert. Dateien sind nicht öffentlich abrufbar. Die Rechte prüft der Server bei jedem Zugriff.</p>
 
-<h2>13. Änderungen</h2>
+<h2>14. Änderungen</h2>
 <p>Der Betreiber passt diese Erklärung an, wenn sich die App oder die Rechtslage ändert. Das Datum oben zeigt den Stand.</p>
 
 <footer>
