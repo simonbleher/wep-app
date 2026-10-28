@@ -6,17 +6,20 @@ Einrichtung der Dienste für Simon: [V2-EINRICHTUNG.md](V2-EINRICHTUNG.md).
 ## Ausgangslage
 
 - v2 entsteht im bestehenden Repo auf `main`. Wie immer gilt: ein Thema = ein Branch = ein PR.
-- **v1 bleibt für alle Nutzer unverändert, bis Simon umstellt.** Geräte und `wep-pankow.pages.dev`
-  bekommen nur, was über „Version freigeben“ freigegeben wird (Branch `release`). `main` ist als Vorschau
-  unter `main.wep-pankow.pages.dev` erreichbar. Cloudflare zählt `main` deshalb zur Umgebung **Preview**.
+- **Stand 28.10.2026: v2 geht direkt in Produktion** (`wep-pankow.pages.dev`), ohne Vorschau-Phase. v1 wird
+  nicht mehr genutzt. Geräte und `wep-pankow.pages.dev` bekommen nur, was über „Version freigeben“
+  freigegeben wird (Branch `release`).
 - Alles Neue liegt hinter einem Schalter:
   - **Web:** `VITE_SERVER_MODUS=true`. Er wird beim Build eingebaut (`src/server/modus.ts`).
   - **Functions:** `SERVER_MODUS=true`. Er wird zur Laufzeit gelesen (`functions/_lib/serverModus.ts`).
     Ohne ihn antworten alle Endpunkte unter `/api/v2/` mit 404.
   - **Ohne Schalter verhält sich die App genau wie heute:** OneDrive-Sync, Teilen per .wep-Datei,
     `/bv` mit Dateien. `main` muss jederzeit freigebbar bleiben. Fehlerbehebungen für v1 laufen parallel weiter.
-- Schalter und Bindungen (D1, R2, Resend, Google- und Microsoft-Client) gibt es zuerst **nur für Preview**,
-  mit Testdaten. Production bekommt sie erst bei der Umstellung (Paket 7).
+- Schalter und Bindungen (D1, R2, Resend, Google- und Microsoft-Client) liegen in der Cloudflare-Umgebung
+  **Produktion** (docs/V2-EINRICHTUNG.md). Die Schalter bleiben im Code: Ein Build ohne sie verhält sich weiter wie v1.
+- **Android und Windows** bekommen dasselbe Web-Paket als Live-Update, nutzen den Server aber noch nicht: Dort
+  bleibt der Server-Modus aus (v1 mit OneDrive), oben steht „bitte im Browser nutzen“ (`src/server/modus.ts`).
+  Der Server-Modus für die Apps ist das nächste Paket (8).
 - **Nur erfundene Testdaten**, bis der AV-Vertrag geklärt ist (Abschnitt „Datenschutz“).
 
 ## Zielbild
@@ -125,7 +128,8 @@ Die Entscheidungen fallen im jeweiligen Paket und landen in docs/ENTSCHEIDUNGEN.
   - Lösch- und Aufbewahrungsregeln
   - Zugriffsprotokoll
 - Simon ist 15: Die Verträge laufen über die Eltern, und vor dem Einsatz mit echten Daten braucht es eine Rechtsberatung.
-- **Bis dahin nur Testdaten**, ausschließlich in Preview. Die App zeigt im Server-Modus deutlich „Vorschau – nur Testdaten“.
+- **Bis dahin nur Testdaten** auf dem Server, auch in Produktion. (Das frühere Band „v2-Vorschau – nur Testdaten“
+  ist mit dem Schritt in Produktion entfallen; die Regel bleibt.)
 
 ## Reihenfolge (je Paket ein PR, nacheinander)
 
@@ -142,7 +146,10 @@ Die Entscheidungen fallen im jeweiligen Paket und landen in docs/ENTSCHEIDUNGEN.
 4. **BV-Kontrollseite mit Server-Daten:** Rückfrage mit Auswahl, geprüft und gesperrt, Wiederöffnen mit Begründung.
 5. **Benachrichtigungen** in der App und per Resend.
 6. **Anleitung** (`npm run anleitung`) und Durchlauf-Tests für den ganzen Weg mit drei Testkonten (Bau, Grün, BV).
-7. **Später, die Umstellung:** Migration der bestehenden WEPs (OneDrive/.wep → Server), Schalter in Production an.
+7. **Später, vor echten Daten:** Migration der bestehenden WEPs (OneDrive/.wep → Server), erst nach AV-Vertrag und
+   Rechtsberatung. (Die Schalter sind seit 28.10.2026 in Production an, auf dem Server liegen bis dahin nur Testdaten.)
+8. **Server-Modus für Android und Windows:** Anmeldung per Bearer-Token (im Server vorbereitet), danach kein Hinweis
+   „bitte im Browser nutzen“ mehr. Mit neuen Versionsnummern der Apps.
 
 ## Grundsätze
 

@@ -2903,8 +2903,8 @@ input[type='range'] {
   padding-top: var(--abstand-7);
 }
 
-/* Server-Modus (v2, docs/PLAN-V2.md): Hinweis-Band, nur in Vorschau-Builds mit VITE_SERVER_MODUS=true */
-.vorschau-band {
+/* v2 (docs/PLAN-V2.md): Hinweis in Android- und Windows-App, dass Konten und Abgabe nur im Browser gehen */
+.app-hinweis-band {
   padding: calc(env(safe-area-inset-top, 0px) + 4px) 16px 4px;
   background: var(--farbe-akzent-hell);
   color: var(--farbe-text);

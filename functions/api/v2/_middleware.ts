@@ -1,4 +1,4 @@
-// Alle Endpunkte unter /api/v2/: ohne SERVER_MODUS=true gibt es sie nicht (404), v1 bleibt unberührt.
+// Alle Endpunkte unter /api/v2/: ohne SERVER_MODUS=true gibt es sie nicht (404). In Produktion ist der Schalter gesetzt.
 import { istServerModus, jsonAntwort, type V2Umgebung } from '../../_lib/serverModus'
 
 export const onRequest = async (ctx: { env: V2Umgebung; next: () => Promise<Response> }): Promise<Response> =>

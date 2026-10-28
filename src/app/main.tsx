@@ -6,8 +6,8 @@ import { registerSW } from 'virtual:pwa-register'
 import App from './App'
 import { istWindowsApp } from '@/windows/plattform'
 import { wendeKontrastAn } from '@/profil'
-import { serverModus } from '@/server/modus'
-import { VorschauBand } from '@/server/VorschauBand'
+import { appOhneServer, serverModus } from '@/server/modus'
+import { NurImBrowser } from '@/server/NurImBrowser'
 import { V2Tor } from '@/server/V2Tor'
 import '@/design/tokens.css'
 import './styles.css'
@@ -44,7 +44,7 @@ const istBvSeite = /^\/bv(\/|$)/.test(window.location.pathname)
 
 createRoot(container).render(
   <StrictMode>
-    {serverModus && <VorschauBand />}
+    {appOhneServer && <NurImBrowser />}
     {istBvSeite ? (
       <Suspense fallback={<div className="app" aria-busy="true" />}>
         <BvApp />
