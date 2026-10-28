@@ -19,6 +19,7 @@ import { serverModus } from '@/server/modus'
 import { gemerktesKonto } from '@/server/api'
 import { ZustandMarke } from '@/server/AbgabeBereich'
 import { NeuFuerDich } from '@/server/NeuFuerDich'
+import { RechtLinks } from './RechtLinks'
 
 /** Server-Modus (v2): Neue WEPs legt der Bau-Wertermittler an (Beginn des Ablaufs). */
 const darfNeuesWep = () => !serverModus || Boolean(gemerktesKonto()?.rollen.includes('bau'))
@@ -305,6 +306,7 @@ export function Startseite({ konto, verfuegbar, onProfil, onOeffnen, onPapierkor
             </button>
           </li>
         </ul>
+        <RechtLinks />
       </main>
     </div>
   )

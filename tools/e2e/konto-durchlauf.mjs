@@ -99,6 +99,14 @@ try {
 
   // 1. Erster Start: Login-Bildschirm
   await seite.goto(URL)
+  // Rechtliche Seiten: ohne Anmeldung erreichbar, im Service Worker (Precache) enthalten
+  for (const pfad of ['datenschutz', 'nutzungsbedingungen']) {
+    const antwort = await seite.request.get(`${URL}${pfad}.html`)
+    if (!antwort.ok() || !(await antwort.text()).includes('Entwurf – rechtlich noch nicht geprüft')) throw new Error(`${pfad}.html nicht erreichbar oder ohne Entwurfs-Hinweis`)
+    const sw = readFileSync('dist-e2e/sw.js', 'utf-8')
+    if (!sw.includes(`${pfad}.html`)) throw new Error(`${pfad}.html fehlt im Service Worker`)
+  }
+  await seite.getByRole('link', { name: 'Datenschutzerklärung' }).first().waitFor({ timeout: 5000 }).catch(() => { throw new Error('Anmeldeseite ohne Link zur Datenschutzerklärung') })
   await seite.getByRole('button', { name: 'Mit Microsoft anmelden' }).waitFor()
   pruefe(await seite.getByText('Ohne Konto fortfahren (nur auf diesem Gerät)').isVisible(), 'erster Start zeigt den Login-Bildschirm')
   await seite.screenshot({ path: 'dist-e2e/login.png' })
