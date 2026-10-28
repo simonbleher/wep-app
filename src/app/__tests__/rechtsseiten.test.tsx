@@ -21,22 +21,29 @@ describe('Datenschutz und Nutzungsbedingungen', () => {
     }
   })
 
-  it('nennen in der Testphase Simon Bleher als Verantwortlichen und lassen nur die Verträge offen', () => {
+  it('nennen in der Testphase Simon Bleher als Verantwortlichen, keine offenen Platzhalter', () => {
     for (const html of [ds, nb]) expect(html).toContain('Testphase: Die App wird derzeit nur zu Testzwecken mit erfundenen Daten betrieben.')
     expect(ds).toContain('Verantwortlicher</strong> ist in der Testphase <strong>Simon Bleher')
     expect(ds).toContain('Art. 6 Abs. 1 lit. b DSGVO')
     expect(ds).toContain('höchstens 90 Tage')
-    expect(ds.match(/\[BITTE ERGÄNZEN/g)).toHaveLength(2)
-    expect(ds).toMatch(/Cloudflare-DPA/)
-    expect(ds).toMatch(/Resend/)
-    expect(nb).not.toContain('[BITTE ERGÄNZEN')
+    for (const html of [ds, nb]) expect(html).not.toContain('BITTE ERGÄNZEN')
+    expect(ds).toContain('Version 6.4 vom 03.04.2026')
+    expect(ds).toContain('Resend, Inc. (USA)')
+    expect(ds).toContain('Stand 31.12.2025')
+    expect(ds).toContain('Übermittlung in Drittländer')
+    expect(ds).toContain('Art. 6 Abs. 1 lit. f DSGVO')
+    expect(nb).toContain('werden diese Bedingungen angepasst (der BV übernimmt dann den Einsatz der App)')
+  })
+
+  it('sprechen nicht von „wir“', () => {
+    for (const html of [ds, nb]) expect(html).not.toMatch(/\b[Ww]ir\b/)
     expect(ds).toContain('Berliner Beauftragte für Datenschutz und Informationsfreiheit')
   })
 
   it('brauchen keine Anmeldung, kein Skript und keine externen Dateien (offline lesbar)', () => {
     for (const html of [ds, nb]) {
       expect(html).not.toMatch(/<script/i)
-      expect(html).not.toMatch(/(src|href)="https?:\/\/(?!www\.datenschutz-berlin\.de)/)
+      expect(html).not.toMatch(/(src|href)="https?:\/\/(?!www\.datenschutz-berlin\.de|www\.cloudflare\.com\/gdpr\/subprocessors\/)/)
     }
   })
 
