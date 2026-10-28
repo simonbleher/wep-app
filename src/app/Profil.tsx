@@ -18,6 +18,7 @@ import {
   type Rolle,
 } from '@/profil'
 import { BaupreisindexProfil } from './BauIndexProfil'
+import { RechtLinks } from './RechtLinks'
 import { EigenePositionen } from './EigenePositionen'
 import { Fehlersuche } from './Fehlersuche'
 import { Sicherung } from './Sicherung'
@@ -321,6 +322,7 @@ export function Profil({ konto, verfuegbar, onZurueck, onAnmelden, onAbmelden, v
           </div>
           <p className="neben">Zeigt im Reiter „An den BV senden“ wieder „PDF übersichtlich“ und „PDF wie Vorlage“ und legt beide PDFs mit ins Paket für den BV.</p>
         </details>
+        <RechtLinks />
       </main>
     </div>
   )

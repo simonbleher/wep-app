@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Datenschutzerklärung der WEP-App (Entwurf)">
+<title>Datenschutzerklärung – WEP-App</title>
+<style>
+  :root { --gruen:#2e6640; --gruen-dunkel:#234f31; --text:#1d1f1e; --text-2:#5a605c; --linie:#d9ddd9; --warn:#fff6e0; --warn-rand:#e0b84a; --flaeche:#fff; --grund:#f6f7f5; }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin:0; background:var(--grund); color:var(--text); font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif; }
+  .zurueck { display:block; background:var(--gruen-dunkel); color:#fff; padding:10px 16px; text-decoration:none; font-weight:600; }
+  main { max-width:820px; margin:0 auto; padding:0 16px 48px; }
+  h1 { font-size:30px; margin:28px 0 6px; letter-spacing:-0.4px; }
+  h2 { font-size:20px; margin:32px 0 8px; color:var(--gruen-dunkel); }
+  h3 { font-size:16px; margin:18px 0 4px; }
+  a { color:var(--gruen); }
+  .stand { color:var(--text-2); font-size:14px; margin:0 0 16px; }
+  .entwurf { background:var(--warn); border:2px solid var(--warn-rand); border-radius:12px; padding:12px 16px; margin:16px 0; font-weight:600; }
+  .ergaenzen { background:#ffe9a8; padding:0 4px; border-radius:4px; font-weight:600; }
+  ul { padding-left:22px; } li { margin:4px 0; }
+  table { border-collapse:collapse; width:100%; background:var(--flaeche); font-size:15px; }
+  th, td { border:1px solid var(--linie); padding:8px 10px; text-align:left; vertical-align:top; }
+  th { background:#eef2ee; }
+  .tabelle { overflow-x:auto; }
+  footer { margin-top:40px; padding-top:16px; border-top:1px solid var(--linie); color:var(--text-2); font-size:14px; }
+  footer a { margin-right:12px; }
+</style>
+</head>
+<body>
+<a class="zurueck" href="/">← Zur WEP-App</a>
+<main>
+
+<h1>Datenschutzerklärung</h1>
+<p class="stand">WEP-App, Version 2 (mit Konto und Server) · Stand: 28.10.2026</p>
+<div class="entwurf">Entwurf – rechtlich noch nicht geprüft. Diese Erklärung kann sich noch ändern.</div>
+
+<h2>1. Worum es geht</h2>
+<p>Die WEP-App ist ein Werkzeug, mit dem Wertermittler im Kleingarten das Wertermittlungsprotokoll (WEP) direkt auf der Parzelle erfassen, an die nächste Person weitergeben und dem Bezirksverband zur Prüfung vorlegen. Sie wird im Auftrag des Bezirksverbands der Gartenfreunde Pankow e. V. (BV) betrieben. Diese Seite ist ohne Anmeldung erreichbar und funktioniert auch ohne Netz, sobald die App einmal geladen wurde.</p>
+
+<h2>2. Wer ist verantwortlich?</h2>
+<ul>
+<li><strong>Verantwortlicher</strong> für die Daten in den Wertermittlungsprotokollen ist der Bezirksverband der Gartenfreunde Pankow e. V. (Anschrift, Vertretung, Kontakt: <span class="ergaenzen">[BITTE ERGÄNZEN: Angaben des BV]</span>).</li>
+<li><strong>Betreiber der App</strong> ist Simon Bleher. Er verarbeitet die Daten im Auftrag des BV als <strong>Auftragsverarbeiter</strong>. Der Auftragsverarbeitungsvertrag (AV-Vertrag) mit dem BV ist in Vorbereitung.</li>
+<li>Für das Benutzerkonto (Anmeldung, Rollen, Protokoll der Zugriffe) und die Sicherheit der App ist ebenfalls der BV Verantwortlicher; Simon Bleher setzt es technisch um. <span class="ergaenzen">[BITTE ERGÄNZEN: Der BV bestätigt diese Aufteilung.]</span></li>
+<li><strong>Datenschutzbeauftragter</strong> des BV (falls benannt): <span class="ergaenzen">[BITTE ERGÄNZEN: Angaben des BV]</span></li>
+<li><strong>Kontakt zum Betreiber nur per E-Mail:</strong> <a href="mailto:simon@bleher.name">simon@bleher.name</a></li>
+</ul>
+
+<h2>3. Zweck</h2>
+<p>Die Daten werden nur verarbeitet, um Wertermittlungsprotokolle im Auftrag des BV zu erstellen, zwischen Bau-Wertermittler, Grün-Wertermittler und BV weiterzugeben und zu prüfen, und um dafür Konten und Zugriffsrechte zu verwalten.</p>
+
+<h2>4. Welche Daten verarbeitet werden</h2>
+<div class="tabelle"><table>
+<thead><tr><th>Daten</th><th>Wozu</th><th>Wo</th></tr></thead>
+<tbody>
+<tr><td><strong>Konto:</strong> Name und E-Mail-Adresse aus Ihrem Google- oder Microsoft-Konto, die Kennung des Kontos beim Anbieter, Anbieter (Google/Microsoft), Status (wartet, freigegeben, gesperrt), Rollen (Bau, Grün, BV, Admin), Zeitpunkte (Anlegen, letzte Anmeldung), Einstellung zur E-Mail-Benachrichtigung</td><td>Anmeldung, Freigabe durch einen Admin, Rechteprüfung</td><td>Datenbank Cloudflare D1</td></tr>
+<tr><td><strong>Sitzungen:</strong> ein zufälliges Anmelde-Token (gespeichert nur als Hash) mit Ablaufzeit, 30 Tage gültig</td><td>Angemeldet bleiben</td><td>D1; im Browser ein Cookie (<code>HttpOnly</code>, <code>Secure</code>)</td></tr>
+<tr><td><strong>Zugriffsprotokoll:</strong> Zeit, Konto, Aktion (z. B. Anlegen eines Kontos, Anmeldung, Abmeldung, Änderungen durch einen Admin), ohne Inhalte der WEPs</td><td>Nachvollziehbarkeit und Sicherheit</td><td>D1</td></tr>
+<tr><td><strong>WEP-Daten:</strong> Vorgangs-Nr., Kleingartenanlage, Parzelle, Angaben zu Pächter und Gebäude, Bewertung von Bau, Außenanlagen und Aufwuchs, Beseitigungskosten, Skizzen, Notizen, Zustand und Verlauf (wer hat wann abgegeben oder zurückgefragt)</td><td>Erstellung und Prüfung des WEP</td><td>D1</td></tr>
+<tr><td><strong>Dateien:</strong> Fotos, Unterschriften, Bau-Excel</td><td>Bestandteil des WEP</td><td>Cloudflare R2, nur über die App mit Rechteprüfung abrufbar</td></tr>
+<tr><td><strong>Benachrichtigungen:</strong> Hinweise in der App und optional als E-Mail</td><td>Sie erfahren, wenn ein WEP für Sie bereit ist</td><td>D1; E-Mail über Resend</td></tr>
+<tr><td><strong>Lokale Daten auf Ihrem Gerät:</strong> Arbeitsstand der WEPs, Einstellungen, zuletzt bestätigtes Konto, Katalog und App-Dateien für den Offline-Betrieb</td><td>Arbeiten ohne Netz auf der Parzelle</td><td>IndexedDB und Zwischenspeicher (Service Worker) im Browser</td></tr>
+</tbody></table></div>
+<p>Fotos können Bilder enthalten, auf denen Personen oder Gebäude zu sehen sind. Standortdaten (GPS) aus Fotos werden beim Verkleinern in der App entfernt.</p>
+<p>Die App verwendet keine Werbe- oder Analysedienste. Es werden nur technisch notwendige Cookies und lokale Speicher genutzt. Die KI-Funktionen der App sind abgeschaltet.</p>
+
+<h2>5. Anmeldung über Google oder Microsoft</h2>
+<p>Die Anmeldung läuft über OpenID Connect mit Google oder Microsoft. Es werden nur die Berechtigungen <code>openid</code>, <code>email</code> und <code>profile</code> angefragt, also Ihre Kennung, E-Mail-Adresse und Ihr Name. Die App erhält keinen Zugriff auf Ihre E-Mails, Dateien, Kontakte oder Kalender. Ihr Passwort sehen weder die App noch der Betreiber. Beim Anbieter gelten dessen eigene Datenschutzhinweise.</p>
+
+<h2>6. Wer die Daten bekommt</h2>
+<ul>
+<li><strong>Cloudflare, Inc.</strong> hostet die App und die Datenbank (Pages, Functions, D1, R2). Der Speicherort der Daten ist die EU. Ein Auftragsverarbeitungsvertrag mit Cloudflare (DPA) wird abgeschlossen <span class="ergaenzen">[BITTE ERGÄNZEN: Stand des Cloudflare-DPA bestätigen]</span>. Cloudflare verarbeitet beim Aufruf technisch notwendige Verbindungsdaten (z. B. IP-Adresse).</li>
+<li><strong>Resend</strong> verschickt die E-Mail-Benachrichtigungen. Dorthin gehen Ihre E-Mail-Adresse und der Inhalt der Mail: Vorgangs-Nr., Anlage, Parzelle und ein Link. Keine Pächternamen, keine Beträge. Sie können die Mails in Ihrem Profil je Konto abschalten. <span class="ergaenzen">[BITTE ERGÄNZEN: Serverstandort und Vertrag mit Resend bestätigen]</span></li>
+<li><strong>Google und Microsoft</strong> als Anbieter der Anmeldung (siehe oben).</li>
+<li><strong>Personen mit Zugriff in der App:</strong> Bau-Wertermittler, Grün-Wertermittler, BV und Admins sehen jeweils nur die WEPs und Teile, die ihre Rolle und der Zustand des WEP erlauben. Der Server prüft das bei jedem Zugriff.</li>
+</ul>
+<p>Eine Weitergabe zu Werbezwecken findet nicht statt.</p>
+
+<h2>7. Android- und Windows-App (Version 1)</h2>
+<p>In den bisherigen Apps für Android und Windows liegen die Daten auf Ihrem Gerät. Wenn Sie sich mit Microsoft anmelden, werden sie über Ihr eigenes OneDrive zwischen Ihren Geräten abgeglichen. Dieser Abgleich läuft zwischen Ihrem Gerät und Ihrem Microsoft-Konto; der Betreiber erhält diese Daten nicht. Sie können die App auch ohne Konto nur auf einem Gerät nutzen.</p>
+
+<h2>8. Rechtsgrundlage</h2>
+<p><span class="ergaenzen">[BITTE ERGÄNZEN: Rechtsgrundlage vom BV festlegen, voraussichtlich Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse an ordnungsgemäßer Wertermittlung) und für Wertermittler Art. 6 Abs. 1 lit. b DSGVO]</span></p>
+
+<h2>9. Speicherdauer und Löschung</h2>
+<ul>
+<li><strong>Sitzungen</strong> laufen nach 30 Tagen ab. Beim Abmelden werden sie beendet.</li>
+<li><strong>Konten</strong> kann ein Admin sperren oder löschen. Beim Sperren und Löschen werden alle Sitzungen des Kontos beendet.</li>
+<li><strong>WEP-Daten und Dateien:</strong> Aufbewahrungs- und Löschfristen <span class="ergaenzen">[BITTE ERGÄNZEN: legt der BV fest]</span>.</li>
+<li><strong>Zugriffsprotokoll:</strong> Aufbewahrungsdauer <span class="ergaenzen">[BITTE ERGÄNZEN: legt der BV fest]</span>.</li>
+<li><strong>Lokale Daten</strong> auf Ihrem Gerät können Sie jederzeit selbst löschen (in der App oder in den Browser-Einstellungen unter „Websitedaten“).</li>
+</ul>
+
+<h2>10. Ihre Rechte</h2>
+<p>Sie haben nach der DSGVO das Recht auf</p>
+<ul>
+<li>Auskunft über die zu Ihnen gespeicherten Daten,</li>
+<li>Berichtigung falscher Daten,</li>
+<li>Löschung,</li>
+<li>Einschränkung der Verarbeitung,</li>
+<li>Widerspruch gegen die Verarbeitung, soweit sie auf berechtigtem Interesse beruht,</li>
+<li>Datenübertragbarkeit, soweit sie anwendbar ist.</li>
+</ul>
+<p>Wenden Sie sich dazu an den BV (<span class="ergaenzen">[BITTE ERGÄNZEN: Kontakt des BV]</span>) oder per E-Mail an <a href="mailto:simon@bleher.name">simon@bleher.name</a>. Anfragen, die den BV betreffen, leitet der Betreiber an ihn weiter.</p>
+<p>Sie können sich außerdem bei einer Aufsichtsbehörde beschweren. Zuständig ist die <strong>Berliner Beauftragte für Datenschutz und Informationsfreiheit</strong>, Alt-Moabit 59–61, 10555 Berlin, <a href="https://www.datenschutz-berlin.de" rel="noopener">www.datenschutz-berlin.de</a>.</p>
+
+<h2>11. Sicherheit</h2>
+<p>Die Verbindung zur App ist verschlüsselt (HTTPS). Anmelde-Tokens werden nur als Hash gespeichert. Dateien sind nicht öffentlich abrufbar. Die Rechte prüft der Server bei jedem Zugriff.</p>
+
+<h2>12. Änderungen</h2>
+<p>Wir passen diese Erklärung an, wenn sich die App oder die Rechtslage ändert. Das Datum oben zeigt den Stand.</p>
+
+<footer>
+<a href="/">WEP-App</a>
+<a href="datenschutz.html">Datenschutzerklärung</a>
+<a href="nutzungsbedingungen.html">Nutzungsbedingungen</a>
+<p>Kontakt: <a href="mailto:simon@bleher.name">simon@bleher.name</a></p>
+</footer>
+</main>
+</body>
+</html>

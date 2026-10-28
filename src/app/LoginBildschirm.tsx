@@ -1,5 +1,6 @@
 // Login-Bildschirm beim ersten Start und nach dem Abmelden.
 import { Meldung } from './ui'
+import { RechtLinks } from './RechtLinks'
 
 interface Props {
   onAnmelden: () => void
@@ -28,6 +29,7 @@ export function LoginBildschirm({ onAnmelden, onOhneKonto, fehler }: Props) {
       <button type="button" className="textknopf login-ohne" onClick={onOhneKonto}>
         Ohne Konto fortfahren (nur auf diesem Gerät)
       </button>
+      <RechtLinks />
     </main>
   )
 }

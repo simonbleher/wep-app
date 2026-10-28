@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { LogIn, LogOut, RefreshCw } from 'lucide-react'
 import { ICON, Meldung } from '@/app/ui'
+import { RechtLinks } from '@/app/RechtLinks'
 import { anmeldeUrl, gemerktesKonto, istNetzFehler, ladeEinrichtung, ladeIch, merkeKonto, serverAbmelden, type Einrichtung } from './api'
 import type { ServerKonto } from './typen'
 
@@ -155,6 +156,7 @@ function V2Anmeldung({ fehler }: { fehler?: string }) {
             </Meldung>
           )}
           <p className="neben">Beim ersten Mal wird dein Konto angelegt und wartet auf die Freigabe durch einen Admin.</p>
+          <RechtLinks />
         </div>
       </main>
     </div>

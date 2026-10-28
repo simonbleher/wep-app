@@ -4,6 +4,7 @@
 // beide, geprüft, wieder geöffnet, Benachrichtigungen in der App und per Mail. Alle Namen und Daten sind erfunden.
 //
 // Start: npm run v2:durchlauf
+import { readFileSync } from 'node:fs'
 import type { Page } from 'playwright'
 // @ts-expect-error – JavaScript-Hilfe ohne Typen (gemaltes Testbild, kein echtes Foto)
 import { testFoto } from '../fotos/testbild.mjs'
@@ -36,6 +37,12 @@ try {
   // 1. Anmelde-Bildschirm
   await seite.goto(URL)
   await seite.getByRole('heading', { name: 'WEP-App' }).waitFor()
+  pruefe(await seite.getByRole('link', { name: 'Datenschutzerklärung' }).isVisible(), 'Anmeldeseite verlinkt die Datenschutzerklärung')
+  for (const pfad of ['datenschutz', 'nutzungsbedingungen']) {
+    const antwort = await seite.request.get(`${URL}${pfad}.html`)
+    pruefe(antwort.ok() && (await antwort.text()).includes('Entwurf – rechtlich noch nicht geprüft'), `/${pfad} ohne Anmeldung erreichbar, als Entwurf markiert`)
+    pruefe(readFileSync(`${AUSGABE}/sw.js`, 'utf-8').includes(`${pfad}.html`), `/${pfad} im Service Worker (Precache) enthalten`)
+  }
   pruefe((await seite.getByRole('note').count()) === 0, 'im Browser kein Hinweis-Band (kein Vorschau-Band mehr)')
   pruefe(await seite.getByRole('link', { name: 'Mit Google anmelden' }).isVisible(), 'Anmeldung mit Google angeboten')
   pruefe(await seite.getByRole('link', { name: 'Mit Microsoft anmelden' }).isVisible(), 'Anmeldung mit Microsoft angeboten')

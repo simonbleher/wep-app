@@ -3010,3 +3010,12 @@ input[type='range'] {
   align-items: center;
   gap: var(--abstand-2);
 }
+
+/* Links zu Datenschutz und Nutzungsbedingungen unter Startseite, Profil und Anmeldung */
+.rechtlinks {
+  text-align: center;
+  margin: 24px 0 8px;
+}
+.rechtlinks a {
+  color: inherit;
+}
