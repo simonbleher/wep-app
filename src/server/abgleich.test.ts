@@ -7,8 +7,9 @@ import { FakeLokal, Uhr } from '@/sync/testHilfen'
 import * as regeln from '@/sync/papierkorb'
 import { testDb } from '../../functions/_lib/__tests__/sqliteDb'
 import type { Konto, Rolle } from '../../functions/_lib/v2/konten'
-import { fuehreAktionAus, ladeWep, lesbareWeps, setzePapierkorb, speichereWep, type Ergebnis } from '../../functions/_lib/v2/weps'
+import { fuehreAktionAus, fuehreZusammen, ladeWep, lesbareWeps, setzePapierkorb, speichereWep, type Ergebnis } from '../../functions/_lib/v2/weps'
 import { AbgleichFehler, serverAbgleich, wartendeServerAenderungen, type ServerKopf, type ServerStand, type ServerZugriff } from './abgleich'
+import { merkeZusammenfuehrung, nimmLokalZurueck } from './zusammenfuehrenDienst'
 
 type TestDb = ReturnType<typeof testDb>
 
@@ -48,6 +49,10 @@ function zugriff(db: TestDb, k: Konto, uhr: Uhr): ServerZugriff & { offline: boo
     async stelleWiederHer(id: string) {
       z.pruefe()
       return z.ergebnis(await setzePapierkorb(db, k, id, false, undefined, Date.parse(uhr.jetzt()))) as ServerKopf
+    },
+    async fuehreZusammen(wep: Wep, basisRev: number, aus: string, felder: readonly string[]) {
+      z.pruefe()
+      return z.ergebnis(await fuehreZusammen(db, k, wep.id, { wep, basisRev, aus, felder }, Date.parse(uhr.jetzt()))).kopf as ServerKopf
     },
   }
   return z
@@ -206,7 +211,7 @@ describe('Abgleich mit dem Server', () => {
     expect((await lesbareWeps(db, bert))[0].geloeschtAm).toBeTruthy()
   })
 
-  it('Rechte: Grün-Wertermittler kann kein WEP anlegen (bleibt lokal mit Hinweis); fremde WEPs kommen nicht an', async () => {
+  it('Rechte: Grün legt ein eigenes WEP an (Bau sieht es nicht); fremde WEPs kommen nicht an', async () => {
     const { db, uhr, a } = aufbau()
     const erika = konto(db, 'gruen-1', 'Erika Musterfrau', ['gruen'])
     const g = (() => {
@@ -218,9 +223,12 @@ describe('Abgleich mit dem Server', () => {
     await a.abgleich()
     await g.lokal.speichereWep(testWep('g1'), uhr.vor(1))
     const e = await g.abgleich()
-    expect(e.fehler).toEqual([expect.objectContaining({ wepId: 'g1', text: expect.stringMatching(/Bau-Wertermittler/) })])
+    expect(e.fehler).toEqual([])
+    expect(e.hochgeladen).toEqual(['g1'])
+    expect(g.lokal.weps.get('g1')?.ablauf).toMatchObject({ zustand: 'gruen_in_arbeit', gruen: { id: 'gruen-1' } })
     expect(g.lokal.weps.has('w1')).toBe(false)
-    expect(g.lokal.weps.has('g1')).toBe(true)
+    await a.abgleich()
+    expect(a.lokal.weps.has('g1')).toBe(false)
   })
 
   it('gesperrtes WEP (z. B. schon beim BV): der Stand des Servers gilt, die eigene Änderung bleibt als Fassung sichtbar', async () => {
@@ -284,4 +292,83 @@ describe('Ablauf mit zwei Personen (Paket 3)', () => {
     expect(e.konflikte[0]?.text).toMatch(/gesperrt/)
     expect(bauGeraet.lokal.weps.get('w1')?.formalien.parzelle).toBe('')
   })
+
+  it('Zusammenführen ohne Netz: lokal sofort, beim Abgleich übernimmt der Server; das eigene WEP verschwindet', async () => {
+    const { db, uhr, a: bert, geraet } = aufbau()
+    const erika = konto(db, 'gruen-1', 'Erika Musterfrau', ['gruen'])
+    const e = geraet(erika)
+    // Bert legt an und gibt an Erika ab; Erika gleicht ab und geht dann ohne Netz auf die Parzelle
+    await bert.lokal.speichereWep(testWep('w-bau'), uhr.vor(1))
+    await bert.abgleich()
+    await fuehreAktionAus(db, konto2(db, 'bau-1'), 'w-bau', { aktion: 'an_gruen', gruenKonto: 'gruen-1', basisRev: 1 })
+    await e.abgleich()
+    expect(e.lokal.weps.get('w-bau')?.ablauf?.zustand).toBe('gruen_in_arbeit')
+    e.server.offline = true
+    // Eigenes WEP offline angelegt (nie auf dem Server), dann zusammengeführt und danach weiter bearbeitet
+    const eigenes = testWep('w-eigen')
+    eigenes.rolle = 'gruen'
+    eigenes.formalien.unterpaechter = 'Paula Pächterin'
+    eigenes.gruen.aufwuchs = [{ id: 'p-hecke', bezeichnung: 'Hecke' } as unknown as Wep['gruen']['aufwuchs'][number]]
+    await e.lokal.speichereWep(eigenes, uhr.vor(1))
+    await merkeZusammenfuehrung(e.lokal, 'w-bau', 'w-eigen', ['unterpaechter'], uhr.vor(1))
+    expect(e.lokal.weps.get('w-bau')?.gruen.aufwuchs.map((p) => p.id)).toEqual(['p-hecke'])
+    expect(e.lokal.meta.get('w-eigen')?.zusammengefuehrtIn).toBe('w-bau')
+    const weiter = structuredClone(e.lokal.weps.get('w-bau')!)
+    weiter.gruen.beschreibungAufwuchs = 'nach dem Zusammenführen ergänzt'
+    await e.lokal.speichereWep(weiter, uhr.vor(1))
+    await expect(e.abgleich()).rejects.toThrow() // ohne Netz: alles wartet
+    // Wieder Netz: erst das eigene WEP hoch, dann das Zusammenführen
+    e.server.offline = false
+    const erg = await e.abgleich()
+    expect(erg.fehler).toEqual([])
+    expect(e.lokal.weps.has('w-eigen')).toBe(false)
+    expect(e.lokal.meta.get('w-bau')?.zusammenfuehrung).toBeUndefined()
+    const server = await ladeWep(db, erika, 'w-bau')
+    const w = (server.ok && server.wert.wep) as Wep
+    expect(w.gruen.aufwuchs.map((p) => p.id)).toEqual(['p-hecke'])
+    expect(w.gruen.beschreibungAufwuchs).toBe('nach dem Zusammenführen ergänzt')
+    expect(w.formalien.unterpaechter).toBe('Paula Pächterin')
+    expect(w.ablauf?.zusammengefuehrtAus?.id).toBe('w-eigen')
+    expect((await lesbareWeps(db, erika)).map((x) => x.id)).toEqual(['w-bau'])
+    expect(wartendeServerAenderungen(await e.lokal.alleWeps(), [], await e.lokal.alleMeta())).toBe(0)
+    // Bert sieht den Grün-Teil (nur lesend)
+    await bert.abgleich()
+    expect(bert.lokal.weps.get('w-bau')?.gruen.aufwuchs).toHaveLength(1)
+  })
+
+  it('Zusammenführen lokal zurücknehmen, bevor der Server es hat; vom Server abgelehnt: sein Stand gilt, das eigene WEP kommt zurück', async () => {
+    const { db, uhr, a: bert, geraet } = aufbau()
+    const erika = konto(db, 'gruen-1', 'Erika Musterfrau', ['gruen'])
+    const e = geraet(erika)
+    await bert.lokal.speichereWep(testWep('w-bau'), uhr.vor(1))
+    await bert.abgleich()
+    await fuehreAktionAus(db, konto2(db, 'bau-1'), 'w-bau', { aktion: 'an_gruen', gruenKonto: 'gruen-1', basisRev: 1 })
+    const eigenes = testWep('w-eigen')
+    eigenes.gruen.aufwuchs = [{ id: 'p1' } as unknown as Wep['gruen']['aufwuchs'][number]]
+    await e.lokal.speichereWep(eigenes, uhr.vor(1))
+    await e.abgleich()
+    // lokal zurücknehmen
+    await merkeZusammenfuehrung(e.lokal, 'w-bau', 'w-eigen', [], uhr.vor(1))
+    expect(await nimmLokalZurueck(e.lokal, 'w-bau', uhr.vor(1))).toBe(true)
+    expect(e.lokal.weps.get('w-bau')?.gruen.aufwuchs).toEqual([])
+    expect(e.lokal.meta.get('w-eigen')?.zusammengefuehrtIn).toBeUndefined()
+    await e.abgleich()
+    expect((await lesbareWeps(db, erika)).map((x) => x.id).sort()).toEqual(['w-bau', 'w-eigen'])
+    // vorgemerkt, aber inzwischen auf dem Server nicht mehr bei Grün in Arbeit → abgelehnt
+    await merkeZusammenfuehrung(e.lokal, 'w-bau', 'w-eigen', [], uhr.vor(1))
+    db.roh.prepare("UPDATE weps SET zustand = 'beim_bv', rev = rev + 1 WHERE id = 'w-bau'").run()
+    const erg = await e.abgleich()
+    expect(erg.fehler).toEqual([expect.objectContaining({ wepId: 'w-bau', text: expect.stringMatching(/Zusammenführen nicht möglich.*wieder in der Liste/) })])
+    expect(e.lokal.weps.get('w-bau')?.ablauf?.zustand).toBe('beim_bv')
+    expect(e.lokal.meta.get('w-bau')?.konflikt?.fassung?.gruen.aufwuchs).toHaveLength(1)
+    expect(e.lokal.meta.get('w-bau')?.zusammenfuehrung).toBeUndefined()
+    expect(e.lokal.meta.get('w-eigen')?.zusammengefuehrtIn).toBeUndefined()
+    expect(e.lokal.weps.has('w-eigen')).toBe(true)
+  })
 })
+
+/** Konto aus der Test-Datenbank (für Schritte direkt auf dem Server). */
+function konto2(db: TestDb, id: string): Konto {
+  const z = db.roh.prepare('SELECT * FROM konten WHERE id = ?').get(id) as { id: string; name: string; email: string; rollen: string }
+  return { id: z.id, anbieter: 'google', email: z.email, name: z.name, status: 'freigegeben', rollen: z.rollen.split(',') as Rolle[], mailBenachrichtigung: true, erstelltAm: '', geaendertAm: '' }
+}

@@ -6,6 +6,7 @@
 // Start: npm run v2:durchlauf
 import { readFileSync } from 'node:fs'
 import type { Page } from 'playwright'
+import type { Wep } from '../../src/model/types'
 // @ts-expect-error – JavaScript-Hilfe ohne Typen (gemaltes Testbild, kein echtes Foto)
 import { testFoto } from '../fotos/testbild.mjs'
 import { fuehreAdminAktionAus, ladeKonto } from '../../functions/_lib/v2/konten'
@@ -220,7 +221,18 @@ try {
   await seiteB.screenshot({ path: `${AUSGABE}/05-foto-vom-server.png` })
 
   // 11. Ablauf: Bert gibt an Erika (Grün) ab, Erika bearbeitet nur den Grün-Teil und gibt an den BV ab
-  const zustandVon = (nr: string) => (db.roh.prepare('SELECT zustand FROM weps WHERE vorgangs_nr = ?').get(nr) as { zustand: string }).zustand
+  // Erikas eigenes WEP trägt dieselbe Vorgangs-Nr.: gemeint ist das Bau-WEP (mitBau), sonst irgendeines mit der Nummer
+  const zustandVon = (nr: string, mitBau = true) =>
+    (db.roh.prepare(`SELECT zustand FROM weps WHERE vorgangs_nr = ? ${mitBau ? 'AND bau_konto IS NOT NULL' : ''}`).get(nr) as { zustand: string }).zustand
+  const bauDaten = () => JSON.parse((db.roh.prepare("SELECT daten FROM weps WHERE vorgangs_nr = '2026-0815' AND bau_konto IS NOT NULL").get() as { daten: string }).daten) as Wep
+  const eigenesErika = () => db.roh.prepare("SELECT id, zusammengefuehrt_in FROM weps WHERE vorgangs_nr = '2026-0815' AND bau_konto IS NULL").get() as { id: string; zusammengefuehrt_in: string | null } | undefined
+  const warteAuf = async (bedingung: () => boolean) => {
+    for (let i = 0; i < 100; i++) {
+      if (bedingung()) return true
+      await seiteE.waitForTimeout(100)
+    }
+    return false
+  }
   const erikaKontext = await u.neuerKontext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' })
   const seiteE = await erikaKontext.newPage()
   seiteE.on('pageerror', (e) => skriptFehler.push(String(e)))
@@ -232,8 +244,27 @@ try {
   await fuehreAdminAktionAus(db, ada, (await ladeKonto(db, erikaId))!, { aktion: 'rollen', rollen: ['gruen'] })
   await seiteE.getByRole('button', { name: 'Erneut prüfen' }).click()
   await seiteE.getByRole('heading', { name: 'Protokolle' }).waitFor()
-  pruefe((await seiteE.getByRole('button', { name: 'Neues WEP', exact: true }).count()) === 0, 'Grün: kein „Neues WEP“ (legt der Bau-Wertermittler an)')
   pruefe((await seiteE.getByText(/2026-0815/).count()) === 0, 'Grün sieht Berts Entwurf nicht')
+
+  // 11a. Erika legt (wie in v1) ein eigenes WEP an und erfasst den Grün-Teil schon vor der Abgabe von Bert
+  await neuesWep(seiteE, '2026-0815')
+  const navEigen = await seiteE.getByRole('navigation', { name: 'Abschnitte' }).getByRole('button').allTextContents()
+  pruefe(navEigen.some((t) => /Formalien/.test(t)) && navEigen.some((t) => /Aufwuchs/.test(t)) && !navEigen.some((t) => /Bauten|Mängel/.test(t)), `Grün: eigenes WEP mit Formalien und Grün-Teil, ohne Bau-Teil (${navEigen.join(', ')})`)
+  await seiteE.getByLabel(/^Unterpächter/).first().fill('Paula Pächterin')
+  await seiteE.getByRole('navigation', { name: 'Abschnitte' }).getByRole('button', { name: 'Aufwuchs' }).click()
+  await seiteE.getByRole('button', { name: 'Hinzufügen', exact: true }).click()
+  await seiteE.getByRole('button', { name: 'Eigene Position (Freitext)' }).click()
+  await seiteE.getByLabel(/^Bezeichnung/).fill('Liguster-Hecke')
+  await seiteE.getByRole('button', { name: 'Überschreiben' }).click()
+  await seiteE.getByLabel('Einzelpreis').fill('30')
+  await seiteE.getByRole('button', { name: 'Hinzufügen', exact: true }).click()
+  await seiteE.getByText('1 Position').first().waitFor()
+  await seiteE.getByRole('button', { name: 'Protokolle' }).first().click()
+  pruefe(await warteAuf(() => JSON.parse((db.roh.prepare("SELECT daten FROM weps WHERE vorgangs_nr = '2026-0815' AND bau_konto IS NULL").get() as { daten: string } | undefined)?.daten ?? '{}').gruen?.aufwuchs?.length === 1), 'Server: Erikas eigenes WEP (ohne Bau-Konto) mit dem Grün-Teil')
+  pruefe((db.roh.prepare("SELECT zustand, gruen_konto FROM weps WHERE bau_konto IS NULL").get() as { zustand: string; gruen_konto: string }).gruen_konto === erikaId, 'Server: Erika ist Besitzerin, Zustand „gruen_in_arbeit“')
+  await seite.getByRole('button', { name: 'Abgleichen' }).filter({ visible: true }).first().click()
+  await seite.getByText(/Abgeglichen um/).filter({ visible: true }).first().waitFor()
+  pruefe((await seite.locator('ul[aria-label="Protokolle"] .zeile', { hasText: '2026-0815' }).count()) === 1, 'Bau sieht Erikas eigenes WEP nicht')
 
   await seite.getByRole('button', { name: /2026-0815/ }).first().click()
   await seite.getByRole('button', { name: 'Abgabe' }).filter({ visible: true }).first().click()
@@ -244,7 +275,7 @@ try {
   await seite.getByRole('alertdialog').getByRole('button', { name: 'Abgeben' }).click()
   await seite.getByText('An Erika Musterfrau abgegeben.').waitFor()
   pruefe(zustandVon('2026-0815') === 'gruen_in_arbeit', 'Server: nach der Abgabe „gruen_in_arbeit“')
-  const formalienServer = JSON.parse((db.roh.prepare("SELECT daten FROM weps WHERE vorgangs_nr = '2026-0815'").get() as { daten: string }).daten).formalien
+  const formalienServer = bauDaten().formalien
   pruefe(formalienServer.wertermittlerBaulichkeiten === 'Bert Bauer' && formalienServer.wertermittlerAussenAufwuchs === 'Erika Musterfrau', `Formalien: Wertermittler Bau/Grün sind Bert und Erika (${formalienServer.wertermittlerBaulichkeiten} / ${formalienServer.wertermittlerAussenAufwuchs}) – auch wenn vorher eine andere Person auf dem Gerät angemeldet war`)
   pruefe(await seite.getByText(/Das WEP ist abgegeben\. Du kannst es nur noch lesen/).isVisible(), 'Bau: nach der Abgabe nur noch lesen')
   const navBau = seite.getByRole('navigation', { name: 'Abschnitte' })
@@ -252,13 +283,30 @@ try {
 
   // Benachrichtigung: Mail an Erika (nur Vorgangs-Nr., Anlage, Parzelle, Link) und „Neu für dich“ in der App
   const mailErika = mails.find((m) => m.to.includes('erika@example.org'))
-  pruefe(Boolean(mailErika?.subject.includes('2026-0815 – an dich abgegeben')) && /\?wep=/.test(mailErika?.text ?? '') && !/Bert|€/.test(mailErika?.text ?? ''), 'Mail an Grün: Vorgangs-Nr., Link, keine Namen oder Beträge')
+  pruefe(Boolean(mailErika?.subject.includes('2026-0815 – Bau-WEP an dich abgegeben')) && /\?wep=/.test(mailErika?.text ?? '') && !/Bert|€/.test(mailErika?.text ?? ''), 'Mail an Grün: Vorgangs-Nr., Link, keine Namen oder Beträge')
   await seiteE.reload()
   await seiteE.getByRole('heading', { name: /Neu für dich \(1\)/ }).waitFor()
   await seiteE.screenshot({ path: `${AUSGABE}/06b-neu-fuer-dich.png` })
-  await seiteE.getByRole('button', { name: /2026-0815 – an dich abgegeben/ }).click()
+  await seiteE.getByRole('button', { name: /2026-0815 – Bau-WEP an dich abgegeben/ }).click()
   await seiteE.getByRole('button', { name: 'Abgabe' }).filter({ visible: true }).first().waitFor()
   pruefe(true, 'Grün: „Neu für dich“ öffnet das WEP (vorher abgeglichen)')
+
+  // 11b. Erika nimmt das Bau-WEP an und führt es mit ihrem eigenen WEP zusammen (Vorschau, Stammdaten je Feld)
+  const annahme = seiteE.getByRole('note').filter({ hasText: 'Bau-WEP für dich – mit deinem eigenen WEP zusammenführen?' })
+  await annahme.waitFor()
+  pruefe(await annahme.getByText(/gleiche Vorgangs-Nr\./).isVisible(), 'Annahme: eigenes WEP mit gleicher Vorgangs-Nr. wird vorgeschlagen')
+  await seiteE.screenshot({ path: `${AUSGABE}/06c-annahme.png`, fullPage: true })
+  await annahme.getByRole('button', { name: 'Mit meinem WEP zusammenführen …' }).click()
+  const dlgZ = seiteE.getByRole('dialog', { name: 'Mit eigenem WEP zusammenführen' })
+  pruefe(await dlgZ.getByText(/Aus deinem WEP: 0 Außenanlagen, 1 Aufwuchs/).isVisible(), 'Vorschau: was übernommen wird')
+  pruefe(await dlgZ.getByRole('checkbox', { name: /Unterpächter/ }).isChecked(), 'Vorschau: im Bau-WEP leeres Stammdaten-Feld ist zum Übernehmen vorgewählt')
+  await seiteE.screenshot({ path: `${AUSGABE}/06d-zusammenfuehren.png`, fullPage: true })
+  await dlgZ.getByRole('button', { name: 'Zusammenführen' }).click()
+  await dlgZ.waitFor({ state: 'detached' })
+  pruefe(await warteAuf(() => eigenesErika()?.zusammengefuehrt_in != null), 'Server: Erikas eigenes WEP ist als „zusammengeführt“ markiert (nicht gelöscht)')
+  const nachher = bauDaten()
+  pruefe(nachher.gruen.aufwuchs.length === 1 && nachher.formalien.unterpaechter === 'Paula Pächterin', 'Server: Bau-WEP hat jetzt Erikas Grün-Teil und den übernommenen Unterpächter')
+  pruefe((await annahme.count()) === 0, 'Annahme-Hinweis verschwindet nach dem Zusammenführen')
   await seiteE.getByRole('button', { name: 'Protokolle' }).first().click()
   await seiteE.locator('ul[aria-label="Protokolle"] .zeile', { hasText: '2026-0815' }).getByText('Grün in Arbeit').waitFor()
   pruefe(true, 'Grün: WEP ist da, Zustand „Grün in Arbeit“')
@@ -270,12 +318,29 @@ try {
   const navGruen = await seiteE.getByRole('navigation', { name: 'Abschnitte' }).getByRole('button').allTextContents()
   pruefe(!navGruen.some((t) => /Formalien|Bauten|Mängel/.test(t)) && navGruen.some((t) => /Aufwuchs/.test(t)) && navGruen.some((t) => /Übersicht/.test(t)), `Grün: nur Grün-Teil und Übersicht (${navGruen.join(', ')})`)
   await seiteE.getByRole('button', { name: 'Abgabe' }).filter({ visible: true }).first().click()
+  // Rückgängig (solange nicht an den BV abgegeben) und noch einmal zusammenführen – diesmal aus dem Reiter „Abgabe“
+  await seiteE.getByText(/Mit deinem WEP 2026-0815 zusammengeführt am/).waitFor()
+  await seiteE.getByRole('button', { name: 'Zusammenführen rückgängig machen' }).click()
+  await seiteE.getByRole('alertdialog').getByRole('button', { name: 'Rückgängig machen' }).click()
+  await seiteE.getByRole('status').filter({ hasText: 'Zusammenführen rückgängig gemacht' }).waitFor()
+  pruefe(eigenesErika()?.zusammengefuehrt_in == null && bauDaten().gruen.aufwuchs.length === 0, 'Rückgängig: Bau-WEP wie vorher, Erikas eigenes WEP wieder da')
+  await seiteE.getByRole('button', { name: 'Mit eigenem WEP zusammenführen …' }).click()
+  await seiteE.getByRole('dialog', { name: 'Mit eigenem WEP zusammenführen' }).getByRole('button', { name: 'Zusammenführen' }).click()
+  await seiteE.getByRole('status').filter({ hasText: 'Zusammengeführt.' }).waitFor()
+  pruefe(await warteAuf(() => eigenesErika()?.zusammengefuehrt_in != null && bauDaten().gruen.aufwuchs.length === 1), 'noch einmal zusammengeführt')
+  await seiteE.getByRole('button', { name: 'Protokolle' }).first().click()
+  const zeilen0815 = seiteE.locator('ul[aria-label="Protokolle"] .zeile', { hasText: '2026-0815' })
+  for (let i = 0; i < 50 && (await zeilen0815.count()) !== 1; i++) await seiteE.waitForTimeout(100)
+  pruefe((await zeilen0815.count()) === 1, 'Grün: nur noch ein WEP 2026-0815 in der Liste')
+  await seiteE.getByRole('button', { name: /2026-0815/ }).first().click()
+  await seiteE.getByRole('button', { name: 'Abgabe' }).filter({ visible: true }).first().click()
   await seiteE.getByRole('button', { name: 'An den BV abgeben' }).click()
   await seiteE.getByRole('alertdialog').getByRole('button', { name: 'Abgeben' }).click()
   await seiteE.getByText('An den BV abgegeben.').waitFor()
   pruefe(zustandVon('2026-0815') === 'beim_bv', 'Server: nach Grüns Abgabe „beim_bv“')
+  pruefe((await seiteE.getByRole('button', { name: 'Zusammenführen rückgängig machen' }).count()) === 0, 'nach der Abgabe an den BV kein „Rückgängig“ mehr')
   await seiteE.screenshot({ path: `${AUSGABE}/07-an-bv-abgegeben.png`, fullPage: true })
-  const verlaufAblauf = (db.roh.prepare("SELECT v.aktion, v.zustand_nachher AS nachher FROM verlauf v JOIN weps w ON w.id = v.wep_id WHERE w.vorgangs_nr = '2026-0815' ORDER BY v.id").all() as { aktion: string; nachher: string | null }[])
+  const verlaufAblauf = (db.roh.prepare("SELECT v.aktion, v.zustand_nachher AS nachher FROM verlauf v JOIN weps w ON w.id = v.wep_id WHERE w.vorgangs_nr = '2026-0815' AND w.bau_konto IS NOT NULL ORDER BY v.id").all() as { aktion: string; nachher: string | null }[])
     .filter((v) => v.nachher)
     .map((v) => `${v.aktion}→${v.nachher}`)
   pruefe(verlaufAblauf.join(' ') === 'angelegt→bau_in_arbeit an_gruen→gruen_in_arbeit an_bv→beim_bv', `Verlauf mit Zuständen: ${verlaufAblauf.join(' ')}`)
@@ -343,7 +408,7 @@ try {
   await seiteV.getByRole('alertdialog').getByRole('button', { name: 'Wieder öffnen' }).click()
   await seiteV.getByText('Wieder geöffnet.').waitFor()
   pruefe(zustandVon('2026-0815') === 'beim_bv', 'BV: mit Begründung wieder geöffnet')
-  const notizen = (db.roh.prepare("SELECT v.aktion, v.notiz FROM verlauf v JOIN weps w ON w.id = v.wep_id WHERE w.vorgangs_nr = '2026-0815' AND v.notiz IS NOT NULL ORDER BY v.id").all() as { aktion: string; notiz: string }[]).map((v) => `${v.aktion}: ${v.notiz}`)
+  const notizen = (db.roh.prepare("SELECT v.aktion, v.notiz FROM verlauf v JOIN weps w ON w.id = v.wep_id WHERE w.vorgangs_nr = '2026-0815' AND w.bau_konto IS NOT NULL AND v.aktion IN ('rueckfrage', 'wiederoeffnen') ORDER BY v.id").all() as { aktion: string; notiz: string }[]).map((v) => `${v.aktion}: ${v.notiz}`)
   pruefe(notizen.join(' | ') === 'rueckfrage: Hecke an der Straße fehlt | wiederoeffnen: Betrag Laube korrigieren', `Verlauf mit Notizen: ${notizen.join(' | ')}`)
 
   // 13. Rückfrage an beide: erst Bau (weitergeben an Grün), dann Grün (an den BV)
@@ -372,10 +437,28 @@ try {
   await seiteE.getByRole('alertdialog').getByRole('button', { name: 'Abgeben' }).click()
   await seiteE.getByText('An den BV abgegeben.').waitFor()
   pruefe(zustandVon('2026-0815') === 'beim_bv', 'Rückfrage „beide“: Grün gibt an den BV ab')
+
+  // 14. Eigenes Grün-WEP ohne Bau (reine Grün-Wertermittlung): Grün gibt direkt an den BV ab – mit Rückfrage, nur Warnung
+  await seiteE.getByRole('button', { name: 'Protokolle' }).first().click()
+  await neuesWep(seiteE, '2026-0900')
+  await seiteE.getByRole('button', { name: 'Abgabe' }).filter({ visible: true }).first().click()
+  pruefe(await seiteE.getByText('kein Bau-Teil (eigenes Grün-WEP)').isVisible(), 'Abgabe: „kein Bau-Teil“')
+  await seiteE.getByRole('button', { name: 'An den BV abgeben' }).click()
+  const ohneBau = seiteE.getByRole('alertdialog', { name: 'Kein Bau-Teil – bewusst ohne Bau abgeben?' })
+  await ohneBau.waitFor()
+  await seiteE.screenshot({ path: `${AUSGABE}/12-ohne-bau.png` })
+  await ohneBau.getByRole('button', { name: 'Ohne Bau abgeben' }).click()
+  await seiteE.getByText('An den BV abgegeben.').waitFor()
+  pruefe(zustandVon('2026-0900', false) === 'beim_bv', 'Grün-WEP ohne Bau ist beim BV')
+  await seiteV.getByRole('button', { name: 'Alle WEPs' }).click()
+  await seiteV.getByRole('button', { name: 'Neu laden' }).click()
+  await seiteV.locator('.bv-zeile', { hasText: '2026-0900' }).getByText('Erika Musterfrau (ohne Bau-Teil)').waitFor()
+  pruefe(true, 'BV: Grün-WEP ohne Bau in der Tabelle („ohne Bau-Teil“)')
   await beaKontext.close()
   await erikaKontext.close()
   const verlauf = (db.roh.prepare('SELECT aktion FROM verlauf ORDER BY id').all() as { aktion: string }[]).map((v) => v.aktion)
-  pruefe(verlauf.filter((a) => a === 'angelegt').length === 2, 'Verlauf: „angelegt“ je WEP')
+  pruefe(verlauf.filter((a) => a === 'angelegt').length === 4, 'Verlauf: „angelegt“ je WEP (2 von Bert, 2 von Erika)')
+  pruefe(['zusammengefuehrt', 'zusammengefuehrt_in', 'zusammenfuehrung_zurueck'].every((a) => verlauf.includes(a)), 'Verlauf: Zusammenführen und Rückgängig in beiden WEPs')
   await geraetB.close()
 
   const protokoll = (db.roh.prepare('SELECT aktion FROM protokoll').all() as { aktion: string }[]).map((p) => p.aktion)

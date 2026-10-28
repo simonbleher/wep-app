@@ -47,14 +47,34 @@ export function ohneServerFelder(wep: Wep): Wep {
   return rest
 }
 
+/** Felder des Bau-Teils (ohne Fotos und Unterschrift): Grün im eigenen Grün-WEP schreibt sie nicht. */
+const BAU_FELDER = ['bau', 'grundriss', 'bauExcel'] as const
+
+/** Eigenes Grün-WEP: alles aus der App außer dem Bau-Teil (der bleibt, wie er auf dem Server ist). */
+function ohneBauTeil(server: Wep, app: Wep): Wep {
+  const ergebnis: Wep = { ...app }
+  const ziel = ergebnis as unknown as Record<string, unknown>
+  for (const f of BAU_FELDER) {
+    if (server[f] !== undefined) ziel[f] = server[f]
+    else delete ziel[f]
+  }
+  const u = { bau: server.unterschriften?.bau, gruen: app.unterschriften?.gruen }
+  const sauber = Object.fromEntries(Object.entries(u).filter(([, v]) => v)) as Wep['unterschriften']
+  if (sauber && Object.keys(sauber).length) ergebnis.unterschriften = sauber
+  else delete ergebnis.unterschriften
+  return ergebnis
+}
+
 /**
  * Stand nach dem Speichern: bei 'alles' der Stand der App, bei 'bau'/'gruen' der Stand des Servers mit dem eigenen
- * Teil aus der App. Felder, die nur der Server setzt (`ablauf`), kommen nie aus der App.
+ * Teil aus der App, bei 'ohne_bau' (eigenes Grün-WEP) alles aus der App außer dem Bau-Teil. Felder, die nur der Server
+ * setzt (`ablauf`), kommen nie aus der App.
  */
 export function mitEigenemTeil(server: Wep | undefined, app: Wep, recht: Exclude<Schreibrecht, null>): Wep {
   const a = ohneServerFelder(app)
   if (recht === 'alles' || !server) return a
   const s = ohneServerFelder(server)
+  if (recht === 'ohne_bau') return ohneBauTeil(s, a)
   const ergebnis: Wep =
     recht === 'gruen'
       ? { ...s, gruen: a.gruen, skizze: a.skizze }
@@ -67,4 +87,18 @@ export function mitEigenemTeil(server: Wep | undefined, app: Wep, recht: Exclude
   else delete ergebnis.unterschriften
   if (!ergebnis.skizze) delete ergebnis.skizze
   return ergebnis
+}
+
+/**
+ * Zusammenführen auf dem Server (eigenes Grün-WEP → abgegebenes Bau-WEP): Der Bau-Teil bleibt, wie er auf dem Server
+ * steht; den Grün-Teil (Positionen, Grün-Skizze, Unterschrift Grün, Fotos zum Grün-Teil und neue Fotos) hat die App aus
+ * dem eigenen WEP übernommen. Stammdaten gelten vom Bau-WEP – nur die Felder in `felder` (von Grün gewählt) kommen aus
+ * dem eigenen WEP, und zwar mit dem Wert, den der Server dort kennt.
+ */
+export function zusammenfuehrungAufServer(bau: Wep, gruen: Wep, app: Wep, felder: readonly string[]): Wep {
+  const neu = mitEigenemTeil(bau, app, 'gruen')
+  const formalien = { ...neu.formalien } as unknown as Record<string, unknown>
+  const quelle = gruen.formalien as unknown as Record<string, unknown>
+  for (const f of felder) if (Object.prototype.hasOwnProperty.call(formalien, f) && quelle[f] !== undefined) formalien[f] = quelle[f]
+  return { ...neu, formalien: formalien as unknown as Wep['formalien'] }
 }

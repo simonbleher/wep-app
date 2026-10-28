@@ -107,6 +107,8 @@ export interface WepAblauf {
   gruen?: { id: string; name: string }
   /** Offene Rückfrage des BV: an wen, wer gerade dran ist, Notiz. */
   rueckfrage?: { an: 'bau' | 'gruen' | 'beide'; bei: 'bau' | 'gruen'; notiz: string; am: string; von: string }
+  /** Bau-WEP, in das Grün sein eigenes WEP zusammengeführt hat (rückgängig machbar, solange es bei Grün in Arbeit ist). */
+  zusammengefuehrtAus?: { id: string; vorgangsNr: string; am: string }
 }
 
 /** Angaben zur Bau-Excel am WEP. */

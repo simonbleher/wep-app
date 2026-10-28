@@ -35,7 +35,7 @@ export function dateiArt(wepId: string, name: string): DateiArt | undefined {
   return undefined
 }
 
-const kopf = (z: WepZeile): WepKopf => ({ zustand: z.zustand, bauKonto: z.bau_konto, gruenKonto: z.gruen_konto, geloeschtAm: z.geloescht_am })
+const kopf = (z: WepZeile): WepKopf => ({ zustand: z.zustand, bauKonto: z.bau_konto, gruenKonto: z.gruen_konto, geloeschtAm: z.geloescht_am, zusammengefuehrtIn: z.zusammengefuehrt_in })
 
 export type DateiErgebnis<T> = { ok: true; wert: T } | { ok: false; status: number; fehler: string }
 
@@ -45,8 +45,8 @@ export async function pruefeZugriff(db: Db, konto: Konto, wepId: string, schreib
   if (!z || !darfLesen(kopf(z), konto)) return { ok: false, status: 404, fehler: 'WEP nicht gefunden.' }
   if (schreiben) {
     const recht = schreibrecht(kopf(z), konto)
-    // Grün darf (ab Paket 3) nur Fotos zum Grün-Teil hochladen, die Bau-Excel gehört zum Bau-Teil
-    if (!recht || (recht === 'gruen' && schreiben.art !== 'foto')) return { ok: false, status: 403, fehler: 'Das WEP ist für dich gerade gesperrt (nur lesen).' }
+    // Grün darf (ab Paket 3) nur Fotos hochladen – auch im eigenen Grün-WEP; die Bau-Excel gehört zum Bau-Teil
+    if (!recht || ((recht === 'gruen' || recht === 'ohne_bau') && schreiben.art !== 'foto')) return { ok: false, status: 403, fehler: 'Das WEP ist für dich gerade gesperrt (nur lesen).' }
   }
   return { ok: true, wert: z }
 }
@@ -66,4 +66,22 @@ export async function listeDateien(r2: R2Ablage, wepId: string): Promise<{ name:
     cursor = seite.truncated ? seite.cursor : undefined
   } while (cursor)
   return namen
+}
+
+/**
+ * Kopiert Fotodateien von einem WEP zum anderen (Zusammenführen: eigenes Grün-WEP → Bau-WEP). Was beim Ziel schon liegt
+ * oder beim Quell-WEP fehlt, wird übersprungen (die App lädt es dann selbst hoch). Liefert die Anzahl kopierter Dateien.
+ */
+export async function kopiereFotos(r2: R2Ablage, vonWep: string, nachWep: string, fotoIds: string[]): Promise<number> {
+  let kopiert = 0
+  for (const id of fotoIds) {
+    const von = dateiArt(vonWep, `foto-${id}.jpg`)
+    const nach = dateiArt(nachWep, `foto-${id}.jpg`)
+    if (!von || !nach || (await r2.get(nach.key))) continue
+    const quelle = await r2.get(von.key)
+    if (!quelle?.body) continue
+    await r2.put(nach.key, await new Response(quelle.body).arrayBuffer(), { httpMetadata: { contentType: nach.typ } })
+    kopiert++
+  }
+  return kopiert
 }

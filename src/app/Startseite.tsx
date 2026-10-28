@@ -19,10 +19,11 @@ import { serverModus } from '@/server/modus'
 import { gemerktesKonto } from '@/server/api'
 import { ZustandMarke } from '@/server/AbgabeBereich'
 import { NeuFuerDich } from '@/server/NeuFuerDich'
+import { zustandVon } from '@/server/ablaufDienst'
 import { RechtLinks } from './RechtLinks'
 
-/** Server-Modus (v2): Neue WEPs legt der Bau-Wertermittler an (Beginn des Ablaufs). */
-const darfNeuesWep = () => !serverModus || Boolean(gemerktesKonto()?.rollen.includes('bau'))
+/** Server-Modus (v2): Neue WEPs legen Bau (Bau-WEP) und Grün (eigenes Grün-WEP, wie in v1) an. */
+const darfNeuesWep = () => !serverModus || Boolean(gemerktesKonto()?.rollen.some((r) => r === 'bau' || r === 'gruen'))
 
 interface Props {
   /** Angemeldetes Konto oder null („ohne Konto“). */
@@ -71,7 +72,9 @@ export function Startseite({ konto, verfuegbar, onProfil, onOeffnen, onPapierkor
     void (async () => {
       await raeumePapierkorbAuf()
       const [liste, offene, korb, meta] = await Promise.all([alleWeps(), offeneKonflikte(), ladePapierkorb(), alleSyncMeta()])
-      setWeps(liste)
+      // Server-Modus: ein eigenes WEP, das (lokal) in ein Bau-WEP zusammengeführt ist, steht nicht mehr in der Liste
+      const ausgeblendet = new Set(meta.filter((m) => m.zusammengefuehrtIn).map((m) => m.id))
+      setWeps(liste.filter((w) => !ausgeblendet.has(w.id)))
       setGeaendertAm(new Map(meta.map((m) => [m.id, m.lokalGeaendertAm])))
       setKonflikte(new Set(offene.keys()))
       setImPapierkorb(korb.length)
@@ -283,7 +286,7 @@ export function Startseite({ konto, verfuegbar, onProfil, onOeffnen, onPapierkor
                     </span>
                     {konflikte.has(wep.id) && <span className="status status-konflikt">Konflikt</span>}
                     <TeilMarke rolle={wepRolle(wep, profilRolle)} />
-                    {serverModus ? <ZustandMarke zustand={wep.ablauf?.zustand ?? 'bau_in_arbeit'} /> : <StatusMarke status={wepStatus(wep)} />}
+                    {serverModus ? <ZustandMarke zustand={zustandVon(wep)} /> : <StatusMarke status={wepStatus(wep)} />}
                     <ChevronRight {...ICON} className="chevron" />
                   </button>
                 </li>

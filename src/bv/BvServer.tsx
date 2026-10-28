@@ -191,7 +191,7 @@ export function BvServerApp({ sitzung }: { sitzung: V2Sitzung }) {
                       <td>{f.kleingartenanlage}</td>
                       <td>{[f.parzelle, f.weg].filter((x) => x?.trim()).join(' / ')}</td>
                       <td>{f.unterpaechter}</td>
-                      <td>{[wep.ablauf?.bau?.name, wep.ablauf?.gruen?.name].filter(Boolean).join(' / ')}</td>
+                      <td>{wep.ablauf && !wep.ablauf.bau ? `${wep.ablauf.gruen?.name ?? ''} (ohne Bau-Teil)` : [wep.ablauf?.bau?.name, wep.ablauf?.gruen?.name].filter(Boolean).join(' / ')}</td>
                       <td>{f.wertermittlungAm ? datumDe(f.wertermittlungAm) : ''}</td>
                       <td className="zahl">{gesamt === undefined ? '…' : euroFormat(gesamt)}</td>
                       <td>{zeitDe(kopf.geaendertAm)}</td>
@@ -222,7 +222,9 @@ function BvServerDetail({ e, sitzung, onZurueck, onGeaendert }: { e: BvWep; sitz
     sitzung.konto,
   )
   const [pdf, setPdf] = useState<{ stil?: PdfStil; schritt?: string; meldung?: string; fehler?: boolean }>({})
-  const [an, setAn] = useState<'bau' | 'gruen' | 'beide'>('beide')
+  // Eigenes Grün-WEP ohne Bau (docs/PLAN-V2.md): die Rückfrage geht nur an Grün
+  const ohneBau = Boolean(wep.ablauf && !wep.ablauf.bau)
+  const [an, setAn] = useState<'bau' | 'gruen' | 'beide'>(ohneBau ? 'gruen' : 'beide')
   const [notiz, setNotiz] = useState('')
   const [frage, setFrage] = useState<AblaufAktion>()
   const [meldung, setMeldung] = useState<{ text: string; alarm?: boolean }>()
@@ -275,7 +277,7 @@ function BvServerDetail({ e, sitzung, onZurueck, onGeaendert }: { e: BvWep; sitz
         </button>
         <h1 className="h1">{wepName(wep)}</h1>
         <p className="neben">
-          {[wep.formalien.kleingartenanlage, wep.formalien.parzelle && `Parzelle ${wep.formalien.parzelle}`, `Bau: ${a?.bau?.name ?? '–'}`, `Grün: ${a?.gruen?.name ?? '–'}`].filter(Boolean).join(' · ')}
+          {[wep.formalien.kleingartenanlage, wep.formalien.parzelle && `Parzelle ${wep.formalien.parzelle}`, `Bau: ${a?.bau?.name ?? (ohneBau ? 'kein Bau-Teil' : '–')}`, `Grün: ${a?.gruen?.name ?? '–'}`].filter(Boolean).join(' · ')}
         </p>
       </header>
 
@@ -300,7 +302,7 @@ function BvServerDetail({ e, sitzung, onZurueck, onGeaendert }: { e: BvWep; sitz
           <fieldset className="bv-rueckfrage">
             <legend className="label">Rückfrage an</legend>
             <div className="segmente" role="group" aria-label="Rückfrage an">
-              {(['bau', 'gruen', 'beide'] as const).map((x) => (
+              {(ohneBau ? (['gruen'] as const) : (['bau', 'gruen', 'beide'] as const)).map((x) => (
                 <button key={x} type="button" className="segment" aria-pressed={an === x} onClick={() => setAn(x)}>
                   {x === 'bau' ? 'Bau' : x === 'gruen' ? 'Grün' : 'Bau und Grün'}
                 </button>
