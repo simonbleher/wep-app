@@ -4,6 +4,9 @@ import { useEffect, useId, useState } from 'react'
 import { Send } from 'lucide-react'
 import type { Wep } from '@/model'
 import { ICON, Meldung, Rueckfrage, zeitDe } from '@/app/ui'
+import { speichereWep } from '@/app/db'
+import { lokalesProfil } from '@/profil'
+import { istUnterschriftUrl } from '@/unterschrift'
 import { fuehreSchrittAus, ladeGruenKonten, ladeVerlauf, serverSicht, type GruenKonto, type VerlaufEintrag } from './ablaufDienst'
 import { AKTION_TEXT, ZUSTAND_TEXT, type AblaufAktion, type Zustand } from './rechte'
 
@@ -43,10 +46,17 @@ export function AbgabeBereich({ wep, onGeaendert }: { wep: Wep; onGeaendert: () 
 
   const gruenName = gruenKonten?.find((k) => k.id === gruen)?.name ?? a?.gruen?.name ?? ''
 
+  // Bei der Abgabe kommt die eigene Unterschrift (Profil) für den eigenen Teil ins WEP – wie beim Paket für den BV in v1
+  const teil = sicht.recht === 'gruen' ? 'gruen' : 'bau'
+  const unterschrift = lokalesProfil.lade().profil.unterschrift
+
   async function ausfuehren(schritt: AblaufAktion) {
     setFrage(undefined)
     setLaeuft(true)
     setMeldung(undefined)
+    if (istUnterschriftUrl(unterschrift) && wep.unterschriften?.[teil] !== unterschrift) {
+      await speichereWep({ ...wep, unterschriften: { ...wep.unterschriften, [teil]: unterschrift } })
+    }
     const erg = await fuehreSchrittAus(wep.id, schritt)
     setLaeuft(false)
     if (!erg.ok) return setMeldung({ text: erg.meldung, alarm: true })
@@ -128,6 +138,13 @@ export function AbgabeBereich({ wep, onGeaendert }: { wep: Wep; onGeaendert: () 
         )}
         {!sicht.aktionen.some((x) => x === 'an_gruen' || x === 'an_bv') && (
           <p className="neben">{sicht.recht ? 'Abgeben kannst du, sobald du an der Reihe bist.' : 'Das WEP ist abgegeben. Du kannst es nur noch lesen (Übersicht).'}</p>
+        )}
+        {sicht.aktionen.some((x) => x === 'an_gruen' || x === 'an_bv') && (
+          <p className="neben">
+            {istUnterschriftUrl(unterschrift)
+              ? `Deine Unterschrift (Profil) kommt bei der Abgabe für den ${teil === 'bau' ? 'Bau' : 'Grün'}-Teil ins WEP.`
+              : 'Im Profil ist keine Unterschrift hinterlegt – das Unterschriftsfeld im PDF bleibt leer.'}
+          </p>
         )}
         {laeuft && <p className="neben">Gleiche ab und gebe ab …</p>}
         {meldung &&

@@ -427,3 +427,10 @@
 - **Ablauf im WEP:** Der Server liefert `Wep.ablauf` (Zustand, Beteiligte mit Namen, offene Rückfrage) mit jedem WEP aus und verwirft, was die App dort mitschickt. So kennt die App Zustand und Rechte auch ohne Netz; jeder Schritt erhöht die Revision, der nächste Abgleich bringt den neuen Zustand.
 - **Oberfläche:** Gesperrt wird über die Reiter: Grün sieht den Bau-Teil nur in der Übersicht, nach der Abgabe bleibt nur die Übersicht. Regelverstöße bleiben Warnungen.
 - **Löschen** nur durch den Besitzer, solange Grün noch nicht beteiligt ist. Danach ist das WEP Teil eines Vorgangs mit zwei Personen.
+
+## 2026-10-28 · v2-Kontrollseite: dieselbe Ansicht, Daten vom Server, Schritte statt Status
+
+- **Entscheidung:** `/bv` zeigt im Server-Modus die abgegebenen WEPs vom Server (Rolle BV oder Admin). Die Status „neu / geprüft / Rückfrage“ der Datei-Kontrollseite werden zu Schritten im Ablauf (Rückfrage mit Ziel und Notiz, geprüft, wieder öffnen mit Begründung), die der Server prüft und im Verlauf festhält. Übersicht, Skizzen, Fotos, PDF und Drucken sind dieselben Bausteine wie in v1.
+- **Grund:** Der Zustand eines WEP soll an einer Stelle stehen (Server) und für Wertermittler und BV gleich aussehen; lokale Notizen im Browser des BV gingen an den Wertermittlern vorbei.
+- **Ohne Netz:** Die Kontrollseite im Server-Modus braucht Netz; sie hält keine eigene Kopie (die Datei-Kontrollseite von v1 bleibt dafür ohne Schalter erhalten).
+- **Profil je Person:** Meldet sich auf einem Gerät eine andere Person an, werden Name, Unterschrift und eigene Baupreisindex-Werte des Profils zurückgesetzt, damit nichts in fremde WEPs gerät. Bei der Abgabe kommt die eigene Unterschrift für den eigenen Teil ins WEP.
