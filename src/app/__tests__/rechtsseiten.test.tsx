@@ -43,7 +43,7 @@ describe('Datenschutz und Nutzungsbedingungen', () => {
   it('brauchen keine Anmeldung, kein Skript und keine externen Dateien (offline lesbar)', () => {
     for (const html of [ds, nb]) {
       expect(html).not.toMatch(/<script/i)
-      expect(html).not.toMatch(/(src|href)="https?:\/\/(?!www\.datenschutz-berlin\.de|www\.cloudflare\.com/gdpr/subprocessors/)/)
+      expect(html).not.toMatch(/(src|href)="https?:\/\/(?!www\.datenschutz-berlin\.de|www\.cloudflare\.com\/gdpr\/subprocessors\/)/)
     }
   })
 
