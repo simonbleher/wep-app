@@ -36,11 +36,29 @@ try {
   // 1. Anmelde-Bildschirm
   await seite.goto(URL)
   await seite.getByRole('heading', { name: 'WEP-App' }).waitFor()
-  pruefe(await seite.getByRole('note').getByText('v2-Vorschau – nur Testdaten').isVisible(), 'Band „v2-Vorschau – nur Testdaten“ steht oben')
+  pruefe((await seite.getByRole('note').count()) === 0, 'im Browser kein Hinweis-Band (kein Vorschau-Band mehr)')
   pruefe(await seite.getByRole('link', { name: 'Mit Google anmelden' }).isVisible(), 'Anmeldung mit Google angeboten')
   pruefe(await seite.getByRole('link', { name: 'Mit Microsoft anmelden' }).isVisible(), 'Anmeldung mit Microsoft angeboten')
   pruefe((await seite.getByText('Ohne Konto fortfahren').count()) === 0, 'kein „Ohne Konto fortfahren“ im Server-Modus')
   await seite.screenshot({ path: `${AUSGABE}/01-anmeldung.png` })
+
+  // 1b. Windows-App (Tauri, hier nachgestellt) mit demselben Web-Paket: v1 ohne Server, Hinweis „im Browser nutzen“
+  {
+    const kw = await u.neuerKontext({ viewport: { width: 1024, height: 768 }, serviceWorkers: 'block' })
+    await kw.addInitScript(() => Object.defineProperty(window, '__TAURI_INTERNALS__', { value: {} }))
+    const sw = await kw.newPage()
+    const v2Aufrufe: string[] = []
+    sw.on('request', (r) => r.url().includes('/api/v2/') && v2Aufrufe.push(r.url()))
+    await sw.goto(URL)
+    const band = sw.getByRole('note').filter({ hasText: 'bitte im Browser nutzen' })
+    await band.waitFor()
+    pruefe(await band.getByRole('link', { name: 'wep-pankow.pages.dev' }).isVisible(), 'Windows-App: Hinweis „bitte im Browser nutzen“ mit Link')
+    pruefe((await sw.getByRole('link', { name: 'Mit Google anmelden' }).count()) === 0, 'Windows-App: keine Server-Anmeldung, die App bleibt v1')
+    await sw.waitForTimeout(500)
+    pruefe(v2Aufrufe.length === 0, 'Windows-App: keine Anfragen an /api/v2')
+    await sw.screenshot({ path: `${AUSGABE}/01b-windows-app.png` })
+    await kw.close()
+  }
 
   // 2. Neues Konto (Microsoft) wartet auf Freigabe
   await anmelden(seite, 'max')
@@ -297,7 +315,7 @@ try {
   await seiteE.locator('ul[aria-label="Protokolle"] .zeile', { hasText: '2026-0815' }).getByText('Rückfrage').waitFor()
   await seiteE.getByRole('button', { name: /2026-0815/ }).first().click()
   await seiteE.getByRole('button', { name: 'Abgabe' }).filter({ visible: true }).first().click()
-  pruefe(await seiteE.getByText(/Hecke an der Straße fehlt/).isVisible(), 'Grün: sieht die Rückfrage mit Notiz')
+  pruefe(await seiteE.locator('p').filter({ hasText: 'Rückfrage vom BV' }).filter({ hasText: 'Hecke an der Straße fehlt' }).isVisible(), 'Grün: sieht die Rückfrage mit Notiz')
   await seiteE.getByRole('button', { name: 'An den BV abgeben' }).click()
   await seiteE.getByRole('alertdialog').getByRole('button', { name: 'Abgeben' }).click()
   await seiteE.getByText('An den BV abgegeben.').waitFor()

@@ -1,4 +1,4 @@
-// Schalter für v2 auf dem Server (docs/PLAN-V2.md). SERVER_MODUS=true zuerst nur in der Vorschau (Preview).
+// Schalter für v2 auf dem Server (docs/PLAN-V2.md). SERVER_MODUS=true ist in Produktion gesetzt (docs/V2-EINRICHTUNG.md).
 // Ohne Schalter antworten alle Endpunkte unter /api/v2/ mit 404 – v1 bemerkt nichts davon.
 
 /** Bindungen und Variablen von v2. Was fehlt, meldet /api/v2/status. */

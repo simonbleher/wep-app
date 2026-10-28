@@ -446,3 +446,10 @@
 - **Entscheidung:** Die Anleitung für den Server-Modus ist eine eigene Seite (`public/anleitung-v2/`, PDF `docs/anleitung-v2/Anleitung_WEP-App_v2.pdf`). Die App verlinkt sie nur in Builds mit `VITE_SERVER_MODUS`; der Service Worker hält sie nur dort offline vor. Die Anleitung von v1 bleibt unverändert, bis Simon umstellt (dann ersetzt v2 sie).
 - **Grund:** v1-Nutzer sollen keine Kapitel über Konten und Abgaben sehen, die es für sie noch nicht gibt; ihre Geräte laden die Bilder der v2-Anleitung nicht.
 - **Eine Testumgebung:** `tools/v2/umgebung.ts` startet die gebaute App mit den echten Functions (SQLite statt D1, R2-Ersatz) und nachgebauter Anmeldung bei Google/Microsoft und Resend. Der Durchlauf (`npm run v2:durchlauf`) und die Bildschirmfotos (`npm run anleitung:v2`) nutzen sie gemeinsam – die Bilder zeigen genau das, was der Durchlauf prüft.
+
+## 2026-10-28 · v2 direkt in Production, v1 wird nicht mehr genutzt
+
+- **Entscheidung:** v2 geht ohne Vorschau-Phase direkt nach `wep-pankow.pages.dev` (Cloudflare-Umgebung Produktion, Build aus `release` über „Version freigeben“). v1 wird nicht mehr genutzt. Das Band „v2-Vorschau – nur Testdaten“ entfällt. Die Schalter `VITE_SERVER_MODUS`/`SERVER_MODUS` bleiben im Code.
+- **Grund:** Wunsch von Simon; eine zweite Umgebung bringt für die wenigen Testkonten keinen Gewinn.
+- **Daten:** Auf dem Server weiter **nur Testdaten**, bis der AV-Vertrag mit dem BV steht (PLAN-V2.md, „Datenschutz“).
+- **Android und Windows:** APK und EXE bauen in GitHub Actions ohne `VITE_SERVER_MODUS` (v1). Ihre Live-Updates kommen aber aus dem Production-Build mit Schalter. Ohne Vorkehrung würden die Apps in den Server-Modus wechseln und dort scheitern (keine Server-Anmeldung, `/api/v2` unter `capacitor://`/`tauri://` nicht erreichbar). Deshalb bleibt der Server-Modus in den Apps aus (`modusFuer` in `src/server/modus.ts`): Sie arbeiten weiter wie v1 mit OneDrive und zeigen oben „bitte im Browser nutzen“. So gehen keine Daten auf den Geräten verloren. Server-Modus für die Apps: nächstes Paket (V2-8).
