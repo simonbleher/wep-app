@@ -473,3 +473,8 @@
 - **Resend:** Sitz USA. Ohne eigene Absenderdomain läuft der Versand über die Infrastruktur in den USA, mit eigener Domain über Region EU (Irland).
 - **Neu:** Abschnitt „Übermittlung in Drittländer“ (Cloudflare, Resend, Google, Microsoft; D1/R2 bleiben EU). Rechtsgrundlage ergänzt: Zugriffsprotokoll und Verbindungsdaten nach Art. 6 Abs. 1 lit. f DSGVO.
 - **Stil:** „der Betreiber“ statt „wir“. „Entwurf – rechtlich noch nicht geprüft“ bleibt.
+
+## 2026-10-28 · Abschnitt „Google-Nutzerdaten“ in der Datenschutzerklärung
+
+- **Entscheidung:** Eigener Abschnitt 6 „Google-Nutzerdaten“ (Anker `#google-nutzerdaten`) mit englischer Kurzfassung „Google user data“ und dem Limited-Use-Satz samt Link zur Google API Services User Data Policy.
+- **Grund:** Die Google-OAuth-Veröffentlichung verlangt diese Angaben. Inhalt entspricht dem Code: nur `openid email profile`, kein Zugriff auf weitere Google-Dienste.
