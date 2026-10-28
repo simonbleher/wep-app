@@ -21,9 +21,15 @@ describe('Datenschutz und Nutzungsbedingungen', () => {
     }
   })
 
-  it('markieren fehlende Angaben des BV', () => {
-    expect(ds).toContain('[BITTE ERGÄNZEN')
-    expect(ds).toContain('Auftragsverarbeiter')
+  it('nennen in der Testphase Simon Bleher als Verantwortlichen und lassen nur die Verträge offen', () => {
+    for (const html of [ds, nb]) expect(html).toContain('Testphase: Die App wird derzeit nur zu Testzwecken mit erfundenen Daten betrieben.')
+    expect(ds).toContain('Verantwortlicher</strong> ist in der Testphase <strong>Simon Bleher')
+    expect(ds).toContain('Art. 6 Abs. 1 lit. b DSGVO')
+    expect(ds).toContain('höchstens 90 Tage')
+    expect(ds.match(/\[BITTE ERGÄNZEN/g)).toHaveLength(2)
+    expect(ds).toMatch(/Cloudflare-DPA/)
+    expect(ds).toMatch(/Resend/)
+    expect(nb).not.toContain('[BITTE ERGÄNZEN')
     expect(ds).toContain('Berliner Beauftragte für Datenschutz und Informationsfreiheit')
   })
 
