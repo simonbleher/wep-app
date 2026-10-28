@@ -485,5 +485,10 @@
 - **Grund:** Grün ist oft vor Bau auf der Parzelle; in v1 ging das auch. Kennung, Verlauf und Abgabe des Bau-WEP bleiben so erhalten.
 - **Wie:** Die App rechnet das Zusammenführen selbst (`src/server/zusammenfuehren.ts`: Formalien-Abgleich aus der Bau-Excel, „Grundlage übernehmen“ der Grün-Skizze, Fotos lokal kopiert wie beim Umnummerieren), damit es ohne Netz geht; der Abgleich gibt es danach an den Server (`POST /api/v2/weps/<id>/zusammenfuehren`). Der Server nimmt den Bau-Teil immer aus seinem Stand und Stammdaten nur für die gewählten Felder aus dem Grün-WEP (`zusammenfuehrungAufServer`), kopiert die Fotodateien in R2 und schreibt den Verlauf in beide WEPs.
 - **Rückgängig:** solange das Bau-WEP bei Grün in Arbeit ist. Der Stand des Bau-WEP vor dem Zusammenführen liegt in einer eigenen Tabelle (`zusammenfuehrungen`, wegen der Zeilengröße in D1). Änderungen am Grün-Teil nach dem Zusammenführen gehen dabei verloren (die App sagt das vorher).
-- **Stammdaten:** Bau gilt; in der Vorschau sind im Bau-WEP leere Felder und „Wertermittler Außenanlagen & Aufwuchs“ zum Übernehmen vorgewählt, andere Unterschiede nicht. Die Parzelle (Form) gehört zum Bau-Teil und wird nur als Hinweis verglichen.
+- **Stammdaten:** Bau gilt; in der Vorschau sind im Bau-WEP leere Felder und „Wertermittler Außenanlagen & Aufwuchs“ zum Übernehmen vorgewählt, andere Unterschiede nicht. Die Parzelle (Form) gehört zum Bau-Teil und wird nur als Hinweis verglichen (Nachtrag 28.10.2026 unten: ohne Parzelle im Bau-WEP gilt die von Grün).
+
+## 2026-10-28 · v2: Parzelle beim Zusammenführen von Grün, wenn Bau keine hat
+
+- **Entscheidung:** Hat das Bau-WEP keine Parzelle (Form), übernimmt das Zusammenführen die Parzelle aus dem Grün-WEP, mit dem Hinweis „Parzelle von Grün übernommen – bitte mit Bau abstimmen“. Hat Bau eine, gilt sie wie bisher (Unterschied nur als Hinweis). Der Server nimmt die Parzelle aus seinem Stand des Grün-WEP, nicht aus dem, was die App schickt; Rückgängig stellt das Bau-WEP wieder ohne Parzelle her.
+- **Grund:** Offene Frage 3 aus PR #119, entschieden von Simon: Sonst ginge die Parzelle verloren, auf der Grün die Skizze gezeichnet hat.
 
