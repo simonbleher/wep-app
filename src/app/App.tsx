@@ -12,6 +12,7 @@ import {
 } from '@/konto'
 import { ladeUpdateDienst } from './updateModul'
 import { setzeAbgleichZurueck } from '@/sync'
+import { aendereProfil, lokalesProfil } from '@/profil'
 import { LoginBildschirm } from './LoginBildschirm'
 import { Papierkorb } from './Papierkorb'
 import { Profil } from './Profil'
@@ -112,8 +113,16 @@ export default function App({ v2 }: { v2?: V2Sitzung } = {}) {
     }
   }, [])
 
-  // Server-Modus: kein OneDrive, daher keine Abgleich-Anzeige und keine Microsoft-Anmeldung der App
-  const verfuegbar = v2 ? false : kontoVerfuegbar()
+  // Server-Modus: die Rolle (Bau oder Grün) vergibt der Admin; sie gilt im Profil und für neue WEPs
+  const serverRolle = v2?.konto.rollen.includes('bau') ? 'bau' : v2?.konto.rollen.includes('gruen') ? 'gruen' : undefined
+  useEffect(() => {
+    if (!serverRolle) return
+    const { profil } = lokalesProfil.lade()
+    if (profil.rolle !== serverRolle || !profil.name.trim()) aendereProfil({ rolle: serverRolle, name: profil.name.trim() || v2?.konto.name || '' })
+  }, [serverRolle, v2?.konto.name])
+
+  // Server-Modus: Anmeldung und Abgleich laufen über den Server (Statuszeile zeigt den Server-Abgleich)
+  const verfuegbar = v2 ? true : kontoVerfuegbar()
 
   if (phase === 'lade') return <div className="app" aria-busy="true" />
   if (phase === 'login') {

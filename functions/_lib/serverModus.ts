@@ -38,7 +38,7 @@ export function einrichtung(env: V2Umgebung) {
 }
 
 /** Höchste Migration in migrations/ – so weit muss die Datenbank eingespielt sein. */
-export const SCHEMA_ERWARTET = 1
+export const SCHEMA_ERWARTET = 2
 
 interface SchemaDb {
   prepare(sql: string): { first<T>(): Promise<T | null> }

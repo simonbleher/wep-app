@@ -1,7 +1,7 @@
 // Durchlauf v2 im echten Browser (Chromium) gegen den echten Server-Code: Die App wird mit VITE_SERVER_MODUS=true
 // gebaut; Anfragen an /api/v2/* beantworten die Pages Functions aus functions/ mit einer SQLite-Datenbank (dieselben
 // Migrationen wie D1). Google und Microsoft sind nachgebaut (Anmeldeseite leitet sofort zurück, Token mit Testschlüssel).
-// Erfundene Konten: Ada Admin (Google, V2_ADMINS), Max Mustermann (Microsoft).
+// Erfundene Konten: Ada Admin (Google, V2_ADMINS), Max Mustermann (Microsoft), Bert Bauer (Google, Bau).
 //
 // Start: npm run v2:durchlauf
 import { execFileSync, spawn } from 'node:child_process'
@@ -15,7 +15,12 @@ import * as ich from '../../functions/api/v2/ich'
 import * as abmelden from '../../functions/api/v2/abmelden'
 import * as konten from '../../functions/api/v2/admin/konten'
 import * as konto from '../../functions/api/v2/admin/konten/[id]'
+import * as wepListe from '../../functions/api/v2/weps'
+import * as wepEinzeln from '../../functions/api/v2/weps/[id]'
+import * as wepWieder from '../../functions/api/v2/weps/[id]/wiederherstellen'
+import * as wepVerlauf from '../../functions/api/v2/weps/[id]/verlauf'
 import { onRequest as middleware } from '../../functions/api/v2/_middleware'
+import { fuehreAdminAktionAus, ladeKonto } from '../../functions/_lib/v2/konten'
 
 const PORT = 4183
 const URL = `http://localhost:${PORT}/`
@@ -39,6 +44,7 @@ async function signiere(inhalt: object) {
 const PERSONEN = {
   ada: { anbieter: 'google', claims: { iss: 'https://accounts.google.com', aud: GOOGLE_ID, sub: 'ada-1', email: 'ada@example.org', email_verified: true, name: 'Ada Admin' } },
   max: { anbieter: 'microsoft', claims: { iss: `https://login.microsoftonline.com/${TID}/v2.0`, aud: MS_ID, tid: TID, oid: 'max-1', preferred_username: 'max@bv.example', name: 'Max Mustermann' } },
+  bert: { anbieter: 'google', claims: { iss: 'https://accounts.google.com', aud: GOOGLE_ID, sub: 'bert-1', email: 'bert@example.org', email_verified: true, name: 'Bert Bauer' } },
 } as const
 let wer: keyof typeof PERSONEN = 'ada'
 const codes = new Map<string, string>() // code → nonce
@@ -64,6 +70,10 @@ const ROUTEN: [RegExp, Modul, string?][] = [
   [/^\/api\/v2\/abmelden$/, abmelden],
   [/^\/api\/v2\/admin\/konten$/, konten],
   [/^\/api\/v2\/admin\/konten\/([^/]+)$/, konto, 'id'],
+  [/^\/api\/v2\/weps$/, wepListe],
+  [/^\/api\/v2\/weps\/([^/]+)$/, wepEinzeln, 'id'],
+  [/^\/api\/v2\/weps\/([^/]+)\/wiederherstellen$/, wepWieder, 'id'],
+  [/^\/api\/v2\/weps\/([^/]+)\/verlauf$/, wepVerlauf, 'id'],
 ]
 let serverWeg = false
 
@@ -78,7 +88,8 @@ async function beantworte(route: Route) {
   const request = new Request(anfrage.url(), { method: methode, headers: await anfrage.allHeaders(), body: ['GET', 'HEAD'].includes(methode) ? undefined : anfrage.postData() })
   const antwort = await middleware({
     env,
-    next: async () => (handler ? handler({ request, env, params: treffer?.param ? { [treffer.param]: treffer.m![1] } : {} }) : Response.json({ fehler: 'Nicht gefunden.' }, { status: 404 })),
+    next: async () =>
+      handler ? handler({ request, env, params: treffer?.param ? { [treffer.param]: decodeURIComponent(treffer.m![1]) } : {} }) : Response.json({ fehler: 'Nicht gefunden.' }, { status: 404 }),
   })
   const kopf: Record<string, string> = {}
   antwort.headers.forEach((w, k) => k !== 'set-cookie' && k !== 'location' && (kopf[k] = w))
@@ -117,6 +128,14 @@ function chromiumPfad() {
   const kandidaten = [`${basis}/chromium/chrome-linux/chrome`]
   for (const d of existsSync(basis) ? readdirSync(basis) : []) if (d.startsWith('chromium-')) kandidaten.push(`${basis}/${d}/chrome-linux/chrome`)
   return kandidaten.find((p) => existsSync(p))
+}
+
+async function neuesWep(seite: Page, nr: string) {
+  await seite.getByRole('button', { name: 'Neues WEP', exact: true }).first().click()
+  const dlg = seite.getByRole('dialog', { name: 'Neues WEP' })
+  await dlg.getByLabel(/Vorgangs-Nr/).fill(nr)
+  await dlg.getByRole('button', { name: 'Anlegen' }).click()
+  await seite.getByLabel(/Kleingartenanlage/).first().waitFor()
 }
 
 async function anmelden(seite: Page, person: keyof typeof PERSONEN) {
@@ -212,7 +231,6 @@ try {
   // 8. Gesperrt: Sitzung endet, neue Anmeldung wird abgewiesen
   const adaId = (db.roh.prepare("SELECT id FROM konten WHERE email = 'ada@example.org'").get() as { id: string }).id
   const maxId = (db.roh.prepare("SELECT id FROM konten WHERE email = 'max@bv.example'").get() as { id: string }).id
-  const { fuehreAdminAktionAus, ladeKonto } = await import('../../functions/_lib/v2/konten')
   await fuehreAdminAktionAus(db, (await ladeKonto(db, adaId))!, (await ladeKonto(db, maxId))!, { aktion: 'sperren' })
   await seite.reload()
   await seite.getByRole('link', { name: 'Mit Microsoft anmelden' }).waitFor()
@@ -221,6 +239,58 @@ try {
   await seite.getByText(/Das Konto ist gesperrt/).waitFor()
   pruefe(true, 'gesperrt: Anmeldung zeigt „Das Konto ist gesperrt“')
   pruefe(!seite.url().includes('anmeldefehler'), 'Meldung aus der Adresse entfernt')
+
+  // 9. WEPs auf dem Server: Bert (Bau) legt an, sein zweites Gerät bekommt es; ohne Server wartet die Änderung
+  await anmelden(seite, 'bert')
+  await seite.getByRole('heading', { name: 'Wartet auf Freigabe' }).waitFor()
+  const bertId = (db.roh.prepare("SELECT id FROM konten WHERE email = 'bert@example.org'").get() as { id: string }).id
+  const ada = (await ladeKonto(db, adaId))!
+  await fuehreAdminAktionAus(db, ada, (await ladeKonto(db, bertId))!, { aktion: 'freigeben' })
+  await fuehreAdminAktionAus(db, ada, (await ladeKonto(db, bertId))!, { aktion: 'rollen', rollen: ['bau'] })
+  await seite.getByRole('button', { name: 'Erneut prüfen' }).click()
+  await seite.getByRole('heading', { name: 'Protokolle' }).waitFor()
+  await neuesWep(seite, '2026-0815')
+  await seite.getByRole('button', { name: 'Protokolle' }).first().click()
+  await seite.getByRole('heading', { name: 'Protokolle' }).waitFor()
+  const aufServer = async (n: number) => {
+    for (let i = 0; i < 50; i++) {
+      if ((db.roh.prepare('SELECT count(*) AS n FROM weps').get() as { n: number }).n === n) return true
+      await seite.waitForTimeout(100)
+    }
+    return false
+  }
+  pruefe(await aufServer(1), 'WEP nach dem Anlegen auf dem Server')
+  pruefe((db.roh.prepare('SELECT vorgangs_nr, bau_konto, zustand FROM weps').get() as { vorgangs_nr: string; bau_konto: string; zustand: string }).bau_konto === bertId, 'Server: Bert ist Besitzer, Zustand „bau_in_arbeit“')
+  await seite.getByText(/Abgeglichen um/).filter({ visible: true }).first().waitFor()
+  pruefe(true, 'Statuszeile: mit dem Server abgeglichen')
+  pruefe(await seite.locator('.zeile', { hasText: '2026-0815' }).getByText('Bau', { exact: true }).isVisible(), 'neues WEP ist ein Bau-WEP (Rolle vom Server)')
+
+  const geraetB = await browser.newContext({ viewport: { width: 1200, height: 900 }, serviceWorkers: 'block' })
+  await geraetB.route('**/api/v2/**', beantworte)
+  await geraetB.route(/^https:\/\/(accounts\.google\.com\/o\/oauth2|login\.microsoftonline\.com\/common\/oauth2\/v2\.0\/authorize)/, anbieterSeite)
+  const seiteB = await geraetB.newPage()
+  seiteB.on('pageerror', (e) => skriptFehler.push(String(e)))
+  await seiteB.goto(URL)
+  await anmelden(seiteB, 'bert')
+  await seiteB.getByRole('heading', { name: 'Protokolle' }).first().waitFor()
+  await seiteB.getByText(/2026-0815/).filter({ visible: true }).first().waitFor()
+  pruefe(true, 'zweites Gerät (Tablet): WEP vom Server ist da')
+  await seiteB.screenshot({ path: `${AUSGABE}/04-zweites-geraet.png` })
+
+  serverWeg = true
+  await neuesWep(seite, '2026-0816')
+  await seite.getByRole('button', { name: 'Protokolle' }).first().click()
+  await seite.getByText(/1 Änderung wartet auf den Server/).filter({ visible: true }).first().waitFor()
+  pruefe(true, 'ohne Server: neues WEP wartet („1 Änderung wartet auf den Server“)')
+  serverWeg = false
+  await seite.getByRole('button', { name: 'Abgleichen' }).filter({ visible: true }).first().click()
+  pruefe(await aufServer(2), 'Server wieder da: wartende Änderung hochgeladen')
+  await seiteB.getByRole('button', { name: 'Abgleichen' }).filter({ visible: true }).first().click()
+  await seiteB.getByText(/2026-0816/).filter({ visible: true }).first().waitFor()
+  pruefe(true, 'zweites Gerät bekommt auch das zweite WEP')
+  const verlauf = (db.roh.prepare('SELECT aktion FROM verlauf ORDER BY id').all() as { aktion: string }[]).map((v) => v.aktion)
+  pruefe(verlauf.filter((a) => a === 'angelegt').length === 2, 'Verlauf: „angelegt“ je WEP')
+  await geraetB.close()
 
   const protokoll = (db.roh.prepare('SELECT aktion FROM protokoll').all() as { aktion: string }[]).map((p) => p.aktion)
   pruefe(['konto_angelegt', 'anmeldung', 'abmeldung', 'admin_freigeben', 'admin_rollen', 'admin_sperren'].every((a) => protokoll.includes(a)), 'Zugriffsprotokoll enthält Anmeldungen und Admin-Aktionen')

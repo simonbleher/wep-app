@@ -2965,3 +2965,8 @@ input[type='range'] {
   gap: var(--abstand-2);
   min-height: var(--beruehr-min);
 }
+
+/* Server-Modus: Statuszeile des Abgleichs darf umbrechen (die gleichnamige Status-Marke ist einzeilig) */
+.status.status-server {
+  white-space: normal;
+}

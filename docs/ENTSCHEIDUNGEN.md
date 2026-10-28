@@ -401,3 +401,13 @@
 - **Migrationen:** `migrations/NNNN_*.sql`, eingespielt über die D1-Konsole (kein `wrangler.toml` nötig, solange die Bindungen im Dashboard stehen); `schema_stand` + `/api/v2/status` zeigen, ob alles eingespielt ist. Tests nutzen `node:sqlite` mit denselben Dateien.
 - **Offline:** Die App merkt sich das zuletzt bestätigte Konto (`localStorage`) und startet ohne Netz damit; die erste Anmeldung auf einem Gerät braucht Netz.
 - **Admin-Seite in der App** (Profil → Konten verwalten) statt eigener Unterseite: dieselbe Anmeldung, offline-fähige Hülle.
+
+## 2026-10-28 · v2-WEPs: Revision statt Zeitstempel, eigener Abgleich, gemeinsame Rechte
+
+- **Entscheidung:** Ein WEP liegt als JSON (Format wie v1) in D1 mit einer Revision. Gespeichert wird nur mit der Revision, auf der die Änderung beruht; sonst antwortet der Server mit 409 und seinem Stand. Der Abgleich der App (`src/server/abgleich.ts`) baut darauf auf, nutzt aber die lokalen Bausteine von v1 weiter (IndexedDB, Sync-Metadaten um `serverRev`/`serverGeloescht` ergänzt, Papierkorb, Konflikt-Anzeige und -Entscheidung).
+- **Grund:** Der OneDrive-Abgleich arbeitet mit Dateien und eTags und ist auf einen Nutzer zugeschnitten; mit Revisionen prüft der Server jede Änderung selbst (Rechte, Zustand) und Konflikte sind eindeutig erkennbar. Für die Nutzer sieht ein Konflikt aus wie in v1 („auf zwei Geräten geändert“, neuere Fassung gilt, andere sichtbar).
+- **Rechte an einer Stelle:** `src/server/rechte.ts` ohne Abhängigkeiten, von den Functions mitgebündelt und in der App genutzt. BV und Admin sehen WEPs erst ab der Abgabe an den BV – Entwürfe gehen nur die Beteiligten etwas an.
+- **Papierkorb:** Löschen legt das WEP auch auf dem Server in den Papierkorb (nur der Besitzer, nur in Bearbeitung). „Endgültig löschen“ wirkt nur auf dem Gerät; endgültiges Löschen auf dem Server folgt den Aufbewahrungsregeln des BV (vor echten Daten zu klären).
+- **Verlauf:** jeder Zustandswechsel und Anlegen/Löschen/Wiederherstellen; „bearbeitet“ höchstens einmal je Person und Stunde.
+- **Rolle im Profil:** Im Server-Modus vergibt der Admin die Rolle; das Profil übernimmt Bau bzw. Grün (für neue WEPs) und zeigt sie nur an.
+- **Größe:** D1 erlaubt Zeilen bis 2 MB; der Server nimmt WEPs bis 1,9 MB (Fotos und Bau-Excel liegen nicht im WEP).

@@ -111,9 +111,9 @@ export async function stelleWiederHer(
   return { id, neueNummer: false }
 }
 
-/** Gibt es von diesem WEP Spuren in OneDrive, die der Abgleich noch entfernen muss? */
+/** Gibt es von diesem WEP Spuren in OneDrive (bzw. auf dem Server, v2), die der Abgleich noch bearbeiten muss? */
 function hatSpuren(m: SyncMeta | undefined): boolean {
-  return !!(m?.remoteETag || m?.papierkorbETag)
+  return !!(m?.remoteETag || m?.papierkorbETag || m?.serverRev !== undefined)
 }
 
 /** „Endgültig löschen“. Liefert false, wenn das WEP nicht im Papierkorb liegt. */
