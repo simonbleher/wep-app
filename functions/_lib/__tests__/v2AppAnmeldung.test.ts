@@ -121,7 +121,7 @@ describe('Einmal-Code und Token', () => {
     expect(a.r.status).toBe(302)
     expect(`${a.ort.protocol}//${a.ort.host}${a.ort.pathname}`).toBe(RUECKSPRUNG_ANDROID)
     expect(a.ort.searchParams.get('state')).toBe(a.appState)
-    expect(a.r.headers.getSetCookie().some((c) => c.startsWith('wep_sitzung=') && !c.startsWith('wep_sitzung=;'))).toBe(false)
+    expect(a.r.headers.getSetCookie().some((c) => c.startsWith('__Host-wep_sitzung=') && !c.startsWith('__Host-wep_sitzung=;'))).toBe(false)
     const t = await einloesen(env, a.ort.searchParams.get('code')!, a.verifier)
     expect(t.status).toBe(200)
     const { token, konto } = (await t.json()) as { token: string; konto: { email: string; status: string } }

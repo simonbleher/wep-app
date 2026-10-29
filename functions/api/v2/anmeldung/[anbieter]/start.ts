@@ -5,6 +5,8 @@ import { datenbank, NICHT_EINGERICHTET, type V2Kontext } from '../../../../_lib/
 import { autorisierungsUrl, clientDaten, istAnbieter } from '../../../../_lib/v2/oidc'
 import { beginneAnmeldung } from '../../../../_lib/v2/sitzung'
 import { appAnmeldungAus } from '../../../../_lib/v2/appAnmeldung'
+import { zuViele } from '../../../../_lib/v2/begrenzung'
+import { fehlerZurSeite } from '../../../../_lib/v2/anmeldeAntwort'
 
 export const onRequestGet = async ({ request, env, params }: V2Kontext<'anbieter'>): Promise<Response> => {
   const anbieter = params.anbieter
@@ -14,6 +16,7 @@ export const onRequestGet = async ({ request, env, params }: V2Kontext<'anbieter
   const db = datenbank(env)
   if (!db) return NICHT_EINGERICHTET()
   const url = new URL(request.url)
+  if (await zuViele(db, request, 'anmeldung')) return fehlerZurSeite(url.origin, 'zu_viele')
   const app = appAnmeldungAus(url.searchParams)
   if (typeof app === 'string') return jsonAntwort(400, { fehler: app })
   const v = await beginneAnmeldung(db, anbieter, url.searchParams.get('ziel') ?? '/', Date.now(), app)

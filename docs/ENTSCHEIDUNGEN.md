@@ -535,3 +535,18 @@
   - Die übrigen Punkte beheben die Funde M2, N4, N7, N8 und N12 aus `docs/SICHERHEITSPRUEFUNG-V2.md`.
   - Alte Kennungen werden umnummeriert statt abgelehnt, damit v1-WEPs im Browser und eingespielte Sicherungen weiter auf den Server kommen.
 
+
+## 2026-10-29 · Sicherheitsprüfung v2, PR B Anmeldung/Sitzung
+
+- **Entscheidung:**
+  - `V2_ADMINS` mit Anbieter-Präfix (`google:adresse`, `microsoft:adresse`). Die alte Form gilt weiter, mit Warnung (nur für Admins) in `/api/v2/status` und auf der Admin-Seite.
+  - Konten speichern, ob die Adresse bestätigt ist. Die Admin-Seite zeigt Anbieter, Microsoft-Tenant und „unbestätigt“.
+  - Anmeldeversuche werden im Code begrenzt: Zähler je Bereich und SHA-256 der IP in D1, 10-Minuten-Fenster; 60 für die Anmeldung, 30 für den Token-Tausch. Ohne `CF-Connecting-IP` (lokal) keine Begrenzung.
+  - Cookies mit `__Host-`-Präfix.
+  - Sitzungen enden nach 14 Tagen ohne Nutzung (zusätzlich zu den 30 Tagen). „Überall abmelden“ im Profil.
+  - Fehler der Anmeldung nur als fester Schlüssel in der Adresse.
+- **Grund:**
+  - Funde M3, M5, N1, N2, N3, N5, N6, N10 und N15 (`docs/SICHERHEITSPRUEFUNG-V2.md`).
+  - Eine WAF-Regel geht auf `*.pages.dev` ohne eigene Domain nicht.
+  - Das Umstellen auf `__Host-` meldet alle Browser einmal ab; das ist bei Testdaten vertretbar.
+

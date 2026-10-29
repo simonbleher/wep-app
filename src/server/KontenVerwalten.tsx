@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useId, useState } from 'react'
 import { ChevronLeft } from 'lucide-react'
 import { HauptSeitenleiste, ICON, Kopf, Laedt, Meldung, Rueckfrage, zeitDe } from '@/app/ui'
-import { aendereKonto, ladeKonten, type KontoAktion } from './api'
+import { aendereKonto, ladeKonten, ladeWarnungen, type KontoAktion } from './api'
 import { GERAET_TEXT, ROLLEN_TEXT, STATUS_TEXT, rollenFehler, type ServerKonto, type ServerRolle } from './typen'
 
 interface Props {
@@ -15,10 +15,18 @@ interface Props {
 
 type Wertermittler = '' | 'bau' | 'gruen'
 
+/** Anbieter und bei Microsoft der Tenant – damit ein Konto aus einem fremden Tenant auffällt (Fund M3). */
+function anbieterText(k: ServerKonto): string {
+  if (k.anbieter === 'google') return 'Google'
+  if (!k.tenant) return 'Microsoft'
+  return k.tenant === 'persoenlich' ? 'Microsoft (persönliches Konto)' : `Microsoft (Tenant ${k.tenant})`
+}
+
 export function KontenVerwalten({ ich, onZurueck, onProfil }: Props) {
   const [konten, setKonten] = useState<ServerKonto[]>()
   const [fehler, setFehler] = useState('')
   const [loeschen, setLoeschen] = useState<ServerKonto>()
+  const [warnungen, setWarnungen] = useState<string[]>([])
 
   const laden = useCallback(async () => {
     setFehler('')
@@ -30,6 +38,9 @@ export function KontenVerwalten({ ich, onZurueck, onProfil }: Props) {
   }, [])
   useEffect(() => {
     void laden()
+    ladeWarnungen()
+      .then(setWarnungen)
+      .catch(() => undefined)
   }, [laden])
 
   async function aktion(k: ServerKonto, a: KontoAktion) {
@@ -58,8 +69,14 @@ export function KontenVerwalten({ ich, onZurueck, onProfil }: Props) {
         </header>
         <p className="neben block">
           Neue Konten entstehen bei der ersten Anmeldung und warten auf Freigabe. Ein Wertermittler ist entweder Bau oder Grün; BV und Admin kommen
-          bei Bedarf dazu.
+          bei Bedarf dazu. Name und eine als „unbestätigt“ markierte Adresse kann jede Person selbst wählen – vor dem Freigeben bitte prüfen, wer
+          das Konto ist.
         </p>
+        {warnungen.map((w) => (
+          <Meldung key={w}>
+            <p>{w}</p>
+          </Meldung>
+        ))}
         {fehler && (
           <Meldung alarm>
             <p>{fehler}</p>
@@ -112,7 +129,8 @@ function KontoZeile({ konto, selbst, onAktion, onLoeschen }: { konto: ServerKont
         <span className={`konto-status konto-status-${konto.status}`}>{STATUS_TEXT[konto.status]}</span>
       </div>
       <span className="neben">
-        {konto.email} · {konto.anbieter === 'google' ? 'Google' : 'Microsoft'}
+        {konto.email}
+        {konto.email && konto.emailBestaetigt === false && <strong className="konto-unbestaetigt"> (unbestätigt)</strong>} · {anbieterText(konto)}
         {konto.letzteAnmeldung ? ` · zuletzt angemeldet ${zeitDe(konto.letzteAnmeldung)}` : ''}
       </span>
       {konto.sitzungen && konto.sitzungen.length > 0 && (

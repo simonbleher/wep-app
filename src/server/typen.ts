@@ -10,6 +10,10 @@ export interface ServerKonto {
   status: KontoStatus
   rollen: ServerRolle[]
   mailBenachrichtigung: boolean
+  /** Adresse vom Anbieter bestätigt (sonst zeigt die Admin-Seite „unbestätigt“). */
+  emailBestaetigt?: boolean
+  /** Nur Microsoft: Tenant ('persoenlich' = persönliches Microsoft-Konto). */
+  tenant?: string
   erstelltAm: string
   geaendertAm: string
   letzteAnmeldung?: string
@@ -25,9 +29,13 @@ export interface ServerSitzung {
   geraet: SitzungsGeraet
   erstelltAm: string
   laeuftAb: string
+  zuletztGenutzt?: string
   /** Die Sitzung, mit der gerade gefragt wird. */
   diese?: boolean
 }
+
+/** Wie functions/_lib/v2/sitzung.ts: Sitzungen enden nach so vielen Tagen ohne Nutzung. */
+export const LEERLAUF_TAGE = 14
 
 export const GERAET_TEXT: Record<SitzungsGeraet, string> = { browser: 'Browser', android: 'Android-App', windows: 'Windows-App' }
 

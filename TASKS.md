@@ -410,7 +410,17 @@ Abschnitt 10f) mit Mausrad, Maus-Ziehen und Zwei-Finger-Gesten über CDP-Touch. 
   - N8: `MAX_NOTIZ` 2000.
   - N12: `BAU_FORMALIEN` beim Zusammenführen ausgenommen.
   - M1 bewusst akzeptiert (Test hält das Verhalten fest).
-- V2-SICHERHEIT-B · Anmeldung/Sitzung (M3, M5, N1, N2, N3, N5, N6, N10, N15) ⬜ offen.
+- V2-SICHERHEIT-B · Anmeldung/Sitzung ✅ PR offen – Branch sicherheit/v2-anmeldung-sitzung.
+  - M3: `V2_ADMINS` mit Anbieter (alte Form mit Warnung). Admin-Seite zeigt Anbieter, Tenant und „unbestätigt“.
+  - M5: Begrenzung je IP-Hash in D1 (`functions/_lib/v2/begrenzung.ts`).
+  - N1: Bearer ohne Cookie-Rückfall.
+  - N2: `DELETE … RETURNING`.
+  - N3: gesperrt → kein Token.
+  - N5: `__Host-`-Cookies.
+  - N6: 14 Tage Leerlauf, „Überall abmelden“.
+  - N10: Fehlerschlüssel.
+  - N15: `azp`.
+  - **Nach dem Merge:** Migration `0007_anmeldung_sicherheit.sql` einspielen, `V2_ADMINS` umstellen (docs/V2-EINRICHTUNG.md), neu freigeben. Alle Browser sind danach einmal abgemeldet.
 - V2-SICHERHEIT-C · Missbrauch/Datensparsamkeit (M6, M7, N9, N11, N13) ⬜ offen.
 - V2-SICHERHEIT-D · Security-Header (M4), CSP zuerst als Report-Only, scharf in einem Folge-PR ⬜ offen.
 - V2-SICHERHEIT-E · Abhängigkeiten der Windows-App (M8: zip ≥ 9, tokio ≥ 1.54.1) ⬜ offen.

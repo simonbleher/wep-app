@@ -61,6 +61,14 @@ export const ladeSitzungen = async () => (await rufe<{ sitzungen: ServerSitzung[
 export const beendeSitzung = async (id: string) =>
   (await rufe<{ sitzungen: ServerSitzung[] }>(`/api/v2/ich/sitzungen?id=${encodeURIComponent(id)}`, { method: 'DELETE' })).sitzungen
 
+/** Überall abmelden: alle eigenen Sitzungen beenden, auch diese. */
+export const beendeAlleSitzungen = async () => {
+  await rufe<{ sitzungen: ServerSitzung[] }>('/api/v2/ich/sitzungen?alle=1', { method: 'DELETE' })
+}
+
+/** Hinweise zur Einrichtung für Admins (z. B. V2_ADMINS ohne Anbieter); andere Konten bekommen keine. */
+export const ladeWarnungen = async () => (await rufe<{ warnungen?: string[] }>('/api/v2/status')).warnungen ?? []
+
 export const ladeKonten = async () => (await rufe<{ konten: ServerKonto[] }>('/api/v2/admin/konten')).konten
 
 export type KontoAktion = { aktion: 'freigeben' } | { aktion: 'sperren' } | { aktion: 'abmelden' } | { aktion: 'loeschen' } | { aktion: 'rollen'; rollen: ServerRolle[] }

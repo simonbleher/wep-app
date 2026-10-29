@@ -2946,6 +2946,10 @@ input[type='range'] {
   color: var(--farbe-warnung);
 }
 
+.konto-unbestaetigt {
+  color: var(--farbe-warnung);
+}
+
 .konto-rollen {
   display: flex;
   flex-wrap: wrap;

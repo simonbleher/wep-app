@@ -5,9 +5,17 @@ import { jetztIso, type Db } from './db'
 import { alsKonto, type Konto } from './konten'
 import { sha256b64url, zufall, type Anbieter } from './oidc'
 
-export const SITZUNG_COOKIE = 'wep_sitzung'
-export const ANMELDUNG_COOKIE = 'wep_anmeldung'
+// __Host-: nur Secure, Path=/ und ohne Domain – Unterdomains (Vorschau-Adressen *.wep-pankow.pages.dev) können diese
+// Cookies weder setzen noch überschreiben (Fund N5, docs/SICHERHEITSPRUEFUNG-V2.md).
+export const SITZUNG_COOKIE = '__Host-wep_sitzung'
+export const ANMELDUNG_COOKIE = '__Host-wep_anmeldung'
+/** Frühere Namen (bis 10/2026): werden beim Abmelden mit gelöscht, aber nicht mehr gelesen. */
+export const ALTE_COOKIES = ['wep_sitzung', 'wep_anmeldung']
 export const SITZUNG_TAGE = 30
+/** Eine Sitzung endet, wenn sie so lange nicht benutzt wurde (Fund N6). */
+export const LEERLAUF_TAGE = 14
+/** „Zuletzt benutzt“ wird höchstens so oft aufgefrischt (spart Schreibzugriffe). */
+const AUFFRISCHEN_MS = 86_400_000
 const ANMELDUNG_MIN = 10
 
 export function leseCookie(request: Request, name: string): string | undefined {
@@ -63,25 +71,43 @@ export async function beendeAnmeldung(db: Db, anbieter: Anbieter, state: string 
 export async function neueSitzung(db: Db, kontoId: string, jetzt = Date.now(), geraet: Geraet = 'browser'): Promise<{ token: string; cookie: string }> {
   const token = zufall()
   await db
-    .prepare('INSERT INTO sitzungen (token_hash, konto_id, erstellt_am, laeuft_ab, geraet) VALUES (?, ?, ?, ?, ?)')
-    .bind(await sha256b64url(token), kontoId, jetztIso(jetzt), jetztIso(jetzt + SITZUNG_TAGE * 86_400_000), geraet)
+    .prepare('INSERT INTO sitzungen (token_hash, konto_id, erstellt_am, laeuft_ab, geraet, zuletzt_genutzt) VALUES (?, ?, ?, ?, ?, ?)')
+    .bind(await sha256b64url(token), kontoId, jetztIso(jetzt), jetztIso(jetzt + SITZUNG_TAGE * 86_400_000), geraet, jetztIso(jetzt))
     .run()
   return { token, cookie: cookie(SITZUNG_COOKIE, token, SITZUNG_TAGE * 86_400) }
 }
 
-/** Konto zur Sitzung dieses Requests (Cookie oder `Authorization: Bearer` für die Apps) – oder undefined. */
-export async function kontoDerSitzung(db: Db, request: Request, jetzt = Date.now()): Promise<Konto | undefined> {
-  const bearer = /^Bearer (\S+)$/.exec(request.headers.get('authorization') ?? '')?.[1]
-  const token = bearer ?? leseCookie(request, SITZUNG_COOKIE)
-  if (!token) return undefined
-  const z = await db
-    .prepare('SELECT k.* FROM sitzungen s JOIN konten k ON k.id = s.konto_id WHERE s.token_hash = ? AND s.laeuft_ab > ?')
-    .bind(await sha256b64url(token), jetztIso(jetzt))
-    .first<Parameters<typeof alsKonto>[0]>()
-  return z ? alsKonto(z) : undefined
+/** `Authorization: Bearer <token>` – genau dieses Muster; alles andere gilt als ungültiger Kopf. */
+const BEARER = /^Bearer ([A-Za-z0-9_-]{16,256})$/
+
+/**
+ * Token der Anfrage: Hat sie einen `Authorization`-Kopf, zählt nur der – ohne Rückfall auf das Cookie, auch wenn der Kopf
+ * ungültig ist (Fund N1: sonst ließe ein kaputter Kopf die Herkunftsprüfung aus und nähme trotzdem das Cookie).
+ */
+export function tokenDerAnfrage(request: Request): string | undefined {
+  const kopf = request.headers.get('authorization')
+  if (kopf !== null) return BEARER.exec(kopf)?.[1]
+  return leseCookie(request, SITZUNG_COOKIE)
 }
 
-const tokenDerAnfrage = (request: Request) => /^Bearer (\S+)$/.exec(request.headers.get('authorization') ?? '')?.[1] ?? leseCookie(request, SITZUNG_COOKIE)
+/** Kommt die Anfrage mit gültig geformtem Bearer-Token (Apps)? Dann gibt es kein Cookie und keine Herkunftsprüfung. */
+export const hatBearer = (request: Request) => BEARER.test(request.headers.get('authorization') ?? '')
+
+/** Konto zur Sitzung dieses Requests (Cookie oder `Authorization: Bearer` für die Apps) – oder undefined. */
+export async function kontoDerSitzung(db: Db, request: Request, jetzt = Date.now()): Promise<Konto | undefined> {
+  const token = tokenDerAnfrage(request)
+  if (!token) return undefined
+  const hash = await sha256b64url(token)
+  const z = await db
+    .prepare('SELECT k.*, s.zuletzt_genutzt AS sitzung_genutzt FROM sitzungen s JOIN konten k ON k.id = s.konto_id WHERE s.token_hash = ? AND s.laeuft_ab > ? AND (s.zuletzt_genutzt IS NULL OR s.zuletzt_genutzt > ?)')
+    .bind(hash, jetztIso(jetzt), jetztIso(jetzt - LEERLAUF_TAGE * 86_400_000))
+    .first<Parameters<typeof alsKonto>[0] & { sitzung_genutzt: string | null }>()
+  if (!z) return undefined
+  if (!z.sitzung_genutzt || z.sitzung_genutzt < jetztIso(jetzt - AUFFRISCHEN_MS)) {
+    await db.prepare('UPDATE sitzungen SET zuletzt_genutzt = ? WHERE token_hash = ?').bind(jetztIso(jetzt), hash).run()
+  }
+  return alsKonto(z)
+}
 
 export async function beendeSitzung(db: Db, request: Request): Promise<void> {
   const token = tokenDerAnfrage(request)
@@ -94,6 +120,8 @@ export interface SitzungInfo {
   geraet: Geraet
   erstelltAm: string
   laeuftAb: string
+  /** Zuletzt benutzt (auf einen Tag genau); nach LEERLAUF_TAGE ohne Nutzung endet die Sitzung. */
+  zuletztGenutzt?: string
   /** Die Sitzung dieser Anfrage. */
   diese?: boolean
 }
@@ -105,16 +133,25 @@ export async function sitzungenVon(db: Db, kontoId: string, request?: Request, j
   const eigene = request && tokenDerAnfrage(request)
   const eigenerHash = eigene ? await sha256b64url(eigene) : undefined
   const { results } = await db
-    .prepare('SELECT token_hash, geraet, erstellt_am, laeuft_ab FROM sitzungen WHERE konto_id = ? AND laeuft_ab > ? ORDER BY erstellt_am DESC')
-    .bind(kontoId, jetztIso(jetzt))
-    .all<{ token_hash: string; geraet: Geraet | null; erstellt_am: string; laeuft_ab: string }>()
+    .prepare(
+      'SELECT token_hash, geraet, erstellt_am, laeuft_ab, zuletzt_genutzt FROM sitzungen WHERE konto_id = ? AND laeuft_ab > ? AND (zuletzt_genutzt IS NULL OR zuletzt_genutzt > ?) ORDER BY erstellt_am DESC',
+    )
+    .bind(kontoId, jetztIso(jetzt), jetztIso(jetzt - LEERLAUF_TAGE * 86_400_000))
+    .all<{ token_hash: string; geraet: Geraet | null; erstellt_am: string; laeuft_ab: string; zuletzt_genutzt: string | null }>()
   return results.map((z) => ({
     id: z.token_hash.slice(0, SITZUNG_ID_LAENGE),
     geraet: z.geraet ?? 'browser',
     erstelltAm: z.erstellt_am,
     laeuftAb: z.laeuft_ab,
+    ...(z.zuletzt_genutzt ? { zuletztGenutzt: z.zuletzt_genutzt } : {}),
     ...(z.token_hash === eigenerHash ? { diese: true } : {}),
   }))
+}
+
+/** Beendet alle Sitzungen des Kontos („Überall abmelden“). Liefert die Anzahl. */
+export async function beendeAlleSitzungen(db: Db, kontoId: string): Promise<number> {
+  const r = await db.prepare('DELETE FROM sitzungen WHERE konto_id = ?').bind(kontoId).run()
+  return r.meta.changes ?? 0
 }
 
 /** Beendet eine Sitzung des Kontos anhand ihrer Kennung (z. B. ein verlorenes Gerät). Liefert, ob es sie gab. */

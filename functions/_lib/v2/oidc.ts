@@ -130,6 +130,10 @@ export async function pruefeAnmeldeToken(
   const jetzt = opt.jetztS ?? Math.floor(Date.now() / 1000)
   const aud = inhalt.aud
   if (!opt.clientId || !(aud === opt.clientId || (Array.isArray(aud) && aud.includes(opt.clientId)))) throw new TokenFehler('Token ist nicht für diese App')
+  // Mehrere Empfänger oder ein anderer „azp“: nur, wenn das Token für diese App ausgestellt wurde (Fund N15)
+  if ((Array.isArray(aud) && aud.length > 1) || inhalt.azp !== undefined) {
+    if (inhalt.azp !== opt.clientId) throw new TokenFehler('Token ist nicht für diese App (azp)')
+  }
   if (!opt.nonce || inhalt.nonce !== opt.nonce) throw new TokenFehler('Anmeldung passt nicht zu dieser Sitzung (nonce)')
   const exp = Number(inhalt.exp)
   if (!Number.isFinite(exp) || exp + SPIEL_S < jetzt) throw new TokenFehler('Token abgelaufen')
