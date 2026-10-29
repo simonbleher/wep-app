@@ -52,7 +52,7 @@ Die Namen müssen genau so geschrieben sein.
 
 ### Tabellen einspielen (Migrationen)
 
-Die Tabellen stehen im Repo unter `migrations/` (`0001_konten.sql`, `0002_weps.sql`, `0003_ablauf.sql`, `0004_benachrichtigungen.sql`, `0005_gruen_zusammenfuehren.sql`, …). Jede Datei
+Die Tabellen stehen im Repo unter `migrations/` (`0001_konten.sql`, `0002_weps.sql`, `0003_ablauf.sql`, `0004_benachrichtigungen.sql`, `0005_gruen_zusammenfuehren.sql`, `0006_app_anmeldung.sql`, …). Jede Datei
 wird **genau einmal und in der Reihenfolge der Nummern** eingespielt:
 
 1. Dashboard → **D1** → `wep-v2` → Reiter **Konsole** (*Console*).
@@ -200,10 +200,14 @@ Testen). Die Einzel-Adressen pro Bereitstellung (`<kennung>.wep-pankow.pages.dev
 
 ## Android- und Windows-App
 
-Die Apps bekommen nach der Freigabe dasselbe Web-Paket als Live-Update wie der Browser, nutzen den
-Server aber noch nicht. Sie laufen weiter wie v1 (Daten auf dem Gerät, OneDrive) und zeigen oben den
-Hinweis „Die neue WEP-App mit Konten und Abgabe an Grün und BV bitte im Browser nutzen“. Der
-Server-Modus für die Apps ist das nächste Paket (TASKS.md, V2-8).
+Seit Paket 8 melden sich die Apps über den Browser des Geräts am Server an. **Bei Google und Microsoft
+ist dafür nichts einzutragen:** Der Server benutzt seine bisherigen Rücksprung-Adressen und reicht die
+Anmeldung danach an die App weiter. Nötig ist nur:
+
+1. Migration `0006_app_anmeldung.sql` in der D1-Konsole einspielen (wie oben unter „Tabellen einspielen“).
+2. Die neuen Apps installieren: Android-App 0.2.0 (`https://wep-pankow-apk.pages.dev/wep.apk`), Windows-App
+   0.1.4 (`https://wep-pankow-apk.pages.dev/windows/wep-setup.exe`). Die bisherigen Apps bieten das Update
+   auch selbst an. Bis dahin laufen sie weiter wie v1 und zeigen oben „bitte die App aktualisieren“.
 
 ## Vor echten Daten (Paket 7, nicht jetzt)
 

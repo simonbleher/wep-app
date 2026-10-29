@@ -17,9 +17,9 @@ Einrichtung der Dienste für Simon: [V2-EINRICHTUNG.md](V2-EINRICHTUNG.md).
     `/bv` mit Dateien. `main` muss jederzeit freigebbar bleiben. Fehlerbehebungen für v1 laufen parallel weiter.
 - Schalter und Bindungen (D1, R2, Resend, Google- und Microsoft-Client) liegen in der Cloudflare-Umgebung
   **Produktion** (docs/V2-EINRICHTUNG.md). Die Schalter bleiben im Code: Ein Build ohne sie verhält sich weiter wie v1.
-- **Android und Windows** bekommen dasselbe Web-Paket als Live-Update, nutzen den Server aber noch nicht: Dort
-  bleibt der Server-Modus aus (v1 mit OneDrive), oben steht „bitte im Browser nutzen“ (`src/server/modus.ts`).
-  Der Server-Modus für die Apps ist das nächste Paket (8).
+- **Android und Windows** bekommen dasselbe Web-Paket als Live-Update. Seit Paket 8 arbeiten sie im Server-Modus,
+  wenn die installierte App die Server-Anmeldung kann (Android ab native-version 8, Windows ab huelle-version 4).
+  Ältere APK/EXE bleiben v1 mit OneDrive und zeigen „bitte App aktualisieren“ (`src/server/modus.ts`).
 - **Nur erfundene Testdaten**, bis der AV-Vertrag geklärt ist (Abschnitt „Datenschutz“).
 
 ## Zielbild
@@ -134,8 +134,10 @@ Die Entscheidungen fallen im jeweiligen Paket und landen in docs/ENTSCHEIDUNGEN.
 - **Sitzungen:**
   - Zufälliges Token. In D1 liegt nur sein SHA-256-Hash mit Ablaufzeit.
   - **Browser:** Cookie `HttpOnly; Secure; SameSite=Lax`.
-  - **Android und Windows** (anderer Ursprung): Die App übernimmt die Anmeldung über einen Einmal-Code und schickt
-    das Token als `Authorization: Bearer`. Das klärt Paket 1. Bis dahin funktioniert der Server-Modus im Browser.
+  - **Android und Windows** (anderer Ursprung): Anmeldung im Systembrowser, Rücksprung in die App mit einem
+    Einmal-Code (60 s), Tausch gegen das Token mit PKCE-Verifier; danach `Authorization: Bearer` an
+    `https://wep-pankow.pages.dev`, CORS nur für die App-Herkünfte. Token im Keystore bzw. Credential Manager.
+    Sitzungen tragen das Gerät (Browser, Android-App, Windows-App) und lassen sich im Profil und vom Admin beenden.
 - **Datenbank:** SQL-Migrationen im Ordner `migrations/` (`0001_….sql`, …). Simon spielt sie über die D1-Konsole
   ein (docs/V2-EINRICHTUNG.md). Jede trägt ihre Nummer in `schema_stand` ein, und `/api/v2/status` zeigt den Stand.
   Tests laufen mit SQLite aus Node (`node:sqlite`) und denselben Migrationen, ohne Cloudflare-Konto.
@@ -149,8 +151,9 @@ Die Entscheidungen fallen im jeweiligen Paket und landen in docs/ENTSCHEIDUNGEN.
   Functions mit Rechteprüfung; öffentliche R2-Adressen gibt es nicht.
 - **Zustandsautomat:** eine reine Funktion `erlaubterUebergang(wep, konto, aktion)`. Server und Oberfläche nutzen
   dieselbe Funktion, damit Anzeige und Prüfung nie auseinanderlaufen. Getestet wird sie mit einer vollständigen Tabelle.
-- **Native Apps:** Bevor Android oder Windows den Server-Modus nutzen, steigen ihre Versionsnummern.
-  Bis dahin ist der Server-Modus ein Web-Thema.
+- **Native Apps:** Mit Paket 8 sind die Versionsnummern gestiegen (Android 0.2.0 / native-version 8, Windows 0.1.4 /
+  huelle-version 4). Im Server-Modus nutzen die Apps eine eigene IndexedDB (`wep-db-v2`); v1-WEPs bleiben auf dem
+  Gerät und lassen sich per Sicherung übernehmen.
 
 ## Datenschutz (vor echten Daten zwingend)
 
@@ -181,8 +184,8 @@ Die Entscheidungen fallen im jeweiligen Paket und landen in docs/ENTSCHEIDUNGEN.
 6. **Anleitung** (`npm run anleitung`) und Durchlauf-Tests für den ganzen Weg mit drei Testkonten (Bau, Grün, BV).
 7. **Später, vor echten Daten:** Migration der bestehenden WEPs (OneDrive/.wep → Server), erst nach AV-Vertrag und
    Rechtsberatung. (Die Schalter sind seit 28.10.2026 in Production an, auf dem Server liegen bis dahin nur Testdaten.)
-8. **Server-Modus für Android und Windows:** Anmeldung per Bearer-Token (im Server vorbereitet), danach kein Hinweis
-   „bitte im Browser nutzen“ mehr. Mit neuen Versionsnummern der Apps.
+8. **Server-Modus für Android und Windows** ✅ (PR V2-8): Anmeldung über den Systembrowser mit Einmal-Code,
+   Bearer-Token, Sitzungen je Gerät. Alte Apps zeigen „bitte App aktualisieren“.
 
 ## Grundsätze
 

@@ -1,6 +1,6 @@
 // App-Shell: einfacher Zustands-basierter Wechsel zwischen Login, Startseite,
 // WEP-Detailansicht und Profil. Ein Router ist noch nicht nötig.
-import { useCallback, useEffect, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useState } from 'react'
 import {
   abmelden,
   anmeldeFehlerText,
@@ -41,15 +41,21 @@ import { KontenVerwalten } from '@/server/KontenVerwalten'
 import { jetztMitServerAbgleichen } from '@/server/abgleichDienst'
 import { ladeWep } from './db'
 import type { V2Sitzung } from '@/server/V2Tor'
+import { appMitServer } from '@/server/modus'
 
-type Ansicht = { typ: 'start' } | { typ: 'detail'; wepId: string } | { typ: 'profil' } | { typ: 'papierkorb' } | { typ: 'konten' }
+// Kontrollseite BV in der App (Server-Modus): im Browser unter /bv, in den Apps als eigene Ansicht
+const BvServerApp = lazy(() => import('@/bv/BvServer').then((m) => ({ default: m.BvServerApp })))
+const nurBv = (k?: V2Sitzung['konto']) => Boolean(k?.rollen.includes('bv') && !k.rollen.includes('bau') && !k.rollen.includes('gruen'))
+
+type Ansicht = { typ: 'start' } | { typ: 'detail'; wepId: string } | { typ: 'profil' } | { typ: 'papierkorb' } | { typ: 'konten' } | { typ: 'bv' }
 
 /** lade = Start wird gerade geklärt, login = Login-Bildschirm, bereit = App läuft. */
 type Phase = 'lade' | 'login' | 'bereit'
 
 /** `v2`: Server-Modus (docs/PLAN-V2.md) – angemeldet über den Server, kein OneDrive-Sync, kein Microsoft-Login der App. */
 export default function App({ v2 }: { v2?: V2Sitzung } = {}) {
-  const [ansicht, setAnsicht] = useState<Ansicht>({ typ: 'start' })
+  // App mit reinem BV-Konto: gleich die Kontrollseite
+  const [ansicht, setAnsicht] = useState<Ansicht>(() => (appMitServer && nurBv(v2?.konto) ? { typ: 'bv' } : { typ: 'start' }))
   const [phase, setPhase] = useState<Phase>('lade')
   const [konto, setKonto] = useState<Konto | null>(null)
   const [fehler, setFehler] = useState('')
@@ -201,7 +207,14 @@ export default function App({ v2 }: { v2?: V2Sitzung } = {}) {
           onAbmelden={() => void abmelden_()}
           v2={v2}
           onKontenVerwalten={() => setAnsicht({ typ: 'konten' })}
+          onBv={appMitServer ? () => setAnsicht({ typ: 'bv' }) : undefined}
         />
+      ) : ansicht.typ === 'bv' ? (
+        v2 && (
+          <Suspense fallback={<div aria-busy="true" />}>
+            <BvServerApp sitzung={v2} onZurApp={() => setAnsicht({ typ: 'profil' })} />
+          </Suspense>
+        )
       ) : ansicht.typ === 'konten' ? (
         v2 && <KontenVerwalten ich={v2.konto} onZurueck={() => setAnsicht({ typ: 'profil' })} onProfil={() => setAnsicht({ typ: 'profil' })} />
       ) : (

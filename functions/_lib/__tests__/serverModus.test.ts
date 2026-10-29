@@ -17,10 +17,31 @@ describe('Server-Modus (Functions)', () => {
   })
 
   it('ohne Schalter: 404 für alles unter /api/v2/, mit Schalter geht es weiter', async () => {
-    const aus = await middleware({ env: {}, next: weiter })
+    const anfrage = (origin?: string, method = 'GET') => new Request('https://wep-pankow.pages.dev/api/v2/ich', { method, headers: origin ? { origin } : {} })
+    const aus = await middleware({ request: anfrage(), env: {}, next: weiter })
     expect(aus.status).toBe(404)
-    const an = await middleware({ env: { SERVER_MODUS: 'true' }, next: weiter })
+    const an = await middleware({ request: anfrage(), env: { SERVER_MODUS: 'true' }, next: weiter })
     expect(await an.text()).toBe('weiter')
+    expect(an.headers.get('access-control-allow-origin')).toBeNull()
+  })
+
+  it('CORS nur für die Herkünfte der Apps (Capacitor, Tauri), ohne Cookies', async () => {
+    const env = { SERVER_MODUS: 'true' }
+    const anfrage = (origin: string, method = 'GET') => new Request('https://wep-pankow.pages.dev/api/v2/weps', { method, headers: { origin } })
+    for (const origin of ['https://localhost', 'https://tauri.localhost', 'http://tauri.localhost']) {
+      const vor = await middleware({ request: anfrage(origin, 'OPTIONS'), env, next: weiter })
+      expect(vor.status).toBe(204)
+      expect(vor.headers.get('access-control-allow-origin')).toBe(origin)
+      expect(vor.headers.get('access-control-allow-headers')).toContain('authorization')
+      expect(vor.headers.get('access-control-allow-credentials')).toBeNull()
+      const r = await middleware({ request: anfrage(origin), env, next: weiter })
+      expect(r.headers.get('access-control-allow-origin')).toBe(origin)
+      expect(await r.text()).toBe('weiter')
+    }
+    for (const origin of ['https://evil.example', 'http://localhost', 'capacitor://evil']) {
+      expect((await middleware({ request: anfrage(origin, 'OPTIONS'), env, next: weiter })).status).toBe(403)
+      expect((await middleware({ request: anfrage(origin), env, next: weiter })).headers.get('access-control-allow-origin')).toBeNull()
+    }
   })
 
   it('Status zeigt je Teil nur ja/nein, keine Werte', async () => {

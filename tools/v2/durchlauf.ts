@@ -50,7 +50,8 @@ try {
   pruefe((await seite.getByText('Ohne Konto fortfahren').count()) === 0, 'kein „Ohne Konto fortfahren“ im Server-Modus')
   await seite.screenshot({ path: `${AUSGABE}/01-anmeldung.png` })
 
-  // 1b. Windows-App (Tauri, hier nachgestellt) mit demselben Web-Paket: v1 ohne Server, Hinweis „im Browser nutzen“
+  // 1b. Alte Windows-App (Tauri, ohne Server-Anmeldung, hier nachgestellt) mit demselben Web-Paket: v1 ohne Server,
+  // Hinweis „bitte App aktualisieren“ (mit Link zur neuen .exe) bzw. im Browser nutzen
   {
     const kw = await u.neuerKontext({ viewport: { width: 1024, height: 768 }, serviceWorkers: 'block' })
     await kw.addInitScript(() => Object.defineProperty(window, '__TAURI_INTERNALS__', { value: {} }))
@@ -58,9 +59,10 @@ try {
     const v2Aufrufe: string[] = []
     sw.on('request', (r) => r.url().includes('/api/v2/') && v2Aufrufe.push(r.url()))
     await sw.goto(URL)
-    const band = sw.getByRole('note').filter({ hasText: 'bitte im Browser nutzen' })
+    const band = sw.getByRole('note').filter({ hasText: 'bitte die App aktualisieren' })
     await band.waitFor()
-    pruefe(await band.getByRole('link', { name: 'wep-pankow.pages.dev' }).isVisible(), 'Windows-App: Hinweis „bitte im Browser nutzen“ mit Link')
+    pruefe(await band.getByRole('link', { name: 'wep-pankow.pages.dev' }).isVisible(), 'alte Windows-App: Hinweis mit Link zum Browser')
+    pruefe((await band.getByRole('link', { name: 'neue Windows-App laden' }).getAttribute('href')) === 'https://wep-pankow-apk.pages.dev/windows/wep-setup.exe', 'alte Windows-App: Hinweis „bitte App aktualisieren“ mit Link zur neuen .exe')
     pruefe((await sw.getByRole('link', { name: 'Mit Google anmelden' }).count()) === 0, 'Windows-App: keine Server-Anmeldung, die App bleibt v1')
     await sw.waitForTimeout(500)
     pruefe(v2Aufrufe.length === 0, 'Windows-App: keine Anfragen an /api/v2')
@@ -219,6 +221,68 @@ try {
   await seiteB.locator('.foto-kachel img').first().waitFor({ timeout: 15000 })
   pruefe(true, 'zweites Gerät lädt das Foto vom Server')
   await seiteB.screenshot({ path: `${AUSGABE}/05-foto-vom-server.png` })
+
+  // 10b. Windows-App mit neuer Hülle (Paket 8): Anmeldung über den Systembrowser, Einmal-Code, Bearer-Token statt Cookie
+  {
+    const app = await u.neueWindowsApp('bert')
+    const sa = await app.kontext.newPage()
+    sa.on('pageerror', (e) => skriptFehler.push(String(e)))
+    const v2Ziele = new Set<string>()
+    let ohneBearer = 0
+    sa.on('request', (r) => {
+      if (!r.url().includes('/api/v2/') || r.method() === 'OPTIONS') return
+      v2Ziele.add(new globalThis.URL(r.url()).origin)
+      if (!r.url().endsWith('/api/v2/status') && !r.url().endsWith('/api/v2/anmeldung/app/token') && !r.headers()['authorization']?.startsWith('Bearer ')) ohneBearer++
+    })
+    await sa.goto(app.ADRESSE)
+    await sa.getByRole('button', { name: 'Mit Google anmelden' }).click()
+    await sa.getByRole('heading', { name: 'Protokolle' }).waitFor({ timeout: 20000 })
+    const start = new globalThis.URL(app.geoeffnet[0])
+    pruefe(start.origin === 'https://wep-pankow.pages.dev' && start.searchParams.get('client') === 'app' && start.searchParams.get('ruecksprung') === 'http://127.0.0.1:54321/', 'Windows-App: Anmeldung im Systembrowser beim Server (client=app, Loopback-Rücksprung)')
+    pruefe(Boolean(app.tresor.token) && !(await sa.evaluate(() => JSON.stringify(localStorage))).includes(app.tresor.token!), 'Windows-App: Token im Credential Manager, nicht im localStorage')
+    pruefe((await app.kontext.cookies('https://wep-pankow.pages.dev')).length === 0, 'Windows-App: keine Cookies für den Server')
+    pruefe((db.roh.prepare("SELECT count(*) AS n FROM app_codes").get() as { n: number }).n === 0, 'Einmal-Code nach dem Tausch verbraucht')
+    await sa.getByText(/2026-0815/).filter({ visible: true }).first().waitFor()
+    pruefe(true, 'Windows-App: WEPs vom Server sind da (Abgleich mit Bearer)')
+    await neuesWep(sa, '2026-0817')
+    await sa.getByRole('button', { name: 'Fotos', exact: true }).filter({ visible: true }).first().click()
+    await sa.locator('input[type=file][aria-label="Fotos aus der Galerie wählen: Gesamtansicht"]').setInputFiles({ name: 'IMG_0002.jpg', mimeType: 'image/jpeg', buffer: testFoto({ breite: 1200, hoehe: 900, variante: 1 }) })
+    await sa.locator('.foto-kachel').first().waitFor({ timeout: 30000 })
+    await sa.getByRole('button', { name: 'Protokolle' }).first().click()
+    await sa.getByRole('button', { name: 'Abgleichen' }).filter({ visible: true }).first().click()
+    const wepApp = () => db.roh.prepare("SELECT id FROM weps WHERE vorgangs_nr = '2026-0817'").get() as { id: string } | undefined
+    let fotoApp = false
+    for (let i = 0; i < 80 && !fotoApp; i++) {
+      const w = wepApp()
+      fotoApp = Boolean(w) && [...r2.daten.keys()].some((k) => k.startsWith(`weps/${w!.id}/fotos/`))
+      if (!fotoApp) await sa.waitForTimeout(100)
+    }
+    pruefe(fotoApp, 'Windows-App: neues WEP und Foto auf dem Server (Upload mit Bearer)')
+    pruefe([...v2Ziele].every((o) => o === 'https://wep-pankow.pages.dev'), `Windows-App: alle /api/v2-Aufrufe an https://wep-pankow.pages.dev (${[...v2Ziele].join(', ')})`)
+    pruefe(ohneBearer === 0, `Windows-App: jeder Aufruf mit Bearer (${ohneBearer} ohne)`)
+    const geraete = (db.roh.prepare('SELECT geraet FROM sitzungen WHERE konto_id = ?').all(bertId) as { geraet: string }[]).map((g) => g.geraet)
+    pruefe(geraete.includes('windows') && geraete.includes('browser'), `Server: Sitzungen „windows“ und „browser“ für Bert (${geraete.join(', ')})`)
+    await sa.getByRole('button', { name: 'Profil und Einstellungen' }).filter({ visible: true }).first().click()
+    await sa.getByText('Windows-App (dieses Gerät)').waitFor()
+    pruefe(await sa.locator('li', { hasText: /^Browser · angemeldet am/ }).first().isVisible(), 'Profil: angemeldete Geräte (Windows-App = dieses Gerät, Browser)')
+    await sa.screenshot({ path: `${AUSGABE}/05b-windows-app-geraete.png` })
+    // Browser-Sitzung von der App aus abmelden; Gerät B (Browser) muss sich danach neu anmelden
+    const vorher = (db.roh.prepare('SELECT count(*) AS n FROM sitzungen WHERE konto_id = ?').get(bertId) as { n: number }).n
+    await sa.locator('li', { hasText: /^Browser · angemeldet am/ }).getByRole('button', { name: 'Abmelden' }).first().click()
+    let nachher = vorher
+    for (let i = 0; i < 50 && nachher === vorher; i++) {
+      nachher = (db.roh.prepare('SELECT count(*) AS n FROM sitzungen WHERE konto_id = ?').get(bertId) as { n: number }).n
+      if (nachher === vorher) await sa.waitForTimeout(100)
+    }
+    pruefe(nachher === vorher - 1, 'Profil: eine andere Sitzung lässt sich beenden')
+    // Abmelden in der App: Token weg, Sitzung auf dem Server widerrufen
+    await sa.locator('.knopf-reihe').getByRole('button', { name: 'Abmelden', exact: true }).click()
+    await sa.getByRole('button', { name: 'Mit Google anmelden' }).waitFor()
+    pruefe(app.tresor.token === null, 'Windows-App: Abmelden löscht das Token')
+    pruefe(!(db.roh.prepare("SELECT geraet FROM sitzungen WHERE konto_id = ?").all(bertId) as { geraet: string }[]).some((g) => g.geraet === 'windows'), 'Server: Sitzung der Windows-App widerrufen')
+    await app.kontext.close()
+    await app.systembrowser.close()
+  }
 
   // 11. Ablauf: Bert gibt an Erika (Grün) ab, Erika bearbeitet nur den Grün-Teil und gibt an den BV ab
   // Erikas eigenes WEP trägt dieselbe Vorgangs-Nr.: gemeint ist das Bau-WEP (mitBau), sonst irgendeines mit der Nummer
@@ -457,7 +521,7 @@ try {
   await beaKontext.close()
   await erikaKontext.close()
   const verlauf = (db.roh.prepare('SELECT aktion FROM verlauf ORDER BY id').all() as { aktion: string }[]).map((v) => v.aktion)
-  pruefe(verlauf.filter((a) => a === 'angelegt').length === 4, 'Verlauf: „angelegt“ je WEP (2 von Bert, 2 von Erika)')
+  pruefe(verlauf.filter((a) => a === 'angelegt').length === 5, 'Verlauf: „angelegt“ je WEP (2 von Bert im Browser, 1 in der Windows-App, 2 von Erika)')
   pruefe(['zusammengefuehrt', 'zusammengefuehrt_in', 'zusammenfuehrung_zurueck'].every((a) => verlauf.includes(a)), 'Verlauf: Zusammenführen und Rückgängig in beiden WEPs')
   await geraetB.close()
 

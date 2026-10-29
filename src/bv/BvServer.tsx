@@ -57,7 +57,8 @@ async function schritt(wepId: string, aktion: AblaufAktion, basisRev: number) {
   if (!r.ok) throw new Error(r.status === 409 ? 'Das WEP wurde inzwischen geändert – die Liste ist neu geladen, bitte noch einmal ansehen.' : (d.fehler ?? `Server antwortet mit ${r.status}`))
 }
 
-export function BvServerApp({ sitzung }: { sitzung: V2Sitzung }) {
+/** `onZurApp`: in der Android-/Windows-App ist die Kontrollseite eine Ansicht der App (im Browser eine eigene Seite). */
+export function BvServerApp({ sitzung, onZurApp }: { sitzung: V2Sitzung; onZurApp?: () => void }) {
   const [liste, setListe] = useState<BvWep[]>()
   const [fehler, setFehler] = useState('')
   const [offen, setOffen] = useState<string>()
@@ -134,6 +135,14 @@ export function BvServerApp({ sitzung }: { sitzung: V2Sitzung }) {
               <button type="button" className="textknopf bv-oeffnen" onClick={() => void sitzung.abmelden()}>
                 <LogOut {...ICON} size={16} /> Abmelden
               </button>
+              {onZurApp && (
+                <>
+                  {' · '}
+                  <button type="button" className="textknopf bv-oeffnen" onClick={onZurApp}>
+                    <ChevronLeft {...ICON} size={16} /> Zur App
+                  </button>
+                </>
+              )}
             </p>
           </div>
           <button type="button" className="knopf" onClick={() => void laden()}>

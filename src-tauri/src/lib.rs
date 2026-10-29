@@ -5,6 +5,7 @@
 mod anmeldung;
 mod eingang;
 mod programm;
+mod server;
 mod speichern;
 mod tresor;
 mod webupdate;
@@ -45,6 +46,8 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        // Marke `__WEP_HUELLE__` vor dem Laden jeder Seite: Diese Hülle kann die Server-Anmeldung (Paket 8)
+        .plugin(tauri::plugin::Builder::<tauri::Wry>::new("wep-huelle").js_init_script(server::HUELLE_SKRIPT.to_string()).build())
         .manage(eingang::Eingang::aus_args(&std::env::args().collect::<Vec<_>>()))
         .manage(anmeldung::Lauscher::default())
         .manage(programm::Gefunden::default())
@@ -62,6 +65,9 @@ pub fn run() {
             anmeldung::anmeldung_lesen,
             anmeldung::anmeldung_speichern,
             anmeldung::anmeldung_loeschen,
+            server::server_token_lesen,
+            server::server_token_speichern,
+            server::server_token_loeschen,
             speichern::datei_speichern,
             eingang::eingang_pruefen,
             eingang::eingang_lesen,

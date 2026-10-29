@@ -214,7 +214,8 @@ export function erstelleAndroidKontoDienst(
 
   /** Verarbeitet den Rücksprung `de.wep.app://auth?code=…&state=…`. */
   async function verarbeiteRueckkehr(url: string): Promise<void> {
-    if (!url.startsWith(REDIRECT_URI)) return
+    // de.wep.app://auth/server gehört zur Server-Anmeldung (v2, src/server/appAnmeldung.ts)
+    if (!url.startsWith(REDIRECT_URI) || url.startsWith(`${REDIRECT_URI}/server`)) return
     rueckkehrAngekommen = true
     await abh.schliesseBrowser().catch(() => undefined)
     let pending: { verifier: string; state: string } | null = null

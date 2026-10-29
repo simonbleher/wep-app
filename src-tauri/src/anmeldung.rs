@@ -25,6 +25,16 @@ use crate::tresor;
 const WARTEZEIT: Duration = Duration::from_secs(5 * 60);
 /// Anmeldung über „common“: persönliche Microsoft-Konten und Geschäfts-/Schulkonten.
 const LOGIN_PREFIX: &str = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize?";
+/// Anmeldung am WEP-Server (v2, Paket 8): Start bei Google oder Microsoft über den Server.
+const SERVER_PREFIXE: [&str; 2] = [
+    "https://wep-pankow.pages.dev/api/v2/anmeldung/google/start?",
+    "https://wep-pankow.pages.dev/api/v2/anmeldung/microsoft/start?",
+];
+
+/// Darf `anmeldung_browser` diese Adresse öffnen? Nur die Microsoft-Anmeldung (v1) und der Start beim WEP-Server.
+pub fn ist_anmeldeseite(url: &str) -> bool {
+    url.starts_with(LOGIN_PREFIX) || SERVER_PREFIXE.iter().any(|p| url.starts_with(p))
+}
 const TOKEN_BASIS: &str = "https://login.microsoftonline.com/";
 const TOKEN_ENDE: &str = "/oauth2/v2.0/token";
 
@@ -192,11 +202,11 @@ pub fn anmeldung_abbrechen(lauscher: State<'_, Lauscher>) {
     }
 }
 
-/// Öffnet die Microsoft-Anmeldeseite im Standardbrowser (nur diese Adresse ist erlaubt).
+/// Öffnet die Anmeldeseite im Standardbrowser (nur Microsoft und der Start beim WEP-Server sind erlaubt).
 #[tauri::command]
 pub fn anmeldung_browser(app: tauri::AppHandle, url: String) -> Result<(), String> {
-    if !url.starts_with(LOGIN_PREFIX) {
-        return Err("Nur die Microsoft-Anmeldung darf geöffnet werden".into());
+    if !ist_anmeldeseite(&url) {
+        return Err("Nur die Anmeldung bei Microsoft oder beim WEP-Server darf geöffnet werden".into());
     }
     app.opener().open_url(url, None::<&str>).map_err(|e| format!("Browser lässt sich nicht öffnen: {e}"))
 }
@@ -252,6 +262,16 @@ mod tests {
         assert!(!ist_token_url("https://login.microsoftonline.com/a/b/oauth2/v2.0/token"));
         assert!(!ist_token_url("https://evil.example/common/oauth2/v2.0/token"));
         assert!(!ist_token_url("https://login.microsoftonline.com/common/oauth2/v2.0/token?x=1"));
+    }
+
+    #[test]
+    fn nur_anmeldeseiten_im_browser() {
+        assert!(ist_anmeldeseite("https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=x"));
+        assert!(ist_anmeldeseite("https://wep-pankow.pages.dev/api/v2/anmeldung/google/start?client=app"));
+        assert!(ist_anmeldeseite("https://wep-pankow.pages.dev/api/v2/anmeldung/microsoft/start?client=app"));
+        assert!(!ist_anmeldeseite("https://wep-pankow.pages.dev/api/v2/weps"));
+        assert!(!ist_anmeldeseite("https://wep-pankow.pages.dev.evil.example/api/v2/anmeldung/google/start?"));
+        assert!(!ist_anmeldeseite("file:///C:/Windows/System32/calc.exe"));
     }
 
     #[test]

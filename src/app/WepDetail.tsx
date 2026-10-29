@@ -91,7 +91,7 @@ import { leseZahl, zahlDe, zahlFuerEingabe } from '@/gruen/format'
 import { serverModus } from '@/server/modus'
 import { serverSicht, zustandVon } from '@/server/ablaufDienst'
 import { AbgabeBereich, ZustandMarke } from '@/server/AbgabeBereich'
-import { AnnahmeHinweis } from '@/server/Zusammenfuehren'
+import { AnnahmeHinweis } from '@/server/ZusammenfuehrenDialog'
 import { ZUSTAND_TEXT } from '@/server/rechte'
 
 // ---------------------------------------------------------------------------

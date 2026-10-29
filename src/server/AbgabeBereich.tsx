@@ -8,7 +8,7 @@ import { speichereWep } from '@/app/db'
 import { lokalesProfil } from '@/profil'
 import { istUnterschriftUrl } from '@/unterschrift'
 import { fuehreSchrittAus, istEigenesGruenWep, ladeGruenKonten, ladeVerlauf, serverSicht, zustandVon, type GruenKonto, type VerlaufEintrag } from './ablaufDienst'
-import { ZusammenfuehrenStand } from './Zusammenfuehren'
+import { ZusammenfuehrenStand } from './ZusammenfuehrenDialog'
 import { AKTION_TEXT, ZUSTAND_TEXT, type AblaufAktion, type Zustand } from './rechte'
 
 export function ZustandMarke({ zustand }: { zustand: Zustand }) {

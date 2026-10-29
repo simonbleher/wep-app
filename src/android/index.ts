@@ -2,6 +2,7 @@
 // Speicher-Haken für die Upload-Warteschlange, Planung des Hintergrund-Workers und
 // Übernahme der Worker-Ergebnisse.
 import { App } from '@capacitor/app'
+import { appMitServer } from '@/server/modus'
 import { setzeSpeicherHaken } from '@/app/db'
 import { ladeGeraeteEinstellungen } from '@/profil'
 import { geraeteKennung, setzeSyncHaken } from '@/sync'
@@ -22,6 +23,12 @@ export async function planeHintergrundUpload(): Promise<void> {
 }
 
 export async function startAndroid(): Promise<void> {
+  if (appMitServer) {
+    // Server-Modus (Paket 8): Abgleich, Fotos und Bau-Excel laufen über den Server, nicht über OneDrive – keine
+    // Upload-Warteschlange, kein Hintergrund-Worker. Nur die Update-Prüfung bleibt.
+    void import('./updateDienst').then((m) => m.starteAutomatik())
+    return
+  }
   const q = erstelleWarteschlange(WepNative, syncSpeicher, geraeteKennung)
   warteschlange = q
   const fq = erstelleFotoWarteschlange(WepNative, fotoSpeicher, syncSpeicher)

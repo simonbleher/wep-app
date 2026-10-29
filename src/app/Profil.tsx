@@ -5,7 +5,8 @@ import { BookOpen, ChevronLeft } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
 import type { Konto } from '@/konto'
 import { ServerKontoAbschnitt } from '@/server/ServerKontoAbschnitt'
-import { serverModus } from '@/server/modus'
+import { appMitServer, serverModus } from '@/server/modus'
+import { Altbestand } from '@/server/Altbestand'
 import type { V2Sitzung } from '@/server/V2Tor'
 import {
   ROLLEN,
@@ -38,9 +39,11 @@ interface Props {
   /** Server-Modus (v2): Konto des Servers statt OneDrive-Anmeldung. */
   v2?: V2Sitzung
   onKontenVerwalten?: () => void
+  /** App im Server-Modus: Kontrollseite BV öffnen (im Browser liegt sie unter /bv). */
+  onBv?: () => void
 }
 
-export function Profil({ konto, verfuegbar, onZurueck, onAnmelden, onAbmelden, v2, onKontenVerwalten }: Props) {
+export function Profil({ konto, verfuegbar, onZurueck, onAnmelden, onAbmelden, v2, onKontenVerwalten, onBv }: Props) {
   const id = useId()
   const [profil, setProfil] = useState<ProfilDaten>(() => lokalesProfil.lade().profil)
   const [nurWlan, setNurWlan] = useState(() => ladeGeraeteEinstellungen().nurWlan)
@@ -171,7 +174,7 @@ export function Profil({ konto, verfuegbar, onZurueck, onAnmelden, onAbmelden, v
                 onChange={(e) => {
                   setNurWlan(e.target.checked)
                   speichereGeraeteEinstellungen({ nurWlan: e.target.checked })
-                  if (Capacitor.isNativePlatform()) {
+                  if (Capacitor.isNativePlatform() && !serverModus) {
                     void import('@/android').then((m) => m.planeHintergrundUpload())
                   }
                 }}
@@ -199,10 +202,11 @@ export function Profil({ konto, verfuegbar, onZurueck, onAnmelden, onAbmelden, v
           <p className="neben">Kräftigere Linien und Texte und größere Schrift, damit alles im Freien bei Sonne lesbar bleibt. Gilt nur für dieses Gerät.</p>
         </section>
 
+        {appMitServer && <Altbestand />}
         <Sicherung id={`${id}-sicherung`} appVersion={__APP_VERSION__} />
 
         {v2 ? (
-          <ServerKontoAbschnitt sitzung={v2} onKontenVerwalten={() => onKontenVerwalten?.()} />
+          <ServerKontoAbschnitt sitzung={v2} onKontenVerwalten={() => onKontenVerwalten?.()} onBv={onBv} />
         ) : (
           <section className="abschnitt" aria-labelledby={`${id}-konto`}>
             <h2 className="gruppenkopf" id={`${id}-konto`}>
@@ -233,7 +237,7 @@ export function Profil({ konto, verfuegbar, onZurueck, onAnmelden, onAbmelden, v
           </section>
         )}
 
-        {nativ && <Synchronisierung id={`${id}-sync`} />}
+        {nativ && !serverModus && <Synchronisierung id={`${id}-sync`} />}
         {nativ && fehlersuche && <Fehlersuche />}
 
         <section className="abschnitt" aria-labelledby={`${id}-app`}>
