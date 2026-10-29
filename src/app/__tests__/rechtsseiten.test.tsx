@@ -16,7 +16,7 @@ describe('Datenschutz und Nutzungsbedingungen', () => {
     for (const html of [ds, nb]) {
       expect(html).toContain('Entwurf – rechtlich noch nicht geprüft')
       expect(html).toContain('simon@bleher.name')
-      expect(html).toContain('Stand: 28.10.2026')
+      expect(html).toMatch(/Stand: \d{2}\.\d{2}\.\d{4}/)
       expect(html).not.toMatch(/straße|str\.\s*\d/i)
     }
   })
@@ -25,6 +25,8 @@ describe('Datenschutz und Nutzungsbedingungen', () => {
     for (const html of [ds, nb]) expect(html).toContain('Testphase: Die App wird derzeit nur zu Testzwecken mit erfundenen Daten betrieben.')
     expect(ds).toContain('Verantwortlicher</strong> ist in der Testphase <strong>Simon Bleher')
     expect(ds).toContain('Art. 6 Abs. 1 lit. b DSGVO')
+    // Speicherdauer: doppelte Ablage nach dem Zusammenführen, Dateien ohne WEP, Papierkorb auf dem Server
+    for (const t of ['Zusammengeführte WEPs:', 'Dateien ohne WEP:', '<strong>Papierkorb:</strong>']) expect(ds).toContain(t)
     expect(ds).toContain('höchstens 90 Tage')
     for (const html of [ds, nb]) expect(html).not.toContain('BITTE ERGÄNZEN')
     expect(ds).toContain('Version 6.4 vom 03.04.2026')

@@ -8,6 +8,9 @@
 //   Datei dort angekommen ist und kein Konflikt offen ist. Steht es wieder im WEP (andere Fassung übernommen), bleibt es.
 // - Gelöschte WEPs (Papierkorb) und „endgültig“ gelöschte: die Dateien bleiben auf dem Server beim WEP.
 // - Darf ich das WEP nicht bearbeiten (gesperrt), wird nichts hochgeladen oder gelöscht.
+// - Dateien auf diesem Gerät, die zu keinem WEP, keinem Papierkorb-Eintrag und keiner Sync-Marke mehr gehören (z. B. das
+//   eigene WEP nach dem Zusammenführen oder ein WEP, das auf dem Server nicht mehr sichtbar ist), werden entfernt – auf
+//   dem Server bleibt dabei alles, wie es ist.
 import type { BauExcelSpeicher } from '@/bauexcel/types'
 import type { FotoRecord } from '@/fotos/types'
 import { wartetAufUpload } from '@/sync/engine'
@@ -28,6 +31,8 @@ export interface DateiAbgleichErgebnis {
   hochgeladen: string[]
   geloescht: number
   aufgeschoben: number
+  /** Auf diesem Gerät entfernte Dateien ohne WEP. */
+  verwaistEntfernt: number
   fehler: SyncHinweis[]
 }
 
@@ -38,8 +43,8 @@ export async function serverDateienAbgleichen(opt: {
   bau: BauExcelSpeicher
   uploadErlaubt: () => Promise<boolean>
 }): Promise<DateiAbgleichErgebnis> {
-  const erg: DateiAbgleichErgebnis = { hochgeladen: [], geloescht: 0, aufgeschoben: 0, fehler: [] }
-  const [weps, metas, fotoRecs, bauRecs] = await Promise.all([opt.lokal.alleWeps(), opt.lokal.alleMeta(), opt.fotos.alleRecords(), opt.bau.alleRecords()])
+  const erg: DateiAbgleichErgebnis = { hochgeladen: [], geloescht: 0, aufgeschoben: 0, verwaistEntfernt: 0, fehler: [] }
+  const [weps, metas, fotoRecs, bauRecs, korb] = await Promise.all([opt.lokal.alleWeps(), opt.lokal.alleMeta(), opt.fotos.alleRecords(), opt.bau.alleRecords(), opt.lokal.alleImPapierkorb()])
   const metaVon = new Map(metas.map((m) => [m.id, m]))
   const fotosVon = new Map<string, FotoRecord[]>()
   for (const r of fotoRecs) fotosVon.set(r.wepId, [...(fotosVon.get(r.wepId) ?? []), r])
@@ -112,6 +117,20 @@ export async function serverDateienAbgleichen(opt: {
       const gesperrt = e instanceof AbgleichFehler && e.status === 403
       erg.fehler.push({ wepId: w.id, text: gesperrt ? 'Dateien: Das WEP ist gesperrt, Fotos werden nicht mehr hochgeladen.' : `Dateien: ${e instanceof Error ? e.message : String(e)}` })
     }
+  }
+  // Verwaiste Dateien auf diesem Gerät (kein WEP, kein Papierkorb-Eintrag, keine Sync-Marke mehr)
+  const bekannt = new Set([...weps.map((w) => w.id), ...korb.map((e) => e.id), ...metas.map((m) => m.id)])
+  try {
+    for (const r of fotoRecs.filter((x) => !bekannt.has(x.wepId))) {
+      await opt.fotos.entferne(r.wepId, r.id)
+      erg.verwaistEntfernt++
+    }
+    for (const r of bauRecs.filter((x) => !bekannt.has(x.wepId))) {
+      await opt.bau.entferne(r.wepId)
+      erg.verwaistEntfernt++
+    }
+  } catch (e) {
+    erg.fehler.push({ wepId: 'Dateien', text: `Aufräumen auf diesem Gerät: ${e instanceof Error ? e.message : String(e)}` })
   }
   return erg
 }
