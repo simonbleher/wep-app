@@ -1,10 +1,11 @@
-// Server-Modus (v2): Admin-Seite „Konten verwalten“ – freigeben, sperren, löschen, Rollen vergeben.
+// Server-Modus (v2): Admin-Seite „Konten verwalten“ – freigeben, sperren, löschen, Rollen vergeben, offene Sitzungen
+// (Browser, Android-App, Windows-App) sehen und alle abmelden.
 // Ein Wertermittler ist Bau ODER Grün; BV und Admin kommen zusätzlich dazu. Der Server prüft alles noch einmal.
 import { useCallback, useEffect, useId, useState } from 'react'
 import { ChevronLeft } from 'lucide-react'
 import { HauptSeitenleiste, ICON, Kopf, Laedt, Meldung, Rueckfrage, zeitDe } from '@/app/ui'
 import { aendereKonto, ladeKonten, type KontoAktion } from './api'
-import { ROLLEN_TEXT, STATUS_TEXT, rollenFehler, type ServerKonto, type ServerRolle } from './typen'
+import { GERAET_TEXT, ROLLEN_TEXT, STATUS_TEXT, rollenFehler, type ServerKonto, type ServerRolle } from './typen'
 
 interface Props {
   ich: ServerKonto
@@ -114,6 +115,9 @@ function KontoZeile({ konto, selbst, onAktion, onLoeschen }: { konto: ServerKont
         {konto.email} · {konto.anbieter === 'google' ? 'Google' : 'Microsoft'}
         {konto.letzteAnmeldung ? ` · zuletzt angemeldet ${zeitDe(konto.letzteAnmeldung)}` : ''}
       </span>
+      {konto.sitzungen && konto.sitzungen.length > 0 && (
+        <span className="neben">Angemeldet auf: {konto.sitzungen.map((s) => GERAET_TEXT[s.geraet]).join(', ')}</span>
+      )}
       <div className="konto-rollen">
         <label htmlFor={`${id}-wm`}>
           Wertermittler
@@ -143,6 +147,11 @@ function KontoZeile({ konto, selbst, onAktion, onLoeschen }: { konto: ServerKont
           {konto.status !== 'gesperrt' && (
             <button type="button" className="knopf" onClick={() => onAktion({ aktion: 'sperren' })}>
               Sperren
+            </button>
+          )}
+          {konto.sitzungen && konto.sitzungen.length > 0 && (
+            <button type="button" className="knopf" onClick={() => onAktion({ aktion: 'abmelden' })}>
+              Überall abmelden
             </button>
           )}
           <button type="button" className="knopf knopf-loeschen" onClick={onLoeschen}>

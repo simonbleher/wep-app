@@ -1,5 +1,6 @@
-// Aufrufe der v2-Schnittstelle (/api/v2/…). Die Sitzung steckt im Cookie (HttpOnly), daher nur gleiche Herkunft.
-import type { ServerKonto, ServerRolle } from './typen'
+// Aufrufe der v2-Schnittstelle (/api/v2/…). Im Browser steckt die Sitzung im Cookie (HttpOnly), daher nur gleiche
+// Herkunft. In der Android- und Windows-App leitet appZugriff.ts dieselben Aufrufe mit Bearer-Token an den Server.
+import type { ServerKonto, ServerRolle, ServerSitzung } from './typen'
 
 export class ServerFehler extends Error {
   constructor(
@@ -51,9 +52,18 @@ export const setzeMailBenachrichtigung = async (an: boolean) =>
 
 export const serverAbmelden = () => rufe<{ ok: true }>('/api/v2/abmelden', { method: 'POST' })
 
+/** App-Anmeldung: Einmal-Code + Verifier gegen das Sitzungs-Token tauschen (appAnmeldung.ts). */
+export const tauscheAppCode = (code: string, verifier: string) =>
+  rufe<{ token: string; konto: ServerKonto }>('/api/v2/anmeldung/app/token', { method: 'POST', body: JSON.stringify({ code, verifier }) })
+
+export const ladeSitzungen = async () => (await rufe<{ sitzungen: ServerSitzung[] }>('/api/v2/ich/sitzungen')).sitzungen
+
+export const beendeSitzung = async (id: string) =>
+  (await rufe<{ sitzungen: ServerSitzung[] }>(`/api/v2/ich/sitzungen?id=${encodeURIComponent(id)}`, { method: 'DELETE' })).sitzungen
+
 export const ladeKonten = async () => (await rufe<{ konten: ServerKonto[] }>('/api/v2/admin/konten')).konten
 
-export type KontoAktion = { aktion: 'freigeben' } | { aktion: 'sperren' } | { aktion: 'loeschen' } | { aktion: 'rollen'; rollen: ServerRolle[] }
+export type KontoAktion = { aktion: 'freigeben' } | { aktion: 'sperren' } | { aktion: 'abmelden' } | { aktion: 'loeschen' } | { aktion: 'rollen'; rollen: ServerRolle[] }
 
 export const aendereKonto = async (id: string, a: KontoAktion) =>
   (await rufe<{ konten: ServerKonto[] }>(`/api/v2/admin/konten/${encodeURIComponent(id)}`, { method: 'POST', body: JSON.stringify(a) })).konten

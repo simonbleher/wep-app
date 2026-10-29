@@ -124,7 +124,7 @@ export async function alleKonten(db: Db): Promise<Konto[]> {
   return results.map(alsKonto)
 }
 
-export type AdminAktion = { aktion: 'freigeben' } | { aktion: 'sperren' } | { aktion: 'loeschen' } | { aktion: 'rollen'; rollen: Rolle[] }
+export type AdminAktion = { aktion: 'freigeben' } | { aktion: 'sperren' } | { aktion: 'loeschen' } | { aktion: 'rollen'; rollen: Rolle[] } | { aktion: 'abmelden' }
 
 /** Prüft eine Admin-Aktion; liefert die Fehlermeldung oder undefined. */
 export function adminAktionFehler(admin: Konto, ziel: Konto, a: AdminAktion): string | undefined {
@@ -141,6 +141,9 @@ export async function fuehreAdminAktionAus(db: Db, admin: Konto, ziel: Konto, a:
   const zeit = jetztIso(jetzt)
   if (a.aktion === 'loeschen') {
     await db.batch([db.prepare('DELETE FROM sitzungen WHERE konto_id = ?').bind(ziel.id), db.prepare('DELETE FROM konten WHERE id = ?').bind(ziel.id)])
+  } else if (a.aktion === 'abmelden') {
+    // Alle Sitzungen beenden (Browser und Apps), das Konto bleibt freigegeben
+    await db.prepare('DELETE FROM sitzungen WHERE konto_id = ?').bind(ziel.id).run()
   } else if (a.aktion === 'rollen') {
     await db.prepare('UPDATE konten SET rollen = ?, geaendert_am = ?, geaendert_von = ? WHERE id = ?').bind(a.rollen.join(','), zeit, admin.id, ziel.id).run()
   } else {

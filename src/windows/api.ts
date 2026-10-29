@@ -48,6 +48,10 @@ export interface WepWindowsApi {
   anmeldungLesen(): Promise<Partial<WindowsAnmeldung>>
   anmeldungSpeichern(a: WindowsAnmeldung): Promise<void>
   anmeldungLoeschen(): Promise<void>
+  // Sitzungs-Token des WEP-Servers (v2) im Credential Manager (ab huelle-version 4)
+  serverTokenLesen(): Promise<string | null>
+  serverTokenSpeichern(token: string): Promise<void>
+  serverTokenLoeschen(): Promise<void>
   // „Speichern unter…“: true = gespeichert, false = abgebrochen
   dateiSpeichern(daten: Uint8Array, name: string): Promise<boolean>
   // Doppelklick auf eine .wep-Datei: Name der wartenden Datei (null = keine) und ihre Bytes
@@ -78,6 +82,9 @@ export const WepWindows: WepWindowsApi = {
   anmeldungLesen: () => aufruf('anmeldung_lesen'),
   anmeldungSpeichern: (daten) => aufruf('anmeldung_speichern', { daten }),
   anmeldungLoeschen: () => aufruf('anmeldung_loeschen'),
+  serverTokenLesen: () => aufruf('server_token_lesen'),
+  serverTokenSpeichern: (token) => aufruf('server_token_speichern', { token }),
+  serverTokenLoeschen: () => aufruf('server_token_loeschen'),
   async dateiSpeichern(daten, name) {
     const { invoke } = await import('@tauri-apps/api/core')
     // Rohe Bytes im Anfragekörper (ohne Base64); der Name geht URL-kodiert im Kopf mit.

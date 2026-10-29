@@ -6,9 +6,10 @@ import { registerSW } from 'virtual:pwa-register'
 import App from './App'
 import { istWindowsApp } from '@/windows/plattform'
 import { wendeKontrastAn } from '@/profil'
-import { appOhneServer, serverModus } from '@/server/modus'
+import { appMitServer, appOhneServer, serverModus } from '@/server/modus'
 import { NurImBrowser } from '@/server/NurImBrowser'
 import { V2Tor } from '@/server/V2Tor'
+import type { AppAnbindung } from '@/server/app'
 import '@/design/tokens.css'
 import './styles.css'
 
@@ -42,17 +43,34 @@ if (!container) {
 const BvApp = lazy(() => import('@/bv/BvSeite'))
 const istBvSeite = /^\/bv(\/|$)/.test(window.location.pathname)
 
-createRoot(container).render(
-  <StrictMode>
-    {appOhneServer && <NurImBrowser />}
-    {istBvSeite ? (
-      <Suspense fallback={<div className="app" aria-busy="true" />}>
-        <BvApp />
-      </Suspense>
-    ) : serverModus ? (
-      <V2Tor>{(sitzung) => <App v2={sitzung} />}</V2Tor>
-    ) : (
-      <App />
-    )}
-  </StrictMode>,
-)
+const wurzel = createRoot(container)
+
+function zeichne(app?: AppAnbindung) {
+  wurzel.render(
+    <StrictMode>
+      {appOhneServer && <NurImBrowser />}
+      {istBvSeite ? (
+        <Suspense fallback={<div className="app" aria-busy="true" />}>
+          <BvApp />
+        </Suspense>
+      ) : serverModus ? (
+        <V2Tor app={app}>{(sitzung) => <App v2={sitzung} />}</V2Tor>
+      ) : (
+        <App />
+      )}
+    </StrictMode>,
+  )
+}
+
+if (appMitServer) {
+  // Android-/Windows-App im Server-Modus: erst Zugriff mit Bearer einrichten und das Token aus dem sicheren Speicher
+  // laden, dann zeichnen (sonst hielte V2Tor die App kurz für abgemeldet)
+  void import('@/server/app')
+    .then((m) => m.starteAppServer())
+    .then(zeichne, (e: unknown) => {
+      console.error('Server-Modus der App:', e)
+      zeichne()
+    })
+} else {
+  zeichne()
+}

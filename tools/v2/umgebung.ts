@@ -27,6 +27,8 @@ import * as wepZurueck from '../../functions/api/v2/weps/[id]/zusammenfuehren-zu
 import * as gruenKontenListe from '../../functions/api/v2/konten/gruen'
 import * as benListe from '../../functions/api/v2/benachrichtigungen'
 import * as benGelesen from '../../functions/api/v2/benachrichtigungen/gelesen'
+import * as appToken from '../../functions/api/v2/anmeldung/app/token'
+import * as ichSitzungen from '../../functions/api/v2/ich/sitzungen'
 import { onRequest as middleware } from '../../functions/api/v2/_middleware'
 import { fuehreAdminAktionAus, ladeKonto, type Rolle } from '../../functions/_lib/v2/konten'
 
@@ -57,6 +59,8 @@ const ROUTEN: [RegExp, Modul, string?, string?][] = [
   [/^\/api\/v2\/anmeldung\/([^/]+)\/start$/, start, 'anbieter'],
   [/^\/api\/v2\/anmeldung\/([^/]+)\/zurueck$/, zurueck, 'anbieter'],
   [/^\/api\/v2\/ich$/, ich],
+  [/^\/api\/v2\/ich\/sitzungen$/, ichSitzungen],
+  [/^\/api\/v2\/anmeldung\/app\/token$/, appToken],
   [/^\/api\/v2\/abmelden$/, abmelden],
   [/^\/api\/v2\/admin\/konten$/, konten],
   [/^\/api\/v2\/admin\/konten\/([^/]+)$/, konto, 'id'],
@@ -127,7 +131,7 @@ export async function starteV2Umgebung(opt: { port: number; ausgabe: string }) {
     const params: Record<string, string> = {}
     if (treffer?.param) params[treffer.param] = decodeURIComponent(treffer.m![1])
     if (treffer?.param2) params[treffer.param2] = decodeURIComponent(treffer.m![2])
-    const antwort = await middleware({ env, next: async () => (handler ? handler({ request, env, params }) : Response.json({ fehler: 'Nicht gefunden.' }, { status: 404 })) })
+    const antwort = await middleware({ request, env, next: async () => (handler ? handler({ request, env, params }) : Response.json({ fehler: 'Nicht gefunden.' }, { status: 404 })) })
     const kopf: Record<string, string> = {}
     antwort.headers.forEach((w, k) => k !== 'set-cookie' && k !== 'location' && (kopf[k] = w))
     const cookies = antwort.headers.getSetCookie()
@@ -168,6 +172,70 @@ export async function starteV2Umgebung(opt: { port: number; ausgabe: string }) {
       await k.route('**/api/v2/**', beantworte)
       await k.route(ANBIETER_SEITEN, anbieterSeite)
       return k
+    },
+    /**
+     * Windows-App mit neuer Hülle (Paket 8), nachgestellt: Die Seite läuft wie in Tauri unter https://tauri.localhost
+     * (echte CORS-Prüfung gegen https://wep-pankow.pages.dev), `__TAURI_INTERNALS__` beantwortet die Befehle der Hülle.
+     * Der „Systembrowser“ ist ein eigener Browser-Kontext (eigene Cookies); der Rücksprung geht an den Loopback-Port.
+     * Das Token liegt im „Credential Manager“ dieses Tests (`tresor`), nicht in der Seite.
+     */
+    async neueWindowsApp(person: Person, o: BrowserContextOptions = {}) {
+      const k = await browser.newContext({ viewport: { width: 1200, height: 900 }, serviceWorkers: 'block', ...o })
+      const tresor: { token: string | null } = { token: null }
+      const systembrowser = await this.neuerKontext()
+      const PORT = 54321
+      let rueckkehr: (pfad: string) => void = () => undefined
+      let warten: Promise<string> = Promise.resolve('')
+      const geoeffnet: string[] = []
+      await k.route('https://tauri.localhost/**', async (route) => {
+        const pfad = new globalThis.URL(route.request().url())
+        const r = await echtesFetch(`${URL}${pfad.pathname.slice(1)}${pfad.search}`)
+        const kopf: Record<string, string> = {}
+        r.headers.forEach((w, n) => (kopf[n] = w))
+        await route.fulfill({ status: r.status, headers: kopf, body: Buffer.from(await r.arrayBuffer()) })
+      })
+      await k.route('https://wep-pankow.pages.dev/version.json', (route) => route.fulfill({ status: 404, body: '' }))
+      await k.route('https://wep-pankow.pages.dev/api/v2/**', beantworte)
+      await systembrowser.route(`http://127.0.0.1:${PORT}/**`, async (route) => {
+        const ziel = new globalThis.URL(route.request().url())
+        rueckkehr(ziel.pathname + ziel.search)
+        await route.fulfill({ status: 200, headers: { 'content-type': 'text/html' }, body: '<h1>Anmeldung abgeschlossen</h1>' })
+      })
+      await k.exposeBinding('__wepBefehl', async (_q, befehl: string, args: Record<string, unknown>) => {
+        switch (befehl) {
+          case 'server_token_lesen':
+            return tresor.token
+          case 'server_token_speichern':
+            tresor.token = String(args.token)
+            return null
+          case 'server_token_loeschen':
+            tresor.token = null
+            return null
+          case 'anmeldung_lauschen':
+            warten = new Promise((r) => (rueckkehr = r))
+            return PORT
+          case 'anmeldung_browser': {
+            wer = person
+            geoeffnet.push(String(args.url))
+            const p = await systembrowser.newPage()
+            await p.goto(String(args.url))
+            return null
+          }
+          case 'anmeldung_warten':
+            return warten
+          case 'web_info':
+            return { zustand: { aktiv: null, naechste: null, unbestaetigt: null, fehlgeschlagen: [] }, huelle: 4, programm: '0.1.4' }
+          default:
+            return null
+        }
+      })
+      await k.addInitScript(() => {
+        const w = window as unknown as Record<string, unknown> & { __wepBefehl: (b: string, a: unknown) => Promise<unknown> }
+        w.__TAURI_INTERNALS__ = { invoke: (b: string, a?: unknown) => w.__wepBefehl(b, a ?? {}), transformCallback: () => 1, metadata: {} }
+        w.__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener: () => undefined }
+        w.__WEP_HUELLE__ = { serverAnmeldung: 1 }
+      })
+      return { kontext: k, systembrowser, tresor, geoeffnet, ADRESSE: 'https://tauri.localhost/' }
     },
     /** Auf dem Anmelde-Bildschirm anmelden (die Anmeldung beim Anbieter läuft nachgebaut sofort durch). */
     async anmelden(seite: Page, person: Person) {

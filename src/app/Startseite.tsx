@@ -15,10 +15,11 @@ import { NeuesWepDialog } from './VorgangsNr'
 import { legeWepAusBauExcelAn } from '@/bauexcel/neu'
 import { StatusZeile, useAbgleich } from './SyncLeiste'
 import { HauptSeitenleiste, ICON, Laedt, LeerZustand, Meldung, StatusMarke, TeilMarke, datumDe } from './ui'
-import { serverModus } from '@/server/modus'
+import { appMitServer, serverModus } from '@/server/modus'
 import { gemerktesKonto } from '@/server/api'
 import { ZustandMarke } from '@/server/AbgabeBereich'
 import { NeuFuerDich } from '@/server/NeuFuerDich'
+import { Altbestand } from '@/server/Altbestand'
 import { zustandVon } from '@/server/ablaufDienst'
 import { RechtLinks } from './RechtLinks'
 
@@ -154,6 +155,7 @@ export function Startseite({ konto, verfuegbar, onProfil, onOeffnen, onPapierkor
         </header>
         {!neuErlaubt && <p className="neben block">Neue WEPs legt der Bau-Wertermittler an; abgegebene WEPs erscheinen hier nach dem Abgleich.</p>}
         {serverModus && <NeuFuerDich onOeffnen={(id) => void oeffneNachricht(id)} />}
+        {appMitServer && <Altbestand startseite />}
 
         <div className="nur-handy block">
           {status}

@@ -12,4 +12,6 @@ interface ImportMetaEnv {
   readonly VITE_MS_CLIENT_ID?: string
   /** "true" schaltet v2 ein (Server, Konten, Ablauf – docs/PLAN-V2.md). Sonst verhält sich die App wie v1. */
   readonly VITE_SERVER_MODUS?: string
+  /** Server für die Android- und Windows-App im Server-Modus (Standard https://wep-pankow.pages.dev). */
+  readonly VITE_SERVER_ADRESSE?: string
 }

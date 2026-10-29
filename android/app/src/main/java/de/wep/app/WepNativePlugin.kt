@@ -91,6 +91,40 @@ class WepNativePlugin : Plugin() {
         }
     }
 
+    /** Sitzungs-Token des WEP-Servers (v2) speichern. Nur ein Token im Format des Servers (Base64url, 43 Zeichen). */
+    @PluginMethod
+    fun speichereServerToken(call: PluginCall) {
+        try {
+            val token = call.getString("token") ?: return call.reject("token fehlt")
+            if (!Regex("^[A-Za-z0-9_-]{20,200}$").matches(token)) return call.reject("token ungültig")
+            ServerTokenStore.speichere(ctx, token)
+            call.resolve()
+        } catch (e: Exception) {
+            fehler(call, e)
+        }
+    }
+
+    @PluginMethod
+    fun leseServerToken(call: PluginCall) {
+        try {
+            val r = JSObject()
+            ServerTokenStore.lese(ctx)?.let { r.put("token", it) }
+            call.resolve(r)
+        } catch (e: Exception) {
+            fehler(call, e)
+        }
+    }
+
+    @PluginMethod
+    fun loescheServerToken(call: PluginCall) {
+        try {
+            ServerTokenStore.loesche(ctx)
+            call.resolve()
+        } catch (e: Exception) {
+            fehler(call, e)
+        }
+    }
+
     @PluginMethod
     fun reiheEin(call: PluginCall) {
         try {

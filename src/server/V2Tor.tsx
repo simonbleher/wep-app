@@ -1,11 +1,15 @@
 // Server-Modus (v2): Vor der App steht die Anmeldung mit Google oder Microsoft. Neue Konten warten auf die Freigabe
 // durch einen Admin. Ohne Netz startet die App mit dem zuletzt bestätigten Konto (offline arbeiten bleibt Pflicht).
+// In der Android- und Windows-App (Paket 8, `app`) geht die Anmeldung über den Systembrowser; das Sitzungs-Token liegt
+// sicher im Gerät statt im Cookie.
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { LogIn, LogOut, RefreshCw } from 'lucide-react'
 import { ICON, Meldung } from '@/app/ui'
 import { RechtLinks } from '@/app/RechtLinks'
 import { anmeldeUrl, gemerktesKonto, istNetzFehler, ladeEinrichtung, ladeIch, merkeKonto, serverAbmelden, type Einrichtung } from './api'
 import type { ServerKonto } from './typen'
+import type { AppAnbindung } from './app'
+import type { Anbieter } from './appAnmeldung'
 
 export interface V2Sitzung {
   konto: ServerKonto
@@ -38,13 +42,28 @@ function holeAnmeldeFehler(): string | undefined {
   return fehler.slice(0, 300)
 }
 
-export function V2Tor({ children }: { children: (sitzung: V2Sitzung) => ReactNode }) {
+export function V2Tor({ children, app }: { children: (sitzung: V2Sitzung) => ReactNode; app?: AppAnbindung }) {
   const [z, setZ] = useState<Zustand>({ art: 'lade' })
 
   const pruefe = useCallback(async () => {
     setZ({ art: 'lade' })
+    if (app && !app.hatToken()) {
+      // App ohne Token: nicht angemeldet – außer Android hat die App gerade über den Rücksprung gestartet
+      let fehler = ANMELDEFEHLER
+      const k = await app.kaltstart().catch((e: unknown) => {
+        fehler = e instanceof Error ? e.message : String(e)
+        return null
+      })
+      if (!k) {
+        merkeKonto(null)
+        setZ({ art: 'login', fehler })
+        return
+      }
+    }
     try {
       const konto = await ladeIch()
+      // Der Server kennt die Sitzung nicht mehr (abgemeldet, widerrufen, abgelaufen): Token weg
+      if (!konto && app) await app.vergiss()
       merkeKonto(konto)
       if (!konto) setZ({ art: 'login', fehler: ANMELDEFEHLER })
       else if (konto.status === 'freigegeben') setZ({ art: 'bereit', konto, offline: false })
@@ -54,7 +73,7 @@ export function V2Tor({ children }: { children: (sitzung: V2Sitzung) => ReactNod
       if (istNetzFehler(e) && gemerkt?.status === 'freigegeben') setZ({ art: 'bereit', konto: gemerkt, offline: true })
       else setZ({ art: 'kein-netz' })
     }
-  }, [])
+  }, [app])
 
   useEffect(() => {
     void pruefe()
@@ -64,11 +83,12 @@ export function V2Tor({ children }: { children: (sitzung: V2Sitzung) => ReactNod
     try {
       await serverAbmelden()
     } catch {
-      /* ohne Netz: lokal trotzdem abgemeldet; die Sitzung läuft auf dem Server ab */
+      /* ohne Netz: lokal trotzdem abgemeldet; die Sitzung läuft auf dem Server ab (oder im Profil beenden) */
     }
+    await app?.vergiss()
     merkeKonto(null)
     setZ({ art: 'login' })
-  }, [])
+  }, [app])
 
   if (z.art === 'lade') return <div className="app" aria-busy="true" />
   if (z.art === 'bereit')
@@ -85,7 +105,7 @@ export function V2Tor({ children }: { children: (sitzung: V2Sitzung) => ReactNod
         })}
       </>
     )
-  if (z.art === 'login') return <V2Anmeldung fehler={z.fehler} />
+  if (z.art === 'login') return <V2Anmeldung fehler={z.fehler} app={app} onAngemeldet={() => void pruefe()} />
 
   return (
     <div className="app">
@@ -118,8 +138,24 @@ export function V2Tor({ children }: { children: (sitzung: V2Sitzung) => ReactNod
   )
 }
 
-function V2Anmeldung({ fehler }: { fehler?: string }) {
+function V2Anmeldung({ fehler: startFehler, app, onAngemeldet }: { fehler?: string; app?: AppAnbindung; onAngemeldet: () => void }) {
   const [einrichtung, setEinrichtung] = useState<Einrichtung>()
+  const [fehler, setFehler] = useState(startFehler)
+  const [laeuft, setLaeuft] = useState<Anbieter>()
+
+  /** App: Anmeldung im Systembrowser, danach prüft V2Tor das Konto. */
+  async function inApp(anbieter: Anbieter) {
+    if (!app) return
+    setFehler(undefined)
+    setLaeuft(anbieter)
+    try {
+      await app.anmelden(anbieter)
+      onAngemeldet()
+    } catch (e) {
+      setFehler(e instanceof Error ? e.message : String(e))
+      setLaeuft(undefined)
+    }
+  }
   useEffect(() => {
     ladeEinrichtung()
       .then(setEinrichtung)
@@ -133,17 +169,39 @@ function V2Anmeldung({ fehler }: { fehler?: string }) {
         <div className="login-mitte">
           <h1 className="h1">WEP-App</h1>
           <p className="login-text">Wertermittlungsprotokolle direkt auf der Parzelle erfassen – auch ohne Netz. Melde dich mit deinem Google- oder Microsoft-Konto an.</p>
-          {einrichtung?.google && (
-            <a className="knopf knopf-primaer knopf-breit" href={anmeldeUrl('google', ziel)}>
-              <LogIn {...ICON} />
-              Mit Google anmelden
-            </a>
-          )}
-          {einrichtung?.microsoft && (
-            <a className="knopf knopf-primaer knopf-breit" href={anmeldeUrl('microsoft', ziel)}>
-              <LogIn {...ICON} />
-              Mit Microsoft anmelden
-            </a>
+          {app
+            ? (['google', 'microsoft'] as const)
+                .filter((a) => einrichtung?.[a])
+                .map((a) => (
+                  <button key={a} type="button" className="knopf knopf-primaer knopf-breit" disabled={laeuft !== undefined} onClick={() => void inApp(a)}>
+                    <LogIn {...ICON} />
+                    {a === 'google' ? 'Mit Google anmelden' : 'Mit Microsoft anmelden'}
+                  </button>
+                ))
+            : (['google', 'microsoft'] as const)
+                .filter((a) => einrichtung?.[a])
+                .map((a) => (
+                  <a key={a} className="knopf knopf-primaer knopf-breit" href={anmeldeUrl(a, ziel)}>
+                    <LogIn {...ICON} />
+                    {a === 'google' ? 'Mit Google anmelden' : 'Mit Microsoft anmelden'}
+                  </a>
+                ))}
+          {laeuft && (
+            <>
+              <p className="neben" role="status">
+                Die Anmeldung läuft im Browser. Danach geht es hier automatisch weiter.
+              </p>
+              <button
+                type="button"
+                className="knopf"
+                onClick={() => {
+                  void app?.abbrechen()
+                  setLaeuft(undefined)
+                }}
+              >
+                Abbrechen
+              </button>
+            </>
           )}
           {keiner && (
             <Meldung alarm>

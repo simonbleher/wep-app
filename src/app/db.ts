@@ -13,8 +13,16 @@ import type { ExportEintrag } from '@/sync/exporte'
 import { metaMit, papierkorbMeta } from '@/sync/papierkorb'
 import type { FotoDatei, FotoRecord } from '@/fotos/types'
 import type { BauExcelRecord } from '@/bauexcel/types'
+import { appMitServer } from '@/server/modus'
 
-const DB_NAME = 'wep-db'
+/** Datenbank von v1 (Browser, Android- und Windows-App ohne Server). */
+export const DB_NAME_V1 = 'wep-db'
+/**
+ * Android- und Windows-App im Server-Modus (Paket 8) arbeiten in einer eigenen Datenbank: Die WEPs aus der Zeit vor
+ * dem Server bleiben unangetastet in `wep-db` liegen und werden nicht ungefragt hochgeladen (Übernahme per Sicherung,
+ * src/sicherung/altbestand.ts). Im Browser bleibt es bei `wep-db`.
+ */
+const DB_NAME = appMitServer ? 'wep-db-v2' : DB_NAME_V1
 const DB_VERSION = 6
 const STORE = 'weps'
 const META = 'syncMeta'

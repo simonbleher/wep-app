@@ -13,7 +13,23 @@ export interface ServerKonto {
   erstelltAm: string
   geaendertAm: string
   letzteAnmeldung?: string
+  /** Offene Sitzungen (nur in der Kontenverwaltung der Admins). */
+  sitzungen?: ServerSitzung[]
 }
+
+export type SitzungsGeraet = 'browser' | 'android' | 'windows'
+
+/** Eine offene Sitzung (Browser oder App), Spiegel von SitzungInfo in functions/_lib/v2/sitzung.ts. */
+export interface ServerSitzung {
+  id: string
+  geraet: SitzungsGeraet
+  erstelltAm: string
+  laeuftAb: string
+  /** Die Sitzung, mit der gerade gefragt wird. */
+  diese?: boolean
+}
+
+export const GERAET_TEXT: Record<SitzungsGeraet, string> = { browser: 'Browser', android: 'Android-App', windows: 'Windows-App' }
 
 export const ROLLEN_TEXT: Record<ServerRolle, string> = { bau: 'Bau', gruen: 'Grün', bv: 'BV', admin: 'Admin' }
 export const STATUS_TEXT: Record<KontoStatus, string> = { wartet: 'wartet auf Freigabe', freigegeben: 'freigegeben', gesperrt: 'gesperrt' }

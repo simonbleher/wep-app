@@ -77,6 +77,10 @@ export interface WepNativePlugin {
   speichereAnmeldung(a: Anmeldung): Promise<void>
   leseAnmeldung(): Promise<Partial<Anmeldung>>
   loescheAnmeldung(): Promise<void>
+  /** Sitzungs-Token des WEP-Servers (v2), getrennt von der OneDrive-Anmeldung verschlüsselt gespeichert (ab native-version 8). */
+  speichereServerToken(a: { token: string }): Promise<void>
+  leseServerToken(): Promise<{ token?: string }>
+  loescheServerToken(): Promise<void>
 
   /**
    * Reiht eine WEP-Datei ein. Ist ihr Name als gelöscht gesperrt (`markiereGeloescht`), wird sie
