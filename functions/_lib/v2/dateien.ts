@@ -2,7 +2,9 @@
 // mit derselben Rechteprüfung wie das WEP – öffentliche R2-Adressen gibt es nicht.
 //   weps/<id>/fotos/<Foto-Id>.jpg   Foto (Name in der Schnittstelle: foto-<Foto-Id>.jpg)
 //   weps/<id>/bau.xlsx              Bau-Excel (immer die aktuelle Fassung)
+import type { Wep } from '../../../src/model/types'
 import { darfLesen, schreibrecht, type WepKopf } from '../../../src/server/rechte'
+import { fotoTeil } from '../../../src/server/teile'
 import type { Db } from './db'
 import type { Konto } from './konten'
 import { ladeZeile, type WepZeile } from './weps'
@@ -21,6 +23,8 @@ const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
 export interface DateiArt {
   art: 'foto' | 'bau'
+  /** Foto-Id (nur bei Fotos). */
+  fotoId?: string
   key: string
   typ: string
   max: number
@@ -30,14 +34,14 @@ export interface DateiArt {
 export function dateiArt(wepId: string, name: string): DateiArt | undefined {
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(wepId)) return undefined
   const foto = /^foto-([A-Za-z0-9_-]{1,64})\.jpg$/.exec(name)
-  if (foto) return { art: 'foto', key: `weps/${wepId}/fotos/${foto[1]}.jpg`, typ: 'image/jpeg', max: FOTO_MAX_BYTES }
+  if (foto) return { art: 'foto', fotoId: foto[1], key:`weps/${wepId}/fotos/${foto[1]}.jpg`, typ: 'image/jpeg', max: FOTO_MAX_BYTES }
   if (name === 'bau.xlsx') return { art: 'bau', key: `weps/${wepId}/bau.xlsx`, typ: XLSX, max: BAU_MAX_BYTES }
   return undefined
 }
 
 const kopf = (z: WepZeile): WepKopf => ({ zustand: z.zustand, bauKonto: z.bau_konto, gruenKonto: z.gruen_konto, geloeschtAm: z.geloescht_am, zusammengefuehrtIn: z.zusammengefuehrt_in })
 
-export type DateiErgebnis<T> = { ok: true; wert: T } | { ok: false; status: number; fehler: string }
+export type DateiErgebnis<T> = { ok: true; wert: T; nurNeu?: boolean } | { ok: false; status: number; fehler: string }
 
 /** Prüft Zugriff auf das WEP: lesen (für Abruf/Liste) oder schreiben (für Hochladen/Löschen). */
 export async function pruefeZugriff(db: Db, konto: Konto, wepId: string, schreiben: false | DateiArt): Promise<DateiErgebnis<WepZeile>> {
@@ -47,6 +51,14 @@ export async function pruefeZugriff(db: Db, konto: Konto, wepId: string, schreib
     const recht = schreibrecht(kopf(z), konto)
     // Grün darf (ab Paket 3) nur Fotos hochladen – auch im eigenen Grün-WEP; die Bau-Excel gehört zum Bau-Teil
     if (!recht || ((recht === 'gruen' || recht === 'ohne_bau') && schreiben.art !== 'foto')) return { ok: false, status: 403, fehler: 'Das WEP ist für dich gerade gesperrt (nur lesen).' }
+    // Sind beide beteiligt, ändert jeder nur die Bilddateien seines Teils (wie beim Speichern des WEP): Grün kein Foto des
+    // Bau-Teils, Bau kein Foto an einer Grün-Position. Für Fotos des anderen Teils darf nur eine noch fehlende Datei
+    // hochgeladen werden (`nurNeu`) – z. B. ein neues Foto ohne Position, das Grün hinzugefügt hat und das mit dem
+    // Speichern zum Bau-Teil zählt. Überschreiben und Löschen nicht.
+    if ((recht === 'gruen' || recht === 'bau') && schreiben.fotoId) {
+      const teil = fotoTeil(JSON.parse(z.daten) as Wep, schreiben.fotoId)
+      if (teil && teil !== recht) return { ok: true, wert: z, nurNeu: true }
+    }
   }
   return { ok: true, wert: z }
 }
