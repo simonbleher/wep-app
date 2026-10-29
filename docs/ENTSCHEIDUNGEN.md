@@ -492,3 +492,9 @@
 - **Entscheidung:** Hat das Bau-WEP keine Parzelle (Form), übernimmt das Zusammenführen die Parzelle aus dem Grün-WEP, mit dem Hinweis „Parzelle von Grün übernommen – bitte mit Bau abstimmen“. Hat Bau eine, gilt sie wie bisher (Unterschied nur als Hinweis). Der Server nimmt die Parzelle aus seinem Stand des Grün-WEP, nicht aus dem, was die App schickt; Rückgängig stellt das Bau-WEP wieder ohne Parzelle her.
 - **Grund:** Offene Frage 3 aus PR #119, entschieden von Simon: Sonst ginge die Parzelle verloren, auf der Grün die Skizze gezeichnet hat.
 
+## 2026-10-29 · v2: Doppelte Ablage nach dem Zusammenführen aufräumen
+
+- **Entscheidung:** Mit der Abgabe eines zusammengeführten WEP an den BV (ab dann ist „Rückgängig“ nicht mehr möglich) löscht der Server Inhalt und R2-Dateien des eigenen Grün-WEP; in D1 bleibt nur eine Markierung (`{"id"}`, Vorgangs-Nr., `zusammengefuehrt_in`), damit Verlauf und Anzeige „zusammengeführt mit …“ stimmen. Der Stand des Bau-WEP vor dem Zusammenführen wird geleert. Bei jeder Abgabe an den BV werden außerdem Dateien des WEP in R2 gelöscht, die im WEP nicht mehr stehen. Verlauf und Zugriffsprotokoll halten es fest. Auf dem Gerät entfernt der Datei-Abgleich Fotos und Bau-Excel, die zu keinem WEP, Papierkorb-Eintrag oder Sync-Marke mehr gehören.
+- **Grund:** Pächterdaten und Fotos sollen nicht länger doppelt liegen als nötig (Datenschutz, Speicherdauer).
+- **Nicht geändert:** Endgültiges Löschen aus dem Papierkorb wirkt weiter nur auf dem Gerät; auf dem Server bleibt der Papierkorb samt Dateien bis zu den Aufbewahrungsregeln des BV (Entscheidung zu V2-2). Löschen dort auf Anfrage, spätestens zum Ende der Testphase.
+

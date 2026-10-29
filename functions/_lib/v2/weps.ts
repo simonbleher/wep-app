@@ -419,7 +419,7 @@ export async function nimmZusammenfuehrungZurueck(db: Db, konto: Konto, bauId: s
   if (!darfZusammenfuehrungZuruecknehmen(rechteKopf(z), konto)) return fehlerMitStand(db, 403, 'Das Zusammenführen kann nur Grün zurücknehmen, solange das WEP bei Grün in Arbeit ist.', z)
   if (eingabe.basisRev !== z.rev) return fehlerMitStand(db, 409, 'Das Bau-WEP wurde inzwischen geändert – bitte erst abgleichen.', z)
   const f = await db.prepare('SELECT * FROM zusammenfuehrungen WHERE bau_id = ?').bind(bauId).first<{ gruen_id: string; bau_vorher: string }>()
-  if (!f) return fehler(409, 'Der Stand vor dem Zusammenführen fehlt.')
+  if (!f || !f.bau_vorher) return fehler(409, 'Der Stand vor dem Zusammenführen ist nicht mehr da – Rückgängig geht nicht mehr.')
   const vorher = JSON.parse(f.bau_vorher) as Wep
   const zeit = jetztIso(jetzt)
   const r = await db
