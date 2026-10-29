@@ -508,3 +508,10 @@
 
 - **Entscheidung:** Die Release-Workflows für Android und Windows bauen das eingebaute Web-Paket mit `VITE_SERVER_MODUS=true`, wie Cloudflare-Produktion.
 - **Grund:** Ohne den Schalter startete eine frisch installierte App 0.2.0/0.1.4 im v1-Modus. Das Live-Update brachte das Server-Paket nicht nach, weil es denselben Commit hat und daher als aktuell galt.
+
+
+## 2026-10-29 · Prüfung der Excel-Vorlage: Skript, Rechentests, Korrekturvorschlag
+
+- **Entscheidung:** Die Fehler der BV-Vorlage werden in `docs/VORLAGE-FEHLERBERICHT.md` (und PDF) dokumentiert, jeder Fund mit Nummer F01–F46. Das Prüfskript `tools/vorlage-pruefen.py` enthält den Katalog der Funde und prüft jede neue Fassung der Vorlage (VORHANDEN/behoben). Rechentests schreiben erfundene Eingaben in Kopien, LibreOffice (headless) rechnet neu, eine unabhängige Python-Handrechnung vergleicht jede Zelle. Der Korrekturvorschlag `docs/WEP_Vorlage_Korrekturvorschlag.xlsx` wird direkt im Dateiinhalt (XML, `lxml`) geändert, nicht über openpyxl; Änderungen sind gelb mit Kommentar „Fxx: …“; Formeln im Bericht stehen in deutscher Excel-Schreibweise. Das PDF entsteht über Chrome/Edge/Chromium (`--print-to-pdf`). `docs/WEP_Vorlage.xlsx` bleibt unverändert; es gibt keinen App-Code und keine Änderung an `src/`.
+- **Grund:** Die Vorlage ist die Grundlage jedes Protokolls; der BV muss die Fehler selbst nachvollziehen und beheben können. openpyxl würde beim Speichern die 77 Kontrollkästchen der Mängelliste und die Zeichnungen verlieren. Der Altersabzug von Grube und Kanal (linear oder vom Restwert, PR #95) ist als Rückfrage F29 festgehalten, nicht als Fehler; der Korrekturvorschlag rechnet vom Restwert wie die App und nennt die lineare Alternative im Kommentar.
+
