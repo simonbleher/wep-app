@@ -85,3 +85,41 @@ export async function kopiereFotos(r2: R2Ablage, vonWep: string, nachWep: string
   }
   return kopiert
 }
+
+/** Alle Schlüssel in R2 unter `weps/<id>/`. */
+async function schluesselVon(r2: R2Ablage, wepId: string): Promise<string[]> {
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(wepId)) return []
+  const schluessel: string[] = []
+  let cursor: string | undefined
+  do {
+    const seite = await r2.list({ prefix: `weps/${wepId}/`, cursor })
+    schluessel.push(...seite.objects.map((o) => o.key))
+    cursor = seite.truncated ? seite.cursor : undefined
+  } while (cursor)
+  return schluessel
+}
+
+/** Löscht alle Dateien eines WEP in R2. Liefert die Anzahl. */
+export async function loescheAlleDateien(r2: R2Ablage, wepId: string): Promise<number> {
+  const schluessel = await schluesselVon(r2, wepId)
+  for (const k of schluessel) await r2.delete(k)
+  return schluessel.length
+}
+
+/**
+ * Löscht Dateien in R2, die im WEP nicht (mehr) stehen: Fotos ohne Eintrag in `fotos` (z. B. beim Zusammenführen
+ * ersetzte oder nach „Rückgängig“ übrig gebliebene Kopien) und die Bau-Excel, wenn das WEP keine mehr hat.
+ */
+export async function loescheVerwaisteDateien(r2: R2Ablage, wep: { id: string; fotos?: { id: string }[]; bauExcel?: unknown }): Promise<number> {
+  const fotos = new Set((wep.fotos ?? []).map((f) => f.id))
+  let geloescht = 0
+  for (const k of await schluesselVon(r2, wep.id)) {
+    const rest = k.slice(`weps/${wep.id}/`.length)
+    const foto = /^fotos\/([A-Za-z0-9_-]{1,64})\.jpg$/.exec(rest)?.[1]
+    const verwaist = foto ? !fotos.has(foto) : rest === 'bau.xlsx' ? !wep.bauExcel : false
+    if (!verwaist) continue
+    await r2.delete(k)
+    geloescht++
+  }
+  return geloescht
+}

@@ -32,6 +32,9 @@ function aufbau() {
     speichere: async (w, rev) => erg(await speichereWep(db, bert, w.id, { wep: w, basisRev: rev }, Date.parse(uhr.jetzt()))) as ServerKopf,
     loesche: async (id, rev) => erg(await setzePapierkorb(db, bert, id, true, rev)) as ServerKopf,
     stelleWiederHer: async (id) => erg(await setzePapierkorb(db, bert, id, false, undefined)) as ServerKopf,
+    fuehreZusammen: async () => {
+      throw new Error('in diesen Tests nicht gebraucht')
+    },
   }
   const dateien: DateiZugriff & { aufrufe: string[] } = {
     aufrufe: [],
@@ -149,5 +152,27 @@ describe('Fotos und Bau-Excel auf dem Server', () => {
     expect(e.fehler[0]?.text).toMatch(/gesperrt/)
     expect(t.r2.daten.size).toBe(0)
     expect(t.dateien.aufrufe).toEqual([])
+  })
+
+  it('verwaiste Dateien auf diesem Gerät (kein WEP, kein Papierkorb, keine Marke) werden entfernt; auf dem Server bleibt alles', async () => {
+    const t = aufbau()
+    await t.lokal.speichereWep(mitFoto(neuerWep('w1'), 'f1'), t.uhr.vor(1))
+    await fotoAufnehmen(t.fotos, 'w1', 'f1')
+    await t.abgleich()
+    // z. B. das eigene WEP nach dem Zusammenführen: WEP und Marke sind weg, Foto und Bau-Excel noch da
+    await fotoAufnehmen(t.fotos, 'w-weg', 'f9')
+    await t.bau.speichere({ wepId: 'w-weg', version: 'v1', hatDatei: true, hochgeladen: false, erstelltAm: '2026-10-28' }, XLSX())
+    // im Papierkorb dieses Geräts: bleibt
+    await t.lokal.speichereWep(mitFoto(neuerWep('w2'), 'f2'), t.uhr.vor(1))
+    await fotoAufnehmen(t.fotos, 'w2', 'f2')
+    const e = await t.abgleich()
+    expect(e.verwaistEntfernt).toBe(2)
+    expect(t.fotos.record('w-weg', 'f9')).toBeUndefined()
+    expect(t.bau.record('w-weg')).toBeUndefined()
+    await t.lokal.legeInPapierkorb('w2', t.uhr.vor(1), 'test')
+    expect((await t.abgleich()).verwaistEntfernt).toBe(0)
+    expect(t.fotos.record('w2', 'f2')).toBeDefined()
+    expect(t.fotos.record('w1', 'f1')).toBeDefined()
+    expect(t.r2.daten.has('weps/w1/fotos/f1.jpg')).toBe(true)
   })
 })

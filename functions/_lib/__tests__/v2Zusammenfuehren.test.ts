@@ -13,6 +13,8 @@ import { neueSitzung } from '../v2/sitzung'
 import { fuehreAktionAus, fuehreZusammen, ladeVerlauf, ladeWep, lesbareWeps, nimmZusammenfuehrungZurueck, setzePapierkorb, speichereWep } from '../v2/weps'
 import { onRequestPost as zusammenfuehrenEndpunkt } from '../../api/v2/weps/[id]/zusammenfuehren'
 import { onRequestPost as zuruecknehmenEndpunkt } from '../../api/v2/weps/[id]/zusammenfuehren-zuruecknehmen'
+import { onRequestPost as aktionEndpunkt } from '../../api/v2/weps/[id]/aktion'
+import { markierungsDaten, raeumeNachAbgabeAuf } from '../v2/aufraeumen'
 
 const ORIGIN = 'https://wep-pankow.pages.dev'
 const k = (id: string, ...rollen: KontoRolle[]) => ({ id, rollen })
@@ -271,5 +273,57 @@ describe('Endpunkte', () => {
     expect(r2.daten.has('weps/w-gruen/fotos/f-hecke.jpg')).toBe(true) // kopiert, nicht verschoben
     const z = await post('zusammenfuehren-zuruecknehmen', { basisRev: 3 })
     expect(z.status).toBe(200)
+  })
+
+  it('Abgabe an den BV räumt auf: Grün-WEP nur noch Markierung, seine Dateien gelöscht, verwaiste Dateien des Bau-WEP weg; Verlauf + Protokoll', async () => {
+    const { db, erika } = await aufbau()
+    const r2 = fakeR2()
+    await r2.put('weps/w-gruen/fotos/f-hecke.jpg', new Uint8Array([1]).buffer)
+    await r2.put('weps/w-gruen/fotos/f-allg.jpg', new Uint8Array([2]).buffer)
+    await r2.put('weps/w-bau/fotos/f-bau.jpg', new Uint8Array([3]).buffer)
+    await r2.put('weps/w-bau/fotos/f-alt.jpg', new Uint8Array([4]).buffer) // steht in keinem WEP
+    const env = { SERVER_MODUS: 'true', WEP_DB: db, WEP_DATEIEN: r2 }
+    const cookie = (await neueSitzung(db, erika.id)).cookie.split(';')[0]
+    const post = (pfad: string, body: unknown, endpunkt: typeof aktionEndpunkt) =>
+      endpunkt({ request: new Request(`${ORIGIN}/api/v2/weps/w-bau/${pfad}`, { method: 'POST', body: JSON.stringify(body), headers: { cookie, origin: ORIGIN } }), env, params: { id: 'w-bau' } })
+    const bau = await serverWep(db, erika, 'w-bau')
+    const gruen = await serverWep(db, erika, 'w-gruen')
+    expect((await post('zusammenfuehren', { aus: 'w-gruen', wep: zusammengefuehrtInApp(bau, gruen), basisRev: 2 }, zusammenfuehrenEndpunkt)).status).toBe(200)
+    expect(r2.daten.has('weps/w-bau/fotos/f-hecke.jpg')).toBe(true) // kopiert, Original noch da (Rückgängig möglich)
+    expect(r2.daten.has('weps/w-gruen/fotos/f-hecke.jpg')).toBe(true)
+    expect((await post('aktion', { aktion: 'an_bv', basisRev: 3 }, aktionEndpunkt)).status).toBe(200)
+    // Grün-WEP: keine Dateien mehr, Inhalt nur noch Markierung
+    expect([...r2.daten.keys()].filter((k) => k.startsWith('weps/w-gruen/'))).toEqual([])
+    expect(db.roh.prepare("SELECT daten, anlage, parzelle, zusammengefuehrt_in, vorgangs_nr FROM weps WHERE id = 'w-gruen'").get()).toEqual({
+      daten: markierungsDaten('w-gruen'),
+      anlage: '',
+      parzelle: '',
+      zusammengefuehrt_in: 'w-bau',
+      vorgangs_nr: '2026-0815',
+    })
+    expect(db.roh.prepare("SELECT bau_vorher FROM zusammenfuehrungen WHERE bau_id = 'w-bau'").get()).toEqual({ bau_vorher: '' })
+    // Bau-WEP: die Dateien aus dem WEP bleiben, die verwaiste ist weg
+    expect([...r2.daten.keys()].filter((k) => k.startsWith('weps/w-bau/')).sort()).toEqual(['weps/w-bau/fotos/f-allg.jpg', 'weps/w-bau/fotos/f-bau.jpg', 'weps/w-bau/fotos/f-hecke.jpg'])
+    expect(db.roh.prepare("SELECT aktion, notiz FROM verlauf WHERE wep_id = 'w-gruen' ORDER BY id DESC LIMIT 1").get()).toMatchObject({ aktion: 'aufgeraeumt', notiz: expect.stringMatching(/Inhalt und 2 Dateien gelöscht.*2026-0815/) })
+    const protokoll = db.roh.prepare("SELECT aktion, ziel FROM protokoll WHERE aktion IN ('wep_aufgeraeumt', 'dateien_verwaist_geloescht') ORDER BY id").all()
+    expect(protokoll).toEqual([
+      { aktion: 'dateien_verwaist_geloescht', ziel: 'w-bau' },
+      { aktion: 'wep_aufgeraeumt', ziel: 'w-gruen' },
+    ])
+    // Ablauf zeigt das Zusammenführen weiter an; Rückgängig geht nicht mehr; ein zweites Aufräumen tut nichts
+    expect((await serverWep(db, erika, 'w-bau')).ablauf?.zusammengefuehrtAus).toMatchObject({ id: 'w-gruen', vorgangsNr: '2026-0815' })
+    expect(await raeumeNachAbgabeAuf(db, r2, erika.id, 'w-bau')).toEqual({ verwaist: 0, gruenDateien: 0 })
+  })
+
+  it('Aufräumen nur nach der Abgabe (nicht in Arbeit) und ohne R2 nur in D1', async () => {
+    const { db, erika } = await aufbau()
+    const bau = await serverWep(db, erika, 'w-bau')
+    const gruen = await serverWep(db, erika, 'w-gruen')
+    await fuehreZusammen(db, erika, 'w-bau', { aus: 'w-gruen', wep: zusammengefuehrtInApp(bau, gruen), basisRev: 2 })
+    expect(await raeumeNachAbgabeAuf(db, undefined, erika.id, 'w-bau')).toEqual({ verwaist: 0, gruenDateien: 0 }) // noch bei Grün
+    expect((db.roh.prepare("SELECT daten FROM weps WHERE id = 'w-gruen'").get() as { daten: string }).daten).not.toBe(markierungsDaten('w-gruen'))
+    await fuehreAktionAus(db, erika, 'w-bau', { aktion: 'an_bv', basisRev: 3 })
+    expect(await raeumeNachAbgabeAuf(db, undefined, erika.id, 'w-bau')).toEqual({ verwaist: 0, gruenDateien: 0, gruenId: 'w-gruen' })
+    expect((db.roh.prepare("SELECT daten FROM weps WHERE id = 'w-gruen'").get() as { daten: string }).daten).toBe(markierungsDaten('w-gruen'))
   })
 })

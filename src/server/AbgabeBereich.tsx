@@ -24,6 +24,7 @@ const VERLAUF_TEXT: Record<string, string> = {
   zusammengefuehrt: 'mit eigenem Grün-WEP zusammengeführt',
   zusammengefuehrt_in: 'in ein Bau-WEP zusammengeführt',
   zusammenfuehrung_zurueck: 'Zusammenführen rückgängig gemacht',
+  aufgeraeumt: 'aufgeräumt (Inhalt und Dateien gelöscht, steckt im Bau-WEP)',
 }
 const TEIL = { bau: 'Bau', gruen: 'Grün', beide: 'Bau und Grün' } as const
 
