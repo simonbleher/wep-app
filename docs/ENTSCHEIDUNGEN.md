@@ -567,3 +567,15 @@
   - Zuerst war eine Mail je Stunde geplant. Dann käme aber eine Rückfrage kurz nach „an dich abgegeben“ nicht mehr per Mail an (im Durchlauf gesehen); 5 je Stunde lassen den normalen Ablauf durch und begrenzen eine Flut.
   - Vorhandene lokale Daten gehen bei der Umstellung nicht verloren.
 
+
+## 2026-10-29 · Sicherheitsprüfung v2, PR D Security-Header
+
+- **Entscheidung:**
+  - In `public/_headers` gelten für alle Seiten `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin` und `Permissions-Policy`.
+  - Die Content-Security-Policy gilt zuerst nur als `Report-Only`. Meldungen gehen an `/api/csp-bericht`, das nur Regel, Herkunft und Pfad ins Function-Log schreibt.
+  - Die Functions setzen `nosniff` selbst (`jsonAntwort`, Dateien); die Bau-Excel kommt als Download.
+  - Scharf geschaltet wird die CSP in einem eigenen kleinen PR, wenn in Produktion keine Meldungen mehr kommen.
+- **Grund:**
+  - Fund M4 (`docs/SICHERHEITSPRUEFUNG-V2.md`): Clickjacking auf der Admin-Seite.
+  - Eine falsche CSP würde die App sofort blockieren. Der Durchlauf v2 mit lokal scharf geschalteter CSP lief ohne Verstoß, deckt aber nicht alles ab (v1/OneDrive, KI, alle Exporte).
+
