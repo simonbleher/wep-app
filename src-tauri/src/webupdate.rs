@@ -88,7 +88,10 @@ pub fn entpacke(zip_bytes: &[u8], ziel: &Path) -> Result<(), String> {
     let mut gesamt: u64 = 0;
     for i in 0..archiv.len() {
         let mut eintrag = archiv.by_index(i).map_err(|e| e.to_string())?;
-        let rel = eintrag.enclosed_name().ok_or_else(|| format!("Unsicherer Pfad im Paket: {}", eintrag.name()))?;
+        let rel = eintrag.enclosed_name().ok_or_else(|| {
+            // zip 9: der Name kann selbst ungültig sein (kein UTF-8 o. Ä.)
+            format!("Unsicherer Pfad im Paket: {}", eintrag.name().map(|n| n.into_owned()).unwrap_or_else(|_| "?".into()))
+        })?;
         gesamt += eintrag.size();
         if gesamt > MAX_ENTPACKT {
             return Err("Paket zu groß".into());

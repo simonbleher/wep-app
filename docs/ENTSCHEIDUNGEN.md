@@ -579,3 +579,13 @@
   - Fund M4 (`docs/SICHERHEITSPRUEFUNG-V2.md`): Clickjacking auf der Admin-Seite.
   - Eine falsche CSP würde die App sofort blockieren. Der Durchlauf v2 mit lokal scharf geschalteter CSP lief ohne Verstoß, deckt aber nicht alles ab (v1/OneDrive, KI, alle Exporte).
 
+
+## 2026-10-29 · Sicherheitsprüfung v2, PR E Abhängigkeiten der Windows-App
+
+- **Entscheidung:**
+  - `zip` 9, `tauri-plugin-updater` 2.14.1 und `tokio` 1.54.1.
+  - Windows-Programm 0.1.6. Die Hülle steigt auf 5, obwohl der Web-Teil keine neue Funktion des Programms braucht.
+- **Grund:**
+  - Fund M8 (`docs/SICHERHEITSPRUEFUNG-V2.md`).
+  - Mit der neuen Hülle nimmt kein altes Programm mehr das neue Web-Paket an, sondern bietet das App-Update an. So laufen alle Rechner bald mit den aktualisierten Abhängigkeiten (Wunsch von Simon).
+
