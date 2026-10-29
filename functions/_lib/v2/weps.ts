@@ -15,7 +15,8 @@ import {
   type WepKopf,
   type Zustand,
 } from '../../../src/server/rechte'
-import { mitEigenemTeil, ohneServerFelder, zusammenfuehrungAufServer } from '../../../src/server/teile'
+import { BAU_FORMALIEN, mitEigenemTeil, ohneServerFelder, zusammenfuehrungAufServer } from '../../../src/server/teile'
+import { wepFormFehler } from './form'
 import { jetztIso, type Db } from './db'
 import type { Konto } from './konten'
 
@@ -77,7 +78,7 @@ export const kopfVon = (z: WepZeile): ServerWepKopf => ({
   ...(z.geloescht_am ? { geloeschtAm: z.geloescht_am } : {}),
 })
 
-const rechteKopf = (z: WepZeile): WepKopf => ({
+export const rechteKopf = (z: WepZeile): WepKopf => ({
   zustand: z.zustand,
   bauKonto: z.bau_konto,
   gruenKonto: z.gruen_konto,
@@ -160,6 +161,10 @@ interface WepFormalien {
   formalien?: { vorgangsNr?: unknown; kleingartenanlage?: unknown; parzelle?: unknown }
 }
 
+/** Erlaubte Kennung (auch Ordner in R2) und alte, erratbare Kennung aus v1 („2026-007“, wie `istAlteKennung`). */
+const KENNUNG = /^[A-Za-z0-9_-]{1,64}$/
+const ALTE_KENNUNG = /^\d{4}-\d+$/
+
 const text = (v: unknown, max = 200) => (typeof v === 'string' ? v.trim().slice(0, max) : '')
 
 export async function verlauf(db: Db, eintrag: { wepId: string; kontoId: string; aktion: string; notiz?: string; vorher?: Zustand; nachher?: Zustand }, jetzt = Date.now()) {
@@ -185,11 +190,16 @@ async function merkeBearbeitung(db: Db, wepId: string, kontoId: string, jetzt: n
 export async function speichereWep(db: Db, konto: Konto, id: string, eingabe: { wep?: unknown; basisRev?: unknown }, jetzt = Date.now()): Promise<Ergebnis<ServerWepKopf>> {
   const roh = eingabe.wep as WepFormalien | undefined
   if (!roh || typeof roh !== 'object' || roh.id !== id) return fehler(400, 'WEP fehlt oder passt nicht zur Adresse.')
+  const form = wepFormFehler(roh)
+  if (form) return fehler(400, form)
   const appWep = ohneServerFelder(roh as unknown as Wep)
   const zeit = jetztIso(jetzt)
   const z = await ladeZeile(db, id)
 
   if (!z) {
+    // Neue WEPs nur mit einer nicht erratbaren Kennung: alte Kennungen („2026-007“) könnte ein anderes Konto vorab belegen
+    // (Fund N7). Die App vergibt solchen WEPs vor dem ersten Hochladen eine neue Kennung (src/server/abgleich.ts).
+    if (!KENNUNG.test(id) || ALTE_KENNUNG.test(id)) return fehler(400, 'Neue WEPs brauchen eine neue Kennung (UUID) – bitte die App aktualisieren.')
     const daten = JSON.stringify(appWep)
     if (new TextEncoder().encode(daten).length > MAX_WEP_BYTES) return fehler(413, 'Das WEP ist zu groß für den Server (Unterschriften oder Skizzen verkleinern).')
     const spalten = spaltenVon(appWep)
@@ -312,7 +322,8 @@ export async function fuehreAktionAus(
   if (aktion.aktion === 'an_bv' && !z.bau_konto) {
     // Eigenes Grün-WEP ohne Bau: der Name des Grün-Wertermittlers steht in den Formalien (Zelle E13)
     const w = JSON.parse(z.daten) as Wep
-    if (!w.formalien.wertermittlerAussenAufwuchs?.trim()) {
+    w.formalien = w.formalien ?? ({} as Wep['formalien'])
+    if (typeof w.formalien.wertermittlerAussenAufwuchs !== 'string' || !w.formalien.wertermittlerAussenAufwuchs.trim()) {
       const n = await namen(db, [z.gruen_konto])
       w.formalien = { ...w.formalien, wertermittlerAussenAufwuchs: n.get(z.gruen_konto ?? '') ?? '' }
       daten = JSON.stringify(w)
@@ -322,11 +333,13 @@ export async function fuehreAktionAus(
     // Ab jetzt hat das WEP beide Teile; die Namen der Wertermittler stehen in den Formalien (Zellen E12/E13)
     const w = JSON.parse(z.daten) as Wep
     const n = await namen(db, [k.bauKonto ?? null, k.gruenKonto ?? null])
+    const f = w.formalien ?? ({} as Wep['formalien'])
+    const t = (v: unknown) => (typeof v === 'string' ? v.trim() : '')
     w.rolle = 'beides'
     w.formalien = {
-      ...w.formalien,
-      wertermittlerBaulichkeiten: w.formalien.wertermittlerBaulichkeiten?.trim() || n.get(k.bauKonto ?? '') || '',
-      wertermittlerAussenAufwuchs: w.formalien.wertermittlerAussenAufwuchs?.trim() || n.get(k.gruenKonto ?? '') || '',
+      ...f,
+      wertermittlerBaulichkeiten: t(f.wertermittlerBaulichkeiten) || n.get(k.bauKonto ?? '') || '',
+      wertermittlerAussenAufwuchs: t(f.wertermittlerAussenAufwuchs) || n.get(k.gruenKonto ?? '') || '',
     }
     daten = JSON.stringify(w)
   }
@@ -384,7 +397,13 @@ export async function fuehreZusammen(
   if (eingabe.basisRev !== z.rev) return fehlerMitStand(db, 409, 'Das Bau-WEP wurde inzwischen geändert.', z)
   const roh = eingabe.wep as Wep | undefined
   if (!roh || typeof roh !== 'object' || roh.id !== bauId) return fehler(400, 'Das zusammengeführte WEP fehlt oder passt nicht zur Adresse.')
-  const felder = Array.isArray(eingabe.felder) ? eingabe.felder.filter((f): f is string => typeof f === 'string') : []
+  const form = wepFormFehler(roh)
+  if (form) return fehler(400, form)
+  // Nur Felder der Formalien, die es im Bau-WEP gibt, nie die des Bau-Teils (N12) und nicht beliebig viele (N8)
+  const bekannt = Object.keys((JSON.parse(z.daten) as Wep).formalien ?? {})
+  const felder = (Array.isArray(eingabe.felder) ? eingabe.felder : [])
+    .filter((f): f is string => typeof f === 'string' && bekannt.includes(f) && !BAU_FORMALIEN.includes(f))
+    .slice(0, bekannt.length)
   const vorher = JSON.parse(z.daten) as Wep
   const neu = zusammenfuehrungAufServer(vorher, JSON.parse(g.daten) as Wep, ohneServerFelder(roh), felder)
   const daten = JSON.stringify(neu)

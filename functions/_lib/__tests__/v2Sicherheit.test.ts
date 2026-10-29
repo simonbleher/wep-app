@@ -327,20 +327,28 @@ describe('Herkunft, CORS, Sitzung (geprüft, in Ordnung)', () => {
 // ---------------------------------------------------------------------------------------------------------------------
 
 describe('offene Funde', () => {
-  it.fails('Fund M1: Wer selbst Bau/Grün am WEP ist, prüft es nicht als BV (Vier-Augen)', async () => {
+  // Bewusst erlaubt, siehe Entscheidung M1 (docs/ENTSCHEIDUNGEN.md, 29.10.2026): Die BV-Revision legt keine eigenen WEPs
+  // an, und zum Testen soll ein Konto alle Rollen durchspielen können. Der Test hält das heutige Verhalten fest.
+  it('Fund M1 (bewusst erlaubt): Wer selbst Bau/Grün am WEP ist, darf es als BV prüfen', async () => {
     const { db, k, abgabe } = await aufbau()
     db.roh.prepare("UPDATE konten SET rollen = 'gruen,bv' WHERE id = 'gruen'").run()
     expect((await abgabe('w1', k.bau, { aktion: 'an_gruen', gruenKonto: 'gruen' })).status).toBe(200)
     const gruenBv = { ...k.gruen, rollen: ['gruen', 'bv'] as Rolle[] }
     expect((await abgabe('w1', gruenBv, { aktion: 'an_bv' })).status).toBe(200)
-    expect((await abgabe('w1', gruenBv, { aktion: 'geprueft' })).status).toBe(403)
+    expect((await abgabe('w1', gruenBv, { aktion: 'geprueft' })).status).toBe(200)
   })
 
-  it.fails('Fund M2: Grün kann den Grün-Teil nicht in eine kaputte Form bringen (kein JSON-Schema)', async () => {
+  it('Fund M2 (behoben): WEPs in falscher Form werden mit 400 abgelehnt', async () => {
     const { k, ruf, p, rev, abgabe } = await aufbau()
     expect((await abgabe('w1', k.bau, { aktion: 'an_gruen', gruenKonto: 'gruen' })).status).toBe(200)
     const kaputt = { ...bauWep('w1'), gruen: 'kein Objekt', skizze: { elemente: 'x'.repeat(10) } }
     expect((await ruf(wepSpeichern, 'PUT', '/api/v2/weps/w1', k.gruen, { params: p('w1'), body: { wep: kaputt, basisRev: await rev('w1') } })).status).toBe(400)
+    // formalien: null hätte später „an Grün“/„an den BV“ mit 500 abbrechen lassen
+    for (const wep of [{ ...neuerWep('w2'), formalien: null }, { ...neuerWep('w2'), fotos: [{ id: '../x' }] }, { ...neuerWep('w2'), bau: 'x' }, { ...neuerWep('w2'), gruen: { aufwuchs: 'x' } }]) {
+      expect((await ruf(wepSpeichern, 'PUT', '/api/v2/weps/w2', k.bau, { params: p('w2'), body: { wep, basisRev: 0 } })).status).toBe(400)
+    }
+    // Fehlende Teile bleiben erlaubt
+    expect((await ruf(wepSpeichern, 'PUT', '/api/v2/weps/w3', k.bau, { params: p('w3'), body: { wep: { id: 'w3', formalien: {} }, basisRev: 0 } })).status).toBe(200)
   })
 
   it.fails('Fund M3a: Microsoft – ohne Adresse in preferred_username wird der unbestätigte Anspruch „email“ nicht als Konto-Adresse übernommen', async () => {
@@ -416,12 +424,15 @@ describe('offene Funde', () => {
     expect((await loeseAppCodeEin(db, code, verifier)).ok).toBe(false)
   })
 
-  it.fails('Fund N4: Bei einer Rückfrage darf die gefragte Person Fotos hochladen (Rechte der Dateien ohne Rückfrage-Felder)', async () => {
+  it('Fund N4 (behoben): Bei einer Rückfrage darf die gefragte Person Fotos hochladen, die andere nicht', async () => {
     const { k, ruf, p, abgabe } = await aufbau()
     await abgabe('w1', k.bau, { aktion: 'an_gruen', gruenKonto: 'gruen' })
     await abgabe('w1', k.gruen, { aktion: 'an_bv' })
     await abgabe('w1', k.bv, { aktion: 'rueckfrage', an: 'bau', notiz: 'Foto fehlt' })
     expect((await ruf(dateiHochladen, 'PUT', '/api/v2/weps/w1/dateien/foto-bf2.jpg', k.bau, { body: JPEG, params: p('w1', 'foto-bf2.jpg') })).status).toBe(200)
+    expect((await ruf(dateiHochladen, 'PUT', '/api/v2/weps/w1/dateien/foto-gf9.jpg', k.gruen, { body: JPEG, params: p('w1', 'foto-gf9.jpg') })).status).toBe(403)
+    // H1 gilt auch hier: Bau überschreibt kein Foto an einer Grün-Position
+    expect((await ruf(dateiHochladen, 'PUT', '/api/v2/weps/w1/dateien/foto-gf1.jpg', k.bau, { body: JPEG_BOESE, params: p('w1', 'foto-gf1.jpg') })).status).toBe(403)
   })
 
   it.fails('Fund N5: Sitzungs-Cookie mit __Host-Präfix (Vorschau-Subdomains können sonst Cookies setzen)', () => {
@@ -438,18 +449,23 @@ describe('offene Funde', () => {
     expect(await kontoDerSitzung(db, new Request(ORIGIN, { headers: { authorization: `Bearer ${token}` } }), spaeter)).toBeUndefined()
   })
 
-  it.fails('Fund N7: Eine fremde Person kann keine WEP-Kennung belegen, die ein anderes Konto später hochlädt', async () => {
+  it('Fund N7 (behoben): Alte, erratbare Kennungen und ungültige Kennungen lassen sich nicht neu belegen', async () => {
     const { k, ruf, p } = await aufbau()
-    // bau2 belegt die (alte, erratbare) Kennung zuerst
-    expect((await ruf(wepSpeichern, 'PUT', '/api/v2/weps/2026-007', k.bau2, { params: p('2026-007'), body: { wep: neuerWep('2026-007'), basisRev: 0 } })).status).toBe(200)
-    expect((await ruf(wepSpeichern, 'PUT', '/api/v2/weps/2026-007', k.bau, { params: p('2026-007'), body: { wep: neuerWep('2026-007'), basisRev: 0 } })).status).toBe(200)
+    for (const id of ['2026-007', '2026-1', 'a b', 'x'.repeat(65)]) {
+      expect((await ruf(wepSpeichern, 'PUT', `/api/v2/weps/${encodeURIComponent(id)}`, k.bau2, { params: p(id), body: { wep: neuerWep(id), basisRev: 0 } })).status).toBe(400)
+    }
+    const uuid = '6f1c2d3e-4a5b-4c6d-8e7f-90a1b2c3d4e5'
+    expect((await ruf(wepSpeichern, 'PUT', `/api/v2/weps/${uuid}`, k.bau2, { params: p(uuid), body: { wep: neuerWep(uuid), basisRev: 0 } })).status).toBe(200)
   })
 
-  it.fails('Fund N8: Notizen und Begründungen haben eine Höchstlänge', async () => {
+  it('Fund N8 (behoben): Notizen und Begründungen haben eine Höchstlänge', async () => {
     const { k, abgabe } = await aufbau()
     await abgabe('w1', k.bau, { aktion: 'an_gruen', gruenKonto: 'gruen' })
     await abgabe('w1', k.gruen, { aktion: 'an_bv' })
     expect((await abgabe('w1', k.bv, { aktion: 'rueckfrage', an: 'bau', notiz: 'x'.repeat(200_000) })).status).toBe(400)
+    expect((await abgabe('w1', k.bv, { aktion: 'geprueft', notiz: 'x'.repeat(2001) })).status).toBe(400)
+    expect((await abgabe('w1', k.bv, { aktion: 'geprueft', notiz: 'x'.repeat(2000) })).status).toBe(200)
+    expect((await abgabe('w1', k.bv, { aktion: 'wiederoeffnen', begruendung: 'x'.repeat(2001) })).status).toBe(400)
   })
 
   it.fails('Fund N9: /api/v2/status verrät ohne Anmeldung nichts über die Einrichtung', async () => {
@@ -463,15 +479,21 @@ describe('offene Funde', () => {
     expect(d.konten.every((x) => !x.email)).toBe(true)
   })
 
-  it.fails('Fund N12: Beim Zusammenführen übernimmt Grün nicht den Namen des Bau-Wertermittlers aus dem eigenen WEP', async () => {
+  it('Fund N12 (behoben): Beim Zusammenführen übernimmt Grün nicht den Namen des Bau-Wertermittlers, und `felder` ist begrenzt', async () => {
     const { db, k, ruf, p, rev, abgabe } = await aufbau()
     const g = neuerWep('g1')
     g.formalien.wertermittlerBaulichkeiten = 'Falscher Name'
     await ruf(wepSpeichern, 'PUT', '/api/v2/weps/g1', k.gruen, { params: p('g1'), body: { wep: g, basisRev: 0 } })
     await abgabe('w1', k.bau, { aktion: 'an_gruen', gruenKonto: 'gruen' })
-    await ruf(zusammenfuehren, 'POST', '/api/v2/weps/w1/zusammenfuehren', k.gruen, { params: p('w1'), body: { aus: 'g1', wep: bauWep('w1'), felder: ['wertermittlerBaulichkeiten'], basisRev: await rev('w1') } })
+    const felder = ['wertermittlerBaulichkeiten', 'auftraggeber', ...Array.from({ length: 5000 }, (_, i) => `x${i}`)]
+    g.formalien.auftraggeber = 'Gartenfreunde e. V.'
+    await ruf(wepSpeichern, 'PUT', '/api/v2/weps/g1', k.gruen, { params: p('g1'), body: { wep: g, basisRev: await rev('g1') } })
+    expect((await ruf(zusammenfuehren, 'POST', '/api/v2/weps/w1/zusammenfuehren', k.gruen, { params: p('w1'), body: { aus: 'g1', wep: bauWep('w1'), felder, basisRev: await rev('w1') } })).status).toBe(200)
     const w = JSON.parse((await db.prepare("SELECT daten FROM weps WHERE id = 'w1'").first<{ daten: string }>())!.daten) as Wep
     expect(w.formalien.wertermittlerBaulichkeiten).not.toBe('Falscher Name')
+    expect(w.formalien.auftraggeber).toBe('Gartenfreunde e. V.')
+    const notiz = (await db.prepare("SELECT notiz FROM verlauf WHERE wep_id = 'w1' AND aktion = 'zusammengefuehrt'").first<{ notiz: string }>())!.notiz
+    expect(notiz).toBe('mit dem eigenen WEP ohne Vorgangs-Nr.; übernommene Stammdaten: auftraggeber')
   })
 
   it.fails('Fund N15: aud mit mehreren Empfängern nur mit passendem azp', async () => {

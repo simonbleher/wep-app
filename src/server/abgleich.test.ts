@@ -372,3 +372,22 @@ function konto2(db: TestDb, id: string): Konto {
   const z = db.roh.prepare('SELECT * FROM konten WHERE id = ?').get(id) as { id: string; name: string; email: string; rollen: string }
   return { id: z.id, anbieter: 'google', email: z.email, name: z.name, status: 'freigegeben', rollen: z.rollen.split(',') as Rolle[], mailBenachrichtigung: true, erstelltAm: '', geaendertAm: '' }
 }
+
+describe('Alte Kennungen (Sicherheitsprüfung N7)', () => {
+  it('ein nie abgeglichenes WEP mit alter Kennung bekommt vor dem Hochladen eine neue; Vorgangs-Nr., Fotos und Zusammenführen ziehen mit', async () => {
+    const { uhr, a } = aufbau()
+    await a.lokal.speichereWep(neuerWep('2026-007'), uhr.vor(1))
+    const umzug: string[] = []
+    const erg = await serverAbgleich({ server: a.server, lokal: a.lokal, jetzt: uhr.jetzt, vorUmnummerieren: async (von, nach) => void umzug.push(`${von}>${nach}`) })
+    expect(erg.umnummeriert).toHaveLength(1)
+    const { von, nach } = erg.umnummeriert[0]
+    expect(von).toBe('2026-007')
+    expect(nach).toMatch(/^[0-9a-f-]{36}$/)
+    expect(umzug).toEqual([`2026-007>${nach}`])
+    expect(erg.hochgeladen).toEqual([nach])
+    expect(a.lokal.weps.has('2026-007')).toBe(false)
+    expect(a.lokal.weps.get(nach)?.formalien.vorgangsNr).toBe('2026-007')
+    // Beim nächsten Abgleich nichts mehr umzunummerieren
+    expect((await a.abgleich()).umnummeriert).toEqual([])
+  })
+})

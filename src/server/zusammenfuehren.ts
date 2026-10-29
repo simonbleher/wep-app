@@ -11,6 +11,7 @@
 //   src/skizze/grundlage.ts). Hat Grün ohne Bau-Grundlage gezeichnet, gibt es den Hinweis, die Lage zu prüfen.
 import type { Foto, Formalien, Wep } from '@/model'
 import { pruefeFormalien } from '@/bauexcel/abgleich'
+import { BAU_FORMALIEN } from './teile'
 import { normalisiere } from '@/katalog/util'
 import { lageVon } from '@/parzelle'
 import { stabil } from '@/sicherung'
@@ -113,6 +114,9 @@ export function skizzeZusammen(bauWep: Wep, gruen: Wep, jetzt: string): { skizze
 /** Was übernommen würde – für die Vorschau vor dem Zusammenführen. */
 export function vorschau(bau: Wep, gruen: Wep, jetzt = new Date().toISOString()): ZusammenfuehrenVorschau {
   const ab = pruefeFormalien(bau.formalien, gruen.formalien)
+  // Felder des Bau-Teils (Name des Bau-Wertermittlers) bietet die Vorschau nicht an: Sie kommen immer von Bau
+  ab.neu = ab.neu.filter((f) => !BAU_FORMALIEN.includes(f.feld))
+  ab.unterschiede = ab.unterschiede.filter((f) => !BAU_FORMALIEN.includes(f.feld))
   const stammdaten: StammdatenFeld[] = [
     ...ab.neu.map((f): StammdatenFeld => ({ feld: f.feld, name: f.name, bau: '', gruen: f.bau, art: 'leer', vorgewaehlt: true })),
     ...ab.unterschiede.map((f): StammdatenFeld => ({ feld: f.feld, name: f.name, bau: f.wep, gruen: f.bau, art: 'anders', vorgewaehlt: f.feld === 'wertermittlerAussenAufwuchs' })),
@@ -145,7 +149,7 @@ export function vorschau(bau: Wep, gruen: Wep, jetzt = new Date().toISOString())
  */
 export function fuehreZusammen(bau: Wep, gruen: Wep, felder: readonly (keyof Formalien)[], jetzt = new Date().toISOString()): Wep {
   const formalien = { ...bau.formalien } as unknown as Record<string, unknown>
-  for (const f of felder) formalien[f] = gruen.formalien[f]
+  for (const f of felder) if (!BAU_FORMALIEN.includes(f)) formalien[f] = gruen.formalien[f]
   // Fotos: die des Bau-Teils bleiben (nicht die an einem von Bau vorbereiteten Grün-Teil), dazu alle des eigenen WEP
   const vorbereitet = gruenPositionen(bau)
   const bauFotos = (bau.fotos ?? []).filter((f) => !(f.positionId && vorbereitet.has(f.positionId)))

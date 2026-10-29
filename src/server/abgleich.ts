@@ -17,7 +17,7 @@
 //   (`SyncMeta.zusammenfuehrung`), das eigene WEP ist nur ausgeblendet. Beim Abgleich wird zuerst das eigene WEP
 //   hochgeladen, dann übernimmt der Server das Zusammenführen; danach verschwindet das eigene WEP von diesem Gerät.
 //   Lehnt der Server ab (z. B. schon an den BV abgegeben), gilt sein Stand, das eigene WEP ist wieder in der Liste.
-import type { Wep } from '@/model'
+import { istAlteKennung, neueWepId, vorgangsNrVon, type Wep } from '@/model'
 import { metaMit, papierkorbMeta } from '@/sync/papierkorb'
 import type { KonfliktInfo, LokalSpeicher, SyncErgebnis, SyncMeta } from '@/sync/types'
 import { wartetAufUpload } from '@/sync/engine'
@@ -66,6 +66,8 @@ export interface ServerAbgleichOptionen {
   lokal: LokalSpeicher
   /** Name/Kennung für Konfliktmeldungen (wer hat die andere Fassung geschrieben). */
   jetzt?: () => string
+  /** Bevor ein WEP eine neue Kennung bekommt: Fotos und Bau-Excel auf diesem Gerät mitnehmen. */
+  vorUmnummerieren?: (von: string, nach: string) => Promise<void>
 }
 
 const leeresErgebnis = (): SyncErgebnis => ({
@@ -85,9 +87,38 @@ export async function serverAbgleich(opt: ServerAbgleichOptionen): Promise<SyncE
   const jetzt = opt.jetzt ?? (() => new Date().toISOString())
   const { server, lokal } = opt
   const erg = leeresErgebnis()
-  const [koepfe, weps, korb, metas] = await Promise.all([server.liste(), lokal.alleWeps(), lokal.alleImPapierkorb(), lokal.alleMeta()])
+  const [koepfe, alleWeps, korb, metas] = await Promise.all([server.liste(), lokal.alleWeps(), lokal.alleImPapierkorb(), lokal.alleMeta()])
   const kopfVon = new Map(koepfe.map((k) => [k.id, k]))
   const metaVon = new Map(metas.map((m) => [m.id, m]))
+
+  // Alte Kennungen („2026-007“, z. B. aus einer Sicherung von v1) nimmt der Server für neue WEPs nicht an – sie wären
+  // erratbar (docs/SICHERHEITSPRUEFUNG-V2.md, N7). Vor dem ersten Hochladen bekommt das WEP eine neue Kennung; die
+  // Vorgangs-Nr. bleibt, Fotos und Bau-Excel kommen mit.
+  const weps: Wep[] = []
+  for (const w of alleWeps) {
+    const m = metaVon.get(w.id)
+    if (!istAlteKennung(w.id) || m?.serverRev !== undefined || kopfVon.has(w.id)) {
+      weps.push(w)
+      continue
+    }
+    const nr = neueWepId()
+    const neu: Wep = { ...w, id: nr, formalien: { ...w.formalien, vorgangsNr: vorgangsNrVon(w) } }
+    await opt.vorUmnummerieren?.(w.id, nr)
+    const meta = metaMit(undefined, nr, jetzt())
+    await lokal.schreibe({ id: w.id, wep: null, meta: null })
+    await lokal.schreibe({ id: nr, wep: neu, meta })
+    metaVon.delete(w.id)
+    metaVon.set(nr, meta)
+    // Vorgemerktes Zusammenführen mit diesem WEP zeigt jetzt auf die neue Kennung
+    for (const x of metaVon.values()) {
+      if (x.zusammenfuehrung?.aus !== w.id) continue
+      const z = { ...x, zusammenfuehrung: { ...x.zusammenfuehrung, aus: nr } }
+      await lokal.setzeMeta(z)
+      metaVon.set(x.id, z)
+    }
+    weps.push(neu)
+    erg.umnummeriert.push({ von: w.id, nach: nr })
+  }
   const lokaleIds = new Set([...weps.map((w) => w.id), ...korb.map((e) => e.id)])
 
   /** Lokaler Stand = Server-Stand (nichts wartet). */

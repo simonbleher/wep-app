@@ -16,7 +16,7 @@ import { httpZugriff } from '@/server/abgleichDienst'
 import type { ServerKopf } from '@/server/abgleich'
 import { ladeBauExcelVomServer, ladeFotoVomServer } from '@/server/dateiDienst'
 import { ladeVerlauf, type VerlaufEintrag } from '@/server/ablaufDienst'
-import { AKTION_TEXT, ZUSTAND_TEXT, moeglicheAktionen, type AblaufAktion, type Zustand } from '@/server/rechte'
+import { AKTION_TEXT, MAX_NOTIZ, ZUSTAND_TEXT, moeglicheAktionen, type AblaufAktion, type Zustand } from '@/server/rechte'
 import type { V2Sitzung } from '@/server/V2Tor'
 import { Fotos, Skizzen } from './BvDetail'
 
@@ -320,7 +320,7 @@ function BvServerDetail({ e, sitzung, onZurueck, onGeaendert }: { e: BvWep; sitz
             <label className="label" htmlFor={`${id}-notiz`}>
               Notiz (was soll geklärt werden?)
             </label>
-            <textarea id={`${id}-notiz`} className="eingabe" rows={2} value={notiz} onChange={(x) => setNotiz(x.target.value)} />
+            <textarea id={`${id}-notiz`} className="eingabe" rows={2} maxLength={MAX_NOTIZ} value={notiz} onChange={(x) => setNotiz(x.target.value)} />
           </fieldset>
         )}
         {aktionen.includes('wiederoeffnen') && (
@@ -328,7 +328,7 @@ function BvServerDetail({ e, sitzung, onZurueck, onGeaendert }: { e: BvWep; sitz
             <label className="label" htmlFor={`${id}-begruendung`}>
               Begründung zum Wieder öffnen
             </label>
-            <textarea id={`${id}-begruendung`} className="eingabe" rows={2} value={notiz} onChange={(x) => setNotiz(x.target.value)} />
+            <textarea id={`${id}-begruendung`} className="eingabe" rows={2} maxLength={MAX_NOTIZ} value={notiz} onChange={(x) => setNotiz(x.target.value)} />
           </>
         )}
         <div className="knopf-reihe">
