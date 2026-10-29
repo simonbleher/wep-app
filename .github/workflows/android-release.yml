@@ -27,6 +27,7 @@ jobs:
     timeout-minutes: 40
     env:
       VITE_MS_CLIENT_ID: ${{ vars.VITE_MS_CLIENT_ID }}
+      VITE_SERVER_MODUS: 'true' # v2: eingebautes Web-Paket der APK im Server-Modus (wie Cloudflare-Produktion)
       ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
       ANDROID_KEYSTORE_PASSWORT: ${{ secrets.ANDROID_KEYSTORE_PASSWORT }}
       ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}

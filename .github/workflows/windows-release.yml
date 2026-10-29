@@ -32,6 +32,7 @@ jobs:
         shell: bash
     env:
       VITE_MS_CLIENT_ID: ${{ vars.VITE_MS_CLIENT_ID }}
+      VITE_SERVER_MODUS: 'true' # v2: eingebautes Web-Paket der EXE im Server-Modus (wie Cloudflare-Produktion)
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
       TAURI_SIGNING_PUBLIC_KEY: ${{ vars.TAURI_SIGNING_PUBLIC_KEY || secrets.TAURI_SIGNING_PUBLIC_KEY }}
