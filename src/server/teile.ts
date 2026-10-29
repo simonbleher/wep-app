@@ -16,6 +16,16 @@ function gruenPositionen(...weps: (Wep | undefined)[]): Set<string> {
   return ids
 }
 
+/**
+ * Zu welchem Teil ein Foto des WEP gehört: 'gruen' an einer Grün-Position, sonst 'bau'; undefined = nicht im WEP
+ * (neu, noch nicht gespeichert). Dieselbe Einteilung wie beim Speichern – damit prüft der Server auch die Bilddateien.
+ */
+export function fotoTeil(wep: Wep, fotoId: string): 'bau' | 'gruen' | undefined {
+  const f = (wep.fotos ?? []).find((x) => x.id === fotoId)
+  if (!f) return undefined
+  return f.positionId && gruenPositionen(wep).has(f.positionId) ? 'gruen' : 'bau'
+}
+
 /** Fotos: der eigene Teil kommt von der App, der andere bleibt wie auf dem Server. */
 function fotosZusammen(server: Wep, app: Wep, teil: 'bau' | 'gruen'): Foto[] | undefined {
   const gruenIds = gruenPositionen(server, app)
