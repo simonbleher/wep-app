@@ -2,7 +2,8 @@
 import { readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { einrichtung, istServerModus, SCHEMA_ERWARTET } from '../serverModus'
+import { einrichtung, istServerModus, schemaStand, SCHEMA_ERWARTET } from '../serverModus'
+import { neueSitzung } from '../v2/sitzung'
 import { testDb } from './sqliteDb'
 import { onRequest as middleware } from '../../api/v2/_middleware'
 import { onRequestGet as status } from '../../api/v2/status'
@@ -44,25 +45,38 @@ describe('Server-Modus (Functions)', () => {
     }
   })
 
-  it('Status zeigt je Teil nur ja/nein, keine Werte', async () => {
-    const env = { SERVER_MODUS: 'true', WEP_DB: {}, GOOGLE_CLIENT_ID: 'abc.apps.googleusercontent.com', GOOGLE_CLIENT_SECRET: 'geheim-123', VITE_MS_CLIENT_ID: 'x', MS_CLIENT_SECRET: ' ' }
-    const r = await status({ env })
-    const text = await r.text()
+  it('Status zeigt je Teil nur ja/nein, keine Werte; ohne Admin-Anmeldung nur Google/Microsoft', async () => {
+    const db = testDb()
+    const env = { SERVER_MODUS: 'true', WEP_DB: db, GOOGLE_CLIENT_ID: 'abc.apps.googleusercontent.com', GOOGLE_CLIENT_SECRET: 'geheim-123', VITE_MS_CLIENT_ID: 'x', MS_CLIENT_SECRET: ' ' }
+    const ohne = await (await status({ env })).text()
+    expect(JSON.parse(ohne)).toEqual({ serverModus: true, einrichtung: { google: true, microsoft: false } })
+    const text = await (await status({ request: await alsAdmin(db), env })).text()
     expect(JSON.parse(text)).toEqual({
       serverModus: true,
       einrichtung: { datenbank: true, dateien: false, google: true, microsoft: false, mail: false, admins: false },
-      schema: { stand: 0, erwartet: SCHEMA_ERWARTET },
+      schema: { stand: SCHEMA_ERWARTET, erwartet: SCHEMA_ERWARTET },
+      warnungen: [],
     })
-    expect(text).not.toContain('geheim')
-    expect(text).not.toContain('googleusercontent')
+    for (const t of [ohne, text]) {
+      expect(t).not.toContain('geheim')
+      expect(t).not.toContain('googleusercontent')
+    }
     expect(einrichtung({}).datenbank).toBe(false)
   })
 
-  it('Schema-Stand: mit allen Migrationen genau der erwartete Stand, ohne Datenbank null', async () => {
-    const mit = await (await status({ env: { SERVER_MODUS: 'true', WEP_DB: testDb() } })).json()
+  it('Schema-Stand: mit allen Migrationen genau der erwartete Stand, ohne Datenbank kein Stand', async () => {
+    const db = testDb()
+    const mit = await (await status({ request: await alsAdmin(db), env: { SERVER_MODUS: 'true', WEP_DB: db } })).json()
     expect(mit.schema).toEqual({ stand: SCHEMA_ERWARTET, erwartet: SCHEMA_ERWARTET })
-    expect((await (await status({ env: {} })).json()).schema.stand).toBeNull()
+    expect(await schemaStand({})).toBeUndefined()
     // eine neue Migration muss SCHEMA_ERWARTET mitziehen
     expect(readdirSync(join(__dirname, '../../../migrations')).filter((d) => d.endsWith('.sql'))).toHaveLength(SCHEMA_ERWARTET)
   })
 })
+
+/** Anfrage mit der Sitzung eines freigegebenen Admin-Kontos (Status zeigt sonst nur Google/Microsoft). */
+async function alsAdmin(db: ReturnType<typeof testDb>): Promise<Request> {
+  db.roh.prepare("INSERT INTO konten (id, anbieter, subjekt, email, name, status, rollen, erstellt_am, geaendert_am) VALUES ('a1', 'google', 'a1', 'a@example.org', 'Ada', 'freigegeben', 'admin', 'x', 'x')").run()
+  const { cookie } = await neueSitzung(db, 'a1')
+  return new Request('https://wep.example/api/v2/status', { headers: { cookie: cookie.split(';')[0] } })
+}

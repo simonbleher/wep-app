@@ -421,7 +421,13 @@ Abschnitt 10f) mit Mausrad, Maus-Ziehen und Zwei-Finger-Gesten über CDP-Touch. 
   - N10: Fehlerschlüssel.
   - N15: `azp`.
   - **Nach dem Merge:** Migration `0007_anmeldung_sicherheit.sql` einspielen, `V2_ADMINS` umstellen (docs/V2-EINRICHTUNG.md), neu freigeben. Alle Browser sind danach einmal abgemeldet.
-- V2-SICHERHEIT-C · Missbrauch/Datensparsamkeit (M6, M7, N9, N11, N13) ⬜ offen.
+- V2-SICHERHEIT-C · Missbrauch/Datensparsamkeit ✅ PR offen – Branch sicherheit/v2-missbrauch-datensparsamkeit.
+  - M6: Grenzen für Fotos je WEP, Anlegen und Abgaben je Tag, Mails je Stunde.
+  - M7: lokale Ablage je Konto (`src/server/ablage.ts`), Rückfrage beim Abmelden mit „Abmelden und Daten löschen“.
+  - N9: Status ohne Admin nur Google/Microsoft.
+  - N11: keine E-Mail-Adressen in Grün-Auswahl und Verlauf.
+  - N13: Resend-Fehler ohne Text.
+  - Durchlauf v2 prüft Kontowechsel und Löschen.
 - V2-SICHERHEIT-D · Security-Header (M4), CSP zuerst als Report-Only, scharf in einem Folge-PR ⬜ offen.
 - V2-SICHERHEIT-E · Abhängigkeiten der Windows-App (M8: zip ≥ 9, tokio ≥ 1.54.1) ⬜ offen.
 - V2-SICHERHEIT-N14 · Android: App Links (https, verifiziert) statt `de.wep.app://` für den Rücksprung der Server-Anmeldung; im Browser vor dem Rücksprung fragen „Anmeldung für die WEP-App auf diesem Gerät?“ ⬜ offen (Fund N14, niedrig).

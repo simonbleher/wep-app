@@ -16,6 +16,8 @@ import { fakeR2 } from './fakeR2'
 import type { Konto, Rolle } from '../v2/konten'
 import { adminWarnungen, kontoZurAnmeldung } from '../v2/konten'
 import { GRENZEN, zuViele } from '../v2/begrenzung'
+import { MAX_FOTOS_JE_WEP, MAX_FOTOS_OHNE_EINTRAG } from '../v2/dateien'
+import { TAGESGRENZEN } from '../v2/weps'
 import { ANMELDEFEHLER_TEXT, anmeldeFehlerText } from '../../../src/server/anmeldeFehler'
 import { onRequestPost as appToken } from '../../api/v2/anmeldung/app/token'
 import { ANMELDUNG_COOKIE, cookie, kontoDerSitzung, neueSitzung, SITZUNG_COOKIE } from '../v2/sitzung'
@@ -42,7 +44,7 @@ import { onRequestPost as zusammenfuehren } from '../../api/v2/weps/[id]/zusamme
 import { onRequestPost as zuruecknehmen } from '../../api/v2/weps/[id]/zusammenfuehren-zuruecknehmen'
 import { onRequestGet as anmeldungStart } from '../../api/v2/anmeldung/[anbieter]/start'
 import { onRequestGet as anmeldungZurueck } from '../../api/v2/anmeldung/[anbieter]/zurueck'
-import { sendeMail } from '../v2/benachrichtigungen'
+import { MAILS_JE_STUNDE, sendeMail } from '../v2/benachrichtigungen'
 
 const ORIGIN = 'https://wep-pankow.pages.dev'
 const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3])
@@ -423,20 +425,49 @@ describe('offene Funde', () => {
     expect(await zuViele(db, new Request(ORIGIN), 'token')).toBeUndefined()
   })
 
-  it.fails('Fund M6: Massen-Uploads – Fotos ohne Eintrag im WEP sind begrenzt', async () => {
+  it('Fund M6 (behoben): Massen-Uploads – Fotos ohne Eintrag im WEP und Fotos je WEP sind begrenzt', async () => {
     const { r2, k, ruf, p } = await aufbau()
-    for (let i = 0; i < 60; i++) await ruf(dateiHochladen, 'PUT', `/api/v2/weps/w1/dateien/foto-x${i}.jpg`, k.bau, { body: JPEG, params: p('w1', `foto-x${i}.jpg`) })
-    expect([...r2.daten.keys()].filter((s) => s.startsWith('weps/w1/fotos/x')).length).toBeLessThan(60)
+    const hoch = (id: string) => ruf(dateiHochladen, 'PUT', `/api/v2/weps/w1/dateien/foto-${id}.jpg`, k.bau, { body: JPEG, params: p('w1', `foto-${id}.jpg`) })
+    for (let i = 0; i < MAX_FOTOS_OHNE_EINTRAG; i++) expect((await hoch(`x${i}`)).status).toBe(200)
+    expect((await hoch('x-zuviel')).status).toBe(429)
+    expect([...r2.daten.keys()].filter((s) => s.startsWith('weps/w1/fotos/x')).length).toBe(MAX_FOTOS_OHNE_EINTRAG)
+    // Ersetzen geht weiter, Fotos aus dem WEP auch
+    expect((await hoch('x0')).status).toBe(200)
+    expect((await hoch('bf1')).status).toBe(200)
+    // Höchstzahl je WEP (auch für Fotos im WEP)
+    for (let i = 0; i < MAX_FOTOS_JE_WEP; i++) r2.daten.set(`weps/w1/fotos/v${i}.jpg`, { bytes: JPEG, zeit: new Date() })
+    expect((await hoch('gf2')).status).toBe(413)
   })
 
-  it.fails('Fund M6b: Mail-Flut – viele eigene Grün-WEPs direkt an den BV erzeugen nicht je eine Nachricht an jedes BV-Konto', async () => {
-    const { db, k, ruf, p, abgabe } = await aufbau()
-    for (let i = 0; i < 30; i++) {
-      await ruf(wepSpeichern, 'PUT', `/api/v2/weps/s${i}`, k.gruen, { params: p(`s${i}`), body: { wep: neuerWep(`s${i}`), basisRev: 0 } })
-      await abgabe(`s${i}`, k.gruen, { aktion: 'an_bv' })
+  it('Fund M6b (behoben): Mail-Flut – Abgaben an den BV je Konto und Tag begrenzt, höchstens 5 Mails je Empfänger und Stunde', async () => {
+    const { db, env, k, ruf, p, abgabe } = await aufbau()
+    const mails: string[] = []
+    env.RESEND_API_KEY = 'test'
+    env.MAIL_ABSENDER = 'WEP <wep@example.org>'
+    const original = globalThis.fetch
+    globalThis.fetch = (async (_u: unknown, init?: RequestInit) => {
+      mails.push(JSON.parse(String(init?.body)).to[0])
+      return new Response('{}')
+    }) as typeof fetch
+    try {
+      const status: number[] = []
+      for (let i = 0; i < 30; i++) {
+        await ruf(wepSpeichern, 'PUT', `/api/v2/weps/s${i}`, k.gruen, { params: p(`s${i}`), body: { wep: neuerWep(`s${i}`), basisRev: 0 } })
+        status.push((await abgabe(`s${i}`, k.gruen, { aktion: 'an_bv' })).status)
+      }
+      expect(status.filter((s) => s === 200).length).toBe(TAGESGRENZEN.an_bv)
+      expect(status.filter((s) => s === 429).length).toBe(30 - TAGESGRENZEN.an_bv)
+      const n = (await db.prepare("SELECT count(*) AS n FROM benachrichtigungen WHERE konto_id = 'bv'").first<{ n: number }>())!.n
+      expect(n).toBe(TAGESGRENZEN.an_bv)
+      expect(mails.filter((m) => m === 'bv@example.org')).toHaveLength(MAILS_JE_STUNDE)
+      const gebuendelt = (await db.prepare("SELECT count(*) AS n FROM benachrichtigungen WHERE konto_id = 'bv' AND mail = 'gebuendelt'").first<{ n: number }>())!.n
+      expect(gebuendelt).toBe(TAGESGRENZEN.an_bv - MAILS_JE_STUNDE)
+    } finally {
+      globalThis.fetch = original
     }
-    const n = (await db.prepare("SELECT count(*) AS n FROM benachrichtigungen WHERE konto_id = 'bv'").first<{ n: number }>())!.n
-    expect(n).toBeLessThan(30)
+    // Anlegen: höchstens TAGESGRENZEN.angelegt neue WEPs je Konto und Tag
+    for (let i = 0; i < TAGESGRENZEN.angelegt; i++) await ruf(wepSpeichern, 'PUT', `/api/v2/weps/n${i}`, k.bau2, { params: p(`n${i}`), body: { wep: neuerWep(`n${i}`), basisRev: 0 } })
+    expect((await ruf(wepSpeichern, 'PUT', '/api/v2/weps/n-zuviel', k.bau2, { params: p('n-zuviel'), body: { wep: neuerWep('n-zuviel'), basisRev: 0 } })).status).toBe(429)
   })
 
   it('Fund N1 (behoben): Origin-Prüfung und Sitzung lesen „Authorization“ gleich (kein Cookie-Rückfall bei ungültigem Bearer)', async () => {
@@ -521,15 +552,29 @@ describe('offene Funde', () => {
     expect((await abgabe('w1', k.bv, { aktion: 'wiederoeffnen', begruendung: 'x'.repeat(2001) })).status).toBe(400)
   })
 
-  it.fails('Fund N9: /api/v2/status verrät ohne Anmeldung nichts über die Einrichtung', async () => {
-    const r = await status({ env: { SERVER_MODUS: 'true' } })
-    expect(((await r.json()) as { einrichtung?: unknown }).einrichtung).toBeUndefined()
+  it('Fund N9 (behoben): /api/v2/status zeigt ohne Admin-Anmeldung nur, ob Google und Microsoft eingerichtet sind', async () => {
+    const { env, k, db } = await aufbau()
+    const frage = async (wer: Konto | null) => {
+      const c = wer ? (await neueSitzung(db, wer.id)).cookie.split(';')[0] : ''
+      return (await (await status({ request: new Request(`${ORIGIN}/api/v2/status`, { headers: { cookie: c } }), env })).json()) as Record<string, unknown>
+    }
+    for (const wer of [null, k.bau, k.bv]) expect(await frage(wer)).toEqual({ serverModus: true, einrichtung: { google: false, microsoft: false } })
+    const admin = await frage(k.admin)
+    expect(admin.einrichtung).toMatchObject({ datenbank: true, dateien: true, mail: false })
+    expect(admin.schema).toMatchObject({ erwartet: expect.any(Number) })
+    expect(admin.warnungen).toEqual([])
   })
 
-  it.fails('Fund N11: Die Grün-Auswahl für Bau zeigt keine E-Mail-Adressen', async () => {
-    const { k, ruf } = await aufbau()
-    const d = (await (await ruf(gruenListe, 'GET', '/api/v2/konten/gruen', k.bau)).json()) as { konten: { email?: string }[] }
+  it('Fund N11 (behoben): Grün-Auswahl, Verlauf und Ablauf zeigen keine E-Mail-Adressen', async () => {
+    const { db, k, ruf, p, abgabe } = await aufbau()
+    db.roh.prepare("UPDATE konten SET name = '' WHERE id = 'gruen'").run()
+    const d = (await (await ruf(gruenListe, 'GET', '/api/v2/konten/gruen', k.bau)).json()) as { konten: { id: string; name: string; email?: string }[] }
     expect(d.konten.every((x) => !x.email)).toBe(true)
+    expect(d.konten.find((x) => x.id === 'gruen')?.name).toBe('Konto ohne Namen')
+    await abgabe('w1', k.bau, { aktion: 'an_gruen', gruenKonto: 'gruen' })
+    const v = await (await ruf(verlauf, 'GET', '/api/v2/weps/w1/verlauf', k.gruen, { params: p('w1') })).text()
+    const w = await (await ruf(wepHolen, 'GET', '/api/v2/weps/w1', k.gruen, { params: p('w1') })).text()
+    for (const text of [v, w]) expect(text).not.toContain('gruen@example.org')
   })
 
   it('Fund N12 (behoben): Beim Zusammenführen übernimmt Grün nicht den Namen des Bau-Wertermittlers, und `felder` ist begrenzt', async () => {
@@ -568,10 +613,12 @@ describe('offene Funde', () => {
     expect(anmeldeFehlerText('__proto__')).toBe(ANMELDEFEHLER_TEXT.fehler)
   })
 
-  it.fails('Fund N13: Fehler von Resend landen ohne E-Mail-Adresse im Log', async () => {
+  it('Fund N13 (behoben): Fehler von Resend landen ohne E-Mail-Adresse im Log', async () => {
     const laden = (async () => new Response('Invalid `to` field: erika@example.org', { status: 422 })) as unknown as typeof fetch
     const fehler = await sendeMail({ RESEND_API_KEY: 'k', MAIL_ABSENDER: 'a@example.org' }, 'erika@example.org', { subject: 's', text: 't', html: 'h' }, laden).catch((e: Error) => e.message)
     expect(fehler).not.toContain('erika@example.org')
+    const mitArt = (async () => new Response(JSON.stringify({ name: 'validation_error', message: 'Invalid `to` field: erika@example.org' }), { status: 422 })) as unknown as typeof fetch
+    expect(await sendeMail({ RESEND_API_KEY: 'k', MAIL_ABSENDER: 'a@example.org' }, 'erika@example.org', { subject: 's', text: 't', html: 'h' }, mitArt).catch((e: Error) => e.message)).toBe('Resend 422 (validation_error)')
   })
 
   it.fails('Fund N14: Ein Start-Link mit fremder challenge führt nicht ohne Rückfrage zum Anbieter', async () => {

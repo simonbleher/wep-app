@@ -550,3 +550,20 @@
   - Eine WAF-Regel geht auf `*.pages.dev` ohne eigene Domain nicht.
   - Das Umstellen auf `__Host-` meldet alle Browser einmal ab; das ist bei Testdaten vertretbar.
 
+
+## 2026-10-29 · Sicherheitsprüfung v2, PR C Missbrauch/Datensparsamkeit
+
+- **Entscheidung:**
+  - Grenzen gegen Missbrauch:
+    - höchstens 300 Fotodateien je WEP, davon 50 ohne Eintrag im WEP;
+    - je Konto und 24 Stunden 50 neue WEPs und 20 Abgaben an den BV;
+    - höchstens 5 Mails je Empfänger und Stunde, der Rest nur in „Neu für dich“.
+  - Lokale Ablage je Konto: Die bisherige IndexedDB gehört dem ersten Konto nach der Umstellung (im localStorage vermerkt), jedes weitere Konto bekommt eine eigene. Beim Abmelden fragt die App, ob die Daten auf dem Gerät bleiben oder gelöscht werden.
+  - `/api/v2/status` zeigt ohne Admin nur Google/Microsoft.
+  - Grün-Auswahl, Verlauf und Ablauf zeigen keine E-Mail-Adressen.
+  - Resend-Fehler werden ohne Text protokolliert.
+- **Grund:**
+  - Funde M6, M7, N9, N11 und N13 (`docs/SICHERHEITSPRUEFUNG-V2.md`).
+  - Zuerst war eine Mail je Stunde geplant. Dann käme aber eine Rückfrage kurz nach „an dich abgegeben“ nicht mehr per Mail an (im Durchlauf gesehen); 5 je Stunde lassen den normalen Ablauf durch und begrenzen eine Flut.
+  - Vorhandene lokale Daten gehen bei der Umstellung nicht verloren.
+

@@ -210,7 +210,7 @@ describe('Ablauf auf dem Server', () => {
     const s = (await neueSitzung(db, bert.id)).cookie.split(';')[0]
     const sg = (await neueSitzung(db, erika.id)).cookie.split(';')[0]
     const liste = await gruenListe({ request: new Request('https://x.example/api/v2/konten/gruen', { headers: { cookie: s } }), env, params: {} })
-    expect((await liste.json()).konten).toEqual([{ id: 'gruen-1', name: 'Erika Musterfrau', email: 'gruen-1@example.org' }])
+    expect((await liste.json()).konten).toEqual([{ id: 'gruen-1', name: 'Erika Musterfrau' }])
     expect((await gruenListe({ request: new Request('https://x.example/api/v2/konten/gruen', { headers: { cookie: sg } }), env, params: {} })).status).toBe(403)
     const req = (origin: string) => new Request('https://x.example/api/v2/weps/w1/aktion', { method: 'POST', body: JSON.stringify({ aktion: 'an_gruen', gruenKonto: 'gruen-1', basisRev: 1 }), headers: { cookie: s, origin } })
     expect((await aktionEndpunkt({ request: req('https://evil.example'), env, params: { id: 'w1' } })).status).toBe(403)

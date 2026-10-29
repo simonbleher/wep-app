@@ -4,10 +4,13 @@
 // sicher im Gerät statt im Cookie.
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { LogIn, LogOut, RefreshCw } from 'lucide-react'
-import { ICON, Meldung } from '@/app/ui'
+import { Dialog, ICON, Meldung } from '@/app/ui'
+import { alleImPapierkorb, alleSyncMeta, alleWeps, loescheLokaleAblage, waehleLokaleAblage } from '@/app/db'
+import { aendereProfil } from '@/profil'
 import { RechtLinks } from '@/app/RechtLinks'
 import { anmeldeUrl, gemerktesKonto, istNetzFehler, ladeEinrichtung, ladeIch, merkeKonto, serverAbmelden, type Einrichtung } from './api'
 import { anmeldeFehlerText } from './anmeldeFehler'
+import { wartendeServerAenderungen } from './abgleich'
 import type { ServerKonto } from './typen'
 import type { AppAnbindung } from './app'
 import type { Anbieter } from './appAnmeldung'
@@ -46,6 +49,14 @@ function holeAnmeldeFehler(): string | undefined {
 
 export function V2Tor({ children, app }: { children: (sitzung: V2Sitzung) => ReactNode; app?: AppAnbindung }) {
   const [z, setZ] = useState<Zustand>({ art: 'lade' })
+  /** Rückfrage beim Abmelden: Daten auf diesem Gerät behalten oder löschen (Anzahl nicht abgeglichener Änderungen). */
+  const [abmeldeFrage, setAbmeldeFrage] = useState<{ offen: number }>()
+
+  /** Bereit für ein Konto: zuerst seine eigene lokale Ablage wählen (Fund M7), dann zeichnen. */
+  const bereit = useCallback((konto: ServerKonto, offline: boolean) => {
+    waehleLokaleAblage(konto.id)
+    setZ({ art: 'bereit', konto, offline })
+  }, [])
 
   const pruefe = useCallback(async () => {
     setZ({ art: 'lade' })
@@ -68,29 +79,54 @@ export function V2Tor({ children, app }: { children: (sitzung: V2Sitzung) => Rea
       if (!konto && app) await app.vergiss()
       merkeKonto(konto)
       if (!konto) setZ({ art: 'login', fehler: ANMELDEFEHLER })
-      else if (konto.status === 'freigegeben') setZ({ art: 'bereit', konto, offline: false })
+      else if (konto.status === 'freigegeben') bereit(konto, false)
       else setZ({ art: konto.status, konto })
     } catch (e) {
       const gemerkt = gemerktesKonto()
-      if (istNetzFehler(e) && gemerkt?.status === 'freigegeben') setZ({ art: 'bereit', konto: gemerkt, offline: true })
+      if (istNetzFehler(e) && gemerkt?.status === 'freigegeben') bereit(gemerkt, true)
       else setZ({ art: 'kein-netz' })
     }
-  }, [app])
+  }, [app, bereit])
 
   useEffect(() => {
     void pruefe()
   }, [pruefe])
 
+  /** Abmelden: erst fragen, ob die Daten auf diesem Gerät bleiben sollen. */
   const abmelden = useCallback(async () => {
+    let offen = 0
     try {
-      await serverAbmelden()
+      const [weps, korb, metas] = await Promise.all([alleWeps(), alleImPapierkorb(), alleSyncMeta()])
+      offen = wartendeServerAenderungen(weps, korb.map((e) => e.id), metas)
     } catch {
-      /* ohne Netz: lokal trotzdem abgemeldet; die Sitzung läuft auf dem Server ab (oder im Profil beenden) */
+      /* ohne lokale Ablage: nichts offen */
     }
-    await app?.vergiss()
-    merkeKonto(null)
-    setZ({ art: 'login' })
-  }, [app])
+    setAbmeldeFrage({ offen })
+  }, [])
+
+  const abmeldenAusfuehren = useCallback(
+    async (loeschen: boolean) => {
+      setAbmeldeFrage(undefined)
+      try {
+        await serverAbmelden()
+      } catch {
+        /* ohne Netz: lokal trotzdem abgemeldet; die Sitzung läuft auf dem Server ab (oder im Profil beenden) */
+      }
+      await app?.vergiss()
+      merkeKonto(null)
+      let fehler: string | undefined
+      if (loeschen) {
+        try {
+          await loescheLokaleAblage()
+          aendereProfil({ name: '', unterschrift: undefined, baupreisindex: undefined })
+        } catch (e) {
+          fehler = `Die Daten auf diesem Gerät ließen sich nicht ganz löschen (${e instanceof Error ? e.message : String(e)}). Bitte die App bzw. andere Tabs schließen und erneut versuchen.`
+        }
+      }
+      setZ({ art: 'login', fehler })
+    },
+    [app],
+  )
 
   if (z.art === 'lade') return <div className="app" aria-busy="true" />
   if (z.art === 'bereit')
@@ -105,6 +141,33 @@ export function V2Tor({ children, app }: { children: (sitzung: V2Sitzung) => Rea
             setZ({ art: 'bereit', konto, offline: false })
           },
         })}
+        {abmeldeFrage && (
+          <Dialog titel="Abmelden" rueckfrage onSchliessen={() => setAbmeldeFrage(undefined)}>
+            <p>
+              Deine WEPs, Fotos und Bau-Excel bleiben auf diesem Gerät, damit du nach der nächsten Anmeldung weiterarbeiten kannst. Auf einem
+              fremden oder geteilten Gerät lösche sie besser.
+            </p>
+            {abmeldeFrage.offen > 0 && (
+              <Meldung alarm>
+                <p>
+                  {abmeldeFrage.offen === 1 ? 'Eine Änderung ist' : `${abmeldeFrage.offen} Änderungen sind`} noch nicht auf dem Server. Beim Löschen
+                  gehen sie verloren.
+                </p>
+              </Meldung>
+            )}
+            <div className="dialog-knoepfe">
+              <button type="button" className="knopf" autoFocus onClick={() => setAbmeldeFrage(undefined)}>
+                Abbrechen
+              </button>
+              <button type="button" className="knopf knopf-gefahr" onClick={() => void abmeldenAusfuehren(true)}>
+                Abmelden und Daten löschen
+              </button>
+              <button type="button" className="knopf knopf-primaer" onClick={() => void abmeldenAusfuehren(false)}>
+                Nur abmelden
+              </button>
+            </div>
+          </Dialog>
+        )}
       </>
     )
   if (z.art === 'login') return <V2Anmeldung fehler={z.fehler} app={app} onAngemeldet={() => void pruefe()} />
@@ -128,7 +191,7 @@ export function V2Tor({ children, app }: { children: (sitzung: V2Sitzung) => Rea
               Erneut prüfen
             </button>
             {z.art !== 'kein-netz' && (
-              <button type="button" className="knopf" onClick={() => void abmelden()}>
+              <button type="button" className="knopf" onClick={() => void abmeldenAusfuehren(false)}>
                 <LogOut {...ICON} />
                 Abmelden
               </button>

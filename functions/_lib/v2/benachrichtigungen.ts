@@ -9,6 +9,9 @@ import { ART_TEXT, type BenachrichtigungsArt } from '../../../src/server/benachr
 
 export { ART_TEXT, type BenachrichtigungsArt }
 
+/** Höchstens so viele Mails je Empfänger und Stunde; der Rest steht nur in „Neu für dich“ (Fund M6). */
+export const MAILS_JE_STUNDE = 5
+
 interface WepAngaben {
   id: string
   vorgangsNr: string
@@ -62,7 +65,11 @@ export async function sendeMail(env: V2Umgebung, an: string, inhalt: { subject: 
     headers: { authorization: `Bearer ${env.RESEND_API_KEY}`, 'content-type': 'application/json' },
     body: JSON.stringify({ from: env.MAIL_ABSENDER, to: [an], subject: inhalt.subject, text: inhalt.text, html: inhalt.html }),
   })
-  if (!r.ok) throw new Error(`Resend ${r.status}: ${(await r.text().catch(() => '')).slice(0, 200)}`)
+  if (!r.ok) {
+    // Nur Status und Fehlerart (z. B. validation_error), nie den Text: der kann die Empfängeradresse enthalten (Fund N13)
+    const art = ((await r.json().catch(() => ({}))) as { name?: unknown }).name
+    throw new Error(`Resend ${r.status}${typeof art === 'string' && /^[a-z_]{1,50}$/.test(art) ? ` (${art})` : ''}`)
+  }
 }
 
 /**
@@ -85,6 +92,15 @@ export async function benachrichtige(
       .bind(z.kontoId, opt.wep.id, z.art, jetztIso(jetzt), opt.wep.vorgangsNr, opt.wep.anlage, opt.wep.parzelle, mailBereit && k.mail_benachrichtigung === 1 && k.email ? 'offen' : 'aus')
       .first<{ id: number }>()
     if (!r || !mailBereit || k.mail_benachrichtigung !== 1 || !k.email) continue
+    // Höchstens MAILS_JE_STUNDE Mails je Empfänger und Stunde (Fund M6); der Rest steht nur in „Neu für dich“
+    const kuerzlich = await db
+      .prepare("SELECT count(*) AS n FROM benachrichtigungen WHERE konto_id = ? AND mail = 'gesendet' AND zeit > ?")
+      .bind(z.kontoId, jetztIso(jetzt - 3600_000))
+      .first<{ n: number }>()
+    if ((kuerzlich?.n ?? 0) >= MAILS_JE_STUNDE) {
+      await db.prepare("UPDATE benachrichtigungen SET mail = 'gebuendelt' WHERE id = ?").bind(r.id).run()
+      continue
+    }
     // BV landet auf der Kontrollseite, Wertermittler in der App
     const link = `${opt.origin}${z.art === 'beim_bv' ? '/bv' : '/'}?wep=${encodeURIComponent(opt.wep.id)}`
     try {
