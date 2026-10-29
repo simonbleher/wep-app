@@ -3,7 +3,7 @@
 // übernimmt beim Abgleich (functions/_lib/v2/weps.ts, `fuehreZusammen`).
 //
 // Ergebnis ist das Bau-WEP (Kennung, Verlauf und Abgabe bleiben):
-// - Bau-Teil, Parzelle und Bau-Excel vom Bau-WEP; Grün-Teil (Positionen, Beschreibungen, Grün-Skizze, Unterschrift Grün,
+// - Bau-Teil, Parzelle und Bau-Excel vom Bau-WEP (hat Bau keine Parzelle, kommt die von Grün); Grün-Teil (Positionen, Beschreibungen, Grün-Skizze, Unterschrift Grün,
 //   Fotos an Grün-Positionen und allgemeine Fotos) aus dem eigenen WEP.
 // - Stammdaten (Formalien): Bau gilt. Unterschiede und Felder, die nur im eigenen WEP ausgefüllt sind, stehen in der
 //   Vorschau; Grün wählt je Feld den eigenen Wert (Abgleich wie bei der Bau-Excel, src/bauexcel/abgleich.ts).
@@ -87,8 +87,16 @@ function bauGrundlage(bau: Wep): GrundlageQuelle | undefined {
   return undefined
 }
 
+/** Hinweis, wenn die Parzelle aus dem Grün-WEP kommt (das Bau-WEP hat keine). */
+export const PARZELLE_VON_GRUEN = 'Parzelle von Grün übernommen – bitte mit Bau abstimmen.'
+
+/** Parzelle des Ergebnisses: die von Bau; hat Bau keine, die von Grün. */
+export const parzelleZusammen = (bau: Wep, gruen: Wep): Wep['parzelle'] => bau.parzelle ?? gruen.parzelle
+
 /** Grün-Skizze auf der Bau-Grundlage und die Hinweise dazu. */
-export function skizzeZusammen(bau: Wep, gruen: Wep, jetzt: string): { skizze?: SkizzeDaten; hinweise: string[] } {
+export function skizzeZusammen(bauWep: Wep, gruen: Wep, jetzt: string): { skizze?: SkizzeDaten; hinweise: string[] } {
+  // Grundlage mit der Parzelle des Ergebnisses (ggf. die von Grün)
+  const bau: Wep = { ...bauWep, parzelle: parzelleZusammen(bauWep, gruen) }
   const g = gruen.skizze
   if (!g) return { hinweise: [] }
   const hinweise: string[] = []
@@ -113,7 +121,7 @@ export function vorschau(bau: Wep, gruen: Wep, jetzt = new Date().toISOString())
   if (gruen.parzelle && bau.parzelle && stabil(gruen.parzelle) !== stabil(bau.parzelle)) {
     hinweise.push('Die Parzelle (Form) unterscheidet sich: Die Parzelle des Bau-WEP gilt, deine Grün-Elemente behalten ihre Lage in Metern.')
   } else if (gruen.parzelle && !bau.parzelle) {
-    hinweise.push('Im Bau-WEP ist keine Parzelle angelegt; deine Parzelle wird nicht übernommen (sie gehört zum Bau-Teil).')
+    hinweise.push(PARZELLE_VON_GRUEN)
   }
   hinweise.push(...skizzeZusammen(bau, gruen, jetzt).hinweise)
   return {
@@ -146,6 +154,8 @@ export function fuehreZusammen(bau: Wep, gruen: Wep, felder: readonly (keyof For
   const unterschriften = Object.fromEntries(Object.entries({ bau: bau.unterschriften?.bau, gruen: gruen.unterschriften?.gruen }).filter(([, v]) => v)) as Wep['unterschriften']
   const { skizze } = skizzeZusammen(bau, gruen, jetzt)
   const neu: Wep = { ...bau, formalien: formalien as unknown as Formalien, gruen: gruen.gruen }
+  const parzelle = parzelleZusammen(bau, gruen)
+  if (parzelle) neu.parzelle = parzelle
   if (skizze) neu.skizze = skizze
   else delete neu.skizze
   if (fotos.length) neu.fotos = fotos

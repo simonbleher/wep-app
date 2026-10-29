@@ -128,4 +128,18 @@ describe('Ergebnis', () => {
     expect(neu.parzelle).toEqual(b.parzelle)
     expect(neu.skizze?.grundlage?.quelle).toBe('bau')
   })
+
+  it('Parzelle: hat das Bau-WEP keine, kommt die von Grün – mit Hinweis „bitte mit Bau abstimmen“; die Skizze liegt darauf', () => {
+    const b = bauWep()
+    delete b.grundriss
+    const g = gruenWep()
+    g.parzelle = { form: 'rechteck', laenge: 25, breite: 12 }
+    expect(vorschau(b, g, JETZT).hinweise).toContain('Parzelle von Grün übernommen – bitte mit Bau abstimmen.')
+    const neu = fuehreZusammen(b, g, [], JETZT)
+    expect(neu.parzelle).toEqual(g.parzelle)
+    expect(neu.skizze?.grundlage?.quelle).toBe('parzelle')
+    expect(neu.skizze?.massstab).toBeDefined()
+    // weder Bau noch Grün haben eine: keine
+    expect(fuehreZusammen(bauWep(), gruenWep(), [], JETZT).parzelle).toBeUndefined()
+  })
 })

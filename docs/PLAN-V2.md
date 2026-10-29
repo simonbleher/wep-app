@@ -73,7 +73,8 @@ Wie in v1 kann Grün auch ohne Bau ein WEP anlegen. Ablauf:
    Auswahl aus allen eigenen offenen WEPs) oder **ohne eigenes WEP weiterarbeiten** (wie bisher).
 5. Zusammenführen:
    - Ergebnis ist das Bau-WEP (Kennung, Verlauf und Abgabe bleiben), Zustand weiter `gruen_in_arbeit`.
-   - Bau-Teil, Parzelle, Bau-Excel vom Bau-WEP; Grün-Teil, Grün-Skizze, Unterschrift Grün, Fotos an Grün-Positionen und
+   - Bau-Teil, Parzelle, Bau-Excel vom Bau-WEP (hat das Bau-WEP keine Parzelle, kommt die von Grün – Hinweis „Parzelle von
+     Grün übernommen – bitte mit Bau abstimmen“); Grün-Teil, Grün-Skizze, Unterschrift Grün, Fotos an Grün-Positionen und
      allgemeine Fotos aus dem Grün-WEP (Fotodateien kopiert der Server in R2).
    - Stammdaten: Bau gilt. Unterschiede und im Bau-WEP leere Felder zeigt die Vorschau; Grün übernimmt je Feld den eigenen
      Wert (leere Felder und der eigene Name als Grün-Wertermittler sind vorgewählt). Nur Hinweise, nichts gesperrt.

@@ -155,6 +155,27 @@ describe('Zusammenführen auf dem Server', () => {
     expect((await lesbareWeps(db, bea)).map((w) => w.id)).toEqual(['w-bau'])
   })
 
+  it('Parzelle: ohne Parzelle im Bau-WEP gilt die aus dem Grün-WEP (Stand des Servers), sonst die von Bau', async () => {
+    const { db, erika } = await aufbau()
+    const gruen = await serverWep(db, erika, 'w-gruen')
+    const parzelle = { form: 'rechteck' as const, laenge: 25, breite: 12 }
+    await speichereWep(db, erika, 'w-gruen', { wep: { ...gruen, parzelle }, basisRev: 1 })
+    const bau = await serverWep(db, erika, 'w-bau')
+    // die App schickt eine andere Parzelle mit – der Server nimmt die aus seinem Grün-WEP
+    const app = { ...zusammengefuehrtInApp(bau, gruen), parzelle: { form: 'rechteck' as const, laenge: 99, breite: 99 } }
+    expect(await fuehreZusammen(db, erika, 'w-bau', { aus: 'w-gruen', wep: app, basisRev: 2 })).toMatchObject({ ok: true })
+    expect((await serverWep(db, erika, 'w-bau')).parzelle).toEqual(parzelle)
+    // Rückgängig: wieder ohne Parzelle
+    await nimmZusammenfuehrungZurueck(db, erika, 'w-bau', { basisRev: 3 })
+    expect((await serverWep(db, erika, 'w-bau')).parzelle).toBeUndefined()
+    // hat Bau eine Parzelle, gilt sie
+    const bauParzelle = { form: 'rechteck' as const, laenge: 20, breite: 10 }
+    db.roh.prepare("UPDATE weps SET daten = json_set(daten, '$.parzelle', json(?)) WHERE id = 'w-bau'").run(JSON.stringify(bauParzelle))
+    const mitBau = await serverWep(db, erika, 'w-bau')
+    expect(await fuehreZusammen(db, erika, 'w-bau', { aus: 'w-gruen', wep: zusammengefuehrtInApp(mitBau, gruen), basisRev: 4 })).toMatchObject({ ok: true })
+    expect((await serverWep(db, erika, 'w-bau')).parzelle).toEqual(bauParzelle)
+  })
+
   it('Weg b: ohne eigenes WEP weiterarbeiten – Grün füllt den Grün-Teil im Bau-WEP (wie bisher)', async () => {
     const { db, erika } = await aufbau()
     const bau = await serverWep(db, erika, 'w-bau')

@@ -93,12 +93,15 @@ export function mitEigenemTeil(server: Wep | undefined, app: Wep, recht: Exclude
  * Zusammenführen auf dem Server (eigenes Grün-WEP → abgegebenes Bau-WEP): Der Bau-Teil bleibt, wie er auf dem Server
  * steht; den Grün-Teil (Positionen, Grün-Skizze, Unterschrift Grün, Fotos zum Grün-Teil und neue Fotos) hat die App aus
  * dem eigenen WEP übernommen. Stammdaten gelten vom Bau-WEP – nur die Felder in `felder` (von Grün gewählt) kommen aus
- * dem eigenen WEP, und zwar mit dem Wert, den der Server dort kennt.
+ * dem eigenen WEP, und zwar mit dem Wert, den der Server dort kennt. Die Parzelle (Form) kommt vom Bau-WEP; hat es keine,
+ * die aus dem Grün-WEP.
  */
 export function zusammenfuehrungAufServer(bau: Wep, gruen: Wep, app: Wep, felder: readonly string[]): Wep {
   const neu = mitEigenemTeil(bau, app, 'gruen')
   const formalien = { ...neu.formalien } as unknown as Record<string, unknown>
   const quelle = gruen.formalien as unknown as Record<string, unknown>
   for (const f of felder) if (Object.prototype.hasOwnProperty.call(formalien, f) && quelle[f] !== undefined) formalien[f] = quelle[f]
-  return { ...neu, formalien: formalien as unknown as Wep['formalien'] }
+  // Hat das Bau-WEP keine Parzelle (Form), gilt die aus dem Grün-WEP (Wert vom Server); sonst die von Bau
+  const parzelle = bau.parzelle ?? gruen.parzelle
+  return { ...neu, formalien: formalien as unknown as Wep['formalien'], ...(parzelle ? { parzelle } : {}) }
 }
