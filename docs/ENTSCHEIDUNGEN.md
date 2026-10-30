@@ -520,3 +520,18 @@
 
 - **Entscheidung:** Für Bilddateien in R2 gilt dieselbe Grenze zwischen Bau- und Grün-Teil wie beim Speichern des WEP-JSON (`fotoTeil` in `src/server/teile.ts`). Sind beide beteiligt, darf niemand die Datei eines Fotos des anderen Teils überschreiben oder löschen. Erlaubt ist nur, eine noch fehlende Datei hochzuladen (z. B. ein neues Foto ohne Position, das Grün hinzufügt und das danach zum Bau-Teil zählt). Offene Funde aus der Prüfung stehen als `it.fails`-Tests im Repo, damit eine Behebung auffällt.
 - **Grund:** Grün konnte Bau-Fotos austauschen oder entfernen, obwohl der Server Änderungen am Bau-Teil sonst ablehnt (Fund H1, `docs/SICHERHEITSPRUEFUNG-V2.md`). Der App-Abgleich lädt Dateien erst nach dem WEP hoch; ohne die Ausnahme „fehlende Datei“ könnte Grün eigene neue Fotos ohne Position nicht mehr hochladen.
+
+
+## 2026-10-29 · Sicherheitsprüfung v2: Entscheidungen zu den Funden, PR A Rechte/Eingaben
+
+- **Entscheidung:**
+  - M1 bleibt bewusst erlaubt: Ein Konto mit BV-Rolle darf auch ein WEP prüfen, an dem es selbst als Bau oder Grün beteiligt ist (kein Vier-Augen-Zwang).
+  - WEPs werden beim Speichern und Zusammenführen auf ihre Form geprüft (`functions/_lib/v2/form.ts`): Teile, die da sind, müssen die richtige Art haben. Fehlende Teile bleiben erlaubt, Inhalte bleiben frei.
+  - Neue WEPs legt der Server nur mit einer nicht erratbaren Kennung an: keine alten Kennungen „2026-007“ und nur `[A-Za-z0-9_-]{1,64}`. Die App vergibt alten WEPs vor dem ersten Hochladen eine UUID; die Vorgangs-Nr. bleibt, Fotos und Bau-Excel ziehen mit.
+  - Notiz, Begründung und Notiz zu „geprüft“ haben höchstens 2000 Zeichen.
+  - Beim Zusammenführen übernimmt Grün die Felder des Bau-Teils in den Formalien (`BAU_FORMALIEN`: Name des Bau-Wertermittlers) nie aus dem eigenen WEP.
+- **Grund:**
+  - M1: Die BV-Revision legt keine eigenen WEPs an, und zum Testen soll ein Konto alle Rollen durchspielen können.
+  - Die übrigen Punkte beheben die Funde M2, N4, N7, N8 und N12 aus `docs/SICHERHEITSPRUEFUNG-V2.md`.
+  - Alte Kennungen werden umnummeriert statt abgelehnt, damit v1-WEPs im Browser und eingespielte Sicherungen weiter auf den Server kommen.
+

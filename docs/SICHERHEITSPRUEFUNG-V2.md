@@ -1,9 +1,9 @@
 # Sicherheitsprüfung v2 (Server-Modus)
 
-Stand 29.10.2026, Branch `claude/sicherheit-pruefung-v2-h2x461`. Unabhängige Prüfung von `functions/` (v2), `src/server/`,
+Stand 29.10.2026 (Prüfung in #125; Behebung siehe „Stand der Behebung“). Unabhängige Prüfung von `functions/` (v2), `src/server/`,
 `src-tauri/src/` und `android/…/WepNative*`/`ServerTokenStore`. Geprüft wurde **nur lokal**: Functions mit SQLite statt D1 und
 einem R2-Ersatz im Arbeitsspeicher (wie `tools/v2/umgebung.ts`), dazu Unit-Tests. `https://wep-pankow.pages.dev` wurde nicht
-angefasst. Alle Testdaten sind erfunden. Zeilenangaben beziehen sich auf den Stand dieses Branches.
+angefasst. Alle Testdaten sind erfunden. Zeilenangaben in der Fundtabelle beziehen sich auf den Stand von #125.
 
 **Tests zu den Funden:** `functions/_lib/__tests__/v2Sicherheit.test.ts` und `src/server/kontowechsel.test.ts`.
 Behobene Funde haben normale Tests. Offene Funde stehen als `it.fails`: Der Test beschreibt das **sichere** Verhalten und
@@ -15,9 +15,41 @@ dann `it.fails` zu `it` machen.
 | Schwere | Anzahl | Stand |
 |---|---|---|
 | kritisch | 0 | – |
-| hoch | 1 | H1 behoben (dieser PR) |
-| mittel | 8 | Vorschlag, Simon entscheidet |
-| niedrig | 15 | Vorschlag, Simon entscheidet |
+| hoch | 1 | H1 behoben (#125) |
+| mittel | 8 | Entscheidungen von Simon vom 29.10.2026, siehe „Stand der Behebung“ |
+| niedrig | 15 | Entscheidungen von Simon vom 29.10.2026, siehe „Stand der Behebung“ |
+
+## Stand der Behebung
+
+Simon hat am 29.10.2026 entschieden. Die Behebung läuft in fünf PRs nacheinander auf `main`: A Rechte/Eingaben,
+B Anmeldung/Sitzung, C Missbrauch/Datensparsamkeit, D Header, E Abhängigkeiten.
+
+| Nr. | Stand | Wo |
+|---|---|---|
+| H1 | ✅ behoben | #125 |
+| M1 | ☑️ bewusst akzeptiert: Die BV-Revision legt keine eigenen WEPs an, und zum Testen soll ein Konto alle Rollen durchspielen können. Der Test hält das Verhalten fest. | Entscheidung 29.10.2026 |
+| M2 | ✅ behoben: schlanke Formprüfung (`functions/_lib/v2/form.ts`) beim Speichern und Zusammenführen, 400 statt 500 | PR A |
+| M3 | geplant | PR B |
+| M4 | geplant (CSP zuerst als Report-Only) | PR D |
+| M5 | geplant (Begrenzung im Code, WAF geht auf `*.pages.dev` nicht) | PR B |
+| M6 | geplant | PR C |
+| M7 | geplant | PR C |
+| M8 | geplant | PR E |
+| N1 | geplant | PR B |
+| N2 | geplant | PR B |
+| N3 | geplant | PR B |
+| N4 | ✅ behoben: Dateirechte mit denselben Rückfrage-Feldern wie das WEP (`rechteKopf`). Die Teile-Grenze aus H1 gilt damit auch bei der Rückfrage. | PR A |
+| N5 | geplant | PR B |
+| N6 | geplant | PR B |
+| N7 | ✅ behoben: Der Server legt keine neuen WEPs mit alter Kennung („2026-007“) oder ungültiger Kennung an. Die App vergibt solchen WEPs vor dem ersten Hochladen eine UUID (Vorgangs-Nr., Fotos und Bau-Excel ziehen mit). | PR A |
+| N8 | ✅ behoben: Notiz, Begründung und Notiz zu „geprüft“ höchstens 2000 Zeichen (`MAX_NOTIZ`, auch als `maxLength` auf der Kontrollseite). `felder` beim Zusammenführen nur bekannte Formalien-Felder. | PR A |
+| N9 | geplant | PR C |
+| N10 | geplant | PR B |
+| N11 | geplant | PR C |
+| N12 | ✅ behoben: `BAU_FORMALIEN` (`wertermittlerBaulichkeiten`) wird beim Zusammenführen nie aus dem Grün-WEP übernommen, weder auf dem Server noch in der App-Vorschau | PR A |
+| N13 | geplant | PR C |
+| N14 | offen, als Aufgabe in TASKS.md (App Links) | – |
+| N15 | geplant | PR B |
 
 ## Funde
 
@@ -127,9 +159,9 @@ Verfügbarkeit/Datenschutz · **niedrig** = Härtung, kaum ausnutzbar.
 
 ## Offene Fragen an Simon
 
-1. **M1:** Soll ein BV-Konto, das selbst Bau oder Grün an einem WEP ist, dieses WEP prüfen dürfen?
-2. **N12:** Sollen beim Zusammenführen Felder des Bau-Teils (Name des Bau-Wertermittlers) aus dem Grün-WEP übernommen werden dürfen?
-3. **M3:** Welche Adressen stehen in `V2_ADMINS`, und mit welchem Anbieter melden sich diese Personen an? Danach richtet sich, wie streng die Prüfung sein muss.
-4. **M7:** Werden Geräte von mehreren Personen genutzt (Vereins-Tablet)? Dann sollte die lokale Ablage je Konto getrennt werden.
-5. **M5:** Ist das Cloudflare-Konto im kostenlosen Tarif? Dann ist die Rate-Limiting-Regel (WAF) vor echten Daten wichtig.
-6. **H1, Restrisiko:** Hat Bau ein Foto ins WEP aufgenommen, die Datei aber noch nicht hochgeladen (offline), kann Grün die fehlende Datei zuerst hochladen. Danach kann Bau sie nicht mehr ersetzen, weil Bau nach der Abgabe gesperrt ist. Reicht das, oder soll der Server sich merken, wer eine Datei hochgeladen hat?
+1. ~~**M1:** Soll ein BV-Konto, das selbst Bau oder Grün an einem WEP ist, dieses WEP prüfen dürfen?~~ Ja, bewusst erlaubt (29.10.2026).
+2. ~~**N12:** Sollen beim Zusammenführen Felder des Bau-Teils (Name des Bau-Wertermittlers) aus dem Grün-WEP übernommen werden dürfen?~~ Nein, sie werden ausgenommen (PR A).
+3. ~~**M3:** Welche Adressen stehen in `V2_ADMINS`?~~ Künftig mit Anbieter-Präfix (PR B).
+4. ~~**M7:** Werden Geräte geteilt?~~ Lokale Ablage wird je Konto getrennt (PR C).
+5. ~~**M5:** WAF-Regel?~~ Geht auf `*.pages.dev` nicht; Begrenzung im Code (PR B).
+6. **H1, Restrisiko:** Hat Bau ein Foto ins WEP aufgenommen, die Datei aber noch nicht hochgeladen (offline), kann Grün die fehlende Datei zuerst hochladen. Danach kann Bau sie nicht mehr ersetzen, weil Bau nach der Abgabe gesperrt ist. Reicht das, oder soll der Server sich merken, wer eine Datei hochgeladen hat? **Bleibt so (29.10.2026).**

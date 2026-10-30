@@ -143,3 +143,19 @@ describe('Ergebnis', () => {
     expect(fuehreZusammen(bauWep(), gruenWep(), [], JETZT).parzelle).toBeUndefined()
   })
 })
+
+describe('Felder des Bau-Teils (Sicherheitsprüfung N12)', () => {
+  it('die Vorschau bietet den Namen des Bau-Wertermittlers nicht an, und das Zusammenführen übernimmt ihn nie', () => {
+    const bau = neuerWep('bau-n12')
+    bau.formalien.wertermittlerBaulichkeiten = 'Bert Bauer'
+    const gruen = neuerWep('gruen-n12')
+    gruen.formalien.wertermittlerBaulichkeiten = 'Falscher Name'
+    gruen.formalien.auftraggeber = 'Gartenfreunde e. V.'
+    const v = vorschau(bau, gruen)
+    expect(v.stammdaten.map((f) => f.feld)).not.toContain('wertermittlerBaulichkeiten')
+    expect(v.stammdaten.map((f) => f.feld)).toContain('auftraggeber')
+    const erg = fuehreZusammen(bau, gruen, ['wertermittlerBaulichkeiten', 'auftraggeber'])
+    expect(erg.formalien.wertermittlerBaulichkeiten).toBe('Bert Bauer')
+    expect(erg.formalien.auftraggeber).toBe('Gartenfreunde e. V.')
+  })
+})

@@ -1,6 +1,7 @@
 // Server-Modus (v2): Abgleich der App mit dem Server – HTTP-Zugriff auf /api/v2/weps, danach Fotos und Bau-Excel,
 // Papierkorb-Aufräumen wie in v1, nie zwei Abgleiche gleichzeitig. Die Regeln stehen in ./abgleich.ts.
 import type { Wep } from '@/model'
+import { kopiereBauExcelLokal, kopiereFotosLokal } from '@/app/db'
 import { fotoUploadErlaubt } from '@/fotos/netz'
 import { raeumePapierkorbAuf } from '@/sync/aktionen'
 import { offeneBauExcel } from '@/sync/bauExcel'
@@ -42,7 +43,14 @@ export function jetztMitServerAbgleichen(): Promise<SyncErgebnis> {
     laufend = (async () => {
       if (!navigator.onLine) throw new Error('Keine Internetverbindung – Änderungen warten.')
       await raeumePapierkorbAuf()
-      const erg = await serverAbgleich({ server: httpZugriff, lokal: syncSpeicher })
+      const erg = await serverAbgleich({
+        server: httpZugriff,
+        lokal: syncSpeicher,
+        vorUmnummerieren: async (von, nach) => {
+          await kopiereFotosLokal(von, nach)
+          await kopiereBauExcelLokal(von, nach)
+        },
+      })
       // Fotos und Bau-Excel nach den WEPs: hochgeladen wird erst, wenn das WEP auf dem Server ist
       try {
         const d = await serverDateienAbgleichen({ server: httpDateien, lokal: syncSpeicher, fotos: fotoSpeicher, bau: bauSpeicher, uploadErlaubt: fotoUploadErlaubt })
