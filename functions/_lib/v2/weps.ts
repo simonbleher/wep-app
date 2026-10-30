@@ -15,7 +15,8 @@ import {
   type WepKopf,
   type Zustand,
 } from '../../../src/server/rechte'
-import { mitEigenemTeil, ohneServerFelder, zusammenfuehrungAufServer } from '../../../src/server/teile'
+import { BAU_FORMALIEN, mitEigenemTeil, ohneServerFelder, zusammenfuehrungAufServer } from '../../../src/server/teile'
+import { wepFormFehler } from './form'
 import { jetztIso, type Db } from './db'
 import type { Konto } from './konten'
 
@@ -77,7 +78,7 @@ export const kopfVon = (z: WepZeile): ServerWepKopf => ({
   ...(z.geloescht_am ? { geloeschtAm: z.geloescht_am } : {}),
 })
 
-const rechteKopf = (z: WepZeile): WepKopf => ({
+export const rechteKopf = (z: WepZeile): WepKopf => ({
   zustand: z.zustand,
   bauKonto: z.bau_konto,
   gruenKonto: z.gruen_konto,
@@ -88,14 +89,33 @@ const rechteKopf = (z: WepZeile): WepKopf => ({
   zusammengefuehrtAus: z.zusammengefuehrt_aus,
 })
 
+/**
+ * Tagesgrenzen je Konto (Fund M6): so viele neue WEPs bzw. Abgaben an den BV in 24 Stunden. Großzügig für die Arbeit
+ * auf der Parzelle, aber kein Massen-Anlegen und keine Mail-Flut an alle BV-Konten.
+ */
+export const TAGESGRENZEN = { angelegt: 50, an_bv: 20 } as const
+
+/** Wie oft hat das Konto diese Aktion in den letzten 24 Stunden im Verlauf? */
+async function heuteSchon(db: Db, kontoId: string, aktion: keyof typeof TAGESGRENZEN, jetzt: number): Promise<number> {
+  const z = await db
+    .prepare('SELECT count(*) AS n FROM verlauf WHERE konto_id = ? AND aktion = ? AND zeit > ?')
+    .bind(kontoId, aktion, jetztIso(jetzt - 86_400_000))
+    .first<{ n: number }>()
+  return z?.n ?? 0
+}
+
+/** Anzeige für ein Konto ohne Namen (statt der E-Mail-Adresse). */
+export const OHNE_NAMEN = 'Konto ohne Namen'
+
 async function namen(db: Db, ids: (string | null)[]): Promise<Map<string, string>> {
   const liste = [...new Set(ids.filter((i): i is string => Boolean(i)))]
   if (!liste.length) return new Map()
   const { results } = await db
-    .prepare(`SELECT id, name, email FROM konten WHERE id IN (${liste.map(() => '?').join(',')})`)
+    .prepare(`SELECT id, name FROM konten WHERE id IN (${liste.map(() => '?').join(',')})`)
     .bind(...liste)
-    .all<{ id: string; name: string; email: string }>()
-  return new Map(results.map((k) => [k.id, k.name || k.email]))
+    .all<{ id: string; name: string }>()
+  // Nur der Name, nie die Adresse (Fund N11)
+  return new Map(results.map((k) => [k.id, k.name || OHNE_NAMEN]))
 }
 
 /** Ablauf, wie ihn die App im WEP sieht (Zustand, Beteiligte mit Namen, offene Rückfrage). */
@@ -160,6 +180,10 @@ interface WepFormalien {
   formalien?: { vorgangsNr?: unknown; kleingartenanlage?: unknown; parzelle?: unknown }
 }
 
+/** Erlaubte Kennung (auch Ordner in R2) und alte, erratbare Kennung aus v1 („2026-007“, wie `istAlteKennung`). */
+const KENNUNG = /^[A-Za-z0-9_-]{1,64}$/
+const ALTE_KENNUNG = /^\d{4}-\d+$/
+
 const text = (v: unknown, max = 200) => (typeof v === 'string' ? v.trim().slice(0, max) : '')
 
 export async function verlauf(db: Db, eintrag: { wepId: string; kontoId: string; aktion: string; notiz?: string; vorher?: Zustand; nachher?: Zustand }, jetzt = Date.now()) {
@@ -185,16 +209,24 @@ async function merkeBearbeitung(db: Db, wepId: string, kontoId: string, jetzt: n
 export async function speichereWep(db: Db, konto: Konto, id: string, eingabe: { wep?: unknown; basisRev?: unknown }, jetzt = Date.now()): Promise<Ergebnis<ServerWepKopf>> {
   const roh = eingabe.wep as WepFormalien | undefined
   if (!roh || typeof roh !== 'object' || roh.id !== id) return fehler(400, 'WEP fehlt oder passt nicht zur Adresse.')
+  const form = wepFormFehler(roh)
+  if (form) return fehler(400, form)
   const appWep = ohneServerFelder(roh as unknown as Wep)
   const zeit = jetztIso(jetzt)
   const z = await ladeZeile(db, id)
 
   if (!z) {
+    // Neue WEPs nur mit einer nicht erratbaren Kennung: alte Kennungen („2026-007“) könnte ein anderes Konto vorab belegen
+    // (Fund N7). Die App vergibt solchen WEPs vor dem ersten Hochladen eine neue Kennung (src/server/abgleich.ts).
+    if (!KENNUNG.test(id) || ALTE_KENNUNG.test(id)) return fehler(400, 'Neue WEPs brauchen eine neue Kennung (UUID) – bitte die App aktualisieren.')
     const daten = JSON.stringify(appWep)
     if (new TextEncoder().encode(daten).length > MAX_WEP_BYTES) return fehler(413, 'Das WEP ist zu groß für den Server (Unterschriften oder Skizzen verkleinern).')
     const spalten = spaltenVon(appWep)
     const neu = neuerKopf(konto)
     if (!neu) return fehler(403, 'Neue WEPs legen die Wertermittler Bau und Grün an.')
+    if ((await heuteSchon(db, konto.id, 'angelegt', jetzt)) >= TAGESGRENZEN.angelegt) {
+      return fehler(429, `Heute schon ${TAGESGRENZEN.angelegt} neue WEPs angelegt – mehr geht erst morgen wieder.`)
+    }
     await db
       .prepare(
         'INSERT INTO weps (id, rev, daten, zustand, bau_konto, gruen_konto, vorgangs_nr, anlage, parzelle, erstellt_am, erstellt_von, geaendert_am, geaendert_von) VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -256,15 +288,15 @@ export async function ladeVerlauf(db: Db, konto: Konto, id: string): Promise<Erg
   const z = await ladeZeile(db, id)
   if (!z || !darfLesen(rechteKopf(z), konto)) return fehler(404, 'WEP nicht gefunden.')
   const { results } = await db
-    .prepare('SELECT v.*, k.name AS name, k.email AS email FROM verlauf v LEFT JOIN konten k ON k.id = v.konto_id WHERE v.wep_id = ? ORDER BY v.id')
+    .prepare('SELECT v.*, k.id AS konto, k.name AS name FROM verlauf v LEFT JOIN konten k ON k.id = v.konto_id WHERE v.wep_id = ? ORDER BY v.id')
     .bind(id)
-    .all<{ zeit: string; aktion: string; notiz: string | null; zustand_vorher: Zustand | null; zustand_nachher: Zustand | null; name: string | null; email: string | null }>()
+    .all<{ zeit: string; aktion: string; notiz: string | null; zustand_vorher: Zustand | null; zustand_nachher: Zustand | null; konto: string | null; name: string | null }>()
   return {
     ok: true,
     wert: results.map((v) => ({
       zeit: v.zeit,
       aktion: v.aktion,
-      wer: v.name || v.email || 'gelöschtes Konto',
+      wer: v.konto ? v.name || OHNE_NAMEN : 'gelöschtes Konto',
       ...(v.notiz ? { notiz: v.notiz } : {}),
       ...(v.zustand_vorher ? { zustandVorher: v.zustand_vorher } : {}),
       ...(v.zustand_nachher ? { zustandNachher: v.zustand_nachher } : {}),
@@ -272,12 +304,12 @@ export async function ladeVerlauf(db: Db, konto: Konto, id: string): Promise<Erg
   }
 }
 
-/** Freigegebene Grün-Wertermittler (Auswahl bei der Abgabe Bau → Grün). */
-export async function gruenKonten(db: Db): Promise<{ id: string; name: string; email: string }[]> {
+/** Freigegebene Grün-Wertermittler (Auswahl bei der Abgabe Bau → Grün): nur Name, keine Adresse (Fund N11). */
+export async function gruenKonten(db: Db): Promise<{ id: string; name: string }[]> {
   const { results } = await db
-    .prepare("SELECT id, name, email, rollen FROM konten WHERE status = 'freigegeben' ORDER BY name COLLATE NOCASE")
-    .all<{ id: string; name: string; email: string; rollen: string }>()
-  return results.filter((k) => k.rollen.split(',').includes('gruen')).map(({ id, name, email }) => ({ id, name, email }))
+    .prepare("SELECT id, name, rollen FROM konten WHERE status = 'freigegeben' ORDER BY name COLLATE NOCASE")
+    .all<{ id: string; name: string; rollen: string }>()
+  return results.filter((k) => k.rollen.split(',').includes('gruen')).map(({ id, name }) => ({ id, name: name || OHNE_NAMEN }))
 }
 
 /**
@@ -306,13 +338,17 @@ export async function fuehreAktionAus(
   if (!aktion || typeof aktion.aktion !== 'string' || !(aktion.aktion in AKTION_TEXT)) return fehler(400, 'Unbekannter Schritt.')
   const erg = wendeAn(rechteKopf(z), konto, aktion, aktion.aktion === 'an_gruen' ? (await gruenKonten(db)).map((k) => k.id) : [])
   if (!erg.ok) return erg.status === 403 ? fehlerMitStand(db, 403, erg.fehler, z) : fehler(erg.status, erg.fehler)
+  if (aktion.aktion === 'an_bv' && (await heuteSchon(db, konto.id, 'an_bv', jetzt)) >= TAGESGRENZEN.an_bv) {
+    return fehler(429, `Heute schon ${TAGESGRENZEN.an_bv} WEPs an den BV abgegeben – mehr geht erst morgen wieder.`)
+  }
   const k = erg.kopf
   const zeit = jetztIso(jetzt)
   let daten = z.daten
   if (aktion.aktion === 'an_bv' && !z.bau_konto) {
     // Eigenes Grün-WEP ohne Bau: der Name des Grün-Wertermittlers steht in den Formalien (Zelle E13)
     const w = JSON.parse(z.daten) as Wep
-    if (!w.formalien.wertermittlerAussenAufwuchs?.trim()) {
+    w.formalien = w.formalien ?? ({} as Wep['formalien'])
+    if (typeof w.formalien.wertermittlerAussenAufwuchs !== 'string' || !w.formalien.wertermittlerAussenAufwuchs.trim()) {
       const n = await namen(db, [z.gruen_konto])
       w.formalien = { ...w.formalien, wertermittlerAussenAufwuchs: n.get(z.gruen_konto ?? '') ?? '' }
       daten = JSON.stringify(w)
@@ -322,11 +358,13 @@ export async function fuehreAktionAus(
     // Ab jetzt hat das WEP beide Teile; die Namen der Wertermittler stehen in den Formalien (Zellen E12/E13)
     const w = JSON.parse(z.daten) as Wep
     const n = await namen(db, [k.bauKonto ?? null, k.gruenKonto ?? null])
+    const f = w.formalien ?? ({} as Wep['formalien'])
+    const t = (v: unknown) => (typeof v === 'string' ? v.trim() : '')
     w.rolle = 'beides'
     w.formalien = {
-      ...w.formalien,
-      wertermittlerBaulichkeiten: w.formalien.wertermittlerBaulichkeiten?.trim() || n.get(k.bauKonto ?? '') || '',
-      wertermittlerAussenAufwuchs: w.formalien.wertermittlerAussenAufwuchs?.trim() || n.get(k.gruenKonto ?? '') || '',
+      ...f,
+      wertermittlerBaulichkeiten: t(f.wertermittlerBaulichkeiten) || n.get(k.bauKonto ?? '') || '',
+      wertermittlerAussenAufwuchs: t(f.wertermittlerAussenAufwuchs) || n.get(k.gruenKonto ?? '') || '',
     }
     daten = JSON.stringify(w)
   }
@@ -384,7 +422,13 @@ export async function fuehreZusammen(
   if (eingabe.basisRev !== z.rev) return fehlerMitStand(db, 409, 'Das Bau-WEP wurde inzwischen geändert.', z)
   const roh = eingabe.wep as Wep | undefined
   if (!roh || typeof roh !== 'object' || roh.id !== bauId) return fehler(400, 'Das zusammengeführte WEP fehlt oder passt nicht zur Adresse.')
-  const felder = Array.isArray(eingabe.felder) ? eingabe.felder.filter((f): f is string => typeof f === 'string') : []
+  const form = wepFormFehler(roh)
+  if (form) return fehler(400, form)
+  // Nur Felder der Formalien, die es im Bau-WEP gibt, nie die des Bau-Teils (N12) und nicht beliebig viele (N8)
+  const bekannt = Object.keys((JSON.parse(z.daten) as Wep).formalien ?? {})
+  const felder = (Array.isArray(eingabe.felder) ? eingabe.felder : [])
+    .filter((f): f is string => typeof f === 'string' && bekannt.includes(f) && !BAU_FORMALIEN.includes(f))
+    .slice(0, bekannt.length)
   const vorher = JSON.parse(z.daten) as Wep
   const neu = zusammenfuehrungAufServer(vorher, JSON.parse(g.daten) as Wep, ohneServerFelder(roh), felder)
   const daten = JSON.stringify(neu)

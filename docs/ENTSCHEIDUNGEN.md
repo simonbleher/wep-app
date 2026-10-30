@@ -520,3 +520,72 @@
 
 - **Entscheidung:** Für Bilddateien in R2 gilt dieselbe Grenze zwischen Bau- und Grün-Teil wie beim Speichern des WEP-JSON (`fotoTeil` in `src/server/teile.ts`). Sind beide beteiligt, darf niemand die Datei eines Fotos des anderen Teils überschreiben oder löschen. Erlaubt ist nur, eine noch fehlende Datei hochzuladen (z. B. ein neues Foto ohne Position, das Grün hinzufügt und das danach zum Bau-Teil zählt). Offene Funde aus der Prüfung stehen als `it.fails`-Tests im Repo, damit eine Behebung auffällt.
 - **Grund:** Grün konnte Bau-Fotos austauschen oder entfernen, obwohl der Server Änderungen am Bau-Teil sonst ablehnt (Fund H1, `docs/SICHERHEITSPRUEFUNG-V2.md`). Der App-Abgleich lädt Dateien erst nach dem WEP hoch; ohne die Ausnahme „fehlende Datei“ könnte Grün eigene neue Fotos ohne Position nicht mehr hochladen.
+
+
+## 2026-10-29 · Sicherheitsprüfung v2: Entscheidungen zu den Funden, PR A Rechte/Eingaben
+
+- **Entscheidung:**
+  - M1 bleibt bewusst erlaubt: Ein Konto mit BV-Rolle darf auch ein WEP prüfen, an dem es selbst als Bau oder Grün beteiligt ist (kein Vier-Augen-Zwang).
+  - WEPs werden beim Speichern und Zusammenführen auf ihre Form geprüft (`functions/_lib/v2/form.ts`): Teile, die da sind, müssen die richtige Art haben. Fehlende Teile bleiben erlaubt, Inhalte bleiben frei.
+  - Neue WEPs legt der Server nur mit einer nicht erratbaren Kennung an: keine alten Kennungen „2026-007“ und nur `[A-Za-z0-9_-]{1,64}`. Die App vergibt alten WEPs vor dem ersten Hochladen eine UUID; die Vorgangs-Nr. bleibt, Fotos und Bau-Excel ziehen mit.
+  - Notiz, Begründung und Notiz zu „geprüft“ haben höchstens 2000 Zeichen.
+  - Beim Zusammenführen übernimmt Grün die Felder des Bau-Teils in den Formalien (`BAU_FORMALIEN`: Name des Bau-Wertermittlers) nie aus dem eigenen WEP.
+- **Grund:**
+  - M1: Die BV-Revision legt keine eigenen WEPs an, und zum Testen soll ein Konto alle Rollen durchspielen können.
+  - Die übrigen Punkte beheben die Funde M2, N4, N7, N8 und N12 aus `docs/SICHERHEITSPRUEFUNG-V2.md`.
+  - Alte Kennungen werden umnummeriert statt abgelehnt, damit v1-WEPs im Browser und eingespielte Sicherungen weiter auf den Server kommen.
+
+
+## 2026-10-29 · Sicherheitsprüfung v2, PR B Anmeldung/Sitzung
+
+- **Entscheidung:**
+  - `V2_ADMINS` mit Anbieter-Präfix (`google:adresse`, `microsoft:adresse`). Die alte Form gilt weiter, mit Warnung (nur für Admins) in `/api/v2/status` und auf der Admin-Seite.
+  - Konten speichern, ob die Adresse bestätigt ist. Die Admin-Seite zeigt Anbieter, Microsoft-Tenant und „unbestätigt“.
+  - Anmeldeversuche werden im Code begrenzt: Zähler je Bereich und SHA-256 der IP in D1, 10-Minuten-Fenster; 60 für die Anmeldung, 30 für den Token-Tausch. Ohne `CF-Connecting-IP` (lokal) keine Begrenzung.
+  - Cookies mit `__Host-`-Präfix.
+  - Sitzungen enden nach 14 Tagen ohne Nutzung (zusätzlich zu den 30 Tagen). „Überall abmelden“ im Profil.
+  - Fehler der Anmeldung nur als fester Schlüssel in der Adresse.
+- **Grund:**
+  - Funde M3, M5, N1, N2, N3, N5, N6, N10 und N15 (`docs/SICHERHEITSPRUEFUNG-V2.md`).
+  - Eine WAF-Regel geht auf `*.pages.dev` ohne eigene Domain nicht.
+  - Das Umstellen auf `__Host-` meldet alle Browser einmal ab; das ist bei Testdaten vertretbar.
+
+
+## 2026-10-29 · Sicherheitsprüfung v2, PR C Missbrauch/Datensparsamkeit
+
+- **Entscheidung:**
+  - Grenzen gegen Missbrauch:
+    - höchstens 300 Fotodateien je WEP, davon 50 ohne Eintrag im WEP;
+    - je Konto und 24 Stunden 50 neue WEPs und 20 Abgaben an den BV;
+    - höchstens 5 Mails je Empfänger und Stunde, der Rest nur in „Neu für dich“.
+  - Lokale Ablage je Konto: Die bisherige IndexedDB gehört dem ersten Konto nach der Umstellung (im localStorage vermerkt), jedes weitere Konto bekommt eine eigene. Beim Abmelden fragt die App, ob die Daten auf dem Gerät bleiben oder gelöscht werden.
+  - `/api/v2/status` zeigt ohne Admin nur Google/Microsoft.
+  - Grün-Auswahl, Verlauf und Ablauf zeigen keine E-Mail-Adressen.
+  - Resend-Fehler werden ohne Text protokolliert.
+- **Grund:**
+  - Funde M6, M7, N9, N11 und N13 (`docs/SICHERHEITSPRUEFUNG-V2.md`).
+  - Zuerst war eine Mail je Stunde geplant. Dann käme aber eine Rückfrage kurz nach „an dich abgegeben“ nicht mehr per Mail an (im Durchlauf gesehen); 5 je Stunde lassen den normalen Ablauf durch und begrenzen eine Flut.
+  - Vorhandene lokale Daten gehen bei der Umstellung nicht verloren.
+
+
+## 2026-10-29 · Sicherheitsprüfung v2, PR D Security-Header
+
+- **Entscheidung:**
+  - In `public/_headers` gelten für alle Seiten `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin` und `Permissions-Policy`.
+  - Die Content-Security-Policy gilt zuerst nur als `Report-Only`. Meldungen gehen an `/api/csp-bericht`, das nur Regel, Herkunft und Pfad ins Function-Log schreibt.
+  - Die Functions setzen `nosniff` selbst (`jsonAntwort`, Dateien); die Bau-Excel kommt als Download.
+  - Scharf geschaltet wird die CSP in einem eigenen kleinen PR, wenn in Produktion keine Meldungen mehr kommen.
+- **Grund:**
+  - Fund M4 (`docs/SICHERHEITSPRUEFUNG-V2.md`): Clickjacking auf der Admin-Seite.
+  - Eine falsche CSP würde die App sofort blockieren. Der Durchlauf v2 mit lokal scharf geschalteter CSP lief ohne Verstoß, deckt aber nicht alles ab (v1/OneDrive, KI, alle Exporte).
+
+
+## 2026-10-29 · Sicherheitsprüfung v2, PR E Abhängigkeiten der Windows-App
+
+- **Entscheidung:**
+  - `zip` 9, `tauri-plugin-updater` 2.14.1 und `tokio` 1.54.1.
+  - Windows-Programm 0.1.6. Die Hülle steigt auf 5, obwohl der Web-Teil keine neue Funktion des Programms braucht.
+- **Grund:**
+  - Fund M8 (`docs/SICHERHEITSPRUEFUNG-V2.md`).
+  - Mit der neuen Hülle nimmt kein altes Programm mehr das neue Web-Paket an, sondern bietet das App-Update an. So laufen alle Rechner bald mit den aktualisierten Abhängigkeiten (Wunsch von Simon).
+

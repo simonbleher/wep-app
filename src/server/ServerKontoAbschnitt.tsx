@@ -2,9 +2,9 @@
 // (Admins), Kontrollseite BV, angemeldete Geräte, Abmelden. Ersetzt im Server-Modus die OneDrive-Anmeldung.
 import { useEffect, useId, useState } from 'react'
 import { ShieldCheck, Users } from 'lucide-react'
-import { ICON, Meldung, datumDe } from '@/app/ui'
-import { beendeSitzung, ladeSitzungen, setzeMailBenachrichtigung } from './api'
-import { GERAET_TEXT, ROLLEN_TEXT, type ServerSitzung } from './typen'
+import { ICON, Meldung, Rueckfrage, datumDe } from '@/app/ui'
+import { beendeAlleSitzungen, beendeSitzung, ladeSitzungen, setzeMailBenachrichtigung } from './api'
+import { GERAET_TEXT, LEERLAUF_TAGE, ROLLEN_TEXT, type ServerSitzung } from './typen'
 import type { V2Sitzung } from './V2Tor'
 
 export function ServerKontoAbschnitt({ sitzung, onKontenVerwalten, onBv }: { sitzung: V2Sitzung; onKontenVerwalten: () => void; onBv?: () => void }) {
@@ -70,16 +70,17 @@ export function ServerKontoAbschnitt({ sitzung, onKontenVerwalten, onBv }: { sit
           Abmelden
         </button>
       </div>
-      {!sitzung.offline && <Geraete />}
+      {!sitzung.offline && <Geraete onUeberallAbgemeldet={() => void sitzung.abmelden()} />}
     </section>
   )
 }
 
 /** Angemeldete Geräte (Browser, Android-App, Windows-App); andere lassen sich abmelden, z. B. ein verlorenes Handy. */
-function Geraete() {
+function Geraete({ onUeberallAbgemeldet }: { onUeberallAbgemeldet: () => void }) {
   const id = useId()
   const [liste, setListe] = useState<ServerSitzung[]>()
   const [fehler, setFehler] = useState('')
+  const [ueberall, setUeberall] = useState(false)
 
   useEffect(() => {
     let aktiv = true
@@ -95,6 +96,17 @@ function Geraete() {
     setFehler('')
     try {
       setListe(await beendeSitzung(s.id))
+    } catch (e) {
+      setFehler(e instanceof Error ? e.message : String(e))
+    }
+  }
+
+  async function ueberallAbmelden() {
+    setUeberall(false)
+    setFehler('')
+    try {
+      await beendeAlleSitzungen()
+      onUeberallAbgemeldet()
     } catch (e) {
       setFehler(e instanceof Error ? e.message : String(e))
     }
@@ -122,6 +134,21 @@ function Geraete() {
           </li>
         ))}
       </ul>
+      <p className="neben">Ein Gerät, das {LEERLAUF_TAGE} Tage nicht benutzt wurde, wird automatisch abgemeldet.</p>
+      <div className="knopf-reihe">
+        <button type="button" className="knopf" onClick={() => setUeberall(true)}>
+          Überall abmelden
+        </button>
+      </div>
+      {ueberall && (
+        <Rueckfrage
+          titel="Überall abmelden?"
+          text="Alle angemeldeten Geräte werden abgemeldet, auch dieses. Danach meldest du dich überall neu an."
+          bestaetigen="Überall abmelden"
+          onAbbrechen={() => setUeberall(false)}
+          onBestaetigen={() => void ueberallAbmelden()}
+        />
+      )}
       {fehler && (
         <Meldung alarm>
           <p>{fehler}</p>

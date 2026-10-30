@@ -1,5 +1,18 @@
 # Cloudflare Pages: Service Worker und Manifest nie zwischenspeichern,
 # damit Updates der App sofort ankommen. Gehashte Assets dürfen lange gecacht werden.
+
+# Sicherheits-Header für alle Seiten (Sicherheitsprüfung v2, Fund M4, docs/SICHERHEITSPRUEFUNG-V2.md).
+# - X-Frame-Options: keine fremde Seite darf die App einbetten (Clickjacking, z. B. auf der Admin-Seite).
+# - Content-Security-Policy erst als Report-Only: Verstöße werden nur gemeldet (Browser-Konsole und /api/csp-bericht),
+#   nichts wird blockiert. Scharf geschaltet wird in einem eigenen kleinen PR, wenn keine Meldungen mehr kommen.
+#   Microsoft (login, Graph, OneDrive-Dateien) braucht nur noch v1.
+# Die Antworten der Functions (/api/…) setzen ihre Header selbst (functions/_lib/serverModus.ts).
+/*
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(self), microphone=(), geolocation=(self), payment=(), usb=()
+  Content-Security-Policy-Report-Only: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://wep-pankow.pages.dev https://login.microsoftonline.com https://graph.microsoft.com https://*.sharepoint.com https://*.1drv.com https://*.microsoftpersonalcontent.com https://*.livefilestore.com; frame-src https://login.microsoftonline.com; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; report-uri /api/csp-bericht
 /sw.js
   Cache-Control: no-cache
 /registerSW.js

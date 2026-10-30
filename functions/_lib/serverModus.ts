@@ -38,7 +38,7 @@ export function einrichtung(env: V2Umgebung) {
 }
 
 /** Höchste Migration in migrations/ – so weit muss die Datenbank eingespielt sein. */
-export const SCHEMA_ERWARTET = 6
+export const SCHEMA_ERWARTET = 7
 
 interface SchemaDb {
   prepare(sql: string): { first<T>(): Promise<T | null> }
@@ -56,4 +56,4 @@ export async function schemaStand(env: V2Umgebung): Promise<number | undefined> 
 }
 
 export const jsonAntwort = (status: number, body: unknown) =>
-  new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' } })
+  new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } })

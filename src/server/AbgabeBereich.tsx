@@ -128,7 +128,7 @@ export function AbgabeBereich({ wep, onGeaendert }: { wep: Wep; onGeaendert: () 
                   <option value="">bitte wählen …</option>
                   {(gruenKonten ?? []).map((k) => (
                     <option key={k.id} value={k.id}>
-                      {k.name || k.email}
+                      {k.name}
                     </option>
                   ))}
                 </select>

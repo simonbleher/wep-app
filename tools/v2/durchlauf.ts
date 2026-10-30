@@ -75,7 +75,7 @@ try {
   await seite.getByRole('heading', { name: 'Wartet auf Freigabe' }).waitFor()
   pruefe(await seite.getByText(/max@bv\.example/).isVisible(), 'Max: Konto angelegt, wartet auf Freigabe')
   await seite.screenshot({ path: `${AUSGABE}/02-wartet.png` })
-  await seite.getByRole('button', { name: 'Abmelden' }).click()
+  await seite.getByRole('button', { name: 'Abmelden', exact: true }).click()
   await seite.getByRole('link', { name: 'Mit Google anmelden' }).waitFor()
 
   // 3. Erster Admin (V2_ADMINS) kommt direkt in die App, ohne OneDrive
@@ -127,9 +127,13 @@ try {
   // 6. Abmelden, Max meldet sich an und kommt in die App
   await seite.getByRole('button', { name: 'Profil', exact: true }).first().click()
   await seite.getByRole('heading', { name: 'Profil und Einstellungen' }).waitFor()
-  await seite.getByRole('button', { name: 'Abmelden' }).click()
+  await seite.getByRole('button', { name: 'Abmelden', exact: true }).click()
+  // Rückfrage beim Abmelden: Daten auf dem Gerät behalten (Sicherheitsprüfung M7)
+  await seite.getByRole('alertdialog', { name: 'Abmelden' }).getByRole('button', { name: 'Nur abmelden' }).click()
   await anmelden(seite, 'max')
   await seite.getByRole('heading', { name: 'Protokolle' }).waitFor()
+  const ablagen = await seite.evaluate(async () => (await indexedDB.databases()).map((d) => d.name ?? ''))
+  pruefe(ablagen.includes('wep-db') && ablagen.some((n) => /^wep-db-[0-9a-f-]{36}$/.test(n)), 'Kontowechsel im Browser: Max bekommt eine eigene lokale Ablage, die von Ada bleibt')
   await seite.getByRole('button', { name: 'Profil und Einstellungen' }).filter({ visible: true }).first().click()
   pruefe(await seite.getByText('Rollen: Grün, BV').isVisible(), 'Max: freigegeben mit Rollen Grün, BV')
   pruefe((await seite.getByRole('button', { name: 'Konten verwalten' }).count()) === 0, 'Max: keine Konten-Verwaltung (kein Admin)')
@@ -268,7 +272,7 @@ try {
     await sa.screenshot({ path: `${AUSGABE}/05b-windows-app-geraete.png` })
     // Browser-Sitzung von der App aus abmelden; Gerät B (Browser) muss sich danach neu anmelden
     const vorher = (db.roh.prepare('SELECT count(*) AS n FROM sitzungen WHERE konto_id = ?').get(bertId) as { n: number }).n
-    await sa.locator('li', { hasText: /^Browser · angemeldet am/ }).getByRole('button', { name: 'Abmelden' }).first().click()
+    await sa.locator('li', { hasText: /^Browser · angemeldet am/ }).getByRole('button', { name: 'Abmelden', exact: true }).first().click()
     let nachher = vorher
     for (let i = 0; i < 50 && nachher === vorher; i++) {
       nachher = (db.roh.prepare('SELECT count(*) AS n FROM sitzungen WHERE konto_id = ?').get(bertId) as { n: number }).n
@@ -276,8 +280,12 @@ try {
     }
     pruefe(nachher === vorher - 1, 'Profil: eine andere Sitzung lässt sich beenden')
     // Abmelden in der App: Token weg, Sitzung auf dem Server widerrufen
+    const ablagenVorher = await sa.evaluate(async () => (await indexedDB.databases()).map((d) => d.name))
     await sa.locator('.knopf-reihe').getByRole('button', { name: 'Abmelden', exact: true }).click()
+    await sa.getByRole('alertdialog', { name: 'Abmelden' }).getByRole('button', { name: 'Abmelden und Daten löschen' }).click()
     await sa.getByRole('button', { name: 'Mit Google anmelden' }).waitFor()
+    const ablagenNachher = await sa.evaluate(async () => (await indexedDB.databases()).map((d) => d.name))
+    pruefe(ablagenVorher.includes('wep-db-v2') && !ablagenNachher.includes('wep-db-v2'), 'Windows-App: „Abmelden und Daten löschen“ entfernt die lokale Ablage')
     pruefe(app.tresor.token === null, 'Windows-App: Abmelden löscht das Token')
     pruefe(!(db.roh.prepare("SELECT geraet FROM sitzungen WHERE konto_id = ?").all(bertId) as { geraet: string }[]).some((g) => g.geraet === 'windows'), 'Server: Sitzung der Windows-App widerrufen')
     await app.kontext.close()

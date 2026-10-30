@@ -215,6 +215,15 @@ Dienst `updateDienst.ts`), `src/konto/windows.ts` (Anmeldung), `src/app/dateiSpe
 - Geändert unter `src-tauri/`: **Programmversion 0.1.2**, **Hülle 2** (neue Befehle `eingang_pruefen`, `eingang_lesen`, `eingang_verwerfen`). Programme der Hülle 1 wenden das neue Web-Paket nicht an, sondern melden „Neue App-Version“.
 - Die Zuordnung entsteht beim **Installieren** (neue .exe nötig); ein reines Live-Update ändert sie nicht. Doppelklick auf einem echten Windows-PC ist noch nicht ausprobiert (Checkliste im PR).
 
+## Sicherheits-Updates der Abhängigkeiten (Herbst 2026)
+
+- `zip` 9 (vorher 2), `tauri-plugin-updater` 2.14.1 (bringt ebenfalls `zip` 9), `tokio` 1.54.1 – wegen Lücken in `zip`
+  (RUSTSEC-2026-0367/0368/0369) und einer zurückgezogenen `tokio`-Version (Sicherheitsprüfung v2, Fund M8). Das Entpacken
+  der Live-Update-Pakete (`webupdate.rs`) war nicht betroffen: es nutzt nicht `extract()`, prüft `enclosed_name()` und die
+  SHA-256 des Pakets.
+- **Programmversion 0.1.6, Hülle 5.** Programme der Hülle 4 wenden das neue Web-Paket nicht mehr an und melden „Neue
+  App-Version“ – so kommen alle Rechner auf das Programm mit den neuen Abhängigkeiten.
+
 ## Fehlersuche
 
 - **„Der Computer wurde durch Windows geschützt“:** siehe Installation, Schritt 2.

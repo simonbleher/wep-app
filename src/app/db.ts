@@ -6,7 +6,7 @@
 // es lokal geändert und wann es zuletzt abgeglichen wurde. Daraus ergibt sich die
 // Offline-Warteschlange (alles, was seit dem letzten Abgleich geändert wurde).
 
-import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
+import { deleteDB, openDB, type DBSchema, type IDBPDatabase } from 'idb'
 import type { Wep } from '@/model'
 import type { LokaleAenderung, PapierkorbEintrag, SyncMeta } from '@/sync/types'
 import type { ExportEintrag } from '@/sync/exporte'
@@ -14,6 +14,7 @@ import { metaMit, papierkorbMeta } from '@/sync/papierkorb'
 import type { FotoDatei, FotoRecord } from '@/fotos/types'
 import type { BauExcelRecord } from '@/bauexcel/types'
 import { appMitServer } from '@/server/modus'
+import { ablageFuer, besitzerSchluessel } from '@/server/ablage'
 
 /** Datenbank von v1 (Browser, Android- und Windows-App ohne Server). */
 export const DB_NAME_V1 = 'wep-db'
@@ -91,10 +92,53 @@ export function setzeSpeicherHaken(h: SpeicherHaken | undefined): void {
 
 let dbPromise: Promise<IDBPDatabase<WepDB>> | undefined
 
+/** Name der geöffneten Datenbank; im Server-Modus je Konto (`waehleLokaleAblage`). */
+let dbName = DB_NAME
+
+const localStorageOderNichts = (): Storage | undefined => {
+  try {
+    return globalThis.localStorage
+  } catch {
+    return undefined
+  }
+}
+
+function schliesse(): void {
+  const offen = dbPromise
+  dbPromise = undefined
+  void offen?.then((db) => db.close()).catch(() => undefined)
+}
+
+/**
+ * Server-Modus: die lokale Ablage dieses Kontos verwenden (src/server/ablage.ts, Fund M7). Aufruf, bevor die App für das
+ * Konto zeichnet; war eine andere Ablage offen, wird sie geschlossen.
+ */
+export function waehleLokaleAblage(kontoId: string): void {
+  const name = ablageFuer(DB_NAME, kontoId, localStorageOderNichts())
+  if (name === dbName) return
+  schliesse()
+  dbName = name
+}
+
+/** Löscht die lokale Ablage des angemeldeten Kontos (WEPs, Papierkorb, Fotos, Bau-Excel) auf diesem Gerät. */
+export async function loescheLokaleAblage(): Promise<void> {
+  const name = dbName
+  schliesse()
+  await deleteDB(name)
+  // Die bisherige Ablage ist jetzt leer: sie gehört wieder dem nächsten Konto, das sich anmeldet
+  if (name === DB_NAME) {
+    try {
+      localStorageOderNichts()?.removeItem(besitzerSchluessel(DB_NAME))
+    } catch {
+      /* ohne localStorage */
+    }
+  }
+}
+
 /** Öffnet die Datenbank (einmalig) und legt die Object-Stores an. */
 function datenbank(): Promise<IDBPDatabase<WepDB>> {
   if (!dbPromise) {
-    dbPromise = openDB<WepDB>(DB_NAME, DB_VERSION, {
+    dbPromise = openDB<WepDB>(dbName, DB_VERSION, {
       async upgrade(db, alteVersion, _neu, tx) {
         if (!db.objectStoreNames.contains(STORE)) {
           db.createObjectStore(STORE, { keyPath: 'id' })

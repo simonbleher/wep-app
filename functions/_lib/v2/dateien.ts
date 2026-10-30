@@ -3,11 +3,11 @@
 //   weps/<id>/fotos/<Foto-Id>.jpg   Foto (Name in der Schnittstelle: foto-<Foto-Id>.jpg)
 //   weps/<id>/bau.xlsx              Bau-Excel (immer die aktuelle Fassung)
 import type { Wep } from '../../../src/model/types'
-import { darfLesen, schreibrecht, type WepKopf } from '../../../src/server/rechte'
+import { darfLesen, schreibrecht } from '../../../src/server/rechte'
 import { fotoTeil } from '../../../src/server/teile'
 import type { Db } from './db'
 import type { Konto } from './konten'
-import { ladeZeile, type WepZeile } from './weps'
+import { ladeZeile, rechteKopf, type WepZeile } from './weps'
 
 /** Teil der R2-Schnittstelle, den v2 nutzt (in Tests ein Speicher im Arbeitsspeicher). */
 export interface R2Ablage {
@@ -39,16 +39,14 @@ export function dateiArt(wepId: string, name: string): DateiArt | undefined {
   return undefined
 }
 
-const kopf = (z: WepZeile): WepKopf => ({ zustand: z.zustand, bauKonto: z.bau_konto, gruenKonto: z.gruen_konto, geloeschtAm: z.geloescht_am, zusammengefuehrtIn: z.zusammengefuehrt_in })
-
 export type DateiErgebnis<T> = { ok: true; wert: T; nurNeu?: boolean } | { ok: false; status: number; fehler: string }
 
 /** Prüft Zugriff auf das WEP: lesen (für Abruf/Liste) oder schreiben (für Hochladen/Löschen). */
 export async function pruefeZugriff(db: Db, konto: Konto, wepId: string, schreiben: false | DateiArt): Promise<DateiErgebnis<WepZeile>> {
   const z = await ladeZeile(db, wepId)
-  if (!z || !darfLesen(kopf(z), konto)) return { ok: false, status: 404, fehler: 'WEP nicht gefunden.' }
+  if (!z || !darfLesen(rechteKopf(z), konto)) return { ok: false, status: 404, fehler: 'WEP nicht gefunden.' }
   if (schreiben) {
-    const recht = schreibrecht(kopf(z), konto)
+    const recht = schreibrecht(rechteKopf(z), konto)
     // Grün darf (ab Paket 3) nur Fotos hochladen – auch im eigenen Grün-WEP; die Bau-Excel gehört zum Bau-Teil
     if (!recht || ((recht === 'gruen' || recht === 'ohne_bau') && schreiben.art !== 'foto')) return { ok: false, status: 403, fehler: 'Das WEP ist für dich gerade gesperrt (nur lesen).' }
     // Sind beide beteiligt, ändert jeder nur die Bilddateien seines Teils (wie beim Speichern des WEP): Grün kein Foto des
@@ -61,6 +59,27 @@ export async function pruefeZugriff(db: Db, konto: Konto, wepId: string, schreib
     }
   }
   return { ok: true, wert: z }
+}
+
+/** Höchstzahl Fotodateien je WEP und davon ohne Eintrag im WEP (Fund M6: sonst ließe sich R2 beliebig füllen). */
+export const MAX_FOTOS_JE_WEP = 300
+export const MAX_FOTOS_OHNE_EINTRAG = 50
+
+/**
+ * Darf zu diesem WEP noch eine neue Fotodatei dazukommen? Ersetzen einer vorhandenen Datei geht immer (sofern die Rechte
+ * passen). Die App lädt Fotos erst hoch, wenn sie im WEP stehen; „ohne Eintrag“ sind z. B. Reste eines Abbruchs.
+ */
+export async function fotoGrenze(r2: R2Ablage, z: WepZeile, fotoId: string): Promise<{ status: number; fehler: string } | undefined> {
+  const dateien = await listeDateien(r2, z.id)
+  const name = `foto-${fotoId}.jpg`
+  if (dateien.some((d) => d.name === name)) return undefined
+  const fotos = dateien.filter((d) => d.name.startsWith('foto-'))
+  if (fotos.length >= MAX_FOTOS_JE_WEP) return { status: 413, fehler: `Zu viele Fotos: höchstens ${MAX_FOTOS_JE_WEP} je WEP.` }
+  const imWep = new Set(((JSON.parse(z.daten) as Wep).fotos ?? []).map((f) => `foto-${f.id}.jpg`))
+  if (!imWep.has(name) && fotos.filter((d) => !imWep.has(d.name)).length >= MAX_FOTOS_OHNE_EINTRAG) {
+    return { status: 429, fehler: 'Zu viele Fotos ohne Eintrag im WEP. Bitte erst das WEP abgleichen.' }
+  }
+  return undefined
 }
 
 /** Dateinamen eines WEP in der Schnittstelle (foto-<Id>.jpg, bau.xlsx). */

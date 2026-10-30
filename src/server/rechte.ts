@@ -168,6 +168,11 @@ export type AblaufErgebnis = { ok: true; kopf: WepKopf; notiz?: string } | { ok:
 
 const text = (v: unknown) => (typeof v === 'string' ? v.trim() : '')
 
+/** Höchstlänge von Rückfrage-Notiz, Notiz zu „geprüft“ und Begründung beim Wiederöffnen (Zeichen). */
+export const MAX_NOTIZ = 2000
+const zuLang = (t: string) => t.length > MAX_NOTIZ
+const ZU_LANG = { ok: false as const, status: 400, fehler: `Die Notiz ist zu lang (höchstens ${MAX_NOTIZ} Zeichen).` }
+
 /**
  * Wendet einen Schritt an. `gruenKonten`: freigegebene Konten mit Rolle Grün (für die Abgabe an Grün).
  * Liefert den neuen Kopf oder den Grund der Ablehnung.
@@ -189,15 +194,18 @@ export function wendeAn(kopf: WepKopf, konto: RechteKonto, a: AblaufAktion, grue
     case 'rueckfrage': {
       const notiz = text(a.notiz)
       if (!notiz) return { ok: false, status: 400, fehler: 'Bitte in der Notiz schreiben, was geklärt werden soll.' }
+      if (zuLang(notiz)) return ZU_LANG
       if (!['bau', 'gruen', 'beide'].includes(a.an)) return { ok: false, status: 400, fehler: 'Bitte wählen, an wen die Rückfrage geht.' }
       if (istGruenWep(kopf) && a.an !== 'gruen') return { ok: false, status: 400, fehler: 'Das WEP hat keinen Bau-Teil – die Rückfrage geht an Grün.' }
       return { ok: true, kopf: { ...kopf, zustand: 'rueckfrage', rueckfrageAn: a.an, rueckfrageBei: a.an === 'gruen' ? 'gruen' : 'bau' }, notiz }
     }
     case 'geprueft':
+      if (zuLang(text(a.notiz))) return ZU_LANG
       return { ok: true, kopf: { ...kopf, ...ohneRueckfrage, zustand: 'geprueft' }, notiz: text(a.notiz) || undefined }
     case 'wiederoeffnen': {
       const begruendung = text(a.begruendung)
       if (!begruendung) return { ok: false, status: 400, fehler: 'Bitte begründen, warum das geprüfte WEP wieder geöffnet wird.' }
+      if (zuLang(begruendung)) return ZU_LANG
       return { ok: true, kopf: { ...kopf, ...ohneRueckfrage, zustand: 'beim_bv' }, notiz: begruendung }
     }
   }

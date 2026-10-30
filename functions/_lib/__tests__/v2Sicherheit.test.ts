@@ -14,8 +14,13 @@ import type { DbAnweisung } from '../v2/db'
 import { testDb } from './sqliteDb'
 import { fakeR2 } from './fakeR2'
 import type { Konto, Rolle } from '../v2/konten'
-import { kontoZurAnmeldung } from '../v2/konten'
-import { cookie, neueSitzung, SITZUNG_COOKIE } from '../v2/sitzung'
+import { adminWarnungen, kontoZurAnmeldung } from '../v2/konten'
+import { GRENZEN, zuViele } from '../v2/begrenzung'
+import { MAX_FOTOS_JE_WEP, MAX_FOTOS_OHNE_EINTRAG } from '../v2/dateien'
+import { TAGESGRENZEN } from '../v2/weps'
+import { ANMELDEFEHLER_TEXT, anmeldeFehlerText } from '../../../src/server/anmeldeFehler'
+import { onRequestPost as appToken } from '../../api/v2/anmeldung/app/token'
+import { ANMELDUNG_COOKIE, cookie, kontoDerSitzung, neueSitzung, SITZUNG_COOKIE } from '../v2/sitzung'
 import { erstelleAppCode, loeseAppCodeEin, RUECKSPRUNG_ANDROID } from '../v2/appAnmeldung'
 import { pruefeAnmeldeToken, sha256b64url } from '../v2/oidc'
 import { onRequest as middleware } from '../../api/v2/_middleware'
@@ -38,8 +43,10 @@ import { onRequestPost as wiederherstellen } from '../../api/v2/weps/[id]/wieder
 import { onRequestPost as zusammenfuehren } from '../../api/v2/weps/[id]/zusammenfuehren'
 import { onRequestPost as zuruecknehmen } from '../../api/v2/weps/[id]/zusammenfuehren-zuruecknehmen'
 import { onRequestGet as anmeldungStart } from '../../api/v2/anmeldung/[anbieter]/start'
+import { berichtZeile, onRequestPost as cspBericht } from '../../api/csp-bericht'
+import { jsonAntwort } from '../serverModus'
 import { onRequestGet as anmeldungZurueck } from '../../api/v2/anmeldung/[anbieter]/zurueck'
-import { sendeMail } from '../v2/benachrichtigungen'
+import { MAILS_JE_STUNDE, sendeMail } from '../v2/benachrichtigungen'
 
 const ORIGIN = 'https://wep-pankow.pages.dev'
 const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3])
@@ -327,76 +334,172 @@ describe('Herkunft, CORS, Sitzung (geprüft, in Ordnung)', () => {
 // ---------------------------------------------------------------------------------------------------------------------
 
 describe('offene Funde', () => {
-  it.fails('Fund M1: Wer selbst Bau/Grün am WEP ist, prüft es nicht als BV (Vier-Augen)', async () => {
+  // Bewusst erlaubt, siehe Entscheidung M1 (docs/ENTSCHEIDUNGEN.md, 29.10.2026): Die BV-Revision legt keine eigenen WEPs
+  // an, und zum Testen soll ein Konto alle Rollen durchspielen können. Der Test hält das heutige Verhalten fest.
+  it('Fund M1 (bewusst erlaubt): Wer selbst Bau/Grün am WEP ist, darf es als BV prüfen', async () => {
     const { db, k, abgabe } = await aufbau()
     db.roh.prepare("UPDATE konten SET rollen = 'gruen,bv' WHERE id = 'gruen'").run()
     expect((await abgabe('w1', k.bau, { aktion: 'an_gruen', gruenKonto: 'gruen' })).status).toBe(200)
     const gruenBv = { ...k.gruen, rollen: ['gruen', 'bv'] as Rolle[] }
     expect((await abgabe('w1', gruenBv, { aktion: 'an_bv' })).status).toBe(200)
-    expect((await abgabe('w1', gruenBv, { aktion: 'geprueft' })).status).toBe(403)
+    expect((await abgabe('w1', gruenBv, { aktion: 'geprueft' })).status).toBe(200)
   })
 
-  it.fails('Fund M2: Grün kann den Grün-Teil nicht in eine kaputte Form bringen (kein JSON-Schema)', async () => {
+  it('Fund M2 (behoben): WEPs in falscher Form werden mit 400 abgelehnt', async () => {
     const { k, ruf, p, rev, abgabe } = await aufbau()
     expect((await abgabe('w1', k.bau, { aktion: 'an_gruen', gruenKonto: 'gruen' })).status).toBe(200)
     const kaputt = { ...bauWep('w1'), gruen: 'kein Objekt', skizze: { elemente: 'x'.repeat(10) } }
     expect((await ruf(wepSpeichern, 'PUT', '/api/v2/weps/w1', k.gruen, { params: p('w1'), body: { wep: kaputt, basisRev: await rev('w1') } })).status).toBe(400)
+    // formalien: null hätte später „an Grün“/„an den BV“ mit 500 abbrechen lassen
+    for (const wep of [{ ...neuerWep('w2'), formalien: null }, { ...neuerWep('w2'), fotos: [{ id: '../x' }] }, { ...neuerWep('w2'), bau: 'x' }, { ...neuerWep('w2'), gruen: { aufwuchs: 'x' } }]) {
+      expect((await ruf(wepSpeichern, 'PUT', '/api/v2/weps/w2', k.bau, { params: p('w2'), body: { wep, basisRev: 0 } })).status).toBe(400)
+    }
+    // Fehlende Teile bleiben erlaubt
+    expect((await ruf(wepSpeichern, 'PUT', '/api/v2/weps/w3', k.bau, { params: p('w3'), body: { wep: { id: 'w3', formalien: {} }, basisRev: 0 } })).status).toBe(200)
   })
 
-  it.fails('Fund M3a: Microsoft – ohne Adresse in preferred_username wird der unbestätigte Anspruch „email“ nicht als Konto-Adresse übernommen', async () => {
+  it('Fund M3a (behoben): Microsoft – der unbestätigte Anspruch „email“ wird als unbestätigt geführt; Admin-Seite zeigt Tenant und „unbestätigt“', async () => {
     const { schluessel, signiere } = await testSchluessel()
     const tid = '0a1b2c3d-1111-2222-3333-444455556666'
     const token = await signiere({ iss: `https://login.microsoftonline.com/${tid}/v2.0`, aud: 'ms', tid, oid: 'o1', preferred_username: '+491701234567', email: 'simon@example.org', nonce: 'n', exp: Math.floor(Date.now() / 1000) + 600 })
     const id = await pruefeAnmeldeToken(token, { anbieter: 'microsoft', clientId: 'ms', nonce: 'n', schluessel })
-    expect(id.email).toBe('')
+    expect(id.emailBestaetigt).toBe(false)
+    const db = testDb()
+    const k = await kontoZurAnmeldung(db, id, 'microsoft:simon@example.org')
+    expect(k).toMatchObject({ email: 'simon@example.org', emailBestaetigt: false, tenant: tid, status: 'wartet' })
+    expect(k.rollen).not.toContain('admin')
+    const persoenlich = await kontoZurAnmeldung(db, { anbieter: 'microsoft', subjekt: '9188040d-6c67-4c5b-b112-36a304b66dad:o2', name: 'P', email: 'p@example.org', emailBestaetigt: true }, '')
+    expect(persoenlich).toMatchObject({ emailBestaetigt: true, tenant: 'persoenlich' })
   })
 
-  it.fails('Fund M3b: V2_ADMINS gilt nicht für ein Geschäftskonto aus einem beliebigen Tenant (preferred_username ist laut Microsoft nicht für Rechte gedacht)', async () => {
+  it('Fund M3b (behoben): V2_ADMINS mit Anbieter gilt nur bei diesem Anbieter; die alte Form gilt weiter, mit Warnung nur für Admins', async () => {
     const db = testDb()
     const tid = 'fremder-tenant-0000'
-    const k = await kontoZurAnmeldung(db, { anbieter: 'microsoft', subjekt: `${tid}:o1`, name: 'Irgendwer', email: 'admin@example.org', emailBestaetigt: true }, 'admin@example.org')
-    expect(k.rollen).not.toContain('admin')
+    const ms = { anbieter: 'microsoft' as const, subjekt: `${tid}:o1`, name: 'Irgendwer', email: 'admin@example.org', emailBestaetigt: true }
+    expect((await kontoZurAnmeldung(db, ms, 'google:admin@example.org')).rollen).not.toContain('admin')
+    const g = await kontoZurAnmeldung(db, { anbieter: 'google', subjekt: 'g-1', name: 'Simon', email: 'admin@example.org', emailBestaetigt: true }, ' Google:Admin@Example.org ')
+    expect(g.rollen).toContain('admin')
+    // alte Form (ohne Anbieter): gilt noch für beide Anbieter
+    expect((await kontoZurAnmeldung(testDb(), ms, 'admin@example.org')).rollen).toContain('admin')
+    expect(adminWarnungen('google:a@example.org, microsoft:b@example.org')).toEqual([])
+    expect(adminWarnungen('google:a@example.org, b@example.org')[0]).toMatch(/ohne Anbieter/)
+
+    // /api/v2/status: Warnung nur für angemeldete Admins
+    const { env, k, db: db2 } = await aufbau()
+    env.V2_ADMINS = 'admin@example.org'
+    const status2 = async (wer: Konto | null) => {
+      const cookieWert = wer ? (await neueSitzung(db2, wer.id)).cookie.split(';')[0] : ''
+      return (await (await status({ request: new Request(`${ORIGIN}/api/v2/status`, { headers: { cookie: cookieWert } }), env })).json()) as { warnungen?: string[] }
+    }
+    expect((await status2(k.admin)).warnungen?.[0]).toMatch(/ohne Anbieter/)
+    expect((await status2(k.bau)).warnungen).toBeUndefined()
+    expect((await status2(null)).warnungen).toBeUndefined()
   })
 
-  it.fails('Fund M4: Security-Header in public/_headers (CSP mit frame-ancestors, nosniff, Referrer-Policy)', () => {
+  it('Fund M4 (behoben, CSP noch Report-Only): Security-Header in public/_headers und in den Antworten der Functions', async () => {
     const kopf = readFileSync(join(__dirname, '../../../public/_headers'), 'utf8')
-    expect(kopf).toMatch(/Content-Security-Policy:.*frame-ancestors/i)
-    expect(kopf).toMatch(/X-Content-Type-Options: nosniff/i)
-    expect(kopf).toMatch(/Referrer-Policy:/i)
+    const alle = kopf.slice(kopf.indexOf('\n/*\n'), kopf.indexOf('\n/sw.js'))
+    expect(alle).toMatch(/X-Frame-Options: DENY/)
+    expect(alle).toMatch(/X-Content-Type-Options: nosniff/)
+    expect(alle).toMatch(/Referrer-Policy: strict-origin-when-cross-origin/)
+    expect(alle).toMatch(/Permissions-Policy:/)
+    const csp = /Content-Security-Policy-Report-Only: (.*)/.exec(alle)?.[1] ?? ''
+    for (const teil of ["default-src 'self'", "script-src 'self'", "object-src 'none'", "frame-ancestors 'none'", "base-uri 'self'", 'report-uri /api/csp-bericht']) expect(csp).toContain(teil)
+    expect(csp).not.toMatch(/script-src[^;]*'unsafe-inline'/)
+    // Functions setzen ihre Header selbst
+    expect(jsonAntwort(200, {}).headers.get('x-content-type-options')).toBe('nosniff')
+    const { k, ruf, p } = await aufbau()
+    const foto = await ruf(dateiHolen, 'GET', '/api/v2/weps/w1/dateien/foto-bf1.jpg', k.bau, { params: p('w1', 'foto-bf1.jpg') })
+    expect(foto.headers.get('x-content-type-options')).toBe('nosniff')
+    // Meldungen der CSP: nur Regel, Herkunft und Pfad im Log
+    const zeile = berichtZeile(JSON.stringify({ 'csp-report': { 'effective-directive': 'connect-src', 'blocked-uri': 'https://evil.example/x?token=geheim', 'document-uri': `${ORIGIN}/bv?wep=123` } }))
+    expect(zeile).toBe('CSP (nur gemeldet): connect-src ← https://evil.example auf /bv')
+    expect(berichtZeile('kein json')).toBeUndefined()
+    expect((await cspBericht({ request: new Request(`${ORIGIN}/api/csp-bericht`, { method: 'POST', body: 'x'.repeat(20_000) }) })).status).toBe(204)
   })
 
-  it.fails('Fund M5: Anmeldestart ohne Anmeldung ist begrenzt (jede Anfrage schreibt eine Zeile in D1)', async () => {
+  it.fails('Folge-PR zu M4: CSP scharf geschaltet (Content-Security-Policy statt Report-Only)', () => {
+    const kopf = readFileSync(join(__dirname, '../../../public/_headers'), 'utf8')
+    expect(kopf).toMatch(/^  Content-Security-Policy: /m)
+  })
+
+  it('Fund M5 (behoben): Anmeldung und Token-Tausch sind je IP begrenzt (Zähler mit Ablauf, nur IP-Hash in D1)', async () => {
     const db = testDb()
     const env = { SERVER_MODUS: 'true', WEP_DB: db, GOOGLE_CLIENT_ID: 'g', GOOGLE_CLIENT_SECRET: 's' }
-    for (let i = 0; i < 200; i++) await anmeldungStart({ request: new Request(`${ORIGIN}/api/v2/anmeldung/google/start`), env, params: { anbieter: 'google' } })
+    const start = (ip: string) => anmeldungStart({ request: new Request(`${ORIGIN}/api/v2/anmeldung/google/start`, { headers: { 'cf-connecting-ip': ip } }), env, params: { anbieter: 'google' } })
+    for (let i = 0; i < GRENZEN.anmeldung.anzahl; i++) expect((await start('203.0.113.7')).headers.get('location')).toMatch(/^https:\/\/accounts\.google\.com/)
+    expect((await start('203.0.113.7')).headers.get('location')).toBe(`${ORIGIN}/?anmeldefehler=zu_viele`)
+    // Rücksprung zählt mit; andere IP nicht betroffen
+    expect((await anmeldungZurueck({ request: new Request(`${ORIGIN}/api/v2/anmeldung/google/zurueck?code=x&state=y`, { headers: { 'cf-connecting-ip': '203.0.113.7' } }), env, params: { anbieter: 'google' } })).headers.get('location')).toBe(`${ORIGIN}/?anmeldefehler=zu_viele`)
+    expect((await start('198.51.100.1')).headers.get('location')).toMatch(/^https:\/\/accounts\.google\.com/)
     const n = (await db.prepare('SELECT count(*) AS n FROM anmeldungen').first<{ n: number }>())!.n
-    expect(n).toBeLessThan(200)
+    expect(n).toBe(GRENZEN.anmeldung.anzahl + 1)
+    expect(JSON.stringify(db.roh.prepare('SELECT * FROM begrenzung').all())).not.toContain('203.0.113.7')
+    // Token-Tausch
+    const tausch = () => appToken({ request: new Request(`${ORIGIN}/api/v2/anmeldung/app/token`, { method: 'POST', body: '{}', headers: { 'cf-connecting-ip': '203.0.113.9' } }), env, params: {} })
+    for (let i = 0; i < GRENZEN.token.anzahl; i++) expect((await tausch()).status).toBe(400)
+    const zuViel = await tausch()
+    expect(zuViel.status).toBe(429)
+    expect(Number(zuViel.headers.get('retry-after'))).toBeGreaterThan(0)
+    // Nach Ablauf des Fensters wieder frei
+    expect(await zuViele(db, new Request(ORIGIN, { headers: { 'cf-connecting-ip': '203.0.113.9' } }), 'token', Date.now() + 11 * 60_000)).toBeUndefined()
+    // Ohne CF-Connecting-IP (lokal, Tests) keine Begrenzung
+    expect(await zuViele(db, new Request(ORIGIN), 'token')).toBeUndefined()
   })
 
-  it.fails('Fund M6: Massen-Uploads – Fotos ohne Eintrag im WEP sind begrenzt', async () => {
+  it('Fund M6 (behoben): Massen-Uploads – Fotos ohne Eintrag im WEP und Fotos je WEP sind begrenzt', async () => {
     const { r2, k, ruf, p } = await aufbau()
-    for (let i = 0; i < 60; i++) await ruf(dateiHochladen, 'PUT', `/api/v2/weps/w1/dateien/foto-x${i}.jpg`, k.bau, { body: JPEG, params: p('w1', `foto-x${i}.jpg`) })
-    expect([...r2.daten.keys()].filter((s) => s.startsWith('weps/w1/fotos/x')).length).toBeLessThan(60)
+    const hoch = (id: string) => ruf(dateiHochladen, 'PUT', `/api/v2/weps/w1/dateien/foto-${id}.jpg`, k.bau, { body: JPEG, params: p('w1', `foto-${id}.jpg`) })
+    for (let i = 0; i < MAX_FOTOS_OHNE_EINTRAG; i++) expect((await hoch(`x${i}`)).status).toBe(200)
+    expect((await hoch('x-zuviel')).status).toBe(429)
+    expect([...r2.daten.keys()].filter((s) => s.startsWith('weps/w1/fotos/x')).length).toBe(MAX_FOTOS_OHNE_EINTRAG)
+    // Ersetzen geht weiter, Fotos aus dem WEP auch
+    expect((await hoch('x0')).status).toBe(200)
+    expect((await hoch('bf1')).status).toBe(200)
+    // Höchstzahl je WEP (auch für Fotos im WEP)
+    for (let i = 0; i < MAX_FOTOS_JE_WEP; i++) r2.daten.set(`weps/w1/fotos/v${i}.jpg`, { bytes: JPEG, zeit: new Date() })
+    expect((await hoch('gf2')).status).toBe(413)
   })
 
-  it.fails('Fund M6b: Mail-Flut – viele eigene Grün-WEPs direkt an den BV erzeugen nicht je eine Nachricht an jedes BV-Konto', async () => {
-    const { db, k, ruf, p, abgabe } = await aufbau()
-    for (let i = 0; i < 30; i++) {
-      await ruf(wepSpeichern, 'PUT', `/api/v2/weps/s${i}`, k.gruen, { params: p(`s${i}`), body: { wep: neuerWep(`s${i}`), basisRev: 0 } })
-      await abgabe(`s${i}`, k.gruen, { aktion: 'an_bv' })
+  it('Fund M6b (behoben): Mail-Flut – Abgaben an den BV je Konto und Tag begrenzt, höchstens 5 Mails je Empfänger und Stunde', async () => {
+    const { db, env, k, ruf, p, abgabe } = await aufbau()
+    const mails: string[] = []
+    env.RESEND_API_KEY = 'test'
+    env.MAIL_ABSENDER = 'WEP <wep@example.org>'
+    const original = globalThis.fetch
+    globalThis.fetch = (async (_u: unknown, init?: RequestInit) => {
+      mails.push(JSON.parse(String(init?.body)).to[0])
+      return new Response('{}')
+    }) as typeof fetch
+    try {
+      const status: number[] = []
+      for (let i = 0; i < 30; i++) {
+        await ruf(wepSpeichern, 'PUT', `/api/v2/weps/s${i}`, k.gruen, { params: p(`s${i}`), body: { wep: neuerWep(`s${i}`), basisRev: 0 } })
+        status.push((await abgabe(`s${i}`, k.gruen, { aktion: 'an_bv' })).status)
+      }
+      expect(status.filter((s) => s === 200).length).toBe(TAGESGRENZEN.an_bv)
+      expect(status.filter((s) => s === 429).length).toBe(30 - TAGESGRENZEN.an_bv)
+      const n = (await db.prepare("SELECT count(*) AS n FROM benachrichtigungen WHERE konto_id = 'bv'").first<{ n: number }>())!.n
+      expect(n).toBe(TAGESGRENZEN.an_bv)
+      expect(mails.filter((m) => m === 'bv@example.org')).toHaveLength(MAILS_JE_STUNDE)
+      const gebuendelt = (await db.prepare("SELECT count(*) AS n FROM benachrichtigungen WHERE konto_id = 'bv' AND mail = 'gebuendelt'").first<{ n: number }>())!.n
+      expect(gebuendelt).toBe(TAGESGRENZEN.an_bv - MAILS_JE_STUNDE)
+    } finally {
+      globalThis.fetch = original
     }
-    const n = (await db.prepare("SELECT count(*) AS n FROM benachrichtigungen WHERE konto_id = 'bv'").first<{ n: number }>())!.n
-    expect(n).toBeLessThan(30)
+    // Anlegen: höchstens TAGESGRENZEN.angelegt neue WEPs je Konto und Tag
+    for (let i = 0; i < TAGESGRENZEN.angelegt; i++) await ruf(wepSpeichern, 'PUT', `/api/v2/weps/n${i}`, k.bau2, { params: p(`n${i}`), body: { wep: neuerWep(`n${i}`), basisRev: 0 } })
+    expect((await ruf(wepSpeichern, 'PUT', '/api/v2/weps/n-zuviel', k.bau2, { params: p('n-zuviel'), body: { wep: neuerWep('n-zuviel'), basisRev: 0 } })).status).toBe(429)
   })
 
-  it.fails('Fund N1: Origin-Prüfung und Sitzung lesen „Authorization“ gleich (kein Cookie-Rückfall bei ungültigem Bearer)', async () => {
+  it('Fund N1 (behoben): Origin-Prüfung und Sitzung lesen „Authorization“ gleich (kein Cookie-Rückfall bei ungültigem Bearer)', async () => {
     const { k, ruf, p } = await aufbau()
     // „Bearer a b“: fremdeHerkunft lässt durch (startsWith), kontoDerSitzung nimmt dann das Cookie
     const r = await ruf(wepLoeschen, 'DELETE', '/api/v2/weps/w1', k.bau, { params: p('w1'), body: { basisRev: 1 }, kopf: { origin: 'https://evil.example', authorization: 'Bearer a b' } })
     expect([401, 403]).toContain(r.status)
   })
 
-  it.fails('Fund N2: Einmal-Code lässt sich auch bei gleichzeitigen Anfragen nur einmal einlösen', async () => {
+  it('Fund N2 (behoben): Einmal-Code lässt sich auch bei gleichzeitigen Anfragen nur einmal einlösen', async () => {
     const db = testDb()
     anlegen(db, 'k1', ['bau'])
     const verifier = 'v'.repeat(43)
@@ -407,7 +510,7 @@ describe('offene Funde', () => {
     expect([a.ok, b.ok].filter(Boolean).length).toBe(1)
   })
 
-  it.fails('Fund N3: Token-Tausch gibt einem inzwischen gesperrten Konto keine Sitzung', async () => {
+  it('Fund N3 (behoben): Token-Tausch gibt einem inzwischen gesperrten Konto keine Sitzung', async () => {
     const db = testDb()
     anlegen(db, 'k1', ['bau'])
     const verifier = 'v'.repeat(43)
@@ -416,81 +519,128 @@ describe('offene Funde', () => {
     expect((await loeseAppCodeEin(db, code, verifier)).ok).toBe(false)
   })
 
-  it.fails('Fund N4: Bei einer Rückfrage darf die gefragte Person Fotos hochladen (Rechte der Dateien ohne Rückfrage-Felder)', async () => {
+  it('Fund N4 (behoben): Bei einer Rückfrage darf die gefragte Person Fotos hochladen, die andere nicht', async () => {
     const { k, ruf, p, abgabe } = await aufbau()
     await abgabe('w1', k.bau, { aktion: 'an_gruen', gruenKonto: 'gruen' })
     await abgabe('w1', k.gruen, { aktion: 'an_bv' })
     await abgabe('w1', k.bv, { aktion: 'rueckfrage', an: 'bau', notiz: 'Foto fehlt' })
     expect((await ruf(dateiHochladen, 'PUT', '/api/v2/weps/w1/dateien/foto-bf2.jpg', k.bau, { body: JPEG, params: p('w1', 'foto-bf2.jpg') })).status).toBe(200)
+    expect((await ruf(dateiHochladen, 'PUT', '/api/v2/weps/w1/dateien/foto-gf9.jpg', k.gruen, { body: JPEG, params: p('w1', 'foto-gf9.jpg') })).status).toBe(403)
+    // H1 gilt auch hier: Bau überschreibt kein Foto an einer Grün-Position
+    expect((await ruf(dateiHochladen, 'PUT', '/api/v2/weps/w1/dateien/foto-gf1.jpg', k.bau, { body: JPEG_BOESE, params: p('w1', 'foto-gf1.jpg') })).status).toBe(403)
   })
 
-  it.fails('Fund N5: Sitzungs-Cookie mit __Host-Präfix (Vorschau-Subdomains können sonst Cookies setzen)', () => {
-    expect(cookie(SITZUNG_COOKIE, 'x', 60)).toMatch(/^__Host-/)
+  it('Fund N5 (behoben): Sitzungs- und Anmelde-Cookie mit __Host-Präfix (Vorschau-Subdomains können sie nicht setzen)', () => {
+    expect(cookie(SITZUNG_COOKIE, 'x', 60)).toMatch(/^__Host-wep_sitzung=x; Path=\/; HttpOnly; Secure; SameSite=Lax/)
+    expect(cookie(ANMELDUNG_COOKIE, 'x', 60)).toMatch(/^__Host-/)
+    expect(cookie(SITZUNG_COOKIE, 'x', 60)).not.toMatch(/Domain=/i)
   })
 
-  it.fails('Fund N6: Sitzung endet nach längerer Untätigkeit (heute: 30 Tage fest, ohne Leerlauf-Ende)', async () => {
+  it('Fund N6 (behoben): Sitzung endet nach 14 Tagen Untätigkeit; Nutzung verlängert; „Überall abmelden“ beendet alle', async () => {
     const db = testDb()
     anlegen(db, 'k1', ['bau'])
     const jetzt = Date.parse(ZEIT)
+    const tag = 86_400_000
     const { token } = await neueSitzung(db, 'k1', jetzt)
-    const { kontoDerSitzung } = await import('../v2/sitzung')
-    const spaeter = jetzt + 29 * 86_400_000
-    expect(await kontoDerSitzung(db, new Request(ORIGIN, { headers: { authorization: `Bearer ${token}` } }), spaeter)).toBeUndefined()
+    const req = () => new Request(ORIGIN, { headers: { authorization: `Bearer ${token}` } })
+    expect(await kontoDerSitzung(db, req(), jetzt + 13 * tag)).toBeTruthy() // benutzt: zählt neu
+    expect(await kontoDerSitzung(db, req(), jetzt + 26 * tag)).toBeTruthy()
+    expect(await kontoDerSitzung(db, req(), jetzt + 41 * tag)).toBeUndefined() // 15 Tage nicht benutzt
+    // Überall abmelden (auch diese Sitzung)
+    const { k, ruf } = await aufbau()
+    const r = await ruf(sitzungBeenden, 'DELETE', '/api/v2/ich/sitzungen?alle=1', k.bau)
+    expect(r.status).toBe(200)
+    expect(r.headers.get('set-cookie')).toMatch(/^__Host-wep_sitzung=; .*Max-Age=0/)
+    expect((await ruf(wepListe, 'GET', '/api/v2/weps', k.bau)).status).toBe(401)
+    expect((await ruf(wepListe, 'GET', '/api/v2/weps', k.bau2)).status).toBe(200)
   })
 
-  it.fails('Fund N7: Eine fremde Person kann keine WEP-Kennung belegen, die ein anderes Konto später hochlädt', async () => {
+  it('Fund N7 (behoben): Alte, erratbare Kennungen und ungültige Kennungen lassen sich nicht neu belegen', async () => {
     const { k, ruf, p } = await aufbau()
-    // bau2 belegt die (alte, erratbare) Kennung zuerst
-    expect((await ruf(wepSpeichern, 'PUT', '/api/v2/weps/2026-007', k.bau2, { params: p('2026-007'), body: { wep: neuerWep('2026-007'), basisRev: 0 } })).status).toBe(200)
-    expect((await ruf(wepSpeichern, 'PUT', '/api/v2/weps/2026-007', k.bau, { params: p('2026-007'), body: { wep: neuerWep('2026-007'), basisRev: 0 } })).status).toBe(200)
+    for (const id of ['2026-007', '2026-1', 'a b', 'x'.repeat(65)]) {
+      expect((await ruf(wepSpeichern, 'PUT', `/api/v2/weps/${encodeURIComponent(id)}`, k.bau2, { params: p(id), body: { wep: neuerWep(id), basisRev: 0 } })).status).toBe(400)
+    }
+    const uuid = '6f1c2d3e-4a5b-4c6d-8e7f-90a1b2c3d4e5'
+    expect((await ruf(wepSpeichern, 'PUT', `/api/v2/weps/${uuid}`, k.bau2, { params: p(uuid), body: { wep: neuerWep(uuid), basisRev: 0 } })).status).toBe(200)
   })
 
-  it.fails('Fund N8: Notizen und Begründungen haben eine Höchstlänge', async () => {
+  it('Fund N8 (behoben): Notizen und Begründungen haben eine Höchstlänge', async () => {
     const { k, abgabe } = await aufbau()
     await abgabe('w1', k.bau, { aktion: 'an_gruen', gruenKonto: 'gruen' })
     await abgabe('w1', k.gruen, { aktion: 'an_bv' })
     expect((await abgabe('w1', k.bv, { aktion: 'rueckfrage', an: 'bau', notiz: 'x'.repeat(200_000) })).status).toBe(400)
+    expect((await abgabe('w1', k.bv, { aktion: 'geprueft', notiz: 'x'.repeat(2001) })).status).toBe(400)
+    expect((await abgabe('w1', k.bv, { aktion: 'geprueft', notiz: 'x'.repeat(2000) })).status).toBe(200)
+    expect((await abgabe('w1', k.bv, { aktion: 'wiederoeffnen', begruendung: 'x'.repeat(2001) })).status).toBe(400)
   })
 
-  it.fails('Fund N9: /api/v2/status verrät ohne Anmeldung nichts über die Einrichtung', async () => {
-    const r = await status({ env: { SERVER_MODUS: 'true' } })
-    expect(((await r.json()) as { einrichtung?: unknown }).einrichtung).toBeUndefined()
+  it('Fund N9 (behoben): /api/v2/status zeigt ohne Admin-Anmeldung nur, ob Google und Microsoft eingerichtet sind', async () => {
+    const { env, k, db } = await aufbau()
+    const frage = async (wer: Konto | null) => {
+      const c = wer ? (await neueSitzung(db, wer.id)).cookie.split(';')[0] : ''
+      return (await (await status({ request: new Request(`${ORIGIN}/api/v2/status`, { headers: { cookie: c } }), env })).json()) as Record<string, unknown>
+    }
+    for (const wer of [null, k.bau, k.bv]) expect(await frage(wer)).toEqual({ serverModus: true, einrichtung: { google: false, microsoft: false } })
+    const admin = await frage(k.admin)
+    expect(admin.einrichtung).toMatchObject({ datenbank: true, dateien: true, mail: false })
+    expect(admin.schema).toMatchObject({ erwartet: expect.any(Number) })
+    expect(admin.warnungen).toEqual([])
   })
 
-  it.fails('Fund N11: Die Grün-Auswahl für Bau zeigt keine E-Mail-Adressen', async () => {
-    const { k, ruf } = await aufbau()
-    const d = (await (await ruf(gruenListe, 'GET', '/api/v2/konten/gruen', k.bau)).json()) as { konten: { email?: string }[] }
+  it('Fund N11 (behoben): Grün-Auswahl, Verlauf und Ablauf zeigen keine E-Mail-Adressen', async () => {
+    const { db, k, ruf, p, abgabe } = await aufbau()
+    db.roh.prepare("UPDATE konten SET name = '' WHERE id = 'gruen'").run()
+    const d = (await (await ruf(gruenListe, 'GET', '/api/v2/konten/gruen', k.bau)).json()) as { konten: { id: string; name: string; email?: string }[] }
     expect(d.konten.every((x) => !x.email)).toBe(true)
+    expect(d.konten.find((x) => x.id === 'gruen')?.name).toBe('Konto ohne Namen')
+    await abgabe('w1', k.bau, { aktion: 'an_gruen', gruenKonto: 'gruen' })
+    const v = await (await ruf(verlauf, 'GET', '/api/v2/weps/w1/verlauf', k.gruen, { params: p('w1') })).text()
+    const w = await (await ruf(wepHolen, 'GET', '/api/v2/weps/w1', k.gruen, { params: p('w1') })).text()
+    for (const text of [v, w]) expect(text).not.toContain('gruen@example.org')
   })
 
-  it.fails('Fund N12: Beim Zusammenführen übernimmt Grün nicht den Namen des Bau-Wertermittlers aus dem eigenen WEP', async () => {
+  it('Fund N12 (behoben): Beim Zusammenführen übernimmt Grün nicht den Namen des Bau-Wertermittlers, und `felder` ist begrenzt', async () => {
     const { db, k, ruf, p, rev, abgabe } = await aufbau()
     const g = neuerWep('g1')
     g.formalien.wertermittlerBaulichkeiten = 'Falscher Name'
     await ruf(wepSpeichern, 'PUT', '/api/v2/weps/g1', k.gruen, { params: p('g1'), body: { wep: g, basisRev: 0 } })
     await abgabe('w1', k.bau, { aktion: 'an_gruen', gruenKonto: 'gruen' })
-    await ruf(zusammenfuehren, 'POST', '/api/v2/weps/w1/zusammenfuehren', k.gruen, { params: p('w1'), body: { aus: 'g1', wep: bauWep('w1'), felder: ['wertermittlerBaulichkeiten'], basisRev: await rev('w1') } })
+    const felder = ['wertermittlerBaulichkeiten', 'auftraggeber', ...Array.from({ length: 5000 }, (_, i) => `x${i}`)]
+    g.formalien.auftraggeber = 'Gartenfreunde e. V.'
+    await ruf(wepSpeichern, 'PUT', '/api/v2/weps/g1', k.gruen, { params: p('g1'), body: { wep: g, basisRev: await rev('g1') } })
+    expect((await ruf(zusammenfuehren, 'POST', '/api/v2/weps/w1/zusammenfuehren', k.gruen, { params: p('w1'), body: { aus: 'g1', wep: bauWep('w1'), felder, basisRev: await rev('w1') } })).status).toBe(200)
     const w = JSON.parse((await db.prepare("SELECT daten FROM weps WHERE id = 'w1'").first<{ daten: string }>())!.daten) as Wep
     expect(w.formalien.wertermittlerBaulichkeiten).not.toBe('Falscher Name')
+    expect(w.formalien.auftraggeber).toBe('Gartenfreunde e. V.')
+    const notiz = (await db.prepare("SELECT notiz FROM verlauf WHERE wep_id = 'w1' AND aktion = 'zusammengefuehrt'").first<{ notiz: string }>())!.notiz
+    expect(notiz).toBe('mit dem eigenen WEP ohne Vorgangs-Nr.; übernommene Stammdaten: auftraggeber')
   })
 
-  it.fails('Fund N15: aud mit mehreren Empfängern nur mit passendem azp', async () => {
+  it('Fund N15 (behoben): aud mit mehreren Empfängern nur mit passendem azp', async () => {
     const { schluessel, signiere } = await testSchluessel()
     const token = await signiere({ iss: 'https://accounts.google.com', aud: ['fremde-app', 'g'], azp: 'fremde-app', sub: '123', email: 'a@example.org', email_verified: true, nonce: 'n', exp: Math.floor(Date.now() / 1000) + 600 })
-    await expect(pruefeAnmeldeToken(token, { anbieter: 'google', clientId: 'g', nonce: 'n', schluessel })).rejects.toThrow()
+    await expect(pruefeAnmeldeToken(token, { anbieter: 'google', clientId: 'g', nonce: 'n', schluessel })).rejects.toThrow(/azp/)
+    const passend = await signiere({ iss: 'https://accounts.google.com', aud: ['fremde-app', 'g'], azp: 'g', sub: '123', email: 'a@example.org', email_verified: true, nonce: 'n', exp: Math.floor(Date.now() / 1000) + 600 })
+    expect((await pruefeAnmeldeToken(passend, { anbieter: 'google', clientId: 'g', nonce: 'n', schluessel })).subjekt).toBe('123')
   })
 
-  it.fails('Fund N10: Die Anmeldeseite zeigt keinen beliebigen Text aus der Adresse', async () => {
+  it('Fund N10 (behoben): Die Anmeldeseite zeigt keinen beliebigen Text aus der Adresse', async () => {
     const env = { SERVER_MODUS: 'true', WEP_DB: testDb(), GOOGLE_CLIENT_ID: 'g', GOOGLE_CLIENT_SECRET: 's' }
     const text = 'Bitte rufen Sie 0800 123 an'
     const r = await anmeldungZurueck({ request: new Request(`${ORIGIN}/api/v2/anmeldung/google/zurueck?error=${encodeURIComponent(text)}`), env, params: { anbieter: 'google' } })
     expect(decodeURIComponent(r.headers.get('location') ?? '')).not.toContain(text)
+    expect(r.headers.get('location')).toBe(`${ORIGIN}/?anmeldefehler=anbieter`)
+    expect(anmeldeFehlerText(text)).toBe(ANMELDEFEHLER_TEXT.fehler)
+    expect(anmeldeFehlerText('gesperrt')).toBe(ANMELDEFEHLER_TEXT.gesperrt)
+    expect(anmeldeFehlerText('__proto__')).toBe(ANMELDEFEHLER_TEXT.fehler)
   })
 
-  it.fails('Fund N13: Fehler von Resend landen ohne E-Mail-Adresse im Log', async () => {
+  it('Fund N13 (behoben): Fehler von Resend landen ohne E-Mail-Adresse im Log', async () => {
     const laden = (async () => new Response('Invalid `to` field: erika@example.org', { status: 422 })) as unknown as typeof fetch
     const fehler = await sendeMail({ RESEND_API_KEY: 'k', MAIL_ABSENDER: 'a@example.org' }, 'erika@example.org', { subject: 's', text: 't', html: 'h' }, laden).catch((e: Error) => e.message)
     expect(fehler).not.toContain('erika@example.org')
+    const mitArt = (async () => new Response(JSON.stringify({ name: 'validation_error', message: 'Invalid `to` field: erika@example.org' }), { status: 422 })) as unknown as typeof fetch
+    expect(await sendeMail({ RESEND_API_KEY: 'k', MAIL_ABSENDER: 'a@example.org' }, 'erika@example.org', { subject: 's', text: 't', html: 'h' }, mitArt).catch((e: Error) => e.message)).toBe('Resend 422 (validation_error)')
   })
 
   it.fails('Fund N14: Ein Start-Link mit fremder challenge führt nicht ohne Rückfrage zum Anbieter', async () => {

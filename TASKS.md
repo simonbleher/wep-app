@@ -8,12 +8,15 @@ und in docs/ENTSCHEIDUNGEN.md. Die alten Agenten-Prompts stehen in der Git-Histo
 
 ## Offen / als Nächstes
 
-**Sicherheit** (Funde aus docs/SICHERHEITSPRUEFUNG-V2.md, PRs warten auf Simon):
-- 🟡 PR A · Rechte/Eingaben (M2, N4, N7, N8, N12; M1 akzeptiert) – #126
-- 🟡 PR B · Anmeldung/Sitzung (M3, M5, N1, N2, N3, N5, N6, N10, N15) – #127
-- 🟡 PR C · Missbrauch/Datensparsamkeit (M6, M7, N9, N11, N13) – #128
-- 🟡 PR D · Security-Header (M4, CSP zuerst Report-Only) – #129
-- 🟡 PR E · Abhängigkeiten der Windows-App (M8; Windows 0.1.6, Hülle 5) – #130
+**Sicherheit** (Funde aus docs/SICHERHEITSPRUEFUNG-V2.md; PR A–E gemergt, #126–#130):
+- ⬜ Nach PR B: Migration `0007_anmeldung_sicherheit.sql` in D1 einspielen, `V2_ADMINS` mit Anbieter-Präfix umstellen
+  (docs/V2-EINRICHTUNG.md), dann freigeben; danach neue EXE 0.1.6 installieren (Hülle 5).
+- ⬜ V2-SICHERHEIT-D2 · CSP scharf schalten: nach einigen Tagen ohne „[Report Only]“-Meldungen in der Browser-Konsole bzw.
+  „CSP (nur gemeldet)“ im Function-Log `Content-Security-Policy-Report-Only` → `Content-Security-Policy` in `public/_headers`,
+  Test „Folge-PR zu M4“ in `v2Sicherheit.test.ts` von `it.fails` auf `it`.
+- ⬜ V2-SICHERHEIT-N14 · Android: App Links (https, verifiziert) statt `de.wep.app://` für den Rücksprung der Server-Anmeldung.
+- ⬜ Rest-Risiko M5: Die Begrenzung zählt in D1 (jede Anfrage schreibt); dicht erst mit eigener Domain + Cloudflare-WAF.
+- ⬜ Rest-Risiko M7: Besitzer der lokalen Ablage steht im localStorage; besser in der IndexedDB selbst speichern.
 
 **App:**
 - ⬜ Anzeige „N Änderungen warten“, obwohl keine Daten mehr warten (Server-Modus).
@@ -135,4 +138,7 @@ und in docs/ENTSCHEIDUNGEN.md. Die alten Agenten-Prompts stehen in der Git-Histo
 - V2-8 · Server-Modus in Android- und Windows-App ✅ gemergt (#122). Gerätetest offen (V2-8b, oben).
 - V2-8a · APK/EXE mit Server-Schalter bauen ✅ gemergt (#123).
 - V2-SICHERHEIT · Sicherheitsprüfung des Server-Modus, Fix H1 ✅ gemergt (#125). Übrige Funde: PR A–E (oben).
+- V2-SICHERHEIT-A–E · Funde behoben ✅ gemergt (#126 Rechte/Eingaben, #127 Anmeldung/Sitzung mit Migration 0007,
+  #128 Missbrauch/Datensparsamkeit, #129 Security-Header mit CSP Report-Only, #130 Abhängigkeiten zip 9/tokio, Windows 0.1.6).
+  M1 bewusst akzeptiert (ENTSCHEIDUNGEN.md).
 - V2-7 · Migration der v1-WEPs – entfällt (oben).
