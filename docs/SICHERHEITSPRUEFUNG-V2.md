@@ -29,27 +29,27 @@ B Anmeldung/Sitzung, C Missbrauch/Datensparsamkeit, D Header, E Abhängigkeiten.
 | H1 | ✅ behoben | #125 |
 | M1 | ☑️ bewusst akzeptiert: Die BV-Revision legt keine eigenen WEPs an, und zum Testen soll ein Konto alle Rollen durchspielen können. Der Test hält das Verhalten fest. | Entscheidung 29.10.2026 |
 | M2 | ✅ behoben: schlanke Formprüfung (`functions/_lib/v2/form.ts`) beim Speichern und Zusammenführen, 400 statt 500 | PR A |
-| M3 | geplant | PR B |
+| M3 | ✅ behoben: `V2_ADMINS` mit Anbieter-Präfix (`google:`/`microsoft:`). Die alte Form gilt weiter, mit Warnung für Admins in `/api/v2/status` und auf der Admin-Seite. Bestätigt/unbestätigt je Konto (`email_bestaetigt`). Die Admin-Seite zeigt Anbieter, Tenant und „(unbestätigt)“. | PR B |
 | M4 | geplant (CSP zuerst als Report-Only) | PR D |
-| M5 | geplant (Begrenzung im Code, WAF geht auf `*.pages.dev` nicht) | PR B |
+| M5 | ✅ behoben: Zähler je Bereich und IP-Hash in D1 (`begrenzung`, Fenster 10 min): Anmeldung (start + zurueck) 60, Token-Tausch 30. Danach Hinweis bzw. 429. Ohne `CF-Connecting-IP` (lokal) keine Begrenzung. | PR B |
 | M6 | geplant | PR C |
 | M7 | geplant | PR C |
 | M8 | geplant | PR E |
-| N1 | geplant | PR B |
-| N2 | geplant | PR B |
-| N3 | geplant | PR B |
+| N1 | ✅ behoben: Origin-Prüfung und Sitzung lesen denselben Bearer-Kopf. Mit `Authorization`-Kopf wird nie auf das Cookie zurückgegriffen. | PR B |
+| N2 | ✅ behoben: `DELETE … RETURNING` in einem Schritt | PR B |
+| N3 | ✅ behoben: gesperrte Konten bekommen beim Token-Tausch keine Sitzung | PR B |
 | N4 | ✅ behoben: Dateirechte mit denselben Rückfrage-Feldern wie das WEP (`rechteKopf`). Die Teile-Grenze aus H1 gilt damit auch bei der Rückfrage. | PR A |
-| N5 | geplant | PR B |
-| N6 | geplant | PR B |
+| N5 | ✅ behoben: `__Host-wep_sitzung` / `__Host-wep_anmeldung`. Alte Sitzungen enden einmal, alte Cookies werden beim Abmelden gelöscht. | PR B |
+| N6 | ✅ behoben: Ende nach 14 Tagen ohne Nutzung (`zuletzt_genutzt`, höchstens einmal am Tag aufgefrischt). „Überall abmelden“ im Profil (`DELETE /api/v2/ich/sitzungen?alle=1`). | PR B |
 | N7 | ✅ behoben: Der Server legt keine neuen WEPs mit alter Kennung („2026-007“) oder ungültiger Kennung an. Die App vergibt solchen WEPs vor dem ersten Hochladen eine UUID (Vorgangs-Nr., Fotos und Bau-Excel ziehen mit). | PR A |
 | N8 | ✅ behoben: Notiz, Begründung und Notiz zu „geprüft“ höchstens 2000 Zeichen (`MAX_NOTIZ`, auch als `maxLength` auf der Kontrollseite). `felder` beim Zusammenführen nur bekannte Formalien-Felder. | PR A |
 | N9 | geplant | PR C |
-| N10 | geplant | PR B |
+| N10 | ✅ behoben: nur feste Schlüssel (`?anmeldefehler=abgelaufen`), Texte in `src/server/anmeldeFehler.ts` | PR B |
 | N11 | geplant | PR C |
 | N12 | ✅ behoben: `BAU_FORMALIEN` (`wertermittlerBaulichkeiten`) wird beim Zusammenführen nie aus dem Grün-WEP übernommen, weder auf dem Server noch in der App-Vorschau | PR A |
 | N13 | geplant | PR C |
 | N14 | offen, als Aufgabe in TASKS.md (App Links) | – |
-| N15 | geplant | PR B |
+| N15 | ✅ behoben: Bei mehreren Empfängern oder vorhandenem `azp` muss `azp` die Client-ID sein | PR B |
 
 ## Funde
 

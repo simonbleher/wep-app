@@ -75,7 +75,7 @@ try {
   await seite.getByRole('heading', { name: 'Wartet auf Freigabe' }).waitFor()
   pruefe(await seite.getByText(/max@bv\.example/).isVisible(), 'Max: Konto angelegt, wartet auf Freigabe')
   await seite.screenshot({ path: `${AUSGABE}/02-wartet.png` })
-  await seite.getByRole('button', { name: 'Abmelden' }).click()
+  await seite.getByRole('button', { name: 'Abmelden', exact: true }).click()
   await seite.getByRole('link', { name: 'Mit Google anmelden' }).waitFor()
 
   // 3. Erster Admin (V2_ADMINS) kommt direkt in die App, ohne OneDrive
@@ -127,7 +127,7 @@ try {
   // 6. Abmelden, Max meldet sich an und kommt in die App
   await seite.getByRole('button', { name: 'Profil', exact: true }).first().click()
   await seite.getByRole('heading', { name: 'Profil und Einstellungen' }).waitFor()
-  await seite.getByRole('button', { name: 'Abmelden' }).click()
+  await seite.getByRole('button', { name: 'Abmelden', exact: true }).click()
   await anmelden(seite, 'max')
   await seite.getByRole('heading', { name: 'Protokolle' }).waitFor()
   await seite.getByRole('button', { name: 'Profil und Einstellungen' }).filter({ visible: true }).first().click()
@@ -268,7 +268,7 @@ try {
     await sa.screenshot({ path: `${AUSGABE}/05b-windows-app-geraete.png` })
     // Browser-Sitzung von der App aus abmelden; Gerät B (Browser) muss sich danach neu anmelden
     const vorher = (db.roh.prepare('SELECT count(*) AS n FROM sitzungen WHERE konto_id = ?').get(bertId) as { n: number }).n
-    await sa.locator('li', { hasText: /^Browser · angemeldet am/ }).getByRole('button', { name: 'Abmelden' }).first().click()
+    await sa.locator('li', { hasText: /^Browser · angemeldet am/ }).getByRole('button', { name: 'Abmelden', exact: true }).first().click()
     let nachher = vorher
     for (let i = 0; i < 50 && nachher === vorher; i++) {
       nachher = (db.roh.prepare('SELECT count(*) AS n FROM sitzungen WHERE konto_id = ?').get(bertId) as { n: number }).n

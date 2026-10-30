@@ -24,7 +24,7 @@ Cloudflare → **Workers & Pages** → Projekt **wep-pankow** → **Einstellunge
 |---|---|---|
 | `SERVER_MODUS` | Variable (Text) | `true` |
 | `VITE_SERVER_MODUS` | Variable (Text) | `true` (wird beim Build eingebaut) |
-| `V2_ADMINS` | Variable (Text) | deine Anmelde-E-Mail(s), kommagetrennt (erste Admins) |
+| `V2_ADMINS` | Variable (Text) | erste Admins mit Anbieter, kommagetrennt, z. B. `google:du@example.org` (siehe „V2_ADMINS mit Anbieter“) |
 | `VITE_MS_CLIENT_ID` | Variable (Text) | ist schon gesetzt (Produktion) |
 | `GOOGLE_CLIENT_ID` | Variable (Text) | Schritt 3 |
 | `GOOGLE_CLIENT_SECRET` | **Geheimnis** | Schritt 3 |
@@ -52,7 +52,7 @@ Die Namen müssen genau so geschrieben sein.
 
 ### Tabellen einspielen (Migrationen)
 
-Die Tabellen stehen im Repo unter `migrations/` (`0001_konten.sql`, `0002_weps.sql`, `0003_ablauf.sql`, `0004_benachrichtigungen.sql`, `0005_gruen_zusammenfuehren.sql`, `0006_app_anmeldung.sql`, …). Jede Datei
+Die Tabellen stehen im Repo unter `migrations/` (`0001_konten.sql`, `0002_weps.sql`, `0003_ablauf.sql`, `0004_benachrichtigungen.sql`, `0005_gruen_zusammenfuehren.sql`, `0006_app_anmeldung.sql`, `0007_anmeldung_sicherheit.sql`, …). Jede Datei
 wird **genau einmal und in der Reihenfolge der Nummern** eingespielt:
 
 1. Dashboard → **D1** → `wep-v2` → Reiter **Konsole** (*Console*).
@@ -174,8 +174,11 @@ Windows-App arbeiten vorerst weiter wie v1 mit OneDrive und melden sich darüber
 2. Im Browser öffnen: `https://wep-pankow.pages.dev/api/v2/status`. Erwartet wird etwa:
 
    ```json
-   {"serverModus":true,"einrichtung":{"datenbank":true,"dateien":true,"google":true,"microsoft":true,"mail":true,"admins":true},"schema":{"stand":5,"erwartet":5}}
+   {"serverModus":true,"einrichtung":{"datenbank":true,"dateien":true,"google":true,"microsoft":true,"mail":true,"admins":true},"schema":{"stand":7,"erwartet":7}}
    ```
+
+   - Bist du im selben Browser als Admin angemeldet, steht dort zusätzlich `"warnungen":[…]`. Leer (`[]`) ist gut;
+     sonst steht dort, was zu tun ist (z. B. `V2_ADMINS` ohne Anbieter).
 
    - Steht dort `false`, fehlt der Teil oder ist falsch geschrieben (siehe Tabelle oben).
    - Kommt „Nicht gefunden“, fehlt `SERVER_MODUS=true` in Produktion, oder der neue Build fehlt.
@@ -189,10 +192,33 @@ Windows-App arbeiten vorerst weiter wie v1 mit OneDrive und melden sich darüber
    - Unter **Profil → Konten verwalten** gibst du weitere Konten frei und vergibst Rollen
      (Wertermittler Bau **oder** Grün, dazu BV und Admin).
    - Für `V2_ADMINS` zählen nur bestätigte Adressen: bei Google mit bestätigter E-Mail, bei
-     Microsoft die Anmeldeadresse.
+     Microsoft die Anmeldeadresse – und nur beim Anbieter, der davor steht (`google:` bzw. `microsoft:`).
    - Alle anderen Konten warten nach der ersten Anmeldung auf deine Freigabe.
 5. **Anleitung:** In der App unter Profil → Anleitung (oder
    `docs/anleitung-v2/Anleitung_WEP-App_v2.pdf`) – Ablauf Bau → Grün → BV mit Bildern.
+
+### V2_ADMINS mit Anbieter (seit Herbst 2026)
+
+Früher stand in `V2_ADMINS` nur die Adresse. Dann wurde jedes Konto mit dieser Adresse Admin – egal ob es sich
+mit Google oder mit Microsoft anmeldet, auch aus einem fremden Microsoft-Tenant (Sicherheitsprüfung, Fund M3).
+Jetzt steht der Anbieter davor. Die alte Form gilt vorerst weiter, aber die Admin-Seite und `/api/v2/status`
+zeigen dann eine Warnung. So stellst du um:
+
+1. Überlege für jede Adresse, mit welchem Knopf sich die Person anmeldet: „Mit Google anmelden“ → `google:`,
+   „Mit Microsoft anmelden“ → `microsoft:`.
+2. Cloudflare-Dashboard → **Workers & Pages** → `wep-pankow` → **Einstellungen** (*Settings*) →
+   **Variablen und Geheimnisse** (*Variables and Secrets*) → Umgebung **Produktion** (*Production*).
+3. Bei `V2_ADMINS` auf **Bearbeiten** (*Edit*) und den Wert neu schreiben, z. B.
+   `google:simon@example.org` oder für zwei Personen `google:simon@example.org,microsoft:it@verein.example`
+   (ohne Leerzeichen, Groß-/Kleinschreibung egal). **Speichern** (*Save*).
+4. Die Variable wirkt erst mit einem neuen Build: **Bereitstellungen** (*Deployments*) → bei der letzten
+   Bereitstellung von `release` **erneut ausführen** (*Retry deployment*) – oder „Version freigeben“ (Schritt 6.1).
+5. Prüfen: angemeldet als Admin `https://wep-pankow.pages.dev/api/v2/status` öffnen → `"warnungen":[]`.
+   In der App unter **Profil → Konten verwalten** ist der gelbe Hinweis zu `V2_ADMINS` weg.
+
+Bestehende Admins bleiben Admin, auch wenn ihre Adresse nicht mehr passt; Rollen vergibt danach die Admin-Seite.
+Auf der Admin-Seite steht bei jedem Konto der Anbieter, bei Microsoft der Tenant (oder „persönliches Konto“), und
+„(unbestätigt)“, wenn der Anbieter die Adresse nicht bestätigt hat – vor dem Freigeben bitte prüfen, wer das ist.
 
 **Hinweis zur Adresse:** Anmelden klappt nur unter `wep-pankow.pages.dev` (und `localhost:8788` zum
 Testen). Die Einzel-Adressen pro Bereitstellung (`<kennung>.wep-pankow.pages.dev`) und
@@ -204,7 +230,8 @@ Seit Paket 8 melden sich die Apps über den Browser des Geräts am Server an. **
 ist dafür nichts einzutragen:** Der Server benutzt seine bisherigen Rücksprung-Adressen und reicht die
 Anmeldung danach an die App weiter. Nötig ist nur:
 
-1. Migration `0006_app_anmeldung.sql` in der D1-Konsole einspielen (wie oben unter „Tabellen einspielen“).
+1. Migration `0006_app_anmeldung.sql` in der D1-Konsole einspielen (wie oben unter „Tabellen einspielen“), danach
+   `0007_anmeldung_sicherheit.sql`.
 2. Die neuen Apps installieren: Android-App 0.2.0 (`https://wep-pankow-apk.pages.dev/wep.apk`), Windows-App
    0.1.4 (`https://wep-pankow-apk.pages.dev/windows/wep-setup.exe`). Die bisherigen Apps bieten das Update
    auch selbst an. Bis dahin laufen sie weiter wie v1 und zeigen oben „bitte die App aktualisieren“.

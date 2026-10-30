@@ -2,7 +2,7 @@
 import { jsonAntwort, type V2Umgebung } from '../serverModus'
 import type { Db } from './db'
 import type { Konto, Rolle } from './konten'
-import { kontoDerSitzung } from './sitzung'
+import { hatBearer, kontoDerSitzung } from './sitzung'
 
 export interface V2Kontext<P extends string = never> {
   request: Request
@@ -21,7 +21,7 @@ export const NICHT_EINGERICHTET = () => jsonAntwort(503, { fehler: 'Die Datenban
  * vor fremden Seiten, die mit dem Cookie des Nutzers etwas auslösen wollen. Die Apps (Bearer-Token) sind ausgenommen.
  */
 export function fremdeHerkunft(request: Request): Response | undefined {
-  if (request.headers.get('authorization')?.startsWith('Bearer ')) return undefined
+  if (hatBearer(request)) return undefined
   const origin = request.headers.get('origin')
   return origin === new URL(request.url).origin ? undefined : jsonAntwort(403, { fehler: 'Anfrage von fremder Seite abgelehnt.' })
 }

@@ -14,8 +14,11 @@ import type { DbAnweisung } from '../v2/db'
 import { testDb } from './sqliteDb'
 import { fakeR2 } from './fakeR2'
 import type { Konto, Rolle } from '../v2/konten'
-import { kontoZurAnmeldung } from '../v2/konten'
-import { cookie, neueSitzung, SITZUNG_COOKIE } from '../v2/sitzung'
+import { adminWarnungen, kontoZurAnmeldung } from '../v2/konten'
+import { GRENZEN, zuViele } from '../v2/begrenzung'
+import { ANMELDEFEHLER_TEXT, anmeldeFehlerText } from '../../../src/server/anmeldeFehler'
+import { onRequestPost as appToken } from '../../api/v2/anmeldung/app/token'
+import { ANMELDUNG_COOKIE, cookie, kontoDerSitzung, neueSitzung, SITZUNG_COOKIE } from '../v2/sitzung'
 import { erstelleAppCode, loeseAppCodeEin, RUECKSPRUNG_ANDROID } from '../v2/appAnmeldung'
 import { pruefeAnmeldeToken, sha256b64url } from '../v2/oidc'
 import { onRequest as middleware } from '../../api/v2/_middleware'
@@ -351,19 +354,42 @@ describe('offene Funde', () => {
     expect((await ruf(wepSpeichern, 'PUT', '/api/v2/weps/w3', k.bau, { params: p('w3'), body: { wep: { id: 'w3', formalien: {} }, basisRev: 0 } })).status).toBe(200)
   })
 
-  it.fails('Fund M3a: Microsoft – ohne Adresse in preferred_username wird der unbestätigte Anspruch „email“ nicht als Konto-Adresse übernommen', async () => {
+  it('Fund M3a (behoben): Microsoft – der unbestätigte Anspruch „email“ wird als unbestätigt geführt; Admin-Seite zeigt Tenant und „unbestätigt“', async () => {
     const { schluessel, signiere } = await testSchluessel()
     const tid = '0a1b2c3d-1111-2222-3333-444455556666'
     const token = await signiere({ iss: `https://login.microsoftonline.com/${tid}/v2.0`, aud: 'ms', tid, oid: 'o1', preferred_username: '+491701234567', email: 'simon@example.org', nonce: 'n', exp: Math.floor(Date.now() / 1000) + 600 })
     const id = await pruefeAnmeldeToken(token, { anbieter: 'microsoft', clientId: 'ms', nonce: 'n', schluessel })
-    expect(id.email).toBe('')
+    expect(id.emailBestaetigt).toBe(false)
+    const db = testDb()
+    const k = await kontoZurAnmeldung(db, id, 'microsoft:simon@example.org')
+    expect(k).toMatchObject({ email: 'simon@example.org', emailBestaetigt: false, tenant: tid, status: 'wartet' })
+    expect(k.rollen).not.toContain('admin')
+    const persoenlich = await kontoZurAnmeldung(db, { anbieter: 'microsoft', subjekt: '9188040d-6c67-4c5b-b112-36a304b66dad:o2', name: 'P', email: 'p@example.org', emailBestaetigt: true }, '')
+    expect(persoenlich).toMatchObject({ emailBestaetigt: true, tenant: 'persoenlich' })
   })
 
-  it.fails('Fund M3b: V2_ADMINS gilt nicht für ein Geschäftskonto aus einem beliebigen Tenant (preferred_username ist laut Microsoft nicht für Rechte gedacht)', async () => {
+  it('Fund M3b (behoben): V2_ADMINS mit Anbieter gilt nur bei diesem Anbieter; die alte Form gilt weiter, mit Warnung nur für Admins', async () => {
     const db = testDb()
     const tid = 'fremder-tenant-0000'
-    const k = await kontoZurAnmeldung(db, { anbieter: 'microsoft', subjekt: `${tid}:o1`, name: 'Irgendwer', email: 'admin@example.org', emailBestaetigt: true }, 'admin@example.org')
-    expect(k.rollen).not.toContain('admin')
+    const ms = { anbieter: 'microsoft' as const, subjekt: `${tid}:o1`, name: 'Irgendwer', email: 'admin@example.org', emailBestaetigt: true }
+    expect((await kontoZurAnmeldung(db, ms, 'google:admin@example.org')).rollen).not.toContain('admin')
+    const g = await kontoZurAnmeldung(db, { anbieter: 'google', subjekt: 'g-1', name: 'Simon', email: 'admin@example.org', emailBestaetigt: true }, ' Google:Admin@Example.org ')
+    expect(g.rollen).toContain('admin')
+    // alte Form (ohne Anbieter): gilt noch für beide Anbieter
+    expect((await kontoZurAnmeldung(testDb(), ms, 'admin@example.org')).rollen).toContain('admin')
+    expect(adminWarnungen('google:a@example.org, microsoft:b@example.org')).toEqual([])
+    expect(adminWarnungen('google:a@example.org, b@example.org')[0]).toMatch(/ohne Anbieter/)
+
+    // /api/v2/status: Warnung nur für angemeldete Admins
+    const { env, k, db: db2 } = await aufbau()
+    env.V2_ADMINS = 'admin@example.org'
+    const status2 = async (wer: Konto | null) => {
+      const cookieWert = wer ? (await neueSitzung(db2, wer.id)).cookie.split(';')[0] : ''
+      return (await (await status({ request: new Request(`${ORIGIN}/api/v2/status`, { headers: { cookie: cookieWert } }), env })).json()) as { warnungen?: string[] }
+    }
+    expect((await status2(k.admin)).warnungen?.[0]).toMatch(/ohne Anbieter/)
+    expect((await status2(k.bau)).warnungen).toBeUndefined()
+    expect((await status2(null)).warnungen).toBeUndefined()
   })
 
   it.fails('Fund M4: Security-Header in public/_headers (CSP mit frame-ancestors, nosniff, Referrer-Policy)', () => {
@@ -373,12 +399,28 @@ describe('offene Funde', () => {
     expect(kopf).toMatch(/Referrer-Policy:/i)
   })
 
-  it.fails('Fund M5: Anmeldestart ohne Anmeldung ist begrenzt (jede Anfrage schreibt eine Zeile in D1)', async () => {
+  it('Fund M5 (behoben): Anmeldung und Token-Tausch sind je IP begrenzt (Zähler mit Ablauf, nur IP-Hash in D1)', async () => {
     const db = testDb()
     const env = { SERVER_MODUS: 'true', WEP_DB: db, GOOGLE_CLIENT_ID: 'g', GOOGLE_CLIENT_SECRET: 's' }
-    for (let i = 0; i < 200; i++) await anmeldungStart({ request: new Request(`${ORIGIN}/api/v2/anmeldung/google/start`), env, params: { anbieter: 'google' } })
+    const start = (ip: string) => anmeldungStart({ request: new Request(`${ORIGIN}/api/v2/anmeldung/google/start`, { headers: { 'cf-connecting-ip': ip } }), env, params: { anbieter: 'google' } })
+    for (let i = 0; i < GRENZEN.anmeldung.anzahl; i++) expect((await start('203.0.113.7')).headers.get('location')).toMatch(/^https:\/\/accounts\.google\.com/)
+    expect((await start('203.0.113.7')).headers.get('location')).toBe(`${ORIGIN}/?anmeldefehler=zu_viele`)
+    // Rücksprung zählt mit; andere IP nicht betroffen
+    expect((await anmeldungZurueck({ request: new Request(`${ORIGIN}/api/v2/anmeldung/google/zurueck?code=x&state=y`, { headers: { 'cf-connecting-ip': '203.0.113.7' } }), env, params: { anbieter: 'google' } })).headers.get('location')).toBe(`${ORIGIN}/?anmeldefehler=zu_viele`)
+    expect((await start('198.51.100.1')).headers.get('location')).toMatch(/^https:\/\/accounts\.google\.com/)
     const n = (await db.prepare('SELECT count(*) AS n FROM anmeldungen').first<{ n: number }>())!.n
-    expect(n).toBeLessThan(200)
+    expect(n).toBe(GRENZEN.anmeldung.anzahl + 1)
+    expect(JSON.stringify(db.roh.prepare('SELECT * FROM begrenzung').all())).not.toContain('203.0.113.7')
+    // Token-Tausch
+    const tausch = () => appToken({ request: new Request(`${ORIGIN}/api/v2/anmeldung/app/token`, { method: 'POST', body: '{}', headers: { 'cf-connecting-ip': '203.0.113.9' } }), env, params: {} })
+    for (let i = 0; i < GRENZEN.token.anzahl; i++) expect((await tausch()).status).toBe(400)
+    const zuViel = await tausch()
+    expect(zuViel.status).toBe(429)
+    expect(Number(zuViel.headers.get('retry-after'))).toBeGreaterThan(0)
+    // Nach Ablauf des Fensters wieder frei
+    expect(await zuViele(db, new Request(ORIGIN, { headers: { 'cf-connecting-ip': '203.0.113.9' } }), 'token', Date.now() + 11 * 60_000)).toBeUndefined()
+    // Ohne CF-Connecting-IP (lokal, Tests) keine Begrenzung
+    expect(await zuViele(db, new Request(ORIGIN), 'token')).toBeUndefined()
   })
 
   it.fails('Fund M6: Massen-Uploads – Fotos ohne Eintrag im WEP sind begrenzt', async () => {
@@ -397,14 +439,14 @@ describe('offene Funde', () => {
     expect(n).toBeLessThan(30)
   })
 
-  it.fails('Fund N1: Origin-Prüfung und Sitzung lesen „Authorization“ gleich (kein Cookie-Rückfall bei ungültigem Bearer)', async () => {
+  it('Fund N1 (behoben): Origin-Prüfung und Sitzung lesen „Authorization“ gleich (kein Cookie-Rückfall bei ungültigem Bearer)', async () => {
     const { k, ruf, p } = await aufbau()
     // „Bearer a b“: fremdeHerkunft lässt durch (startsWith), kontoDerSitzung nimmt dann das Cookie
     const r = await ruf(wepLoeschen, 'DELETE', '/api/v2/weps/w1', k.bau, { params: p('w1'), body: { basisRev: 1 }, kopf: { origin: 'https://evil.example', authorization: 'Bearer a b' } })
     expect([401, 403]).toContain(r.status)
   })
 
-  it.fails('Fund N2: Einmal-Code lässt sich auch bei gleichzeitigen Anfragen nur einmal einlösen', async () => {
+  it('Fund N2 (behoben): Einmal-Code lässt sich auch bei gleichzeitigen Anfragen nur einmal einlösen', async () => {
     const db = testDb()
     anlegen(db, 'k1', ['bau'])
     const verifier = 'v'.repeat(43)
@@ -415,7 +457,7 @@ describe('offene Funde', () => {
     expect([a.ok, b.ok].filter(Boolean).length).toBe(1)
   })
 
-  it.fails('Fund N3: Token-Tausch gibt einem inzwischen gesperrten Konto keine Sitzung', async () => {
+  it('Fund N3 (behoben): Token-Tausch gibt einem inzwischen gesperrten Konto keine Sitzung', async () => {
     const db = testDb()
     anlegen(db, 'k1', ['bau'])
     const verifier = 'v'.repeat(43)
@@ -435,18 +477,29 @@ describe('offene Funde', () => {
     expect((await ruf(dateiHochladen, 'PUT', '/api/v2/weps/w1/dateien/foto-gf1.jpg', k.bau, { body: JPEG_BOESE, params: p('w1', 'foto-gf1.jpg') })).status).toBe(403)
   })
 
-  it.fails('Fund N5: Sitzungs-Cookie mit __Host-Präfix (Vorschau-Subdomains können sonst Cookies setzen)', () => {
-    expect(cookie(SITZUNG_COOKIE, 'x', 60)).toMatch(/^__Host-/)
+  it('Fund N5 (behoben): Sitzungs- und Anmelde-Cookie mit __Host-Präfix (Vorschau-Subdomains können sie nicht setzen)', () => {
+    expect(cookie(SITZUNG_COOKIE, 'x', 60)).toMatch(/^__Host-wep_sitzung=x; Path=\/; HttpOnly; Secure; SameSite=Lax/)
+    expect(cookie(ANMELDUNG_COOKIE, 'x', 60)).toMatch(/^__Host-/)
+    expect(cookie(SITZUNG_COOKIE, 'x', 60)).not.toMatch(/Domain=/i)
   })
 
-  it.fails('Fund N6: Sitzung endet nach längerer Untätigkeit (heute: 30 Tage fest, ohne Leerlauf-Ende)', async () => {
+  it('Fund N6 (behoben): Sitzung endet nach 14 Tagen Untätigkeit; Nutzung verlängert; „Überall abmelden“ beendet alle', async () => {
     const db = testDb()
     anlegen(db, 'k1', ['bau'])
     const jetzt = Date.parse(ZEIT)
+    const tag = 86_400_000
     const { token } = await neueSitzung(db, 'k1', jetzt)
-    const { kontoDerSitzung } = await import('../v2/sitzung')
-    const spaeter = jetzt + 29 * 86_400_000
-    expect(await kontoDerSitzung(db, new Request(ORIGIN, { headers: { authorization: `Bearer ${token}` } }), spaeter)).toBeUndefined()
+    const req = () => new Request(ORIGIN, { headers: { authorization: `Bearer ${token}` } })
+    expect(await kontoDerSitzung(db, req(), jetzt + 13 * tag)).toBeTruthy() // benutzt: zählt neu
+    expect(await kontoDerSitzung(db, req(), jetzt + 26 * tag)).toBeTruthy()
+    expect(await kontoDerSitzung(db, req(), jetzt + 41 * tag)).toBeUndefined() // 15 Tage nicht benutzt
+    // Überall abmelden (auch diese Sitzung)
+    const { k, ruf } = await aufbau()
+    const r = await ruf(sitzungBeenden, 'DELETE', '/api/v2/ich/sitzungen?alle=1', k.bau)
+    expect(r.status).toBe(200)
+    expect(r.headers.get('set-cookie')).toMatch(/^__Host-wep_sitzung=; .*Max-Age=0/)
+    expect((await ruf(wepListe, 'GET', '/api/v2/weps', k.bau)).status).toBe(401)
+    expect((await ruf(wepListe, 'GET', '/api/v2/weps', k.bau2)).status).toBe(200)
   })
 
   it('Fund N7 (behoben): Alte, erratbare Kennungen und ungültige Kennungen lassen sich nicht neu belegen', async () => {
@@ -496,17 +549,23 @@ describe('offene Funde', () => {
     expect(notiz).toBe('mit dem eigenen WEP ohne Vorgangs-Nr.; übernommene Stammdaten: auftraggeber')
   })
 
-  it.fails('Fund N15: aud mit mehreren Empfängern nur mit passendem azp', async () => {
+  it('Fund N15 (behoben): aud mit mehreren Empfängern nur mit passendem azp', async () => {
     const { schluessel, signiere } = await testSchluessel()
     const token = await signiere({ iss: 'https://accounts.google.com', aud: ['fremde-app', 'g'], azp: 'fremde-app', sub: '123', email: 'a@example.org', email_verified: true, nonce: 'n', exp: Math.floor(Date.now() / 1000) + 600 })
-    await expect(pruefeAnmeldeToken(token, { anbieter: 'google', clientId: 'g', nonce: 'n', schluessel })).rejects.toThrow()
+    await expect(pruefeAnmeldeToken(token, { anbieter: 'google', clientId: 'g', nonce: 'n', schluessel })).rejects.toThrow(/azp/)
+    const passend = await signiere({ iss: 'https://accounts.google.com', aud: ['fremde-app', 'g'], azp: 'g', sub: '123', email: 'a@example.org', email_verified: true, nonce: 'n', exp: Math.floor(Date.now() / 1000) + 600 })
+    expect((await pruefeAnmeldeToken(passend, { anbieter: 'google', clientId: 'g', nonce: 'n', schluessel })).subjekt).toBe('123')
   })
 
-  it.fails('Fund N10: Die Anmeldeseite zeigt keinen beliebigen Text aus der Adresse', async () => {
+  it('Fund N10 (behoben): Die Anmeldeseite zeigt keinen beliebigen Text aus der Adresse', async () => {
     const env = { SERVER_MODUS: 'true', WEP_DB: testDb(), GOOGLE_CLIENT_ID: 'g', GOOGLE_CLIENT_SECRET: 's' }
     const text = 'Bitte rufen Sie 0800 123 an'
     const r = await anmeldungZurueck({ request: new Request(`${ORIGIN}/api/v2/anmeldung/google/zurueck?error=${encodeURIComponent(text)}`), env, params: { anbieter: 'google' } })
     expect(decodeURIComponent(r.headers.get('location') ?? '')).not.toContain(text)
+    expect(r.headers.get('location')).toBe(`${ORIGIN}/?anmeldefehler=anbieter`)
+    expect(anmeldeFehlerText(text)).toBe(ANMELDEFEHLER_TEXT.fehler)
+    expect(anmeldeFehlerText('gesperrt')).toBe(ANMELDEFEHLER_TEXT.gesperrt)
+    expect(anmeldeFehlerText('__proto__')).toBe(ANMELDEFEHLER_TEXT.fehler)
   })
 
   it.fails('Fund N13: Fehler von Resend landen ohne E-Mail-Adresse im Log', async () => {

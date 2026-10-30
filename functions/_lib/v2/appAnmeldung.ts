@@ -60,18 +60,24 @@ export type CodeErgebnis = { ok: true; token: string; kontoId: string; geraet: A
 
 /**
  * Code + Verifier gegen ein Sitzungs-Token tauschen. Der Code ist danach verbraucht – auch bei falschem Verifier
- * (sonst ließe er sich durchprobieren).
+ * (sonst ließe er sich durchprobieren). Gesperrte Konten bekommen keine Sitzung.
  */
 export async function loeseAppCodeEin(db: Db, code: unknown, verifier: unknown, jetzt = Date.now()): Promise<CodeErgebnis> {
   if (typeof code !== 'string' || !code || typeof verifier !== 'string' || verifier.length < 43 || verifier.length > 128) {
     return { ok: false, fehler: 'Code oder Prüfwert fehlt.' }
   }
   const hash = await sha256b64url(code)
-  const z = await db.prepare('SELECT * FROM app_codes WHERE code_hash = ?').bind(hash).first<{ konto_id: string; challenge: string; geraet: string; laeuft_ab: string }>()
+  // Lesen und Löschen in einem Schritt: Auch zwei gleichzeitige Anfragen lösen den Code nur einmal ein (Fund N2)
+  const z = await db
+    .prepare('DELETE FROM app_codes WHERE code_hash = ? RETURNING konto_id, challenge, geraet, laeuft_ab')
+    .bind(hash)
+    .first<{ konto_id: string; challenge: string; geraet: string; laeuft_ab: string }>()
   if (!z) return { ok: false, fehler: 'Der Code ist ungültig oder schon benutzt.' }
-  await db.prepare('DELETE FROM app_codes WHERE code_hash = ?').bind(hash).run()
   if (z.laeuft_ab < jetztIso(jetzt)) return { ok: false, fehler: 'Der Code ist abgelaufen. Bitte noch einmal anmelden.' }
   if ((await sha256b64url(verifier)) !== z.challenge) return { ok: false, fehler: 'Der Prüfwert passt nicht zum Code.' }
+  // Inzwischen gesperrt oder gelöscht (zwischen Rücksprung und Tausch): keine Sitzung (Fund N3)
+  const konto = await db.prepare('SELECT status FROM konten WHERE id = ?').bind(z.konto_id).first<{ status: string }>()
+  if (!konto || konto.status === 'gesperrt') return { ok: false, fehler: 'Das Konto ist gesperrt. Bitte beim Admin melden.' }
   const geraet = z.geraet === 'windows' ? 'windows' : 'android'
   const { token } = await neueSitzung(db, z.konto_id, jetzt, geraet)
   return { ok: true, token, kontoId: z.konto_id, geraet }

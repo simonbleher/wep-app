@@ -7,6 +7,7 @@ import { LogIn, LogOut, RefreshCw } from 'lucide-react'
 import { ICON, Meldung } from '@/app/ui'
 import { RechtLinks } from '@/app/RechtLinks'
 import { anmeldeUrl, gemerktesKonto, istNetzFehler, ladeEinrichtung, ladeIch, merkeKonto, serverAbmelden, type Einrichtung } from './api'
+import { anmeldeFehlerText } from './anmeldeFehler'
 import type { ServerKonto } from './typen'
 import type { AppAnbindung } from './app'
 import type { Anbieter } from './appAnmeldung'
@@ -28,7 +29,7 @@ type Zustand =
   | { art: 'bereit'; konto: ServerKonto; offline: boolean }
 
 /**
- * Meldung, die der Server nach einer gescheiterten Anmeldung mitgibt (?anmeldefehler=…). Einmal beim Laden gelesen und
+ * Meldung nach einer gescheiterten Anmeldung (?anmeldefehler=<Schlüssel>, Texte in ./anmeldeFehler.ts). Einmal beim Laden gelesen und
  * aus der Adresse entfernt; nach dem Rücksprung lädt die Seite ohnehin neu.
  */
 const ANMELDEFEHLER = holeAnmeldeFehler()
@@ -39,7 +40,8 @@ function holeAnmeldeFehler(): string | undefined {
   if (fehler === null) return undefined
   url.searchParams.delete('anmeldefehler')
   window.history.replaceState(null, '', url.pathname + url.search + url.hash)
-  return fehler.slice(0, 300)
+  // Nur feste Schlüssel; unbekannter Text aus der Adresse wird nie angezeigt (Fund N10)
+  return anmeldeFehlerText(fehler)
 }
 
 export function V2Tor({ children, app }: { children: (sitzung: V2Sitzung) => ReactNode; app?: AppAnbindung }) {

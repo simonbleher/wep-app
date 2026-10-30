@@ -3,12 +3,15 @@
 // nur die App kennt, die die Anmeldung begonnen hat (functions/_lib/v2/appAnmeldung.ts).
 import { jsonAntwort } from '../../../../_lib/serverModus'
 import { loeseAppCodeEin } from '../../../../_lib/v2/appAnmeldung'
+import { zuViele } from '../../../../_lib/v2/begrenzung'
 import { ladeKonto, protokolliere } from '../../../../_lib/v2/konten'
 import { datenbank, NICHT_EINGERICHTET, type V2Kontext } from '../../../../_lib/v2/kontext'
 
 export const onRequestPost = async ({ request, env }: V2Kontext): Promise<Response> => {
   const db = datenbank(env)
   if (!db) return NICHT_EINGERICHTET()
+  const warten = await zuViele(db, request, 'token')
+  if (warten) return new Response(JSON.stringify({ fehler: 'Zu viele Versuche. Bitte in einigen Minuten noch einmal.' }), { status: 429, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'retry-after': String(warten) } })
   const body = (await request.json().catch(() => ({}))) as { code?: unknown; verifier?: unknown }
   const e = await loeseAppCodeEin(db, body.code, body.verifier)
   if (!e.ok) return jsonAntwort(400, { fehler: e.fehler })

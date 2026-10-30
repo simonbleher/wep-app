@@ -68,7 +68,7 @@ async function melde(env: Env, wer: 'google' | 'microsoft', token: (nonce: strin
   a.setzeNonce(ort.searchParams.get('nonce')!)
   const anmeldeCookie = s.headers.get('set-cookie')!.split(';')[0]
   const r = await zurueck({ request: new Request(`${ORIGIN}/api/v2/anmeldung/${wer}/zurueck?code=c0de&state=${state}`, { headers: { cookie: anmeldeCookie } }), env, params: { anbieter: wer } })
-  const sitzung = r.headers.getSetCookie().find((c) => c.startsWith('wep_sitzung=') && !c.startsWith('wep_sitzung=;'))?.split(';')[0]
+  const sitzung = r.headers.getSetCookie().find((c) => c.startsWith('__Host-wep_sitzung=') && !c.startsWith('__Host-wep_sitzung=;'))?.split(';')[0]
   return { r, sitzung, ort }
 }
 
@@ -128,7 +128,7 @@ describe('Anmeldung, Sitzung, Freigabe', () => {
     const ort = new URL(s.headers.get('location')!)
     expect(ort.origin + ort.pathname).toBe('https://accounts.google.com/o/oauth2/v2/auth')
     expect(Object.fromEntries(ort.searchParams)).toMatchObject({ client_id: GOOGLE_ID, response_type: 'code', code_challenge_method: 'S256', scope: 'openid email profile', redirect_uri: `${ORIGIN}/api/v2/anmeldung/google/zurueck` })
-    expect(s.headers.get('set-cookie')).toMatch(/^wep_anmeldung=.+; Path=\/; HttpOnly; Secure; SameSite=Lax; Max-Age=600$/)
+    expect(s.headers.get('set-cookie')).toMatch(/^__Host-wep_anmeldung=.+; Path=\/; HttpOnly; Secure; SameSite=Lax; Max-Age=600$/)
     expect(sicheresZiel('/admin?x=1')).toBe('/admin?x=1')
     for (const boese of ['//evil.example', 'https://evil.example', '/\\evil.example', '', null]) expect(sicheresZiel(boese)).toBe('/')
     expect((await start({ request: new Request(`${ORIGIN}/api/v2/anmeldung/github/start`), env, params: { anbieter: 'github' } })).status).toBe(404)
@@ -156,17 +156,17 @@ describe('Anmeldung, Sitzung, Freigabe', () => {
     expect(r.headers.get('location')).toBe(`${ORIGIN}/`)
     expect(merke.body?.get('client_secret')).toBe('geheim')
     expect(merke.body?.get('code_verifier')).toMatch(/^[A-Za-z0-9_-]{60,}$/)
-    const sitzungsCookie = r.headers.getSetCookie().find((c) => c.startsWith('wep_sitzung='))!
+    const sitzungsCookie = r.headers.getSetCookie().find((c) => c.startsWith('__Host-wep_sitzung='))!
     expect(sitzungsCookie).toMatch(/HttpOnly; Secure; SameSite=Lax; Max-Age=2592000/)
     const token = sitzungsCookie.split(';')[0].split('=')[1]
     const gespeichert = env.WEP_DB.roh.prepare('SELECT token_hash FROM sitzungen').all() as { token_hash: string }[]
     expect(gespeichert).toHaveLength(1)
     expect(gespeichert[0].token_hash).not.toBe(token)
 
-    const antwort = await ich({ request: anfrage('/api/v2/ich', `wep_sitzung=${token}`), env, params: {} })
+    const antwort = await ich({ request: anfrage('/api/v2/ich', `__Host-wep_sitzung=${token}`), env, params: {} })
     expect((await antwort.json()).konto).toMatchObject({ name: 'Max Mustermann', email: 'max@bv.example', status: 'wartet', rollen: [], mailBenachrichtigung: true })
     // wartendes Konto: keine Admin-Seite
-    expect((await kontenListe({ request: anfrage('/api/v2/admin/konten', `wep_sitzung=${token}`), env, params: {} })).status).toBe(403)
+    expect((await kontenListe({ request: anfrage('/api/v2/admin/konten', `__Host-wep_sitzung=${token}`), env, params: {} })).status).toBe(403)
   })
 
   it('Rücksprung ohne passendes Anmelde-Cookie (anderer Browser) oder zweimal: zurück zur App mit Meldung, keine Sitzung', async () => {
@@ -176,16 +176,16 @@ describe('Anmeldung, Sitzung, Freigabe', () => {
     const ort = new URL(s.headers.get('location')!)
     a.setzeNonce(ort.searchParams.get('nonce')!)
     const url = `${ORIGIN}/api/v2/anmeldung/google/zurueck?code=c&state=${ort.searchParams.get('state')}`
-    const fremd = await zurueck({ request: new Request(url, { headers: { cookie: 'wep_anmeldung=anderer' } }), env, params: { anbieter: 'google' } })
+    const fremd = await zurueck({ request: new Request(url, { headers: { cookie: '__Host-wep_anmeldung=anderer' } }), env, params: { anbieter: 'google' } })
     expect(fremd.headers.get('location')).toMatch(/anmeldefehler=/)
-    expect(fremd.headers.getSetCookie().some((c) => c.startsWith('wep_sitzung='))).toBe(false)
+    expect(fremd.headers.getSetCookie().some((c) => c.startsWith('__Host-wep_sitzung='))).toBe(false)
     const cookie = s.headers.get('set-cookie')!.split(';')[0]
     expect((await zurueck({ request: new Request(url, { headers: { cookie } }), env, params: { anbieter: 'google' } })).headers.get('location')).toBe(`${ORIGIN}/`)
     // derselbe Rücksprung ein zweites Mal: state ist verbraucht
     expect((await zurueck({ request: new Request(url, { headers: { cookie } }), env, params: { anbieter: 'google' } })).headers.get('location')).toMatch(/anmeldefehler=/)
     // Abbruch beim Anbieter
     const abbruch = await zurueck({ request: new Request(`${ORIGIN}/api/v2/anmeldung/google/zurueck?error=access_denied`), env, params: { anbieter: 'google' } })
-    expect(decodeURIComponent(abbruch.headers.get('location')!)).toContain('Anmeldung abgebrochen.')
+    expect(abbruch.headers.get('location')).toBe(`${ORIGIN}/?anmeldefehler=abgebrochen`)
   })
 
   it('erster Admin (V2_ADMINS) ist sofort freigegeben; Admin gibt frei, vergibt Rollen, sperrt (Sitzung endet), löscht; alles protokolliert', async () => {
@@ -239,7 +239,7 @@ describe('Anmeldung, Sitzung, Freigabe', () => {
     expect((await patch.json()).konto.mailBenachrichtigung).toBe(false)
     expect((await (await ich({ request: anfrage('/api/v2/ich', admin.sitzung), env, params: {} })).json()).konto.mailBenachrichtigung).toBe(false)
     const raus = await abmelden({ request: anfrage('/api/v2/abmelden', admin.sitzung, { method: 'POST' }), env, params: {} })
-    expect(raus.headers.get('set-cookie')).toMatch(/^wep_sitzung=; .*Max-Age=0/)
+    expect(raus.headers.get('set-cookie')).toMatch(/^__Host-wep_sitzung=; .*Max-Age=0/)
     expect((await ich({ request: anfrage('/api/v2/ich', admin.sitzung), env, params: {} })).status).toBe(401)
   })
 
