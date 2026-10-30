@@ -34,7 +34,7 @@ B Anmeldung/Sitzung, C Missbrauch/Datensparsamkeit, D Header, E Abhängigkeiten.
 | M5 | ✅ behoben: Zähler je Bereich und IP-Hash in D1 (`begrenzung`, Fenster 10 min): Anmeldung (start + zurueck) 60, Token-Tausch 30. Danach Hinweis bzw. 429. Ohne `CF-Connecting-IP` (lokal) keine Begrenzung. | PR B |
 | M6 | ✅ behoben: höchstens 300 Fotodateien je WEP, davon 50 ohne Eintrag im WEP (ersetzen geht immer). Je Konto und Tag 50 neue WEPs und 20 Abgaben an den BV (429). Höchstens 5 Mails je Empfänger und Stunde, der Rest nur in „Neu für dich“ (`mail = 'gebuendelt'`). | PR C |
 | M7 | ✅ behoben: lokale Ablage je Konto (`src/server/ablage.ts`). Die bisherige Ablage (`wep-db` im Browser, `wep-db-v2` in den Apps) gehört dem ersten Konto nach der Umstellung, weitere Konten bekommen `<Ablage>-<Konto-Id>`. Beim Abmelden die Rückfrage „Nur abmelden“ / „Abmelden und Daten löschen“, mit Warnung bei nicht abgeglichenen Änderungen. | PR C |
-| M8 | geplant | PR E |
+| M8 | ✅ behoben: `zip` 2.6.1 → 9.1.3 (eigene Abhängigkeit); `tauri-plugin-updater` 2.14.0 → 2.14.1 bringt `zip` 9.1.3 statt 4.6.1; `tokio` 1.54.0 → 1.54.1. `cargo audit` meldet keine Lücken mehr (nur noch „unmaintained“/„unsound“-Hinweise in Abhängigkeiten von Tauri unter Linux). Windows 0.1.6, Hülle 5. | PR E |
 | N1 | ✅ behoben: Origin-Prüfung und Sitzung lesen denselben Bearer-Kopf. Mit `Authorization`-Kopf wird nie auf das Cookie zurückgegriffen. | PR B |
 | N2 | ✅ behoben: `DELETE … RETURNING` in einem Schritt | PR B |
 | N3 | ✅ behoben: gesperrte Konten bekommen beim Token-Tausch keine Sitzung | PR B |
