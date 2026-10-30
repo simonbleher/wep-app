@@ -31,7 +31,16 @@ export const onRequestGet = async (ctx: V2Kontext<'id' | 'datei'>): Promise<Resp
   if (v instanceof Response) return v
   const obj = await v.r2.get(v.art.key)
   if (!obj?.body) return jsonAntwort(404, { fehler: 'Datei nicht auf dem Server.' })
-  return new Response(obj.body, { headers: { 'content-type': v.art.typ, 'content-length': String(obj.size), 'cache-control': 'private, no-store' } })
+  return new Response(obj.body, {
+    headers: {
+      'content-type': v.art.typ,
+      'content-length': String(obj.size),
+      'cache-control': 'private, no-store',
+      // Kein Raten des Typs (ein „JPEG“ mit HTML darin bleibt ein Bild); die Bau-Excel wird heruntergeladen, nicht angezeigt
+      'x-content-type-options': 'nosniff',
+      ...(v.art.art === 'bau' ? { 'content-disposition': 'attachment; filename="bau.xlsx"' } : {}),
+    },
+  })
 }
 
 export const onRequestPut = async (ctx: V2Kontext<'id' | 'datei'>): Promise<Response> => {

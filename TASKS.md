@@ -428,7 +428,12 @@ Abschnitt 10f) mit Mausrad, Maus-Ziehen und Zwei-Finger-Gesten über CDP-Touch. 
   - N11: keine E-Mail-Adressen in Grün-Auswahl und Verlauf.
   - N13: Resend-Fehler ohne Text.
   - Durchlauf v2 prüft Kontowechsel und Löschen.
-- V2-SICHERHEIT-D · Security-Header (M4), CSP zuerst als Report-Only, scharf in einem Folge-PR ⬜ offen.
+- V2-SICHERHEIT-D · Security-Header ✅ PR offen – Branch sicherheit/v2-header.
+  - M4: `X-Frame-Options`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`.
+  - CSP als Report-Only mit `/api/csp-bericht`.
+- V2-SICHERHEIT-D2 · CSP scharf schalten ⬜ offen.
+  - Nach einigen Tagen ohne Meldungen „CSP (nur gemeldet)“ im Function-Log und in der Browser-Konsole: in `public/_headers` `Content-Security-Policy-Report-Only` → `Content-Security-Policy`.
+  - Den Test „Folge-PR zu M4“ in `v2Sicherheit.test.ts` von `it.fails` auf `it` umstellen.
 - V2-SICHERHEIT-E · Abhängigkeiten der Windows-App (M8: zip ≥ 9, tokio ≥ 1.54.1) ⬜ offen.
 - V2-SICHERHEIT-N14 · Android: App Links (https, verifiziert) statt `de.wep.app://` für den Rücksprung der Server-Anmeldung; im Browser vor dem Rücksprung fragen „Anmeldung für die WEP-App auf diesem Gerät?“ ⬜ offen (Fund N14, niedrig).
 - V2-RECHT-1 · Datenschutzerklärung und Nutzungsbedingungen (für die Google-OAuth-Veröffentlichung) ✅ PR offen – Branch recht/datenschutz-seiten. Zwei statische Seiten `public/datenschutz.html` und `public/nutzungsbedingungen.html` (Adressen `/datenschutz` und `/nutzungsbedingungen`), ohne Anmeldung und offline (Precache) in Builds mit und ohne `VITE_SERVER_MODUS`. Beide als „Entwurf – rechtlich noch nicht geprüft“ markiert. Testphase: Simon Bleher ist Verantwortlicher (nur E-Mail), Hinweis „Testphase, erfundene Daten“ oben; nur Cloudflare-DPA und Resend-Vertrag bleiben als „[BITTE ERGÄNZEN]“ offen. Links in Anmeldeseite (v1 und v2), Wartebildschirm, Startseite (Fußzeile), Profil und beiden Anleitungen (`RechtLinks.tsx`). Tests: `rechtsseiten.test.tsx`, `npm run e2e` und `npm run v2:durchlauf` prüfen Erreichbarkeit ohne Anmeldung und Eintrag im Service Worker. **Offen:** Rechtsprüfung, DPA/Resend-Vertrag, Umstellung auf BV als Verantwortlichen mit AV-Vertrag (V2-7), automatische Löschung des Zugriffsprotokolls nach 90 Tagen.

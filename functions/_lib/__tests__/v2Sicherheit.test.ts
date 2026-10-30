@@ -43,6 +43,8 @@ import { onRequestPost as wiederherstellen } from '../../api/v2/weps/[id]/wieder
 import { onRequestPost as zusammenfuehren } from '../../api/v2/weps/[id]/zusammenfuehren'
 import { onRequestPost as zuruecknehmen } from '../../api/v2/weps/[id]/zusammenfuehren-zuruecknehmen'
 import { onRequestGet as anmeldungStart } from '../../api/v2/anmeldung/[anbieter]/start'
+import { berichtZeile, onRequestPost as cspBericht } from '../../api/csp-bericht'
+import { jsonAntwort } from '../serverModus'
 import { onRequestGet as anmeldungZurueck } from '../../api/v2/anmeldung/[anbieter]/zurueck'
 import { MAILS_JE_STUNDE, sendeMail } from '../v2/benachrichtigungen'
 
@@ -394,11 +396,31 @@ describe('offene Funde', () => {
     expect((await status2(null)).warnungen).toBeUndefined()
   })
 
-  it.fails('Fund M4: Security-Header in public/_headers (CSP mit frame-ancestors, nosniff, Referrer-Policy)', () => {
+  it('Fund M4 (behoben, CSP noch Report-Only): Security-Header in public/_headers und in den Antworten der Functions', async () => {
     const kopf = readFileSync(join(__dirname, '../../../public/_headers'), 'utf8')
-    expect(kopf).toMatch(/Content-Security-Policy:.*frame-ancestors/i)
-    expect(kopf).toMatch(/X-Content-Type-Options: nosniff/i)
-    expect(kopf).toMatch(/Referrer-Policy:/i)
+    const alle = kopf.slice(kopf.indexOf('\n/*\n'), kopf.indexOf('\n/sw.js'))
+    expect(alle).toMatch(/X-Frame-Options: DENY/)
+    expect(alle).toMatch(/X-Content-Type-Options: nosniff/)
+    expect(alle).toMatch(/Referrer-Policy: strict-origin-when-cross-origin/)
+    expect(alle).toMatch(/Permissions-Policy:/)
+    const csp = /Content-Security-Policy-Report-Only: (.*)/.exec(alle)?.[1] ?? ''
+    for (const teil of ["default-src 'self'", "script-src 'self'", "object-src 'none'", "frame-ancestors 'none'", "base-uri 'self'", 'report-uri /api/csp-bericht']) expect(csp).toContain(teil)
+    expect(csp).not.toMatch(/script-src[^;]*'unsafe-inline'/)
+    // Functions setzen ihre Header selbst
+    expect(jsonAntwort(200, {}).headers.get('x-content-type-options')).toBe('nosniff')
+    const { k, ruf, p } = await aufbau()
+    const foto = await ruf(dateiHolen, 'GET', '/api/v2/weps/w1/dateien/foto-bf1.jpg', k.bau, { params: p('w1', 'foto-bf1.jpg') })
+    expect(foto.headers.get('x-content-type-options')).toBe('nosniff')
+    // Meldungen der CSP: nur Regel, Herkunft und Pfad im Log
+    const zeile = berichtZeile(JSON.stringify({ 'csp-report': { 'effective-directive': 'connect-src', 'blocked-uri': 'https://evil.example/x?token=geheim', 'document-uri': `${ORIGIN}/bv?wep=123` } }))
+    expect(zeile).toBe('CSP (nur gemeldet): connect-src ← https://evil.example auf /bv')
+    expect(berichtZeile('kein json')).toBeUndefined()
+    expect((await cspBericht({ request: new Request(`${ORIGIN}/api/csp-bericht`, { method: 'POST', body: 'x'.repeat(20_000) }) })).status).toBe(204)
+  })
+
+  it.fails('Folge-PR zu M4: CSP scharf geschaltet (Content-Security-Policy statt Report-Only)', () => {
+    const kopf = readFileSync(join(__dirname, '../../../public/_headers'), 'utf8')
+    expect(kopf).toMatch(/^  Content-Security-Policy: /m)
   })
 
   it('Fund M5 (behoben): Anmeldung und Token-Tausch sind je IP begrenzt (Zähler mit Ablauf, nur IP-Hash in D1)', async () => {
