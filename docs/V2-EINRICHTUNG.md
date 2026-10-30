@@ -171,7 +171,9 @@ Windows-App arbeiten vorerst weiter wie v1 mit OneDrive und melden sich darüber
    - Wurde nur eine Variable geändert und `main` ist schon freigegeben, reicht in Cloudflare unter
      **Bereitstellungen** (*Deployments*) bei der letzten Bereitstellung von `release`
      **erneut ausführen** (*Retry deployment*).
-2. Im Browser öffnen: `https://wep-pankow.pages.dev/api/v2/status`. Erwartet wird etwa:
+2. Im Browser öffnen: `https://wep-pankow.pages.dev/api/v2/status`. Ohne Anmeldung zeigt die Seite nur, ob Google und
+   Microsoft eingerichtet sind (`{"serverModus":true,"einrichtung":{"google":true,"microsoft":true}}`). Alles Weitere sieht
+   nur ein angemeldeter Admin. Nach der ersten Anmeldung (Punkt 4) im selben Browser noch einmal öffnen; erwartet wird etwa:
 
    ```json
    {"serverModus":true,"einrichtung":{"datenbank":true,"dateien":true,"google":true,"microsoft":true,"mail":true,"admins":true},"schema":{"stand":7,"erwartet":7}}

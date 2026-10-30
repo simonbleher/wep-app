@@ -61,6 +61,27 @@ export async function pruefeZugriff(db: Db, konto: Konto, wepId: string, schreib
   return { ok: true, wert: z }
 }
 
+/** Höchstzahl Fotodateien je WEP und davon ohne Eintrag im WEP (Fund M6: sonst ließe sich R2 beliebig füllen). */
+export const MAX_FOTOS_JE_WEP = 300
+export const MAX_FOTOS_OHNE_EINTRAG = 50
+
+/**
+ * Darf zu diesem WEP noch eine neue Fotodatei dazukommen? Ersetzen einer vorhandenen Datei geht immer (sofern die Rechte
+ * passen). Die App lädt Fotos erst hoch, wenn sie im WEP stehen; „ohne Eintrag“ sind z. B. Reste eines Abbruchs.
+ */
+export async function fotoGrenze(r2: R2Ablage, z: WepZeile, fotoId: string): Promise<{ status: number; fehler: string } | undefined> {
+  const dateien = await listeDateien(r2, z.id)
+  const name = `foto-${fotoId}.jpg`
+  if (dateien.some((d) => d.name === name)) return undefined
+  const fotos = dateien.filter((d) => d.name.startsWith('foto-'))
+  if (fotos.length >= MAX_FOTOS_JE_WEP) return { status: 413, fehler: `Zu viele Fotos: höchstens ${MAX_FOTOS_JE_WEP} je WEP.` }
+  const imWep = new Set(((JSON.parse(z.daten) as Wep).fotos ?? []).map((f) => `foto-${f.id}.jpg`))
+  if (!imWep.has(name) && fotos.filter((d) => !imWep.has(d.name)).length >= MAX_FOTOS_OHNE_EINTRAG) {
+    return { status: 429, fehler: 'Zu viele Fotos ohne Eintrag im WEP. Bitte erst das WEP abgleichen.' }
+  }
+  return undefined
+}
+
 /** Dateinamen eines WEP in der Schnittstelle (foto-<Id>.jpg, bau.xlsx). */
 export async function listeDateien(r2: R2Ablage, wepId: string): Promise<{ name: string; groesse: number; geaendertAm: string }[]> {
   const praefix = `weps/${wepId}/`

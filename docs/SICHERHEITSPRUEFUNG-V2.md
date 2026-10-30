@@ -32,8 +32,8 @@ B Anmeldung/Sitzung, C Missbrauch/Datensparsamkeit, D Header, E Abhängigkeiten.
 | M3 | ✅ behoben: `V2_ADMINS` mit Anbieter-Präfix (`google:`/`microsoft:`). Die alte Form gilt weiter, mit Warnung für Admins in `/api/v2/status` und auf der Admin-Seite. Bestätigt/unbestätigt je Konto (`email_bestaetigt`). Die Admin-Seite zeigt Anbieter, Tenant und „(unbestätigt)“. | PR B |
 | M4 | geplant (CSP zuerst als Report-Only) | PR D |
 | M5 | ✅ behoben: Zähler je Bereich und IP-Hash in D1 (`begrenzung`, Fenster 10 min): Anmeldung (start + zurueck) 60, Token-Tausch 30. Danach Hinweis bzw. 429. Ohne `CF-Connecting-IP` (lokal) keine Begrenzung. | PR B |
-| M6 | geplant | PR C |
-| M7 | geplant | PR C |
+| M6 | ✅ behoben: höchstens 300 Fotodateien je WEP, davon 50 ohne Eintrag im WEP (ersetzen geht immer). Je Konto und Tag 50 neue WEPs und 20 Abgaben an den BV (429). Höchstens 5 Mails je Empfänger und Stunde, der Rest nur in „Neu für dich“ (`mail = 'gebuendelt'`). | PR C |
+| M7 | ✅ behoben: lokale Ablage je Konto (`src/server/ablage.ts`). Die bisherige Ablage (`wep-db` im Browser, `wep-db-v2` in den Apps) gehört dem ersten Konto nach der Umstellung, weitere Konten bekommen `<Ablage>-<Konto-Id>`. Beim Abmelden die Rückfrage „Nur abmelden“ / „Abmelden und Daten löschen“, mit Warnung bei nicht abgeglichenen Änderungen. | PR C |
 | M8 | geplant | PR E |
 | N1 | ✅ behoben: Origin-Prüfung und Sitzung lesen denselben Bearer-Kopf. Mit `Authorization`-Kopf wird nie auf das Cookie zurückgegriffen. | PR B |
 | N2 | ✅ behoben: `DELETE … RETURNING` in einem Schritt | PR B |
@@ -43,11 +43,11 @@ B Anmeldung/Sitzung, C Missbrauch/Datensparsamkeit, D Header, E Abhängigkeiten.
 | N6 | ✅ behoben: Ende nach 14 Tagen ohne Nutzung (`zuletzt_genutzt`, höchstens einmal am Tag aufgefrischt). „Überall abmelden“ im Profil (`DELETE /api/v2/ich/sitzungen?alle=1`). | PR B |
 | N7 | ✅ behoben: Der Server legt keine neuen WEPs mit alter Kennung („2026-007“) oder ungültiger Kennung an. Die App vergibt solchen WEPs vor dem ersten Hochladen eine UUID (Vorgangs-Nr., Fotos und Bau-Excel ziehen mit). | PR A |
 | N8 | ✅ behoben: Notiz, Begründung und Notiz zu „geprüft“ höchstens 2000 Zeichen (`MAX_NOTIZ`, auch als `maxLength` auf der Kontrollseite). `felder` beim Zusammenführen nur bekannte Formalien-Felder. | PR A |
-| N9 | geplant | PR C |
+| N9 | ✅ behoben: Ohne Admin-Anmeldung zeigt der Status nur `google`/`microsoft`; Admins sehen alles samt `warnungen`. | PR C |
 | N10 | ✅ behoben: nur feste Schlüssel (`?anmeldefehler=abgelaufen`), Texte in `src/server/anmeldeFehler.ts` | PR B |
-| N11 | geplant | PR C |
+| N11 | ✅ behoben: Grün-Auswahl, Verlauf und Ablauf zeigen nur Namen („Konto ohne Namen“ statt Adresse). | PR C |
 | N12 | ✅ behoben: `BAU_FORMALIEN` (`wertermittlerBaulichkeiten`) wird beim Zusammenführen nie aus dem Grün-WEP übernommen, weder auf dem Server noch in der App-Vorschau | PR A |
-| N13 | geplant | PR C |
+| N13 | ✅ behoben: Fehler von Resend nur als Status und Fehlerart (`Resend 422 (validation_error)`) | PR C |
 | N14 | offen, als Aufgabe in TASKS.md (App Links) | – |
 | N15 | ✅ behoben: Bei mehreren Empfängern oder vorhandenem `azp` muss `azp` die Client-ID sein | PR B |
 

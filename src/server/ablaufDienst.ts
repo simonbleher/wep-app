@@ -17,7 +17,6 @@ async function rufe<T>(pfad: string, init: RequestInit = {}): Promise<T> {
 export interface GruenKonto {
   id: string
   name: string
-  email: string
 }
 
 export const ladeGruenKonten = async () => (await rufe<{ konten: GruenKonto[] }>('/api/v2/konten/gruen')).konten
