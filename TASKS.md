@@ -22,7 +22,8 @@ und in docs/ENTSCHEIDUNGEN.md. Die alten Agenten-Prompts stehen in der Git-Histo
 - ⬜ Anzeige „N Änderungen warten“, obwohl keine Daten mehr warten (Server-Modus).
 - ⬜ V2-8b · Prüfen auf echten Geräten: NSIS-Hook vor „CheckIfAppIsRunning“, Android-Kaltstart nach der
   Anmeldung, Custom Tab schließt nach dem Rücksprung (Checkliste in #122).
-- ⬜ Fachlich: Abdeckung der Richtlinie prüfen (docs/RICHTLINIE-ABDECKUNG.md), danach kleine Lücken schließen.
+- ✅ Fachlich: Abdeckung der Richtlinie – Bericht docs/RICHTLINIE-ABDECKUNG.md gemergt (#132); offen: kleine Lücken in
+  eigenen PRs (Liste am Ende des Berichts), Fragen 1–5 an Simon/BV.
 - 🟡 BAUM-1 · Bäume: Vorschlag direkt aus dem Maß (PR aufwuchs/baum-mass): „Baum fällen“ nach Stammumfang/Durchmesser
   (S. 20–21), Obstgehölze nach Alter (S. 16), geschützter Baum fest 1 €; „Maß fehlt“ als Hinweis, Warnung vor der Abgabe.
   Frage an Simon/BV: Obstgehölz mit genau 30 Jahren.
@@ -39,6 +40,7 @@ und in docs/ENTSCHEIDUNGEN.md. Die alten Agenten-Prompts stehen in der Git-Histo
 
 ## Offene Fragen an Simon / den BV
 - Zustandsstufen: feste Prozent-Staffel (src/model/types.ts, „vom BV zu bestätigen“) oder freie Schätzung?
+- Richtlinie: Fragen 1–5 in docs/RICHTLINIE-ABDECKUNG.md (u. a. Altersabzug Außenanlagen, #95 linear/Restwert, Laubbäume ohne Schutz).
 - Blätter „Anl IV Schuppen“ / „Anl IV Dach“ der Vorlage (versteckt, viele #REF!): noch gebraucht?
 - Offene Gerätetests aus Beta 3–5 (Skizzen-Gesten, PDF speichern/teilen auf Android/Windows) und
   Optikprüfung der PDFs auf Papier.
