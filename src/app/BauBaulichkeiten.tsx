@@ -462,6 +462,13 @@ export function BauteilFormular({
           </fieldset>
         )}
 
+        {b.art === 'schuppen' && (
+          <p className="neben">
+            Schuppen und Unterstände neben einer Laube werden nicht bewertet. Hängt der Schuppen direkt an einer Laube unter 24 m², als
+            Anbau erfassen.
+          </p>
+        )}
+
         {b.art === 'gewaechshaus' && (
           <fieldset className="fieldset abschnitt">
             <legend className="label">Gewächshaus (Richtlinie S. 11 a)</legend>

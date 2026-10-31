@@ -615,3 +615,21 @@
   „5 bis 30“ (wie „bis“ einschließlich bei den Bäumen), mit Hinweis.
 - **Grund:** Der Wertermittler soll die Staffel nicht selbst suchen; Maße statt Stufen sind vor Ort schneller und
   nachprüfbar. Nichts sperren, nur warnen (CLAUDE.md).
+
+
+## 2026-10-31 · Antworten des BV zu den Richtlinien-Fragen (#132, #133)
+
+- **Entscheidung** (von Simon mit dem BV geklärt):
+  1. **Zustands-Staffel** sehr gut 100 % / gut 75 % / mittel 50 % ist bestätigt; „schlecht = 1 €“ gilt für alle Positionen
+     (auch Außenanlagen). Keine Code-Änderung, nur der Vermerk „vom BV zu bestätigen“ in `src/model/types.ts` entfällt.
+  2. **Alterswertminderung Außenanlagen** (mind. 3 % je Jahr, BewRL S. 12) steckt im Zustand; ein Alter wird nicht
+     erfasst. Hinweis im Positionsformular und in der Anleitung.
+  3. **Grube/Kanal (#95):** linear – Abzug = 3 % × Alter vom Bis-Wert (16 Jahre = 48 %), 16-Jahres-Grenze und −150 € wie in
+     der Richtlinie. Umsetzung im eigenen PR (BV-ANTW-2).
+  4. **Nicht geschützte Laub-/Nadelbäume** werden immer entfernt, kein Wert im Aufwuchs. Umsetzung im eigenen PR (BV-ANTW-3).
+  5. **Schuppen neben der Laube** werden nie bewertet (#83 bleibt). Hinweis in der Erfassung: „Hängt der Schuppen direkt an
+     einer Laube unter 24 m², als Anbau erfassen.“ Keine neue Logik.
+  6. **Obstgehölz mit genau 30 Jahren:** Stufe „5 bis 30 Jahre“. Der Hinweis zum Grenzfall entfällt.
+  7. **Alter als Pflichtangabe** auch bei Beerenobst und allen weiteren Kulturen, die die Richtlinie nach Alter staffelt.
+     Umsetzung im eigenen PR (BV-ANTW-4).
+- **Grund:** Antworten des BV über Simon (31.10.2026) auf die Fragen in docs/RICHTLINIE-ABDECKUNG.md und #133.
