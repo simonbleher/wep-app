@@ -9,7 +9,7 @@ import { bauklasseAusAngaben } from './assistent'
 import {
   GEWAECHSHAUS,
   GRUBE_MAX_ALTER_TANK,
-  altersabzugVomRestwert,
+  altersabzugLinear,
   GRUBE_NICHT_GELEERT_ABZUG,
   GRUBEN_TYPEN,
   KANAL_HOECHSTWERT,
@@ -387,8 +387,8 @@ export function grubenGrundwert(typ: string | undefined): number {
 }
 
 /**
- * Höchstalter für die Abschreibung: Tanks/monolithische Gruben 16 Jahre (S. 14); sonst ohne Grenze – der Abzug vom
- * Restwert (`altersabzugVomRestwert`) erreicht nie 100 %.
+ * Höchstalter für die Abschreibung: Tanks/monolithische Gruben 16 Jahre (S. 14); sonst ohne Grenze – der lineare Abzug
+ * (`altersabzugLinear`) endet bei 100 %.
  */
 export function grubeMaxAlter(typ: string | undefined): number {
   return typ === 'beton' || typ === 'tank' || typ === 'kunststoff' ? GRUBE_MAX_ALTER_TANK : Infinity
@@ -402,7 +402,7 @@ function rechneGrube(bau: BauDaten, wertjahr: number): GrubeErgebnis {
   const g = bau.abwasser.grube
   const alter = alterInJahren(g.baujahr, wertjahr)
   const wirksam = Math.min(alter ?? 0, grubeMaxAlter(g.typ)) // C74
-  const abzug = altersabzugVomRestwert(wirksam) // C75
+  const abzug = altersabzugLinear(wirksam) // C75: 3 % × Alter, höchstens 100 %
   const grundwert = g.grundwert ?? grubenGrundwert(g.typ) // F74
   const wertProM3 = rund2(grundwert - (grundwert * abzug) / 100) // F75
   const inhalt = g.zuBeseitigen ? 0 : (g.inhaltM3 ?? 0) // I75
@@ -415,10 +415,10 @@ function rechneGrube(bau: BauDaten, wertjahr: number): GrubeErgebnis {
 function rechneKanal(bau: BauDaten, wertjahr: number): KanalErgebnis {
   const k = bau.abwasser.kanal
   const alter = alterInJahren(k.baujahr, wertjahr)
-  const wirksam = alter ?? 0 // G78 (keine Grenze: der Abzug vom Restwert erreicht nie 100 %)
+  const wirksam = alter ?? 0 // G78 (keine Grenze: der Abzug endet bei 100 %)
   const kosten = k.kosten ?? 0 // C79
   const hoechstens = wirksam > 0 ? Math.min(KANAL_HOECHSTWERT, kosten) : 0 // E79
-  const abzug = altersabzugVomRestwert(wirksam) / 100 // H79: jährlich 3 % vom Restwert, wie die Grube
+  const abzug = altersabzugLinear(wirksam) / 100 // H79: 3 % × Alter vom Erstellungspreis, wie die Grube
   const wert = kosten > 74 ? rund2(hoechstens - hoechstens * abzug) : 0 // K79
   return { alter, kosten, hoechstens, abzug, wert }
 }

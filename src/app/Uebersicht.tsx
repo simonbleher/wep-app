@@ -294,7 +294,7 @@ function Abwasser({ p }: { p: Protokoll }) {
               ['Genehmigungsnummer', grube.nr],
               ['Alter', grube.alter === undefined ? undefined : `${zahl(grube.alter)} Jahre`],
               ['Grundwert', grube.grundwert === undefined ? undefined : `${euro(grube.grundwert)}/m³`],
-              ['Altersabzug (3 % je Jahr vom Restwert)', grube.abzugProzent === undefined ? undefined : prozent(grube.abzugProzent)],
+              ['Altersabzug (3 % je Jahr vom Bis-Wert)', grube.abzugProzent === undefined ? undefined : prozent(grube.abzugProzent)],
               ['Wert nach Altersabzug', grube.wertProM3 === undefined ? undefined : `${euro(grube.wertProM3)}/m³`],
               ['Inhalt', grube.menge === undefined ? undefined : `${zahl(grube.menge)} m³`],
               ['Dichtheitsgutachten vom', grube.dichtheitAm ?? (grube.nachweisFehlt ? 'fehlt' : undefined)],
@@ -313,7 +313,7 @@ function Abwasser({ p }: { p: Protokoll }) {
               ['Alter', kanal.alter === undefined ? undefined : `${zahl(kanal.alter)} Jahre`],
               ['Kosten', kanal.kosten === undefined ? undefined : euro(kanal.kosten)],
               ['höchstens', kanal.hoechstens === undefined ? undefined : euro(kanal.hoechstens)],
-              ['Altersabzug (3 % je Jahr vom Restwert)', kanal.abzug === undefined ? undefined : prozent(kanal.abzug * 100)],
+              ['Altersabzug (3 % je Jahr vom Bis-Wert)', kanal.abzug === undefined ? undefined : prozent(kanal.abzug * 100)],
             ]}
             summe={['Wert des Kanals', euro(kanal.wert)]}
           />

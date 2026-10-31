@@ -103,7 +103,7 @@ describe('Reiter Abwasser', () => {
     w.bau!.nichtBeraeumt = { aktiv: true, m3: 3, preis: 100 }
     const h = render(createElement(AbwasserTab, { wep: w, aendere: nichts }))
     expect(h).toContain('Abwassersammelgrube')
-    expect(h).toContain('Altersabzug 38,57 % (1 − 0,97^16)') // jährlich 3 % vom Restwert, nicht 16 × 3 = 48 %
+    expect(h).toContain('Altersabzug 48 % (16 Jahre × 3 %)') // linear vom Bis-Wert (vom BV bestätigt)
     expect(h).toContain('Grube nicht geleert')
     expect(h).toContain('Genehmigungsdatum fehlt')
     expect(h).toContain('Kosten nicht beräumter Baulichkeiten')

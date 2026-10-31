@@ -61,23 +61,14 @@ describe('Bau-Export: Struktur', () => {
     expect(r.bau!.korrekturen.map((k) => k.zelle).sort()).toEqual(['C33', 'C64', 'C75', 'H79', 'J52', 'K21', 'K81'])
   })
 
-  it('Altersabzug Grube (C75) und Kanal (H79): Formel vom Restwert, 2 Nachkommastellen nur an diesen Zellen', async () => {
+  it('Altersabzug Grube (C75) und Kanal (H79): linear wie die Vorlage, nur auf 100 % begrenzt; Formate unverändert', async () => {
     const r = await exportWep(wep(), vorlage, { teil: 'bau' })
     const neu = await JSZip.loadAsync(await r.blob.arrayBuffer())
     const alt = await JSZip.loadAsync(vorlage)
     const b = await text(neu, 'xl/worksheets/sheet3.xml')
-    expect(readCellFormula(b, 'C75')).toBe('(1-0.97^C74)*100')
-    expect(readCellFormula(b, 'H79')).toBe('1-0.97^G78')
-    const xfs = (x: string) => [.../<cellXfs\b[^>]*>([\s\S]*?)<\/cellXfs>/.exec(x)![1].matchAll(/<xf\b[^>]*?(?:\/>|>[\s\S]*?<\/xf>)/g)].map((m) => m[0])
-    const stil = (x: string, zelle: string) => Number(new RegExp(`<c r="${zelle}"[^>]*\\ss="(\\d+)"`).exec(x)![1])
-    const stileNeu = xfs(await text(neu, 'xl/styles.xml'))
-    const stileAlt = xfs(await text(alt, 'xl/styles.xml'))
-    expect(stileNeu.length).toBe(stileAlt.length + 2)
-    expect(stileNeu[stil(b, 'C75')]).toContain('numFmtId="2"')
-    expect(stileNeu[stil(b, 'H79')]).toContain('numFmtId="10"')
-    // bisherige Formate unverändert (andere Zellen mit demselben Format zeigen weiter „0“ bzw. „0%“)
-    expect(stileNeu.slice(0, stileAlt.length)).toEqual(stileAlt)
-    expect(await text(neu, 'xl/styles.xml')).toContain(`<cellXfs count="${stileAlt.length + 2}">`)
+    expect(readCellFormula(b, 'C75')).toBe('MIN(C74*3,100)')
+    expect(readCellFormula(b, 'H79')).toBe('MIN(G78/100*3,1)')
+    expect(await text(neu, 'xl/styles.xml')).toBe(await text(alt, 'xl/styles.xml'))
   })
 
   it('Eingabezellen: Typ mit Leerzeichen am Ende, Baujahr, Mängel %, Fläche, Index, Abwasser, Baubeschreibung', async () => {

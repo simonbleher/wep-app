@@ -252,10 +252,11 @@ export const GRUBEN_TYPEN = [
 /** Alterswertminderung der Grube: 3 % je Jahr, von den Höchstwerten ausgehend (S. 13). */
 export const GRUBE_MINDERUNG_PRO_JAHR = 3
 /**
- * Altersabzug von Grube und Kanalanschluss in % nach `alter` Jahren: jährlich 3 % vom Restwert, also (1 − 0,97^Alter) × 100
- * (16 Jahre: 38,57 %, nicht 16 × 3 = 48 %). Export: Formeln Baulichkeiten!C75 und H79 (`VORLAGEN_KORREKTUREN`).
+ * Altersabzug von Grube und Kanalanschluss in % nach `alter` Jahren: linear 3 % × Alter vom Bis-Wert (16 Jahre = 48 %),
+ * höchstens 100 % (vom BV bestätigt, docs/ENTSCHEIDUNGEN.md 2026-10-31; ersetzt den Abzug vom Restwert aus #95).
+ * Export: Formeln Baulichkeiten!C75 und H79 mit Obergrenze (`VORLAGEN_KORREKTUREN`).
  */
-export const altersabzugVomRestwert = (alter: number): number => (1 - (1 - GRUBE_MINDERUNG_PRO_JAHR / 100) ** alter) * 100
+export const altersabzugLinear = (alter: number): number => Math.min(alter * GRUBE_MINDERUNG_PRO_JAHR, 100)
 /** Tanks und monolithische Betongruben mit gültigem Dichtheitsnachweis: nach 16 Jahren nicht weiter abschreiben (S. 14; Kommentar Vorlage F74). */
 export const GRUBE_MAX_ALTER_TANK = 16
 /** Abzug bei nicht geleerter Grube (S. 14); in der Vorlage Baulichkeiten!K77 mit Minuszeichen. */

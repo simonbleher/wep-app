@@ -130,7 +130,7 @@ function abwasser(s: Satz, p: Protokoll): void {
         rz('Genehmigungsnummer', grube.nr),
         grube.alter !== undefined ? rz('Alter', `${zahl(grube.alter)} Jahre`) : undefined,
         grube.grundwert !== undefined ? rz('Grundwert', `${euro(grube.grundwert)}/m³`) : undefined,
-        grube.abzugProzent !== undefined ? rz('Altersabzug (3 % je Jahr vom Restwert)', prozent(grube.abzugProzent)) : undefined,
+        grube.abzugProzent !== undefined ? rz('Altersabzug (3 % je Jahr vom Bis-Wert)', prozent(grube.abzugProzent)) : undefined,
         grube.wertProM3 !== undefined ? rz('Wert nach Altersabzug', `${euro(grube.wertProM3)}/m³`) : undefined,
         grube.menge !== undefined ? rz('Inhalt', `${zahl(grube.menge)} m³`) : undefined,
         rz('Dichtheitsgutachten vom', grube.dichtheitAm ?? (grube.nachweisFehlt ? 'fehlt' : undefined)),
@@ -148,7 +148,7 @@ function abwasser(s: Satz, p: Protokoll): void {
         kanal.alter !== undefined ? rz('Alter', `${zahl(kanal.alter)} Jahre`) : undefined,
         kanal.kosten !== undefined ? rz('Kosten', euro(kanal.kosten)) : undefined,
         kanal.hoechstens !== undefined ? rz('höchstens', euro(kanal.hoechstens)) : undefined,
-        kanal.abzug !== undefined ? rz('Altersabzug (3 % je Jahr vom Restwert)', prozent(kanal.abzug * 100)) : undefined,
+        kanal.abzug !== undefined ? rz('Altersabzug (3 % je Jahr vom Bis-Wert)', prozent(kanal.abzug * 100)) : undefined,
         { art: 'summe', zellen: [{ text: 'Wert des Kanals' }, r(euro(kanal.wert))] },
       ]),
     })

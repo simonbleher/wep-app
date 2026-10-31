@@ -25,7 +25,7 @@ import {
   tabellenEnde,
   umbrechen,
   weisePlaetzeZu,
-  altersabzugVomRestwert,
+  altersabzugLinear,
 } from '..'
 import { blattPfadNachName, sharedStrings, zellenWert } from '../../export/bauExcelLesen'
 
@@ -249,38 +249,43 @@ describe('Baupreisindex', () => {
   })
 })
 
-describe('Abwassergrube: Altersabzug jährlich 3 % vom Restwert', () => {
-  it('(1 − 0,97^Alter) × 100: 16 Jahre 38,57 % statt 48 %', () => {
-    expect(altersabzugVomRestwert(0)).toBe(0)
-    expect(altersabzugVomRestwert(1)).toBeCloseTo(3, 10)
-    expect(altersabzugVomRestwert(16)).toBeCloseTo(38.5746, 4)
+describe('Abwassergrube: Altersabzug linear 3 % × Alter vom Bis-Wert (vom BV bestätigt)', () => {
+  it('3 % × Alter, höchstens 100 %: 16 Jahre = 48 %', () => {
+    expect(altersabzugLinear(0)).toBe(0)
+    expect(altersabzugLinear(1)).toBe(3)
+    expect(altersabzugLinear(16)).toBe(48)
+    expect(altersabzugLinear(33)).toBe(99)
+    expect(altersabzugLinear(34)).toBe(100)
+    expect(altersabzugLinear(60)).toBe(100)
   })
-  it('Tank 16 Jahre gedeckelt, Schachtringe ohne Grenze (nie 100 %)', () => {
+  it('Tank nach 16 Jahren nicht weiter abgeschrieben (48 %), Schachtringe ohne Grenze bis 0 €; nicht geleert −150 €', () => {
     const tank = wepMit((_, wep) => { wep.bau!.abwasser = { art: 'grube', kanal: {}, grube: { typ: 'kunststoff', inhaltM3: 5, baujahr: 2000, dichtheitAm: '2025-01-03' } } })
     const g = berechneBau(tank)!.grube!
     expect(g.wirksamesAlter).toBe(16)
-    expect(g.altersabzugProzent).toBeCloseTo(38.5746, 4)
-    expect(g.wertProM3).toBe(288.7) // 470 − 470 × 38,57 %
-    expect(g.wert).toBe(1443.5)
+    expect(g.altersabzugProzent).toBe(48)
+    expect(g.wertProM3).toBe(244.4) // 470 − 470 × 48 %
+    expect(g.wert).toBe(1222)
+    const voll = wepMit((_, wep) => { wep.bau!.abwasser = { art: 'grube', kanal: {}, grube: { typ: 'kunststoff', inhaltM3: 5, baujahr: 2000, dichtheitAm: '2025-01-03', nichtGeleert: true } } })
+    expect(berechneBau(voll)!.grube!.nichtGeleertAbzug).toBe(-150)
     const alt = wepMit((_, wep) => { wep.bau!.abwasser = { art: 'grube', kanal: {}, grube: { typ: 'schachtringe', inhaltM3: 3, baujahr: 1965, dichtheitAm: '2025-01-03' } } })
     const s = berechneBau(alt)!.grube!
     expect(s.wirksamesAlter).toBe(s.alter)
-    expect(s.altersabzugProzent).toBeLessThan(100)
-    expect(s.wert).toBeGreaterThan(0)
+    expect(s.altersabzugProzent).toBe(100)
+    expect(s.wert).toBe(0)
   })
 })
 
-describe('Kanalanschluss: Altersabzug jährlich 3 % vom Restwert', () => {
-  it('Abzug 1 − 0,97^Alter vom Erstellungspreis (höchstens 2.200 €), auch nach über 33 Jahren nicht 0 €', () => {
+describe('Kanalanschluss: Altersabzug linear 3 % × Alter vom Erstellungspreis', () => {
+  it('Abzug 3 % × Alter (höchstens 2.200 €), nach über 33 Jahren 0 € statt negativ', () => {
     const w = wepMit((_, wep) => { wep.bau!.abwasser = { art: 'kanal', grube: {}, kanal: { baujahr: 2006, kosten: 3000 } } })
     const k = berechneBau(w)!.kanal!
     expect(k.alter).toBeGreaterThan(0)
-    expect(k.abzug).toBeCloseTo(1 - 0.97 ** k.alter!, 10)
-    expect(k.wert).toBe(Math.round(2200 * 0.97 ** k.alter! * 100) / 100)
+    expect(k.abzug).toBeCloseTo((3 * k.alter!) / 100, 10)
+    expect(k.wert).toBe(Math.round(2200 * (1 - (3 * k.alter!) / 100) * 100) / 100)
     const alt = wepMit((_, wep) => { wep.bau!.abwasser = { art: 'kanal', grube: {}, kanal: { baujahr: 1960, kosten: 1500 } } })
     const ka = berechneBau(alt)!.kanal!
     expect(ka.alter).toBeGreaterThan(33)
-    expect(ka.wert).toBeGreaterThan(0)
+    expect(ka.wert).toBe(0)
   })
 })
 
