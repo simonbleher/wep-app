@@ -185,3 +185,45 @@ describe('window.wep.positionen', () => {
     expect(Object.isFrozen(api.positionen)).toBe(true)
   })
 })
+
+describe('Bäume: Vorschlag aus dem Maß (wep-positionen/1, abwärtskompatibel)', () => {
+  it('Obstgehölz mit „alter“: Baumform in „variante“, die App wählt die Altersstufe', () => {
+    const g = p([{ suche: 'Apfel', variante: 'Halbstamm', alter: 40, anzahl: 1 }])
+    expect(g.fehler).toEqual([])
+    expect(g.positionen[0]).toMatchObject({ bezeichnung: 'Apfel, Halbstamm, 40 J.', baumform: 'Halbstamm', alterJahre: 40, hoechstwert: 150, einzelpreis: 112.5 })
+    // Eine Variante mit Altersstufe zählt nur mit ihrer Form – das Alter entscheidet
+    expect(p([{ suche: 'Apfel', variante: 'Halbstamm 5–30', alter: 3, anzahl: 1 }]).positionen[0]).toMatchObject({ hoechstwert: 35, alterJahre: 3 })
+    expect(p([{ suche: 'Apfel', alter: 3, anzahl: 1 }]).fehler[0].pfad).toBe('positionen[0].variante')
+    gueltig('positionenVorschlag', { format: 'wep-positionen/1', liste: 'aufwuchs', positionen: [{ suche: 'Apfel', variante: 'Halbstamm', alter: 12, anzahl: 1 }] })
+  })
+
+  it('ohne „alter“ wie bisher, mit Hinweis „Alter fehlt“', () => {
+    const g = p([{ suche: 'Apfel', variante: 'Halbstamm 5–30', anzahl: 1 }])
+    expect(g.positionen[0]).toMatchObject({ hoechstwert: 85, einzelpreis: 63.75 })
+    expect(g.positionen[0].baumform).toBeUndefined()
+    expect(g.hinweise.join(' ')).toMatch(/Alter fehlt/)
+  })
+
+  it('Geschützter Baum: 1 € auch bei Zustand „mittel“', () => {
+    expect(p([{ katalogId: 'aw-baum-geschuetzt', zustand: 'mittel', anzahl: 2 }]).positionen[0]).toMatchObject({ einzelpreis: 1 })
+  })
+
+  it('Beseitigung „baum-faellen“: Gegenstand, Einheit und Satz aus Baumart und Maß', () => {
+    const g = p([{ vorlage: 'baum-faellen', baumart: 'Birke', stammumfang: 85, menge: 1 }, { vorlage: 'baum-faellen', durchmesser: 27, menge: 2 }], 'beseitigung')
+    expect(g.fehler).toEqual([])
+    expect(g.beseitigung[0]).toMatchObject({ gegenstand: 'Birke fällen inkl. Wurzelstock, StU 85 cm', einheit: 'Stück', einzelpreis: 600, baum: { art: 'Birke', stammumfangCm: 85 }, preisManuell: false })
+    expect(g.beseitigung[1]).toMatchObject({ gegenstand: 'Baum fällen inkl. Wurzelstock, StU 84,8 cm', einzelpreis: 600, baum: { stammumfangCm: 84.8, durchmesserCm: 27 } })
+    gueltig('positionenVorschlag', { format: 'wep-positionen/1', liste: 'beseitigung', positionen: [{ vorlage: 'baum-faellen', baumart: 'Birke', stammumfang: 85, menge: 1 }] })
+  })
+
+  it('ohne Maß: 0 € und Hinweis, eigener Preis bleibt eigener Preis; Fehler bei Widersprüchen', () => {
+    const ohne = p([{ vorlage: 'baum-faellen', baumart: 'Birke', menge: 1 }], 'beseitigung')
+    expect(ohne.ok).toBe(true)
+    expect(ohne.beseitigung[0]).toMatchObject({ einzelpreis: 0, gegenstand: 'Birke fällen inkl. Wurzelstock, StU fehlt' })
+    expect(ohne.hinweise.join(' ')).toMatch(/Maß fehlt/)
+    expect(p([{ vorlage: 'baum-faellen', stammumfang: 85, einzelpreis: 450, menge: 1 }], 'beseitigung').beseitigung[0]).toMatchObject({ einzelpreis: 450, preisManuell: true })
+    expect(p([{ vorlage: 'baum-faellen', stammumfang: 85, durchmesser: 27, menge: 1 }], 'beseitigung').ok).toBe(false)
+    expect(p([{ vorlage: 'hecke', menge: 1 }], 'beseitigung').fehler[0].pfad).toBe('positionen[0].vorlage')
+    expect(p([{ gegenstand: 'x', stammumfang: 85, menge: 1, einheit: 'Stück', einzelpreis: 1 }], 'beseitigung').fehler[0].pfad).toBe('positionen[0].stammumfang')
+  })
+})

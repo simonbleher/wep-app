@@ -4,6 +4,8 @@ import { useEffect, useId, useState } from 'react'
 import { Send } from 'lucide-react'
 import type { Wep } from '@/model'
 import { ICON, Meldung, Rueckfrage, zeitDe } from '@/app/ui'
+import { MassFehltHinweis } from '@/app/MassFehltHinweis'
+import { fehlendeMasse } from '@/gruen/baumMass'
 import { speichereWep } from '@/app/db'
 import { lokalesProfil } from '@/profil'
 import { istUnterschriftUrl } from '@/unterschrift'
@@ -145,6 +147,7 @@ export function AbgabeBereich({ wep, onGeaendert }: { wep: Wep; onGeaendert: () 
               An {a?.gruen?.name ?? 'Grün'} weitergeben
             </button>
           ))}
+        {sicht.aktionen.includes('an_bv') && teil === 'gruen' && <MassFehltHinweis wep={wep} />}
         {sicht.aktionen.includes('an_bv') && (
           <button type="button" className="knopf knopf-primaer" disabled={laeuft} onClick={() => setFrage({ aktion: 'an_bv' })}>
             <Send {...ICON} />
@@ -195,7 +198,7 @@ export function AbgabeBereich({ wep, onGeaendert }: { wep: Wep; onGeaendert: () 
           titel={frage.aktion === 'an_bv' ? (ohneBau ? 'Kein Bau-Teil – bewusst ohne Bau abgeben?' : 'An den BV abgeben?') : `An ${gruenName || 'Grün'} abgeben?`}
           text={
             frage.aktion === 'an_bv'
-              ? `${ohneBau ? 'Dieses WEP hat keinen Bau-Teil (kein Bau-Wertermittler beteiligt). ' : ''}Danach kann niemand mehr am WEP arbeiten, bis der BV es prüft oder eine Rückfrage stellt.`
+              ? `${ohneBau ? 'Dieses WEP hat keinen Bau-Teil (kein Bau-Wertermittler beteiligt). ' : ''}${teil === 'gruen' && fehlendeMasse(wep).length ? `Bei ${fehlendeMasse(wep).length} Baum-Position(en) fehlt das Maß (siehe oben). ` : ''}Danach kann niemand mehr am WEP arbeiten, bis der BV es prüft oder eine Rückfrage stellt.`
               : `Danach kannst du das WEP nur noch lesen. ${gruenName || 'Grün'} bearbeitet den Grün-Teil und gibt an den BV ab.`
           }
           bestaetigen={frage.aktion === 'an_bv' && ohneBau ? 'Ohne Bau abgeben' : 'Abgeben'}

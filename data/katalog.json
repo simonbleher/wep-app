@@ -68,5 +68,44 @@
     { "id": "aw-rasen", "abschnitt": "III. Aufwuchs", "kategorie": "Rasen und Wiesen", "bezeichnung": "Rasen", "einheit": "m²", "hoechstwert": 0.5, "seite": 18, "regeln": "Nur bis max. 100 m² Fläche bewertet. Darüber hinausgehende Fläche erzeugt nur einen Hinweis.", "arten": ["Rasengräser"], "relevanz": 4 },
     { "id": "aw-wiese", "abschnitt": "III. Aufwuchs", "kategorie": "Rasen und Wiesen", "bezeichnung": "Wiese (Blumenwiese, Bienenweide)", "einheit": "m²", "hoechstwert": 2.5, "seite": 18, "regeln": "Nur bis max. 100 m² Fläche bewertet. Darüber hinausgehende Fläche erzeugt nur einen Hinweis.", "arten": ["Blumenwiese", "Bienenweide"], "relevanz": 3 },
     { "id": "aw-baum-geschuetzt", "abschnitt": "III. Aufwuchs", "kategorie": "Bäume (Baumschutzverordnung)", "bezeichnung": "Geschützter Baum (Baumschutzverordnung)", "einheit": "Stück", "hoechstwert": 1, "seite": 16, "regeln": "Bäume, die nach der jeweils aktuellen Baumschutzverordnung besonders geschützt sind, sind zu erhalten und mit 1,00 € je Stück zu bewerten (S. 16, Absatz 3). Anpflanzung nur zulässig, wenn im Unterpachtvertrag/Nutzungsvertrag nicht verboten.", "arten": ["Eiche", "Linde", "Kastanie", "Ahorn"], "relevanz": 2 }
-  ]
+  ],
+  "staffeln": {
+    "baumBeseitigung": {
+      "bezeichnung": "Baum fällen (Beseitigung inkl. Wurzel/Wurzelfräsung bis mind. 20 cm unter Oberkante Erdreich)",
+      "abschnitt": "IV. Ermittlung der Beseitigungskosten",
+      "mass": "Stammumfang in 1,30 m Höhe über dem Boden",
+      "masseinheit": "cm",
+      "einheit": "Stück",
+      "seite": 20,
+      "seiteBis": 21,
+      "regeln": "„bis N cm“ schließt N ein; über 140 cm gilt der letzte Satz. Die Kosten beinhalten die komplette Beseitigung einschließlich des Wurzelstocks. Naturschutzgesetz und Baumschutzverordnung beachten.",
+      "stufen": [
+        { "bis": 30, "hoechstwert": 75 },
+        { "bis": 40, "hoechstwert": 160 },
+        { "bis": 50, "hoechstwert": 245 },
+        { "bis": 60, "hoechstwert": 330 },
+        { "bis": 70, "hoechstwert": 415 },
+        { "bis": 80, "hoechstwert": 500 },
+        { "bis": 90, "hoechstwert": 600 },
+        { "bis": 100, "hoechstwert": 700 },
+        { "bis": 110, "hoechstwert": 800 },
+        { "bis": 120, "hoechstwert": 900 },
+        { "bis": 130, "hoechstwert": 1000 },
+        { "bis": 140, "hoechstwert": 1100 },
+        { "ueber": 140, "hoechstwert": 1250 }
+      ]
+    },
+    "obstgehoelzAlter": {
+      "katalogId": "aw-obstgehoelz",
+      "mass": "Alter",
+      "masseinheit": "Jahre",
+      "seite": 16,
+      "regeln": "Volle Jahre. „bis 4 Jahre“ bis einschließlich 4, „5 bis 30 Jahre“ bis einschließlich 30, darüber „30 + Jahre“ (im Katalog „über 30 Jahre“). Grenzfall genau 30 Jahre: Frage an Simon/BV, bis zur Antwort Stufe 5–30.",
+      "stufen": [
+        { "bis": 4, "altersstufe": "bis 4 Jahre" },
+        { "bis": 30, "altersstufe": "5 bis 30 Jahre" },
+        { "ueber": 30, "altersstufe": "über 30 Jahre" }
+      ]
+    }
+  }
 }

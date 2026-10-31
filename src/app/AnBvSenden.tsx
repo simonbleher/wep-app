@@ -15,6 +15,7 @@ import { usePdfExport } from './ohneExcel'
 import { erstellePdf } from './PdfExport'
 import { ICON, Meldung, zeitDe } from './ui'
 import { UnterschriftHinweis, absenderAusProfil } from './UnterschriftHinweis'
+import { MassFehltHinweis } from './MassFehltHinweis'
 
 type Zustand =
   | { typ: 'idle' }
@@ -111,6 +112,7 @@ export function AnBvSenden({
         {wep.anBvGesendetAm && ` Zuletzt gesendet am ${zeitDe(wep.anBvGesendetAm)}.`}
       </p>
       <UnterschriftHinweis wep={wep} />
+      <MassFehltHinweis wep={wep} />
       {!nr && (
         <Meldung>
           <p>Die Vorgangs-Nr. fehlt noch. Bitte vor dem Senden unter „Formalien“ die Nummer vom BV eintragen.</p>

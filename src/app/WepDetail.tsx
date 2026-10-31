@@ -61,7 +61,7 @@ import { FotoGruppe, FotosTab, useFotoNachladen, useFotoRecords } from './Fotos'
 import { fotoOrdnerName, sammleExportFotos, zipDateien } from '@/fotos/exportOrdner'
 import { dbAblage } from '@/fotos/ablage'
 import { loeseFotosVonPosition, type WepAendern } from '@/fotos'
-import { PositionenAbschnitt } from './Positionen'
+import { PositionenAbschnitt, WarnListe } from './Positionen'
 import { PositionHinzufuegen } from './PositionHinzufuegen'
 import { PositionBearbeiten } from './PositionBearbeiten'
 import { BeseitigungFormular, beseitigungSumme } from './BeseitigungFormular'
@@ -85,6 +85,7 @@ import { svgZuPngBrowser } from '@/export/svgRaster'
 import { dateiStamm, exportRolle, exportWep, mitLeerenBauDaten, type ExportResult } from '@/export'
 import { exportFotosNachOneDrive, exportNachOneDrive, ladeFotoAusOneDrive } from '@/sync'
 import { berechneAbschnittSumme } from '@/gruen/summen'
+import { baumHinweise } from '@/gruen/baumMass'
 import { Capacitor } from '@capacitor/core'
 import { speichereDatei, speicherText } from './dateiSpeichern'
 import { leseZahl, zahlDe, zahlFuerEingabe } from '@/gruen/format'
@@ -467,6 +468,7 @@ export function WepDetail({ wepId, onZurueck, onOeffnen }: Props) {
             key={maske.id ?? 'neu'}
             bearbeiten={bearbeiteBes}
             vorlage={maske.vorlage}
+            baumVorlage
             onAbbrechen={() => setMaske(null)}
             onFertig={speichereBeseitigung}
             onLoeschen={bearbeiteBes ? () => loescheBeseitigung(bearbeiteBes.id) : undefined}
@@ -1006,6 +1008,7 @@ function BeseitigungTab({
                   <span className="zahl c-summe">{euroFormat(pos.menge * pos.einzelpreis * pos.faktor)}</span>
                   <ChevronRight {...ICON} className="chevron" />
                 </button>
+                <WarnListe hinweise={baumHinweise(pos)} />
               </li>
             ))}
           </ul>

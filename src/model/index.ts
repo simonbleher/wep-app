@@ -5,6 +5,7 @@ export type {
   Hinweis,
   Formalien,
   BeseitigungsPosition,
+  BaumMass,
   SkizzeDaten,
   GrundrissDaten,
   GrundrissTeil,

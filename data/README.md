@@ -37,6 +37,13 @@ Jede Position hat:
 Alle Höchstwerte sind „bis“-Werte (Obergrenzen). Preisvorschlag der App =
 Höchstwert × Zustandsstufe; immer überschreibbar (siehe CLAUDE.md).
 
+## Staffeln nach Maß (`staffeln`)
+Wo die Richtlinie nach einem Maß staffelt, wählt die App die Stufe selbst (`src/gruen/baumMass.ts`):
+- `baumBeseitigung` – Beseitigungskosten Bäume nach Stammumfang in 1,30 m Höhe (S. 20–21): `bis` cm
+  (einschließlich) → `hoechstwert`; die letzte Stufe `ueber: 140` gilt für alles darüber.
+- `obstgehoelzAlter` – Altersstufe der Obstgehölze (S. 16) aus dem Alter in vollen Jahren; der Höchstwert
+  kommt aus der Variante von `aw-obstgehoelz` mit gleicher `form` und `altersstufe`.
+
 ## Schema `invasive.json`
 `meta` + Liste `arten`. Je Art: `id`, `wissenschaftlich`, `synonym` (optional),
 `deutsch`, `englisch` (optional), `aufnahme` (Jahr), `seite`, `hinweis` (optional).

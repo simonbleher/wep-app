@@ -9,6 +9,7 @@
 import { INVASIVE_ARTEN, KATALOG_POSITIONEN, PROBLEMPFLANZEN } from '../app/katalogDaten'
 import { gefundeneArt, kurzeBezeichnung, variantenMerkmale } from '../gruen/format'
 import { berechnePreisvorschlag } from '../gruen/preisvorschlag'
+import { BAUM_BESEITIGUNG, OBST_ID, baumFaellenPreis, baumFaellenText, obstBezeichnung, obstFormVarianten, obstHoechstwert, staffelSeite, umfangAusDurchmesser } from '../gruen/baumMass'
 import { berechneRegelhinweise } from '../gruen/regelhinweise'
 import { aktiveEigene, lokaleEigene, sucheKatalog, type Position as KatalogPosition, type Variante } from '../katalog'
 import { normalisiere } from '../katalog/util'
@@ -120,8 +121,10 @@ export function katalogSuchen(begriff: string, liste: 'aufwuchs' | 'aussenanlage
 // Prüfung
 // ---------------------------------------------------------------------------
 
-const POS_FELDER = ['suche', 'katalogId', 'variante', 'bezeichnung', 'anzahl', 'einheit', 'zustand', 'einzelpreis'] as const
-const BES_FELDER = ['gegenstand', 'menge', 'einheit', 'einzelpreis', 'faktor', 'begruendung'] as const
+const POS_FELDER = ['suche', 'katalogId', 'variante', 'bezeichnung', 'anzahl', 'einheit', 'zustand', 'einzelpreis', 'alter'] as const
+const BES_FELDER = ['gegenstand', 'menge', 'einheit', 'einzelpreis', 'faktor', 'begruendung', 'vorlage', 'baumart', 'stammumfang', 'durchmesser'] as const
+/** Vorlagen für Beseitigungspositionen (BewRL S. 20–21). */
+export const BESEITIGUNG_VORLAGEN = ['baum-faellen'] as const
 
 interface Kontext {
   fehler: PositionsFehler[]
@@ -224,6 +227,23 @@ function loeseAuf(k: Kontext, o: Rohobjekt, pfad: string, liste: 'aufwuchs' | 'a
     art = gefundeneArt(pos, suche!)
   }
   let variante = treffVariante
+  // Obstgehölz mit Alter: „variante“ nennt nur die Baumform, die Altersstufe folgt aus „alter“ (BewRL S. 16)
+  if (pos.id === OBST_ID && o.alter !== undefined) {
+    const vs = pos.varianten ?? []
+    const formen = obstFormVarianten(vs)
+    let form: string | undefined
+    if (typeof varianteRoh === 'number' && Number.isInteger(varianteRoh) && varianteRoh >= 0 && varianteRoh < vs.length) form = vs[varianteRoh]!.form
+    else if (typeof varianteRoh === 'string' && varianteRoh.trim()) {
+      const q = normalisiere(varianteRoh)
+      const passend = formen.filter((f) => q.includes(normalisiere(f.form)) || normalisiere(f.form).includes(q))
+      form = passend.length === 1 ? passend[0]!.form : undefined
+    } else form = treffVariante?.form
+    if (!form) {
+      fehlt(k, `${pfad}.variante`, `Obstgehölz mit „alter“: „variante“ nennt die Baumform – ${formen.map((f) => f.form).join(', ')}.`)
+      return null
+    }
+    return { katalog: pos, variante: vs.find((v) => v.form === form), art }
+  }
   if (varianteRoh !== undefined) {
     const vs = pos.varianten ?? []
     if (!vs.length) {
@@ -273,6 +293,7 @@ function pruefePosition(k: Kontext, e: unknown, i: number, liste: 'aufwuchs' | '
     else fehlt(k, `${pfad}.zustand`, `zustand muss ${ZUSTAENDE.map((z) => `„${z}“`).join(', ')} sein (ist ${JSON.stringify(e.zustand)}). Ohne Angabe gilt „gut“.`)
   }
   const preis = zahl(k, e, 'einzelpreis', pfad)
+  const alter = zahl(k, e, 'alter', pfad)
   if (aufgeloest === 'frei') {
     if (!bezeichnungRoh) fehlt(k, `${pfad}.bezeichnung`, 'Freitext-Position: „bezeichnung“ fehlt (oder „suche“ / „katalogId“ für einen Katalogeintrag angeben).')
     if (!einheitRoh && e.einheit === undefined) fehlt(k, `${pfad}.einheit`, `Freitext-Position: „einheit“ fehlt (${EINHEITEN_POSITION.join(', ')}).`)
@@ -282,8 +303,14 @@ function pruefePosition(k: Kontext, e: unknown, i: number, liste: 'aufwuchs' | '
   const katalog = aufgeloest !== 'frei' ? aufgeloest.katalog : undefined
   const eigene = aufgeloest !== 'frei' ? aufgeloest.eigene : undefined
   const variante = aufgeloest !== 'frei' ? aufgeloest.variante : undefined
-  const hoechstwert = variante?.hoechstwert ?? katalog?.hoechstwert
-  const bezeichnung = bezeichnungRoh ?? (katalog ? kurzeBezeichnung(katalog, variante, aufgeloest !== 'frei' ? aufgeloest.art : undefined) : (eigene?.bezeichnung ?? ''))
+  const art = aufgeloest !== 'frei' ? aufgeloest.art : undefined
+  // Obstgehölz mit Alter: Höchstwert aus Baumform + Alter; Bezeichnung „Apfel, Halbstamm, 12 J.“
+  const obstMitAlter = katalog?.id === OBST_ID && alter !== undefined && Boolean(variante?.form)
+  if (alter !== undefined && !obstMitAlter) k.hinweise.push(`${pfad}: „alter“ zählt nur bei Obstgehölzen und wird hier nicht verwendet.`)
+  const hoechstwert = obstMitAlter ? obstHoechstwert(katalog!.varianten ?? [], variante!.form, alter) : (variante?.hoechstwert ?? katalog?.hoechstwert)
+  const bezeichnung =
+    bezeichnungRoh ??
+    (obstMitAlter ? obstBezeichnung(art ?? 'Obstgehölz', variante!.form, alter) : katalog ? kurzeBezeichnung(katalog, variante, art) : (eigene?.bezeichnung ?? ''))
   const einheit = einheitRoh ?? katalog?.einheit ?? eigene?.einheit ?? 'Stück'
   const grund: Position = {
     id: neuePositionId(),
@@ -296,7 +323,9 @@ function pruefePosition(k: Kontext, e: unknown, i: number, liste: 'aufwuchs' | '
     einzelpreis: 0,
     preisManuell: false,
     hinweise: [],
+    ...(obstMitAlter ? { baumform: variante!.form, alterJahre: Math.floor(alter!) } : {}),
   }
+  if (katalog?.id === OBST_ID && !obstMitAlter) k.hinweise.push(`${pfad} „${bezeichnung}“: Alter fehlt – mit „alter“ (Jahre) und der Baumform in „variante“ wählt die App die Altersstufe selbst.`)
   const preisManuell = preis !== undefined || (eigene?.einzelpreis !== undefined && hoechstwert === undefined)
   const einzelpreis = preis ?? (preisManuell ? (eigene?.einzelpreis ?? 0) : berechnePreisvorschlag(grund))
   const pos: Position = { ...grund, einzelpreis, preisManuell }
@@ -319,16 +348,46 @@ function pruefeBeseitigung(k: Kontext, e: unknown, i: number): BeseitigungsPosit
   }
   const anfang = k.fehler.length
   for (const f of Object.keys(e)) if (!(BES_FELDER as readonly string[]).includes(f)) fehlt(k, `${pfad}.${f}`, `Unbekanntes Feld „${f}“. Erlaubt: ${BES_FELDER.join(', ')}.`)
-  const gegenstand = text(k, e, 'gegenstand', pfad, true)
+  // Vorlage „baum-faellen“: Gegenstand, Einheit und Einzelpreis folgen aus Baumart und Maß (BewRL S. 20–21)
+  let baum = false
+  if (e.vorlage !== undefined) {
+    if (e.vorlage === 'baum-faellen') baum = true
+    else fehlt(k, `${pfad}.vorlage`, `Unbekannte Vorlage ${JSON.stringify(e.vorlage)}. Erlaubt: ${BESEITIGUNG_VORLAGEN.join(', ')}.`)
+  }
+  for (const f of ['baumart', 'stammumfang', 'durchmesser']) if (e[f] !== undefined && !baum && e.vorlage === undefined) fehlt(k, `${pfad}.${f}`, `„${f}“ gilt nur mit "vorlage": "baum-faellen".`)
+  const baumart = text(k, e, 'baumart', pfad)
+  const stammumfang = zahl(k, e, 'stammumfang', pfad, { positiv: true })
+  const durchmesser = zahl(k, e, 'durchmesser', pfad, { positiv: true })
+  if (stammumfang !== undefined && durchmesser !== undefined) fehlt(k, pfad, 'Entweder „stammumfang“ oder „durchmesser“ angeben, nicht beides.')
+  const umfang = stammumfang ?? (durchmesser !== undefined ? umfangAusDurchmesser(durchmesser) : undefined)
+  const gegenstand = baum ? (text(k, e, 'gegenstand', pfad) ?? baumFaellenText(baumart, umfang)) : text(k, e, 'gegenstand', pfad, true)
   const menge = zahl(k, e, 'menge', pfad, { pflicht: true, positiv: true })
-  if (e.einheit === undefined) fehlt(k, `${pfad}.einheit`, `„einheit“ fehlt (${EINHEITEN_BESEITIGUNG.join(', ')}).`)
-  const einheit = e.einheit !== undefined ? einheitFeld(k, e, pfad, EINHEITEN_BESEITIGUNG) : undefined
-  const einzelpreis = zahl(k, e, 'einzelpreis', pfad, { pflicht: true })
+  if (e.einheit === undefined && !baum) fehlt(k, `${pfad}.einheit`, `„einheit“ fehlt (${EINHEITEN_BESEITIGUNG.join(', ')}).`)
+  const einheit = e.einheit !== undefined ? einheitFeld(k, e, pfad, EINHEITEN_BESEITIGUNG) : baum ? 'Stück' : undefined
+  const preisRoh = zahl(k, e, 'einzelpreis', pfad, { pflicht: !baum })
+  const vorschlag = baum ? baumFaellenPreis(umfang) : undefined
+  const einzelpreis = preisRoh ?? (baum ? (vorschlag ?? 0) : undefined)
   const faktor = zahl(k, e, 'faktor', pfad, { positiv: true }) ?? 1
   const begruendung = text(k, e, 'begruendung', pfad)
   if (k.fehler.length > anfang || !gegenstand || menge === undefined || !einheit || einzelpreis === undefined) return null
   if (faktor > 1 && !begruendung) k.hinweise.push(`${pfad} „${gegenstand}“: Faktor ${faktor} > 1 braucht eine Begründung („begruendung“).`)
-  return { id: neueBesId(), gegenstand, menge, einheit, einzelpreis, faktor, ...(faktor > 1 && begruendung ? { begruendung } : {}) }
+  if (baum && umfang === undefined) k.hinweise.push(`${pfad} „${gegenstand}“: Maß fehlt – mit „stammumfang“ oder „durchmesser“ (cm, in 1,30 m Höhe) schlägt die App den Satz nach BewRL ${staffelSeite(BAUM_BESEITIGUNG)} vor.`)
+  if (baum && preisRoh !== undefined && vorschlag !== undefined && preisRoh > vorschlag + 0.005) k.hinweise.push(`${pfad} „${gegenstand}“: Preis ${preisRoh} € liegt über dem Satz von ${vorschlag} € (BewRL) – nur ein Hinweis.`)
+  return {
+    id: neueBesId(),
+    gegenstand,
+    menge,
+    einheit,
+    einzelpreis,
+    faktor,
+    ...(faktor > 1 && begruendung ? { begruendung } : {}),
+    ...(baum
+      ? {
+          baum: { ...(baumart ? { art: baumart } : {}), ...(umfang !== undefined ? { stammumfangCm: umfang } : {}), ...(durchmesser !== undefined ? { durchmesserCm: durchmesser } : {}) },
+          preisManuell: preisRoh !== undefined,
+        }
+      : {}),
+  }
 }
 
 const eur = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' })

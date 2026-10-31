@@ -51,13 +51,18 @@ describe('Positionsliste Aufwuchs', () => {
 describe('Position hinzufügen: Varianten direkt in den Suchtreffern', () => {
   const aufwuchs = KATALOG_POSITIONEN.filter((p) => p.abschnitt === 'III. Aufwuchs')
 
-  it('„apfel“ listet alle Varianten des Obstgehölzes einzeln', () => {
+  it('„apfel“ listet je Baumform eine Zeile – die Altersstufe folgt aus dem Alter im Formular', () => {
     const gruppen = gruppiere(aufwuchs, 'apfel', [])
-    const obst = gruppen.find((g) => g.position.varianten && g.eintraege.length > 1)
+    const obst = gruppen.find((g) => g.position.id === 'aw-obstgehoelz')
     expect(obst).toBeDefined()
     expect(obst!.art).toBe('Apfel')
-    expect(obst!.eintraege.every((e) => e.variante)).toBe(true)
-    expect(obst!.eintraege.length).toBe(obst!.position.varianten!.length)
+    expect(obst!.eintraege.map((e) => e.variante?.form)).toEqual(['Buschbaum', 'Halbstamm', 'Hochstamm', 'Säule', 'Spalier'])
+    expect(obst!.eintraege.every((e) => e.variante && !e.variante.altersstufe)).toBe(true)
+  })
+
+  it('andere Positionen mit Varianten listen weiter alle Varianten einzeln', () => {
+    const hecke = gruppiere(aufwuchs, 'hecke', []).find((g) => g.position.id === 'aw-hecke')
+    expect(hecke!.eintraege.length).toBe(hecke!.position.varianten!.length)
   })
 
   it('ohne Varianten gibt es genau einen Eintrag', () => {
