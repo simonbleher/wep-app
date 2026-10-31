@@ -115,13 +115,14 @@ Stand 30.10.2026. Vergleich von `docs/Richtlinie.pdf` mit App, Katalog (`data/ka
 | Teilung: je Teilparzelle ein Protokoll | S. 23 | 🟨 | über „Duplizieren“ möglich | – | – |
 | Rundung | – | ✅ | Richtlinie regelt keine Rundung; App rundet auf Cent (`rund2`) wie die Vorlage | – | – |
 
-## Fragen an Simon / den BV
+## Fragen an Simon / den BV – beantwortet am 31.10.2026
 
-1. **Zustandsstufen:** Gilt die Staffel 100 / 75 / 50 % und „schlecht = 1 €“? Gilt „schlecht = 1 €“ auch für Außenanlagen und Nicht-Obst-Aufwuchs?
-2. **Alterswertminderung Außenanlagen (S. 12):** Soll die App ein Alter je Außenanlage erfassen und mindestens 3 % je Jahr abziehen, oder ist das im Zustand enthalten?
-3. **#95 Grube/Kanal:** linear vom Höchstwert (3 % × Alter) oder vom Restwert (1 − 0,97^Alter)? Der Wortlaut „von den Bis-Werten ausgehend“ spricht eher für linear.
-4. **Laub-/Nadelbäume ohne Schutz:** Wie werden sie bewertet?
-5. **Schuppen neben der Laube (#83):** Werden genehmigte separate Schuppen nach S. 11 b nie bewertet, oder hängt das vom Vertrag ab?
+Die Antworten stehen in docs/ENTSCHEIDUNGEN.md (2026-10-31, „Antworten des BV zu den Richtlinien-Fragen“):
+1. Zustands-Staffel 100 / 75 / 50 % bestätigt, „schlecht = 1 €“ gilt für alle Positionen.
+2. Altersabzug Außenanlagen steckt im Zustand, kein Alter erfassen (nur Hinweis).
+3. #95 Grube/Kanal: linear, 3 % × Alter vom Bis-Wert.
+4. Nicht geschützte Laub-/Nadelbäume werden immer entfernt – kein Wert im Aufwuchs, Beseitigung „Baum fällen“.
+5. Schuppen neben der Laube nie bewerten (#83 bleibt); hängt er an einer Laube unter 24 m², als Anbau erfassen.
 
 ## Kleine, eindeutige Lücken (eigene PRs)
 

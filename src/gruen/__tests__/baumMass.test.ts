@@ -91,7 +91,7 @@ describe('Staffel „Baum fällen“ (BewRL S. 20–21)', () => {
 })
 
 describe('Obstgehölze nach Alter (BewRL S. 16)', () => {
-  it('Altersstufen in vollen Jahren; genau 30 Jahre = „5 bis 30“ (Frage an den BV)', () => {
+  it('Altersstufen in vollen Jahren; genau 30 Jahre = „5 bis 30“ (vom BV bestätigt)', () => {
     expect(obstAltersstufe(0)).toBe('bis 4 Jahre')
     expect(obstAltersstufe(4)).toBe('bis 4 Jahre')
     expect(obstAltersstufe(4.9)).toBe('bis 4 Jahre')
@@ -133,7 +133,7 @@ describe('Obstgehölze nach Alter (BewRL S. 16)', () => {
     const mit = pos({ katalogId: 'aw-obstgehoelz', baumform: 'Halbstamm', alterJahre: 12, hoechstwert: 85 })
     expect(berechnePreisvorschlag(mit)).toBe(63.75)
     expect(alterHinweise(mit)[0]).toMatchObject({ schwere: 'info' })
-    expect(alterHinweise({ ...mit, alterJahre: 30 })[0]!.text).toMatch(/Genau 30 Jahre/)
+    expect(alterHinweise({ ...mit, alterJahre: 30 })).toEqual([{ schwere: 'info', text: 'Alter 30 Jahre → Altersstufe „5 bis 30 Jahre“ (BewRL S. 16).' }])
   })
 
   it('alte Positionen ohne Baumform bleiben unverändert (Vorschlag aus der Variante), nur Info-Hinweis', () => {

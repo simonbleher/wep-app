@@ -100,7 +100,7 @@
       "mass": "Alter",
       "masseinheit": "Jahre",
       "seite": 16,
-      "regeln": "Volle Jahre. „bis 4 Jahre“ bis einschließlich 4, „5 bis 30 Jahre“ bis einschließlich 30, darüber „30 + Jahre“ (im Katalog „über 30 Jahre“). Grenzfall genau 30 Jahre: Frage an Simon/BV, bis zur Antwort Stufe 5–30.",
+      "regeln": "Volle Jahre. „bis 4 Jahre“ bis einschließlich 4, „5 bis 30 Jahre“ bis einschließlich 30, darüber „30 + Jahre“ (im Katalog „über 30 Jahre“). Genau 30 Jahre gehört zu „5 bis 30 Jahre“ (vom BV bestätigt).",
       "stufen": [
         { "bis": 4, "altersstufe": "bis 4 Jahre" },
         { "bis": 30, "altersstufe": "5 bis 30 Jahre" },

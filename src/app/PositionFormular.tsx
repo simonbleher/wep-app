@@ -156,6 +156,8 @@ export function PositionFormular({
   )
 
   const stufe = zustand ? ZUSTANDSSTUFEN[zustand] : undefined
+  // Außenanlagen: Die Alterswertminderung (S. 12) steckt im Zustand, ein Alter wird nicht erfasst
+  const istAussenanlage = (bearbeiten?.katalogId ?? katalogPos?.id)?.startsWith('aa-') ?? false
   const einheiten = EINHEITEN.includes(einheit) ? EINHEITEN : [...EINHEITEN, einheit]
   const ungueltig =
     !bezeichnung.trim() ||
@@ -266,6 +268,7 @@ export function PositionFormular({
 
       <fieldset className="feld fieldset">
         <legend className="label">Zustand</legend>
+        {istAussenanlage && <span className="neben">Alter und Abnutzung über den Zustand berücksichtigen – mind. 3 % je Jahr (BewRL S. 12).</span>}
         <div className="segmente">
           {ZUSTAENDE.map((z) => (
             <button key={z} type="button" className="segment" aria-pressed={z === zustand} onClick={() => setZustand(z)}>

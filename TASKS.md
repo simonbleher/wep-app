@@ -23,10 +23,16 @@ und in docs/ENTSCHEIDUNGEN.md. Die alten Agenten-Prompts stehen in der Git-Histo
 - ⬜ V2-8b · Prüfen auf echten Geräten: NSIS-Hook vor „CheckIfAppIsRunning“, Android-Kaltstart nach der
   Anmeldung, Custom Tab schließt nach dem Rücksprung (Checkliste in #122).
 - ✅ Fachlich: Abdeckung der Richtlinie – Bericht docs/RICHTLINIE-ABDECKUNG.md gemergt (#132); offen: kleine Lücken in
-  eigenen PRs (Liste am Ende des Berichts), Fragen 1–5 an Simon/BV.
-- 🟡 BAUM-1 · Bäume: Vorschlag direkt aus dem Maß (PR aufwuchs/baum-mass): „Baum fällen“ nach Stammumfang/Durchmesser
-  (S. 20–21), Obstgehölze nach Alter (S. 16), geschützter Baum fest 1 €; „Maß fehlt“ als Hinweis, Warnung vor der Abgabe.
-  Frage an Simon/BV: Obstgehölz mit genau 30 Jahren.
+  eigenen PRs (Liste am Ende des Berichts).
+- ✅ BAUM-1 · Bäume: Vorschlag direkt aus dem Maß gemergt (#133): „Baum fällen“ nach Stammumfang/Durchmesser,
+  Obstgehölze nach Alter, geschützter Baum fest 1 €.
+- Antworten von Simon/BV zu #132/#133 (docs/ENTSCHEIDUNGEN.md, 2026-10-31):
+  - 🟡 BV-ANTW-1 · Zustands-Staffel bestätigt, Obstbaum 30 J. = „5 bis 30“, Hinweise Außenanlagen-Alter (S. 12) und
+    Schuppen an der Laube (PR fachlich/bv-antworten).
+  - ⬜ BV-ANTW-2 · Grube/Kanal: Altersabzug linear 3 % × Alter vom Bis-Wert (#95 zurückbauen).
+  - ⬜ BV-ANTW-3 · Nicht geschützte Laub-/Nadelbäume im Aufwuchs: Hinweis „wird entfernt“ mit Knopf zu „Baum fällen“.
+  - ⬜ BV-ANTW-4 · Alter als Pflichtangabe auch bei Beerenobst und weiteren Kulturen.
+- ⬜ Teil 3 · Unförmige Lauben (Beschreibung folgt).
 
 **Betrieb (Simon):**
 - ⬜ Backups von D1 und R2 einrichten.
@@ -39,8 +45,6 @@ und in docs/ENTSCHEIDUNGEN.md. Die alten Agenten-Prompts stehen in der Git-Histo
 **Entfällt:** V2-7 / Paket 7 (Migration der v1-WEPs auf den Server) – v1 hat außer Simon niemand genutzt.
 
 ## Offene Fragen an Simon / den BV
-- Zustandsstufen: feste Prozent-Staffel (src/model/types.ts, „vom BV zu bestätigen“) oder freie Schätzung?
-- Richtlinie: Fragen 1–5 in docs/RICHTLINIE-ABDECKUNG.md (u. a. Altersabzug Außenanlagen, #95 linear/Restwert, Laubbäume ohne Schutz).
 - Blätter „Anl IV Schuppen“ / „Anl IV Dach“ der Vorlage (versteckt, viele #REF!): noch gebraucht?
 - Offene Gerätetests aus Beta 3–5 (Skizzen-Gesten, PDF speichern/teilen auf Android/Windows) und
   Optikprüfung der PDFs auf Papier.

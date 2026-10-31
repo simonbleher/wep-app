@@ -37,7 +37,7 @@ export function hinweiseBauteil(b: Bauteil, erg: BauErgebnis): BauHinweis[] {
   if (b.id === erg.schuppen?.bauteil.id && erg.schuppen.nichtBewertetWegenLaube) {
     h.push(
       info(
-        `${n} wird nicht bewertet: Schuppen und Unterstände zählen nicht, solange es eine Laube gibt. Ist er in Wahrheit die Laube, bitte als Laube eintragen. Zu entfernende Teile gehören in die Beseitigungskosten.`,
+        `${n} wird nicht bewertet: Schuppen und Unterstände zählen nicht, solange es eine Laube gibt. Ist er in Wahrheit die Laube, bitte als Laube eintragen. Hängt der Schuppen direkt an einer Laube unter 24 m², als Anbau erfassen. Zu entfernende Teile gehören in die Beseitigungskosten.`,
         'Richtlinie',
         id,
       ),

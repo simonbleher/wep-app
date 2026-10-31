@@ -291,10 +291,9 @@ export interface BaumMass {
   durchmesserCm?: number
 }
 
-// OFFENE FRAGE: Die Zuordnung Zustand → Faktor ist vorläufig. Die BewRL nennt nur
-// Höchstwerte ("bis €") und "bei schlechtem Zustand Abwertung bis 1,00 €". Diese
-// Staffel (sehr gut 100 %, gut 75 %, mittel 50 %, schlecht = 1 € Sonderfall) muss
-// vom BV bestätigt werden.
+// Zustand → Faktor des Höchstwerts (BewRL nennt nur „bis“-Werte): sehr gut 100 %, gut 75 %, mittel 50 %,
+// schlecht = fester Erinnerungswert 1,00 € – für alle Positionen. Vom BV bestätigt (docs/ENTSCHEIDUNGEN.md,
+// 2026-10-31). Bei Außenanlagen deckt der Zustand auch Alter und Abnutzung ab (mind. 3 % je Jahr, BewRL S. 12).
 export const ZUSTANDSSTUFEN: Record<
   NonNullable<Position['zustand']>,
   { faktor: number; festpreis?: number }

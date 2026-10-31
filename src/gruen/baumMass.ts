@@ -155,16 +155,9 @@ export function alterHinweise(p: Position): Hinweis[] {
       ? [{ schwere: 'warnung', text: `Maß fehlt: Alter in Jahren eintragen – ohne Alter kein Vorschlag (BewRL S. ${OBST_ALTER.seite}).` }]
       : [{ schwere: 'info', text: 'Alter nicht erfasst: Der Vorschlag folgt der gewählten Altersstufe. Beim Ändern der Position kann das Alter nachgetragen werden.' }]
   }
+  // Genau 30 Jahre gehört zu „5 bis 30 Jahre“ (vom BV bestätigt, docs/ENTSCHEIDUNGEN.md 2026-10-31)
   const stufe = obstAltersstufe(p.alterJahre)
-  const grenze = Math.floor(p.alterJahre!) === 30
-  return [
-    {
-      schwere: 'info',
-      text:
-        `Alter ${zahlDe(Math.floor(p.alterJahre!))} Jahre → Altersstufe „${stufe}“ (BewRL S. ${OBST_ALTER.seite}).` +
-        (grenze ? ' Genau 30 Jahre: Die Richtlinie nennt „5 bis 30“ und „30 +“ – die App nimmt „5 bis 30“, bis der BV das klärt.' : ''),
-    },
-  ]
+  return [{ schwere: 'info', text: `Alter ${zahlDe(Math.floor(p.alterJahre!))} Jahre → Altersstufe „${stufe}“ (BewRL S. ${OBST_ALTER.seite}).` }]
 }
 
 // ---------------------------------------------------------------------------
