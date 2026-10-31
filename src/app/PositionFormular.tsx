@@ -8,6 +8,7 @@ import { ZUSTANDSSTUFEN } from '@/model'
 import type { EigenePosition, Position as KatalogPosition, Variante as KatalogVariante } from '@/katalog'
 import { berechnePreisvorschlag } from '@/gruen/preisvorschlag'
 import { berechneRegelhinweise } from '@/gruen/regelhinweise'
+import { OBST_ID, formAusBezeichnung, obstBezeichnung, obstHoechstwert, staffelSeite, OBST_ALTER } from '@/gruen/baumMass'
 import { kurzeBezeichnung, leseZahl, leseZahlOder, variantenMerkmale, zahlDe, zahlFuerEingabe } from '@/gruen/format'
 import { INVASIVE_ARTEN, KATALOG_POSITIONEN, PROBLEMPFLANZEN } from './katalogDaten'
 import { WarnListe } from './Positionen'
@@ -63,12 +64,45 @@ export function PositionFormular({
   fotos?: ReactNode
 }) {
   const { position: katalogPos, variante, art, eigene } = auswahl
-  const hoechstwert = bearbeiten ? bearbeiten.hoechstwert : (variante?.hoechstwert ?? katalogPos?.hoechstwert)
   const id = useId()
 
+  // Obstgehölze: Baumform + Alter in Jahren → Altersstufe und Höchstwert (BewRL S. 16). Ältere Positionen ohne
+  // Baumform: Form aus der Bezeichnung lesen; ohne Alter bleibt ihr bisheriger Höchstwert.
+  const obstVarianten = KATALOG_POSITIONEN.find((p) => p.id === OBST_ID)?.varianten ?? []
+  const istObst = (bearbeiten ? bearbeiten.katalogId : katalogPos?.id) === OBST_ID
+  const baumform = istObst
+    ? (bearbeiten?.baumform ?? (bearbeiten ? formAusBezeichnung(obstVarianten, bearbeiten.bezeichnung) : variante?.form))
+    : undefined
+  const [alter, setAlter] = useState(bearbeiten?.alterJahre !== undefined ? zahlFuerEingabe(bearbeiten.alterJahre) : '')
+  const alterZahl = alter.trim() ? leseZahl(alter) : undefined
+  const alterGueltig = alterZahl !== undefined && Number.isFinite(alterZahl) && alterZahl >= 0 ? Math.floor(alterZahl) : undefined
+  const mitAlter = istObst && Boolean(baumform)
+  const hoechstwert = mitAlter
+    ? alterGueltig !== undefined
+      ? obstHoechstwert(obstVarianten, baumform, alterGueltig)
+      : bearbeiten && !bearbeiten.baumform
+        ? bearbeiten.hoechstwert // ältere Position: unverändert, nur Hinweis
+        : undefined
+    : bearbeiten
+      ? bearbeiten.hoechstwert
+      : (variante?.hoechstwert ?? katalogPos?.hoechstwert)
+  // Baumform und Alter mitspeichern – bei einer älteren Position erst, wenn ein Alter eingetragen ist (sonst bleibt sie unverändert)
+  const formSpeichern = mitAlter && (!bearbeiten || Boolean(bearbeiten.baumform) || alterGueltig !== undefined)
+  // Name vor Form/Alter, z. B. „Apfel“ aus „Apfel, Halbstamm, 12 J.“
+  const obstName = bearbeiten ? bearbeiten.bezeichnung.split(',')[0]!.trim() : (art ?? 'Obstgehölz')
+
   const [bezeichnung, setBezeichnung] = useState(
-    bearbeiten?.bezeichnung ?? (katalogPos ? kurzeBezeichnung(katalogPos, variante, art) : (eigene?.bezeichnung ?? '')),
+    bearbeiten?.bezeichnung ??
+      (katalogPos ? (mitAlter ? obstBezeichnung(obstName, baumform, undefined) : kurzeBezeichnung(katalogPos, variante, art)) : (eigene?.bezeichnung ?? '')),
   )
+  // Bezeichnung folgt dem Alter, solange sie nicht von Hand geändert wurde
+  const [bezeichnungEigen, setBezeichnungEigen] = useState(false)
+  function aendereAlter(wert: string) {
+    setAlter(wert)
+    if (bezeichnungEigen) return
+    const n = wert.trim() ? leseZahl(wert) : undefined
+    setBezeichnung(obstBezeichnung(obstName, baumform, n !== undefined && Number.isFinite(n) && n >= 0 ? n : undefined))
+  }
   const [anzahl, setAnzahl] = useState(bearbeiten ? zahlFuerEingabe(bearbeiten.anzahl) : '1')
   const [einheit, setEinheit] = useState<string>(bearbeiten?.einheit ?? katalogPos?.einheit ?? eigene?.einheit ?? 'Stück')
   const [zustand, setZustand] = useState<Zustand | undefined>(bearbeiten ? bearbeiten.zustand : 'gut')
@@ -102,6 +136,7 @@ export function PositionFormular({
     einzelpreis: 0,
     preisManuell: false,
     hinweise: [],
+    ...(formSpeichern ? { baumform, alterJahre: alterGueltig } : {}),
   }
   const preisVorschlag = berechnePreisvorschlag(vorschauPos)
   const einzelpreis = preisManuell ? leseZahlOder(preisEingabe, 0) : preisVorschlag
@@ -125,6 +160,7 @@ export function PositionFormular({
   const ungueltig =
     !bezeichnung.trim() ||
     !(leseZahl(anzahl) > 0) ||
+    (alter.trim() !== '' && alterGueltig === undefined) ||
     (preisManuell && !Number.isFinite(leseZahl(preisEingabe)))
 
   function bestaetigen() {
@@ -141,6 +177,7 @@ export function PositionFormular({
         einzelpreis,
         preisManuell,
         hinweise: vorschauHinweise,
+        ...(formSpeichern ? { baumform, alterJahre: alterGueltig } : {}),
       },
       merkenMoeglich && merken
         ? { bezeichnung: bezeichnung.trim(), einheit, einzelpreis: preisManuell ? einzelpreis : undefined }
@@ -169,7 +206,10 @@ export function PositionFormular({
           value={bezeichnung}
           placeholder="z. B. Kirschbaum, alt"
           autoFocus={!katalogPos && !bearbeiten && !eigene}
-          onChange={(e) => setBezeichnung(e.target.value)}
+          onChange={(e) => {
+            setBezeichnung(e.target.value)
+            setBezeichnungEigen(true)
+          }}
         />
       </div>
 
@@ -199,6 +239,30 @@ export function PositionFormular({
           </select>
         </div>
       </div>
+
+      {mitAlter && (
+        <div className="feld">
+          <label className="label" htmlFor={`${id}-alter`}>
+            Alter in Jahren (Pflichtangabe)
+          </label>
+          <input
+            id={`${id}-alter`}
+            className="eingabe"
+            inputMode="numeric"
+            value={alter}
+            placeholder="z. B. 12"
+            autoFocus={!bearbeiten}
+            onChange={(e) => aendereAlter(e.target.value)}
+          />
+          <span className="neben">
+            {alterGueltig !== undefined
+              ? `${baumform}, ${zahlDe(alterGueltig)} Jahre → bis ${euroFormat(hoechstwert ?? 0)} (BewRL S. ${OBST_ALTER.seite})`
+              : alter.trim()
+                ? 'Bitte das Alter als Zahl eintragen.'
+                : `${baumform}: Altersstufe und Höchstwert ergeben sich aus dem Alter (${staffelSeite(OBST_ALTER)}).`}
+          </span>
+        </div>
+      )}
 
       <fieldset className="feld fieldset">
         <legend className="label">Zustand</legend>
@@ -262,7 +326,11 @@ export function PositionFormular({
                 </button>
               </div>
               <span className="neben">
-                {stufe?.festpreis !== undefined
+                {katalogPos?.id === 'aw-baum-geschuetzt' || vorschauPos.katalogId === 'aw-baum-geschuetzt'
+                  ? 'Geschützter Baum: fest 1,00 € je Stück, unabhängig vom Zustand (BewRL S. 16).'
+                  : mitAlter && alterGueltig === undefined && hoechstwert === undefined
+                  ? 'Maß fehlt: Alter eintragen, dann erscheint der Vorschlag.'
+                  : stufe?.festpreis !== undefined
                   ? `Vorschlag: Erinnerungswert ${euroFormat(stufe.festpreis)} bei schlechtem Zustand`
                   : hoechstwert === undefined
                     ? 'Kein Höchstwert im Katalog – Preis bitte über „Überschreiben“ eintragen.'

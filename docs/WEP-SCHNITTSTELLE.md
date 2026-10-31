@@ -140,6 +140,14 @@ nichts wird gesperrt (Warnungen, keine Blockaden).
 - `anzahl` (> 0, Dezimalpunkt), `einheit` (Standard: die des Katalogs: Stück, m, m², m³, lfdm, Pauschale), `zustand` (sehr gut · gut (Standard) · mittel · schlecht).
   Preis = Höchstwert × Stufe (sehr gut 100 %, gut 75 %, mittel 50 %, schlecht = 1 €); `einzelpreis` überschreibt ihn (zählt als eigener Preis).
 - **Beseitigung:** `"liste": "beseitigung"`, Einträge `{ "gegenstand", "menge", "einheit", "einzelpreis", "faktor"?, "begruendung"? }`.
+- **Bäume aus dem Maß** (abwärtskompatibel, alte Vorschläge gelten unverändert):
+  - Obstgehölz mit `"alter"` (volle Jahre): `variante` nennt nur die Baumform, die App wählt die Altersstufe (BewRL S. 16),
+    z. B. `{ "suche": "Apfel", "variante": "Halbstamm", "alter": 12, "anzahl": 1 }` → „Apfel, Halbstamm, 12 J.“, bis 85 €.
+    Ohne `alter` gilt wie bisher die Variante, mit Hinweis „Alter fehlt“.
+  - Beseitigung `"vorlage": "baum-faellen"` mit `"baumart"`? und `"stammumfang"` **oder** `"durchmesser"` (cm, in 1,30 m Höhe):
+    Gegenstand („Birke fällen inkl. Wurzelstock, StU 85 cm“), Einheit (Stück) und Einzelpreis (Satz der Stufe, S. 20–21)
+    bildet die App; `einzelpreis` überschreibt. Ohne Maß: 0 € und Hinweis „Maß fehlt“.
+  - Geschützter Baum (`aw-baum-geschuetzt`): immer 1,00 €.
 - Hinweise (verhindern nichts): Unionsliste/Problempflanze, Preis über Höchstwert, Rasen > 100 m², Zeile gibt es schon, Faktor > 1 ohne Begründung.
 - Unbekannte Felder, Zahlen als Text, unbekannte Einheiten/Zustände und Katalogbegriffe ohne Treffer sind Fehler mit Pfad (`positionen[1].variante`). Höchstens 100 Positionen; alles oder nichts.
 - Grenzen: nur Anlegen (kein Ändern oder Löschen vorhandener Positionen, keine Fotos); bei `liste` ≠ `beseitigung` keine Einträge für Bau; ohne Grün-Teil wird nichts angenommen.

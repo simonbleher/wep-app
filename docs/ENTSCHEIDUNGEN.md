@@ -589,3 +589,29 @@
   - Fund M8 (`docs/SICHERHEITSPRUEFUNG-V2.md`).
   - Mit der neuen Hülle nimmt kein altes Programm mehr das neue Web-Paket an, sondern bietet das App-Update an. So laufen alle Rechner bald mit den aktualisierten Abhängigkeiten (Wunsch von Simon).
 
+
+## 2026-10-31 · Bäume: Vorschlag direkt aus dem Maß
+
+- **Entscheidung:**
+  - Staffeln stehen im Katalog unter `staffeln` (`data/katalog.json`, Schema erweitert), gerechnet wird in `src/gruen/baumMass.ts`.
+  - **Beseitigung Grün, Vorlage „Baum fällen“:** Pflichtmaß Stammumfang in 1,30 m Höhe (cm), wahlweise als Durchmesser
+    (Umfang = π × d, auf 0,1 cm gerundet; die Stufe folgt dem angezeigten Umfang). Grenzen nach Wortlaut der Richtlinie
+    (S. 20–21): „bis 30 cm“ schließt 30 ein, über 140 cm gilt 1.250 €. Gespeichert wird `baum { art?, stammumfangCm?, durchmesserCm? }`
+    und `preisManuell`; das Maß steht im Gegenstand („Birke fällen inkl. Wurzelstock, StU 85 cm“), so kommt es ohne
+    Änderung an Excel und PDF in alle Ausgaben.
+  - **Wurzelstock** staffelt die Richtlinie nicht nach Maß (pauschal bis 250 €) – keine Staffel.
+  - **Aufwuchs:** Nur Obstgehölze staffeln nach einer Angabe (Alter, S. 16); nach Maß staffelt im Aufwuchs nichts. Die Suche
+    zeigt je Baumform eine Zeile, das Alter in vollen Jahren ist Pflichtangabe und wählt die Altersstufe. Neue Positionen
+    speichern `baumform` und `alterJahre`.
+  - **Geschützter Baum:** fest 1,00 € je Stück, unabhängig vom Zustand (Fehler aus docs/RICHTLINIE-ABDECKUNG.md).
+  - „Pflichtfeld“: ohne Maß kein Vorschlag (0 €) und Hinweis „Maß fehlt“; Speichern geht, vor der Abgabe (v2) bzw. beim
+    Paket für den BV (v1) eine Warnung, keine Sperre. Eigener Preis geht immer.
+  - Alte Positionen bleiben, wie sie sind: Obstgehölze ohne `baumform` behalten den Höchstwert ihrer Variante (nur ein
+    Info-Hinweis), Beseitigungen ohne `baum` sind keine Bäume. Erst wenn beim Ändern ein Alter eingetragen wird, rechnet die
+    Position nach Alter.
+  - `window.wep.positionen` (wep-positionen/1, abwärtskompatibel): neu `alter` sowie `vorlage: "baum-faellen"`, `baumart`,
+    `stammumfang`, `durchmesser`. Die Server-Formprüfung (`functions/_lib/v2/form.ts`) prüft diese Felder, wenn vorhanden.
+- **Offen (Frage an Simon/BV):** Obstgehölz mit genau 30 Jahren – die Richtlinie nennt „5 bis 30“ und „30 +“. Die App nimmt
+  „5 bis 30“ (wie „bis“ einschließlich bei den Bäumen), mit Hinweis.
+- **Grund:** Der Wertermittler soll die Staffel nicht selbst suchen; Maße statt Stufen sind vor Ort schneller und
+  nachprüfbar. Nichts sperren, nur warnen (CLAUDE.md).

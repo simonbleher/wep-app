@@ -9,6 +9,7 @@ import type { Hinweis, Position, Wep } from '@/model'
 // Position und InvasiveArt aus @/katalog, da sie von sucheKatalog/istInvasiv verwendet werden
 import type { Position as KatalogPosition, InvasiveArt, Problempflanze } from '@/katalog'
 import { findeProblempflanze, istInvasiv } from '@/katalog'
+import { alterHinweise } from './baumMass'
 
 /** Ein Regelhinweis ist strukturell identisch mit Hinweis. */
 export type Regelhinweis = Hinweis
@@ -74,6 +75,9 @@ export function berechneRegelhinweise(
           'Zur Prüfung: Entfernen und Beseitigungskosten in Abschnitt „Beseitigung" eintragen, falls nötig.'
     hinweise.push({ schwere: 'warnung', text, beseitigung: beseitigungsVorschlag(position, name) })
   }
+
+  // 2c. Obstgehölze: Alter als Pflichtmaß für den Vorschlag
+  hinweise.push(...alterHinweise(position))
 
   // 3. Rasen / Wiese: max. 100 m²
   if (position.katalogId && RASEN_WIESE_IDS.has(position.katalogId) && position.anzahl > 100) {

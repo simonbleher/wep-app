@@ -9,6 +9,7 @@ import type { EigenePosition, Position as KatalogPosition, Variante as KatalogVa
 import { aktiveEigene, alsKatalogPosition, EIGEN_PRAEFIX, lokaleEigene, merkeEigenePosition, sucheKatalog } from '@/katalog'
 import { merkeZuletztVerwendet, ladeZuletztVerwendet } from '@/gruen/zuletzt'
 import { gefundeneArt, kurzeBezeichnung } from '@/gruen/format'
+import { OBST_ID, obstFormVarianten } from '@/gruen/baumMass'
 import { ABSCHNITT_TITEL, KATALOG_POSITIONEN, type Abschnitt } from './katalogDaten'
 import { PositionFormular, type Auswahl, type MerkeDaten } from './PositionFormular'
 import { ICON, Kopf, euroFormat } from './ui'
@@ -49,11 +50,15 @@ export function gruppiere(
     }
     const art = gefundeneArt(t.position, suchbegriff)
     // Nennt der Treffer schon eine Variante (z. B. „Apfel Halbstamm“), nur diese zeigen
-    const varianten: (KatalogVariante | undefined)[] = t.variante
-      ? [t.variante]
-      : t.position.varianten?.length
-        ? t.position.varianten
-        : [undefined]
+    const varianten: (KatalogVariante | undefined)[] =
+      t.position.id === OBST_ID
+        ? // Obstgehölze: nur die Baumform wählen, die Altersstufe folgt aus dem Alter (BewRL S. 16)
+          obstFormVarianten(t.position.varianten ?? []).filter((v) => !t.variante?.form || v.form === t.variante.form)
+        : t.variante
+          ? [t.variante]
+          : t.position.varianten?.length
+            ? t.position.varianten
+            : [undefined]
     return {
       schluessel: `${t.position.id}-${i}`,
       position: t.position,

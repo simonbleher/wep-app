@@ -47,6 +47,40 @@
         ],
         "additionalProperties": false
       }
+    },
+    "staffeln": {
+      "type": "object",
+      "description": "Staffeln nach einem Maß (Stammumfang, Alter): Die App wählt die Stufe aus dem eingegebenen Maß.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["mass", "masseinheit", "seite", "stufen"],
+        "properties": {
+          "katalogId": { "type": "string" },
+          "bezeichnung": { "type": "string" },
+          "abschnitt": { "type": "string" },
+          "mass": { "type": "string" },
+          "masseinheit": { "type": "string" },
+          "einheit": { "type": "string" },
+          "seite": { "type": "integer" },
+          "seiteBis": { "type": "integer" },
+          "regeln": { "type": "string" },
+          "stufen": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "properties": {
+                "bis": { "type": "number" },
+                "ueber": { "type": "number" },
+                "hoechstwert": { "type": "number" },
+                "altersstufe": { "type": "string" }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
     }
   }
 }

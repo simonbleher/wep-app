@@ -231,6 +231,13 @@ export interface Position {
   einzelpreis: number // Spalte K – Vorschlag, frei überschreibbar
   preisManuell: boolean
   hinweise: Hinweis[] // Regel-Warnungen
+  /**
+   * Obstgehölze: Baumform (Buschbaum, Halbstamm …) – gesetzt bei Positionen, deren Altersstufe die App aus
+   * `alterJahre` wählt (src/gruen/baumMass.ts). Fehlt bei älteren Positionen: Dort gilt die gewählte Variante.
+   */
+  baumform?: string
+  /** Obstgehölze: Alter in vollen Jahren (Pflichtangabe für den Vorschlag, BewRL S. 16). */
+  alterJahre?: number
 }
 
 // OFFENE FRAGE: `Formalien` wird in docs/ARCHITEKTUR.md referenziert, aber nicht
@@ -265,6 +272,23 @@ export interface BeseitigungsPosition {
   einzelpreis: number // Spalte H
   faktor: number // Spalte J (Standard 1); Begründung bei > 1 in F53
   begruendung?: string // F53 – Begründung bei Faktor > 100 %
+  /** Vorlage „Baum fällen“ (BewRL S. 20–21): Maß, aus dem die App den Einzelpreis vorschlägt (src/gruen/baumMass.ts). */
+  baum?: BaumMass
+  /** Einzelpreis selbst eingetragen statt aus der Staffel (nur bei `baum`). */
+  preisManuell?: boolean
+}
+
+/**
+ * Maß eines zu fällenden Baums. Gespeichert wird immer der Stammumfang in 1,30 m Höhe; wurde der Durchmesser
+ * eingegeben, steht er zusätzlich da (Umfang = π × Durchmesser).
+ */
+export interface BaumMass {
+  /** Baumart, z. B. „Birke“ (optional, steht im Gegenstand). */
+  art?: string
+  /** Stammumfang in cm in 1,30 m Höhe – fehlt, solange kein Maß eingetragen ist. */
+  stammumfangCm?: number
+  /** Eingegebener Durchmesser in cm (nur, wenn als Durchmesser eingegeben). */
+  durchmesserCm?: number
 }
 
 // OFFENE FRAGE: Die Zuordnung Zustand → Faktor ist vorläufig. Die BewRL nennt nur

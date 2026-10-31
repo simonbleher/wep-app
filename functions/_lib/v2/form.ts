@@ -12,6 +12,19 @@ const MAX_TEXT = 2000
 const OBJEKTE = ['bau', 'skizze', 'parzelle', 'grundriss', 'unterschriften', 'bauExcel'] as const
 const GRUEN_LISTEN = ['aussenanlagen', 'aufwuchs', 'beseitigungAA'] as const
 
+const zahlOderLeer = (v: unknown) => leer(v) || (typeof v === 'number' && Number.isFinite(v) && v >= 0)
+
+/** Alter (Obstgehölz) bzw. Baum-Maß (Beseitigung „Baum fällen“): wenn vorhanden, Zahlen ≥ 0 und kurze Texte. */
+function massFormOk(p: Record<string, unknown>): boolean {
+  if (!zahlOderLeer(p.alterJahre)) return false
+  if (!leer(p.baumform) && (typeof p.baumform !== 'string' || p.baumform.length > MAX_TEXT)) return false
+  if (!leer(p.preisManuell) && typeof p.preisManuell !== 'boolean') return false
+  if (leer(p.baum)) return true
+  if (!istObjekt(p.baum)) return false
+  const b = p.baum
+  return zahlOderLeer(b.stammumfangCm) && zahlOderLeer(b.durchmesserCm) && (leer(b.art) || (typeof b.art === 'string' && b.art.length <= MAX_TEXT))
+}
+
 /** Warum das WEP nicht die erwartete Form hat – oder undefined. */
 export function wepFormFehler(w: unknown): string | undefined {
   if (!istObjekt(w)) return 'Das WEP fehlt.'
@@ -29,6 +42,8 @@ export function wepFormFehler(w: unknown): string | undefined {
       const liste = w.gruen[l]
       if (liste === undefined) continue
       if (!Array.isArray(liste) || liste.some((p) => !istObjekt(p) || typeof p.id !== 'string')) return `Grün-Teil: „${l}“ hat eine ungültige Form.`
+      // Maße der Bäume (src/gruen/baumMass.ts): fehlen dürfen sie, falsch geformt nicht
+      if (liste.some((p) => !massFormOk(p as Record<string, unknown>))) return `Grün-Teil: „${l}“ enthält ein Maß in ungültiger Form.`
     }
     for (const t of ['beschreibungAussen', 'beschreibungAufwuchs']) if (!leer(w.gruen[t]) && typeof w.gruen[t] !== 'string') return `Grün-Teil: „${t}“ hat eine ungültige Form.`
   }

@@ -75,12 +75,12 @@ Stand 30.10.2026. Vergleich von `docs/Richtlinie.pdf` mit App, Katalog (`data/ka
 
 | Regel / Position | Fundstelle | Stand | Beleg | Vorschlag | Aufwand |
 |---|---|---|---|---|---|
-| Obstgehölze 5 Formen × 3 Altersstufen | S. 16 | ✅ | `aw-obstgehoelz` (15 Varianten geprüft, Druckfehler „75;00“ = 75 €) | – | – |
+| Obstgehölze 5 Formen × 3 Altersstufen | S. 16 | ✅ | `aw-obstgehoelz` (15 Varianten geprüft, Druckfehler „75;00“ = 75 €); Altersstufe aus dem Alter (PR aufwuchs/baum-mass) | Grenzfall genau 30 Jahre: Frage an den BV | – |
 | Schlechter Zustand: Abwertung bis 1,00 € | S. 16 | ✅ | `ZUSTANDSSTUFEN.schlecht` (Festpreis 1 €) | – | – |
 | „schlecht = 1 €“ auch für alle übrigen Positionen | – | ⚠️❓ | `berechnePreisvorschlag` gilt für alle | Richtlinie nennt 1 € nur bei Obstgehölzen; bei Außenanlagen (z. B. Zaun 40 €/m, schlecht → 1 €/m) prüfen | S |
 | Zustandsstufen sehr gut 100 % / gut 75 % / mittel 50 % | – | ❓ | `src/model/types.ts`, „vom BV zu bestätigen“ | Bestätigung durch den BV | – |
 | Verkrüppelte/kranke Bäume nicht bewerten; Abschläge bei Pflegemangel/Engstand | S. 16 | 🟨 | Regeltext; Abschlag über Zustand | – | – |
-| **Geschützter Baum: erhalten, 1,00 € je Stück** | S. 16 | ⚠️ | `aw-baum-geschuetzt` hoechstwert 1, aber × Zustand → 0,75 € / 0,50 € | Festwert 1 € unabhängig vom Zustand – **einfache Lücke, eigener PR** | S |
+| **Geschützter Baum: erhalten, 1,00 € je Stück** | S. 16 | ✅ | `berechnePreisvorschlag` (fest 1 €, PR aufwuchs/baum-mass) | – | – |
 | Laub-/Nadelbäume nur, wenn laut Vertrag nicht verboten; Wert? | S. 16 | ❓ | keine Katalogposition außer „geschützt“ und Obst | Frage: Wie werden nicht geschützte Laub-/Nadelbäume (z. B. Birke) bewertet – als Ziergehölz, gar nicht (nur Beseitigung) oder Freitext? | – |
 | Invasive Arten entfernen (Unionsliste) | S. 16, 25–26 | ✅ | `data/invasive.json` (41 Arten), Warnung + Beseitigungsvorschlag | – | – |
 | Beerenobst, weitere Kulturen | S. 16–17 | ✅ | `aw-beerenobst`, `aw-weinrebe` … `aw-gemuese` | Beerenobst über 20 Jahre nennt die Richtlinie nicht – App bietet 5–20 J. an, ok | – |
@@ -99,7 +99,7 @@ Stand 30.10.2026. Vergleich von `docs/Richtlinie.pdf` mit App, Katalog (`data/ka
 | Rückbau nach Bauklasse je m³ (180/180/150/120), Vorplatz 100 €/m², Schornstein 250, Gaube 1.500, Sonderabfall 1.000 | S. 19 | ✅ | `BESEITIGUNG_*`, `rueckbauPosition` | – | – |
 | Blechschuppen = Bauklasse IV; Mischbau = höchste Bauklasse | S. 19 | 🟨 | `beseitigungsKlasse` | Hinweis ergänzen | S |
 | Wegeplatten 25 €/m², Ortbeton 100 €/m², weitere Anlagen 55 €/m³, zweite Tür 250 €, Inventar 100 €/m³, Grube 250 €/m³, Abfuhr 150 €, Spielgeräte 100 €, Unrat 200 €/m³ | S. 20 | 🟨 | Inventar, Grube, Abfuhr, Unrat nur als Bau-Bausteine | **Bausteine für Beseitigung Grün** mit Höchstwert und Einheit (wie `BESEITIGUNG_TEXTBAUSTEINE`) | S |
-| Bäume nach Stammumfang in 1,30 m (75 € bis 1.250 €, 13 Stufen) | S. 20–21 | ❌ | – | Baustein + Stufe aus Stammumfang (bzw. Durchmesser × π) vorschlagen – passt zu Teil 2 „Bäume: Vorschlag aus dem Durchmesser“ | M |
+| Bäume nach Stammumfang in 1,30 m (75 € bis 1.250 €, 13 Stufen) | S. 20–21 | ✅ | Vorlage „Baum fällen“, `src/gruen/baumMass.ts`, Staffel in `data/katalog.json` (PR aufwuchs/baum-mass) | – | – |
 | Abzug fehlende Baumpflege bis 1.000 €; Sträucher 60 €/St.; Hecken 50 €/m; Wurzelstock 250 €; Beete anlegen 250 €; Verwilderung 400 € | S. 21 | ❌ | – | Bausteine wie oben | S |
 | Fällzeit 1. März – 30. September | BNatSchG (Vorlage A46) | 🟨 | fester Text im Beseitigungs-Reiter (`WepDetail.tsx`) | Hinweis an Baum-/Hecken-Beseitigung, wenn das Datum der Wertermittlung in die Zeit fällt | S |
 | Naturschutzgesetz, Baumschutzverordnung beachten | S. 21 | 🟨 | Text | – | – |
@@ -125,8 +125,8 @@ Stand 30.10.2026. Vergleich von `docs/Richtlinie.pdf` mit App, Katalog (`data/ka
 
 ## Kleine, eindeutige Lücken (eigene PRs)
 
-1. Geschützter Baum immer 1,00 €, unabhängig vom Zustand – kommt mit „aufwuchs/baum-mass“ (Bäume: Vorschlag aus dem Maß).
-2. Baumbeseitigung nach Stammumfang (S. 20–21) als Vorlage mit Vorschlag aus dem Maß – ebenfalls „aufwuchs/baum-mass“.
+1. Geschützter Baum immer 1,00 €, unabhängig vom Zustand – erledigt mit „aufwuchs/baum-mass“.
+2. Baumbeseitigung nach Stammumfang (S. 20–21) als Vorlage mit Vorschlag aus dem Maß – erledigt mit „aufwuchs/baum-mass“.
 3. Übrige Bausteine für Beseitigung Grün (S. 20–21) mit Höchstwert, Einheit und Seite; Faktor-Warnung (300 %) auch im Grün-Teil.
 4. Mengengrenzen als Warnung: Teich 10 m², Wasserbecken 2 m³, Zisterne 3 m³, Messergrube 3 m³, Hochbeet 10 % der Parzelle,
    Rasen/Wiese als Summe.

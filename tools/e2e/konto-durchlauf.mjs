@@ -173,13 +173,18 @@ try {
   pruefe(await seite.getByText('0 Positionen').isVisible(), 'Aufwuchs: noch keine Positionen')
   await seite.getByRole('button', { name: 'Hinzufügen', exact: true }).click()
   await seite.getByLabel('Katalog durchsuchen').fill('apfel')
-  await seite.getByRole('button', { name: /Apfel, Halbstamm, 5–30 J\./ }).click()
+  // Obstgehölze: die Suche zeigt nur die Baumform, die Altersstufe folgt aus dem Alter (BewRL S. 16)
+  pruefe((await seite.getByRole('button', { name: /Apfel, Halbstamm, 5–30 J\./ }).count()) === 0, 'Obstgehölz: Suche zeigt Baumformen, keine Altersstufen')
+  await seite.getByRole('button', { name: /^Apfel, Halbstamm/ }).first().click()
+  pruefe(await seite.getByText('Maß fehlt: Alter eintragen, dann erscheint der Vorschlag.').isVisible(), 'Obstgehölz ohne Alter: kein Vorschlag, „Maß fehlt“')
+  await seite.getByLabel(/^Alter in Jahren/).fill('12')
+  pruefe((await seite.getByLabel(/^Bezeichnung/).inputValue()) === 'Apfel, Halbstamm, 12 J.', 'Obstgehölz: Alter steht in der Bezeichnung')
   await seite.getByLabel('Anzahl').fill('2')
-  pruefe((await seite.getByText('63,75').count()) > 0, 'Preisvorschlag Höchstwert × Zustand (85 × 0,75)')
+  pruefe((await seite.getByText('63,75').count()) > 0, 'Preisvorschlag aus dem Alter: Höchstwert × Zustand (85 × 0,75)')
   await seite.getByRole('button', { name: 'Überschreiben' }).click()
   await seite.getByLabel('Einzelpreis').fill('70')
   await seite.getByRole('button', { name: 'Hinzufügen', exact: true }).click()
-  await seite.getByText('Apfel, Halbstamm, 5–30 J.').waitFor()
+  await seite.getByText('Apfel, Halbstamm, 12 J.').waitFor()
   pruefe(await seite.getByText(/2.Stück · gut · je 70,00/).isVisible(), 'Position mit überschriebenem Preis in der Liste')
   pruefe(await seite.getByText(/manuell/).filter({ visible: true }).first().isVisible(), 'überschriebener Preis ist als „manuell“ markiert')
 
@@ -188,7 +193,7 @@ try {
   await seite.getByRole('heading', { name: 'Bewertung' }).waitFor({ timeout: 30000 })
   const gesamtZeile = seite.locator('.ueb-bewertung .ueb-gesamt')
   pruefe((await gesamtZeile.innerText()).includes('140,00'), 'Übersicht: Gesamtbetrag 140,00 € hervorgehoben')
-  pruefe(await seite.locator('.ueb-posten').getByText('Apfel, Halbstamm, 5–30 J.').isVisible(), 'Übersicht: Position im Aufwuchs aufgelistet')
+  pruefe(await seite.locator('.ueb-posten').getByText('Apfel, Halbstamm, 12 J.').isVisible(), 'Übersicht: Position im Aufwuchs aufgelistet')
   await seite.getByRole('navigation', { name: 'Abschnitte' }).getByRole('button', { name: 'Aufwuchs' }).click()
   await seite.getByRole('heading', { name: 'Aufwuchs' }).waitFor()
 
@@ -307,6 +312,25 @@ try {
   await seite.getByRole('alertdialog').getByRole('button', { name: 'Löschen' }).click()
   await seite.getByText('Noch keine Positionen').waitFor()
   pruefe(await seite.getByText('Noch keine Positionen').isVisible(), 'Beseitigung nach Rückfrage gelöscht')
+
+  // 10b2. Vorlage „Baum fällen“: Satz aus dem Stammumfang (BewRL S. 20–21), Eingabe auch als Durchmesser
+  await seite.getByRole('button', { name: 'Hinzufügen', exact: true }).click()
+  await seite.getByRole('button', { name: /Vorlage „Baum fällen“/ }).click()
+  await seite.getByLabel(/^Baumart/).fill('Birke')
+  pruefe((await seite.getByLabel(/^Gegenstand/).inputValue()) === 'Birke fällen inkl. Wurzelstock, StU fehlt', 'Baum fällen: ohne Maß „StU fehlt“')
+  pruefe(await seite.getByText(/Maß fehlt – ohne Maß kein Vorschlag/).isVisible(), 'Baum fällen: „Maß fehlt“ ohne Sperre')
+  await seite.getByRole('button', { name: 'Durchmesser', exact: true }).click()
+  await seite.getByLabel(/^Durchmesser in 1,30 m/).fill('27')
+  pruefe(await seite.getByText(/Stammumfang 84,8 cm · Durchmesser 27 cm → Stufe „bis 90 cm“/).isVisible(), 'Baum fällen: Durchmesser 27 → Umfang 84,8 cm, Stufe bis 90 cm')
+  pruefe((await seite.getByLabel('Einzelpreis (€)').inputValue()) === '600', 'Baum fällen: Vorschlag 600 €')
+  pruefe((await seite.getByLabel(/^Gegenstand/).inputValue()) === 'Birke fällen inkl. Wurzelstock, StU 84,8 cm', 'Baum fällen: Maß im Gegenstand')
+  await seite.getByRole('button', { name: 'Hinzufügen', exact: true }).click()
+  await seite.getByText('Birke fällen inkl. Wurzelstock, StU 84,8 cm').waitFor()
+  pruefe(await seite.getByRole('main').getByText('600,00').first().isVisible(), 'Baum fällen gespeichert: 1 × 600 €')
+  await seite.getByRole('button', { name: /Birke fällen/ }).click()
+  await seite.getByRole('button', { name: 'Löschen' }).click()
+  await seite.getByRole('alertdialog').getByRole('button', { name: 'Löschen' }).click()
+  await seite.getByText('Noch keine Positionen').waitFor()
 
   // 10c. Formalien: gruppierte Felder, Eingaben werden gespeichert
   await nav.getByRole('button', { name: 'Formalien' }).click()
@@ -832,7 +856,7 @@ try {
   pruefe(
     namen.length === 3 &&
       namen[0] === '00 Gesamtansicht 1.jpg' &&
-      namen[1] === '01 Apfel, Halbstamm, 5–30 J.jpg' &&
+      namen[1] === '01 Apfel, Halbstamm, 12 J.jpg' &&
       namen[2].startsWith('02 Rasen'),
     `Export: sprechende Dateinamen mit Positionsnummer (${namen.join(' | ')})`,
   )

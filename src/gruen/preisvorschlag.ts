@@ -6,6 +6,7 @@
 
 import type { Position } from '@/model'
 import { ZUSTANDSSTUFEN } from '@/model'
+import { GESCHUETZT_ID, GESCHUETZT_WERT, brauchtAlter, hatAlter } from './baumMass'
 
 /**
  * Berechnet den Preisvorschlag für eine Position.
@@ -15,6 +16,10 @@ import { ZUSTANDSSTUFEN } from '@/model'
  * trägt dann selbst einen Preis ein.
  */
 export function berechnePreisvorschlag(position: Position): number {
+  // Geschützter Baum: fest 1,00 € je Stück, unabhängig vom Zustand (BewRL S. 16)
+  if (position.katalogId === GESCHUETZT_ID) return GESCHUETZT_WERT
+  // Obstgehölz mit Baumform: ohne Alter kein Vorschlag (Pflichtmaß, src/gruen/baumMass.ts)
+  if (brauchtAlter(position) && !hatAlter(position)) return 0
   if (!position.zustand) return 0
 
   const stufe = ZUSTANDSSTUFEN[position.zustand]
