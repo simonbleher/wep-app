@@ -182,7 +182,7 @@ export function WarnListe({
             {h.beseitigung && onBeseitigung && (
               <button type="button" className="textknopf" onClick={() => onBeseitigung(h.beseitigung!)}>
                 <Shovel {...ICON} size={18} />
-                Zur Beseitigung
+                {h.beseitigung.baum ? 'Baum fällen erfassen' : 'Zur Beseitigung'}
               </button>
             )}
           </div>

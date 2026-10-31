@@ -97,3 +97,15 @@ describe('Problempflanzen: Warnung mit Knopf „Zur Beseitigung“', () => {
     expect(html).not.toContain('Zur Beseitigung')
   })
 })
+
+describe('Baum im Aufwuchs: Knopf „Baum fällen erfassen“ öffnet die Vorlage mit der Art', () => {
+  it('Knopf heißt „Baum fällen erfassen“; das Formular startet als „Baum fällen“ mit Art, ohne Maß', async () => {
+    const { BeseitigungFormular } = await import('../BeseitigungFormular')
+    const h: Hinweis[] = [{ schwere: 'warnung', text: '„Birke" wird entfernt', beseitigung: { gegenstand: 'Birke', einheit: 'Stück', menge: 1, baum: { art: 'Birke' } } }]
+    expect(render(createElement(WarnListe, { hinweise: h, onBeseitigung: nichts }))).toContain('Baum fällen erfassen')
+    const form = render(createElement(BeseitigungFormular, { vorlage: h[0]!.beseitigung, baumVorlage: true, onAbbrechen: nichts, onFertig: nichts }))
+    expect(form).toContain('value="Birke"')
+    expect(form).toContain('value="Birke fällen inkl. Wurzelstock, StU fehlt"')
+    expect(form).toContain('Stammumfang in 1,30 m Höhe (cm, Pflichtangabe)')
+  })
+})

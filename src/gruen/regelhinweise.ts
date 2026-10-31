@@ -14,6 +14,9 @@ import { alterHinweise } from './baumMass'
 /** Ein Regelhinweis ist strukturell identisch mit Hinweis. */
 export type Regelhinweis = Hinweis
 
+/** Katalog-IDs, unter denen ein Baum einen Wert hat – dort kein Hinweis „wird entfernt“. */
+const BAUM_ERLAUBT_IDS = new Set(['aw-baum-geschuetzt', 'aw-obstgehoelz', 'aw-hecke', 'aw-nadelgehoelz-solitaer'])
+
 /** Katalog-IDs mit einer Flächenbegrenzung auf 100 m² (Rasen, Wiese). */
 const RASEN_WIESE_IDS = new Set(['aw-rasen', 'aw-wiese'])
 
@@ -63,17 +66,27 @@ export function berechneRegelhinweise(
   }
 
   // 2b. Problempflanze (Richtlinie oder Praxis); eine Art der Unionsliste ist oben schon gemeldet
-  const problem = invasiv ? null : findeProblempflanze(problempflanzen, position.bezeichnung)
+  const gefunden = invasiv ? null : findeProblempflanze(problempflanzen, position.bezeichnung)
+  // Bäume, die als Katalogposition mit eigenem Wert erfasst sind (geschützter Baum, Obst, Hecke, Solitär), bleiben ohne Hinweis
+  const problem = gefunden?.regel === 'baum-entfernen' && position.katalogId && BAUM_ERLAUBT_IDS.has(position.katalogId) ? null : gefunden
   if (problem) {
     const name = problem.deutsch.split('/')[0]!.trim()
+    // Für „Baum fällen“: die Art, wie sie in der Position steht („Bergahorn“), ohne Zusätze
+    const art = position.bezeichnung.split(/[,(]/)[0]!.trim() || name
     const text =
-      problem.regel === 'nadel-gross'
+      problem.regel === 'baum-entfernen'
+        ? `„${art}" wird entfernt – nicht geschützte Laub- und Nadelbäume haben im Aufwuchs keinen Wert. Bitte als Beseitigung ` +
+          'erfassen („Baum fällen“). Ist der Baum nach der Baumschutzverordnung geschützt, „Geschützter Baum“ wählen (1,00 €).'
+        : problem.regel === 'nadel-gross'
         ? `„${name}" ist ein Nadelgehölz, das ausgewachsen die Wuchshöhe von 2,5 bzw. 4 m (je Vertragslage) ` +
           'überschreiten kann. Es wird auch klein oder im Jungstadium nicht abgeschätzt und muss entfernt werden ' +
           `(BewRL S. ${problem.quelle.seite ?? 17}). Beseitigungskosten in Abschnitt „Beseitigung" eintragen.`
         : `„${name}" gilt als problematisch (${problem.gruppe}); die Richtlinie nennt die Art nicht. ` +
           'Zur Prüfung: Entfernen und Beseitigungskosten in Abschnitt „Beseitigung" eintragen, falls nötig.'
-    hinweise.push({ schwere: 'warnung', text, beseitigung: beseitigungsVorschlag(position, name) })
+    const vorschlag = beseitigungsVorschlag(position, name)
+    // Bäume: Der Knopf öffnet die Vorlage „Baum fällen“ mit der Art
+    if (problem.regel === 'baum-entfernen' || problem.regel === 'nadel-gross') vorschlag.baum = { art }
+    hinweise.push({ schwere: 'warnung', text, beseitigung: vorschlag })
   }
 
   // 2c. Obstgehölze: Alter als Pflichtmaß für den Vorschlag

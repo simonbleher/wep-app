@@ -5,8 +5,8 @@ import { ganzerNameQualitaet } from './suche.js';
 import { normalisiere } from './util.js';
 
 export interface ProblempflanzeQuelle {
-  /** richtlinie: steht in der BewRL · praxis: Einstufung außerhalb der Richtlinie. */
-  art: 'richtlinie' | 'praxis';
+  /** richtlinie: steht in der BewRL · praxis: Einstufung außerhalb der Richtlinie · bv: Entscheidung des BV. */
+  art: 'richtlinie' | 'praxis' | 'bv';
   text: string;
   /** Gedruckte Seite der Richtlinie (nur bei art = richtlinie). */
   seite?: number;
@@ -21,8 +21,11 @@ export interface Problempflanze {
   wissenschaftlich?: string;
   synonyme?: string[];
   gruppe: string;
-  /** nadel-gross: Richtlinie S. 17 · praxis-neophyt: Einstufung außerhalb der Richtlinie. */
-  regel: 'nadel-gross' | 'praxis-neophyt';
+  /**
+   * nadel-gross: Richtlinie S. 17 · praxis-neophyt: Einstufung außerhalb der Richtlinie ·
+   * baum-entfernen: nicht geschützter Laub-/Nadelbaum, wird immer entfernt (Entscheidung BV 31.10.2026).
+   */
+  regel: 'nadel-gross' | 'praxis-neophyt' | 'baum-entfernen';
   quelle: ProblempflanzeQuelle;
 }
 

@@ -41,7 +41,7 @@ export function BeseitigungFormular({
 }: {
   bearbeiten?: BeseitigungsPosition
   /** Vorbelegung beim Hinzufügen (z. B. aus dem Hinweis einer Problempflanze). */
-  vorlage?: { gegenstand: string; einheit: string; menge: number }
+  vorlage?: { gegenstand: string; einheit: string; menge: number; baum?: { art?: string } }
   onAbbrechen: () => void
   onFertig: (pos: BeseitigungsPosition) => void
   onLoeschen?: () => void
@@ -57,17 +57,21 @@ export function BeseitigungFormular({
   baumVorlage?: boolean
 }) {
   const id = useId()
-  const [gegenstand, setGegenstand] = useState(bearbeiten?.gegenstand ?? vorlage?.gegenstand ?? '')
+  // Vorbelegung „Baum fällen“ (Hinweis „wird entfernt“ an einem Baum im Aufwuchs): Art übernehmen, Maß fehlt noch
+  const vorlageBaum = !bearbeiten && baumVorlage ? vorlage?.baum : undefined
+  const [gegenstand, setGegenstand] = useState(
+    bearbeiten?.gegenstand ?? (vorlageBaum ? baumFaellenText(vorlageBaum.art, undefined) : (vorlage?.gegenstand ?? '')),
+  )
   const [menge, setMenge] = useState(bearbeiten ? zahlFuerEingabe(bearbeiten.menge) : vorlage ? zahlFuerEingabe(vorlage.menge) : '1')
-  const [einheit, setEinheit] = useState(bearbeiten?.einheit ?? vorlage?.einheit ?? 'Stück')
+  const [einheit, setEinheit] = useState(bearbeiten?.einheit ?? (vorlageBaum ? 'Stück' : vorlage?.einheit) ?? 'Stück')
   const [einzelpreis, setEinzelpreis] = useState(bearbeiten ? zahlFuerEingabe(bearbeiten.einzelpreis) : '')
   const [faktor, setFaktor] = useState(bearbeiten ? zahlFuerEingabe(bearbeiten.faktor) : '1')
   const [begruendung, setBegruendung] = useState(bearbeiten?.begruendung ?? '')
   const [frage, setFrage] = useState(false)
 
   // Vorlage „Baum fällen“: Maß (Stammumfang oder Durchmesser) → Satz der Stufe
-  const [baum, setBaum] = useState(Boolean(bearbeiten?.baum))
-  const [baumArt, setBaumArt] = useState(bearbeiten?.baum?.art ?? '')
+  const [baum, setBaum] = useState(Boolean(bearbeiten?.baum) || Boolean(vorlageBaum))
+  const [baumArt, setBaumArt] = useState(bearbeiten?.baum?.art ?? vorlageBaum?.art ?? '')
   const [massArt, setMassArt] = useState<'umfang' | 'durchmesser'>(bearbeiten?.baum?.durchmesserCm !== undefined ? 'durchmesser' : 'umfang')
   const [mass, setMass] = useState(
     bearbeiten?.baum?.durchmesserCm !== undefined

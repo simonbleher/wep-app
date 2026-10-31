@@ -20,9 +20,13 @@ describe('Datenliste data/problempflanzen.json', () => {
     expect(liste.length).toBeGreaterThan(5)
     for (const e of liste) {
       expect(e.quelle.text.length, e.id).toBeGreaterThan(10)
-      expect(['richtlinie', 'praxis']).toContain(e.quelle.art)
+      expect(['richtlinie', 'praxis', 'bv']).toContain(e.quelle.art)
       if (e.quelle.art === 'richtlinie') {
         expect(e.quelle.seite, e.id).toBeGreaterThan(0)
+        expect(e.quelle.bestaetigt, e.id).toBe(true)
+      } else if (e.quelle.art === 'bv') {
+        // Entscheidung des BV (nicht geschützte Laub-/Nadelbäume werden entfernt): bestätigt, keine Seite
+        expect(e.regel, e.id).toBe('baum-entfernen')
         expect(e.quelle.bestaetigt, e.id).toBe(true)
       } else {
         // Praxis-Einträge stehen nicht in der Richtlinie und sind noch nicht bestätigt

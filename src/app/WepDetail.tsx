@@ -114,7 +114,7 @@ type ExportZustand =
 type Maske =
   | { art: 'hinzufuegen'; abschnitt: Abschnitt }
   | { art: 'position'; abschnitt: Abschnitt; id: string }
-  | { art: 'beseitigung'; id?: string; vorlage?: { gegenstand: string; einheit: string; menge: number } }
+  | { art: 'beseitigung'; id?: string; vorlage?: { gegenstand: string; einheit: string; menge: number; baum?: { art?: string } } }
   | { art: 'bauteil'; id?: string; bauteilArt?: BauteilArt }
   | { art: 'bauBeseitigung'; id?: string }
 
