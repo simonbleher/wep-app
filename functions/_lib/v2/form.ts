@@ -19,6 +19,7 @@ function massFormOk(p: Record<string, unknown>): boolean {
   if (!zahlOderLeer(p.alterJahre)) return false
   if (!leer(p.baumform) && (typeof p.baumform !== 'string' || p.baumform.length > MAX_TEXT)) return false
   if (!leer(p.preisManuell) && typeof p.preisManuell !== 'boolean') return false
+  if (!leer(p.nachAlter) && typeof p.nachAlter !== 'boolean') return false
   if (leer(p.baum)) return true
   if (!istObjekt(p.baum)) return false
   const b = p.baum

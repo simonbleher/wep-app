@@ -34,13 +34,23 @@ export interface Staffel {
   stufen: Stufe[]
 }
 
-const STAFFELN = (katalogRaw as unknown as { staffeln: Record<'baumBeseitigung' | 'obstgehoelzAlter', Staffel> }).staffeln
+const STAFFELN = (katalogRaw as unknown as { staffeln: Record<string, Staffel> & Record<'baumBeseitigung' | 'obstgehoelzAlter', Staffel> }).staffeln
 
 /** Beseitigungskosten Bäume nach Stammumfang (S. 20–21). */
 export const BAUM_BESEITIGUNG: Staffel = STAFFELN.baumBeseitigung
 /** Altersstufen der Obstgehölze (S. 16). */
 export const OBST_ALTER: Staffel = STAFFELN.obstgehoelzAlter
 export const OBST_ID = 'aw-obstgehoelz'
+/** Altersstaffeln je Katalog-Position (Obstgehölze, Beerenobst, weitere Kulturen; BewRL S. 16–17). */
+const ALTERS_STAFFELN = new Map(
+  Object.values(STAFFELN)
+    .filter((s) => s.masseinheit === 'Jahre' && s.katalogId)
+    .map((s) => [s.katalogId!, s] as const),
+)
+/** Altersstaffel einer Katalog-Position – undefined, wenn die Richtlinie dort nicht nach Alter staffelt. */
+export function altersStaffel(katalogId: string | undefined): Staffel | undefined {
+  return katalogId ? ALTERS_STAFFELN.get(katalogId) : undefined
+}
 export const GESCHUETZT_ID = 'aw-baum-geschuetzt'
 /** Fester Wert geschützter Bäume (S. 16). */
 export const GESCHUETZT_WERT = 1
@@ -109,37 +119,57 @@ export function baumHinweise(p: BeseitigungsPosition): Hinweis[] {
 }
 
 // ---------------------------------------------------------------------------
-// Aufwuchs: Obstgehölze nach Alter
+// Aufwuchs nach Alter: Obstgehölze, Beerenobst, weitere Kulturen (Weinrebe, Erdbeere, Rhabarber, Kiwi, Spargel)
 // ---------------------------------------------------------------------------
 
-/** Altersstufe aus dem Alter in vollen Jahren (Nachkommastellen werden abgeschnitten). */
-export function obstAltersstufe(alterJahre: number | undefined): string | undefined {
-  if (typeof alterJahre !== 'number' || !Number.isFinite(alterJahre) || alterJahre < 0) return undefined
-  const voll = Math.floor(alterJahre)
+/** Altersstufe einer Position aus dem Alter in vollen Jahren (Nachkommastellen werden abgeschnitten). */
+export function altersstufeFuer(katalogId: string | undefined, alterJahre: number | undefined): string | undefined {
+  const staffel = altersStaffel(katalogId)
+  if (!staffel || typeof alterJahre !== 'number' || !Number.isFinite(alterJahre) || alterJahre < 0) return undefined
   // 0 Jahre (frisch gepflanzt) gehört zur ersten Stufe
-  return stufeFuer(OBST_ALTER, Math.max(voll, 0.0001))?.altersstufe
+  return stufeFuer(staffel, Math.max(Math.floor(alterJahre), 0.0001))?.altersstufe
 }
 
-/** Höchstwert eines Obstgehölzes aus Baumform und Alter – undefined, wenn eins fehlt oder unbekannt ist. */
-export function obstHoechstwert(
-  varianten: readonly { form?: string; altersstufe?: string; hoechstwert: number }[],
-  baumform: string | undefined,
+/** Altersstufe eines Obstgehölzes (S. 16). */
+export function obstAltersstufe(alterJahre: number | undefined): string | undefined {
+  return altersstufeFuer(OBST_ID, alterJahre)
+}
+
+type AlterVariante = { form?: string; altersstufe?: string; hoechstwert: number }
+
+/**
+ * Höchstwert aus Wuchsform (falls die Position Formen hat) und Alter – undefined, wenn etwas fehlt oder unbekannt ist.
+ */
+export function hoechstwertNachAlter(
+  katalogId: string | undefined,
+  varianten: readonly AlterVariante[],
+  form: string | undefined,
   alterJahre: number | undefined,
 ): number | undefined {
-  const stufe = obstAltersstufe(alterJahre)
-  if (!baumform || !stufe) return undefined
-  return varianten.find((v) => v.form === baumform && v.altersstufe === stufe)?.hoechstwert
+  const stufe = altersstufeFuer(katalogId, alterJahre)
+  const mitFormen = varianten.some((v) => v.form)
+  if (!stufe || (mitFormen && !form)) return undefined
+  return varianten.find((v) => (mitFormen ? v.form === form : true) && v.altersstufe === stufe)?.hoechstwert
 }
 
-/** Bezeichnung mit Alter: „Apfel, Halbstamm, 12 J.“ */
+/** Höchstwert eines Obstgehölzes aus Baumform und Alter. */
+export function obstHoechstwert(varianten: readonly AlterVariante[], baumform: string | undefined, alterJahre: number | undefined): number | undefined {
+  return hoechstwertNachAlter(OBST_ID, varianten, baumform, alterJahre)
+}
+
+/** Bezeichnung mit Alter: „Apfel, Halbstamm, 12 J.“, „Weinrebe, 6 J.“ */
 export function obstBezeichnung(name: string, baumform: string | undefined, alterJahre: number | undefined): string {
   const alter = typeof alterJahre === 'number' && Number.isFinite(alterJahre) && alterJahre >= 0 ? `${zahlDe(Math.floor(alterJahre))} J.` : undefined
   return [name, baumform, alter].filter(Boolean).join(', ')
 }
 
-/** Ist das Alter der Position ein Pflichtfeld (neue Obstgehölz-Position mit Baumform)? */
-export function brauchtAlter(p: Pick<Position, 'katalogId' | 'baumform'>): boolean {
-  return p.katalogId === OBST_ID && Boolean(p.baumform)
+/**
+ * Ist das Alter der Position ein Pflichtfeld? Ja bei Positionen, die nach Alter erfasst werden (`nachAlter`, bei
+ * Obstgehölzen aus #133 auch erkennbar an der Baumform). Ältere Positionen ohne diese Kennung bleiben, wie sie sind.
+ */
+export function brauchtAlter(p: Pick<Position, 'katalogId' | 'baumform' | 'nachAlter'>): boolean {
+  if (!altersStaffel(p.katalogId)) return false
+  return Boolean(p.nachAlter) || (p.katalogId === OBST_ID && Boolean(p.baumform))
 }
 
 /** Hat die Position ein gültiges Alter? */
@@ -147,24 +177,16 @@ export function hatAlter(p: Pick<Position, 'alterJahre'>): boolean {
   return typeof p.alterJahre === 'number' && Number.isFinite(p.alterJahre) && p.alterJahre >= 0
 }
 
-/** Hinweise zum Maß einer Aufwuchs-Position (Obstgehölze). */
+/** Hinweise zum Alter einer Aufwuchs-Position, deren Wert die Richtlinie nach Alter staffelt. */
 export function alterHinweise(p: Position): Hinweis[] {
-  if (p.katalogId !== OBST_ID) return []
+  const staffel = altersStaffel(p.katalogId)
+  if (!staffel) return []
   if (!hatAlter(p)) {
     return brauchtAlter(p)
-      ? [{ schwere: 'warnung', text: `Maß fehlt: Alter in Jahren eintragen – ohne Alter kein Vorschlag (BewRL S. ${OBST_ALTER.seite}).` }]
+      ? [{ schwere: 'warnung', text: `Maß fehlt: Alter in Jahren eintragen – ohne Alter kein Vorschlag (BewRL S. ${staffel.seite}).` }]
       : [{ schwere: 'info', text: 'Alter nicht erfasst: Der Vorschlag folgt der gewählten Altersstufe. Beim Ändern der Position kann das Alter nachgetragen werden.' }]
   }
-  const stufe = obstAltersstufe(p.alterJahre)
-  const grenze = Math.floor(p.alterJahre!) === 30
-  return [
-    {
-      schwere: 'info',
-      text:
-        `Alter ${zahlDe(Math.floor(p.alterJahre!))} Jahre → Altersstufe „${stufe}“ (BewRL S. ${OBST_ALTER.seite}).` +
-        (grenze ? ' Genau 30 Jahre: Die Richtlinie nennt „5 bis 30“ und „30 +“ – die App nimmt „5 bis 30“, bis der BV das klärt.' : ''),
-    },
-  ]
+  return [{ schwere: 'info', text: `Alter ${zahlDe(Math.floor(p.alterJahre!))} Jahre → Altersstufe „${altersstufeFuer(p.katalogId, p.alterJahre)}“ (BewRL S. ${staffel.seite}).` }]
 }
 
 // ---------------------------------------------------------------------------

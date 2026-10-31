@@ -141,7 +141,8 @@ nichts wird gesperrt (Warnungen, keine Blockaden).
   Preis = Höchstwert × Stufe (sehr gut 100 %, gut 75 %, mittel 50 %, schlecht = 1 €); `einzelpreis` überschreibt ihn (zählt als eigener Preis).
 - **Beseitigung:** `"liste": "beseitigung"`, Einträge `{ "gegenstand", "menge", "einheit", "einzelpreis", "faktor"?, "begruendung"? }`.
 - **Bäume aus dem Maß** (abwärtskompatibel, alte Vorschläge gelten unverändert):
-  - Obstgehölz mit `"alter"` (volle Jahre): `variante` nennt nur die Baumform, die App wählt die Altersstufe (BewRL S. 16),
+  - Obstgehölz, Beerenobst und weitere Kulturen (Weinrebe, Erdbeere, Rhabarber, Kiwi, Spargel) mit `"alter"` (volle Jahre):
+    `variante` nennt nur die Wuchsform (bei Kulturen ohne Form entfällt sie), die App wählt die Altersstufe (BewRL S. 16–17),
     z. B. `{ "suche": "Apfel", "variante": "Halbstamm", "alter": 12, "anzahl": 1 }` → „Apfel, Halbstamm, 12 J.“, bis 85 €.
     Ohne `alter` gilt wie bisher die Variante, mit Hinweis „Alter fehlt“.
   - Beseitigung `"vorlage": "baum-faellen"` mit `"baumart"`? und `"stammumfang"` **oder** `"durchmesser"` (cm, in 1,30 m Höhe):

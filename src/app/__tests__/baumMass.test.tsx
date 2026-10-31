@@ -90,3 +90,26 @@ describe('Warnung vor der Abgabe', () => {
     expect(html).toContain('Stammumfang fehlt')
   })
 })
+
+describe('Beerenobst und weitere Kulturen: Alter als Pflichtangabe', () => {
+  const weinrebe = KATALOG_POSITIONEN.find((p) => p.id === 'aw-weinrebe')!
+  const beeren = KATALOG_POSITIONEN.find((p) => p.id === 'aw-beerenobst')!
+
+  it('Weinrebe neu (ohne Wuchsform): Alter-Feld, ohne Alter kein Vorschlag', () => {
+    const html = formular({ auswahl: { position: weinrebe } })
+    expect(html).toContain('Alter in Jahren (Pflichtangabe)')
+    expect(html).toContain('value="Weinrebe"')
+    expect(html).toContain('Maß fehlt: Alter eintragen')
+  })
+
+  it('Johannisbeere, Stamm, 8 J.: bis 35 €', () => {
+    const html = formular({ bearbeiten: pos({ katalogId: beeren.id, bezeichnung: 'Johannisbeere, Stamm, 8 J.', baumform: 'Stamm', alterJahre: 8, nachAlter: true, hoechstwert: 35, einzelpreis: 26.25 }) })
+    expect(html).toContain('Stamm, 8 Jahre → bis 35,00')
+  })
+
+  it('alte Weinrebe ohne Alter: Vorschlag aus der Variante bleibt', () => {
+    const html = formular({ bearbeiten: pos({ katalogId: weinrebe.id, bezeichnung: 'Weinrebe, 5 J.+', hoechstwert: 35, einzelpreis: 26.25 }) })
+    expect(html).toContain('Höchstwert 35,00')
+    expect(html).not.toContain('Maß fehlt: Alter eintragen')
+  })
+})

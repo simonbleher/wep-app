@@ -106,6 +106,73 @@
         { "bis": 30, "altersstufe": "5 bis 30 Jahre" },
         { "ueber": 30, "altersstufe": "über 30 Jahre" }
       ]
+    },
+    "beerenobstAlter": {
+      "katalogId": "aw-beerenobst",
+      "mass": "Alter",
+      "masseinheit": "Jahre",
+      "seite": 16,
+      "regeln": "Volle Jahre. Spalte „4 Jahre“ = bis einschließlich 4, darüber „5 bis 20 Jahre“. Über 20 Jahre nennt die Richtlinie keine Stufe – vorläufig „5 bis 20 Jahre“ (Frage an Simon/BV).",
+      "stufen": [
+        { "bis": 4, "altersstufe": "bis 4 Jahre" },
+        { "ueber": 4, "altersstufe": "5 bis 20 Jahre" }
+      ]
+    },
+    "weinrebeAlter": {
+      "katalogId": "aw-weinrebe",
+      "mass": "Alter",
+      "masseinheit": "Jahre",
+      "seite": 17,
+      "regeln": "Volle Jahre. Spalte „4 Jahre“ = bis einschließlich 4 (jünger: vorläufig ebenfalls), darüber „5 Jahre und älter“.",
+      "stufen": [
+        { "bis": 4, "altersstufe": "4 Jahre" },
+        { "ueber": 4, "altersstufe": "5 Jahre und älter" }
+      ]
+    },
+    "erdbeereAlter": {
+      "katalogId": "aw-erdbeere",
+      "mass": "Alter",
+      "masseinheit": "Jahre",
+      "seite": 17,
+      "regeln": "Volle Jahre. Spalte „1 Jahr“ = bis einschließlich 1, darüber „2 Jahre“ (ältere Bestände vorläufig ebenfalls).",
+      "stufen": [
+        { "bis": 1, "altersstufe": "1 Jahr" },
+        { "ueber": 1, "altersstufe": "2 Jahre" }
+      ]
+    },
+    "rhabarberAlter": {
+      "katalogId": "aw-rhabarber",
+      "mass": "Alter",
+      "masseinheit": "Jahre",
+      "seite": 17,
+      "regeln": "Volle Jahre. Spalten als „bis“: bis 2 → „2 Jahre“, bis 4 → „4 Jahre“, darüber „5 Jahre und älter“.",
+      "stufen": [
+        { "bis": 2, "altersstufe": "2 Jahre" },
+        { "bis": 4, "altersstufe": "4 Jahre" },
+        { "ueber": 4, "altersstufe": "5 Jahre und älter" }
+      ]
+    },
+    "kiwiAlter": {
+      "katalogId": "aw-kiwi",
+      "mass": "Alter",
+      "masseinheit": "Jahre",
+      "seite": 17,
+      "regeln": "Volle Jahre. Spalte „4 Jahre“ = bis einschließlich 4 (jünger: vorläufig ebenfalls), darüber „5 Jahre und älter“.",
+      "stufen": [
+        { "bis": 4, "altersstufe": "4 Jahre" },
+        { "ueber": 4, "altersstufe": "5 Jahre und älter" }
+      ]
+    },
+    "spargelAlter": {
+      "katalogId": "aw-spargel",
+      "mass": "Alter",
+      "masseinheit": "Jahre",
+      "seite": 17,
+      "regeln": "Volle Jahre. Spalte „4 Jahre“ = bis einschließlich 4 (jünger: vorläufig ebenfalls), darüber „5 Jahre und älter“.",
+      "stufen": [
+        { "bis": 4, "altersstufe": "4 Jahre" },
+        { "ueber": 4, "altersstufe": "5 Jahre und älter" }
+      ]
     }
   }
 }

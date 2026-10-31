@@ -429,7 +429,7 @@ export function schema(): Schema {
           einheit: text('Einheit; weggelassen = die des Katalogs. Bei Freitext Pflicht.', { enum: [...EINHEITEN_POSITION] }),
           zustand: text('Zustand; bestimmt den Preisvorschlag (Höchstwert × Stufe: sehr gut 100 %, gut 75 %, mittel 50 %, schlecht = 1 €). Weggelassen = gut.', { enum: [...ZUSTAENDE] }),
           einzelpreis: zahl('Einzelpreis in Euro; weggelassen = Preisvorschlag. Eine Angabe zählt als eigener Preis (überschreibt den Vorschlag). Bei Freitext ohne Höchstwert Pflicht (sonst 0 €).', { minimum: 0 }),
-          alter: zahl('Nur Obstgehölze: Alter in vollen Jahren. Dann nennt „variante“ nur die Baumform (z. B. „Halbstamm“) und die App wählt die Altersstufe (BewRL S. 16: bis 4, 5 bis 30, darüber). Ohne „alter“ gilt wie bisher die gewählte Variante, mit Hinweis „Alter fehlt“.', { minimum: 0, maximum: 300 }),
+          alter: zahl('Alter in vollen Jahren bei Positionen, die die Richtlinie nach Alter staffelt (Obstgehölze, Beerenobst, Weinrebe, Erdbeere, Rhabarber, Kiwi, Spargel; S. 16–17). Dann nennt „variante“ nur die Wuchsform (z. B. „Halbstamm“, „Busch“; bei Kulturen ohne Form entfällt sie) und die App wählt die Altersstufe. Ohne „alter“ gilt wie bisher die gewählte Variante, mit Hinweis „Alter fehlt“.', { minimum: 0, maximum: 300 }),
         },
         ['anzahl'],
       ),

@@ -23,5 +23,7 @@ describe('Formprüfung: Maße der Bäume', () => {
     expect(wepFormFehler(mit([], [{ id: 'b', baum: 'gross' }]))).toMatch(/beseitigungAA.*Maß/)
     expect(wepFormFehler(mit([], [{ id: 'b', baum: { stammumfangCm: '85' } }]))).toMatch(/Maß/)
     expect(wepFormFehler(mit([], [{ id: 'b', preisManuell: 'ja' }]))).toMatch(/Maß/)
+    expect(wepFormFehler(mit([{ id: 'a', nachAlter: 'ja' }]))).toMatch(/Maß/)
+    expect(wepFormFehler(mit([{ id: 'a', katalogId: 'aw-weinrebe', nachAlter: true, alterJahre: 6 }]))).toBeUndefined()
   })
 })

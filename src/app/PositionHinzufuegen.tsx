@@ -9,7 +9,7 @@ import type { EigenePosition, Position as KatalogPosition, Variante as KatalogVa
 import { aktiveEigene, alsKatalogPosition, EIGEN_PRAEFIX, lokaleEigene, merkeEigenePosition, sucheKatalog } from '@/katalog'
 import { merkeZuletztVerwendet, ladeZuletztVerwendet } from '@/gruen/zuletzt'
 import { gefundeneArt, kurzeBezeichnung } from '@/gruen/format'
-import { OBST_ID, obstFormVarianten } from '@/gruen/baumMass'
+import { altersStaffel, obstFormVarianten } from '@/gruen/baumMass'
 import { ABSCHNITT_TITEL, KATALOG_POSITIONEN, type Abschnitt } from './katalogDaten'
 import { PositionFormular, type Auswahl, type MerkeDaten } from './PositionFormular'
 import { ICON, Kopf, euroFormat } from './ui'
@@ -50,10 +50,14 @@ export function gruppiere(
     }
     const art = gefundeneArt(t.position, suchbegriff)
     // Nennt der Treffer schon eine Variante (z. B. „Apfel Halbstamm“), nur diese zeigen
+    // Nach Alter gestaffelt (Obst, Beerenobst, weitere Kulturen): nur die Wuchsform wählen bzw. eine einzige Zeile –
+    // die Altersstufe folgt aus dem Alter im Formular (BewRL S. 16–17)
+    const formen = altersStaffel(t.position.id) ? obstFormVarianten(t.position.varianten ?? []) : []
     const varianten: (KatalogVariante | undefined)[] =
-      t.position.id === OBST_ID
-        ? // Obstgehölze: nur die Baumform wählen, die Altersstufe folgt aus dem Alter (BewRL S. 16)
-          obstFormVarianten(t.position.varianten ?? []).filter((v) => !t.variante?.form || v.form === t.variante.form)
+      altersStaffel(t.position.id)
+        ? formen.length
+          ? formen.filter((v) => !t.variante?.form || v.form === t.variante.form)
+          : [undefined]
         : t.variante
           ? [t.variante]
           : t.position.varianten?.length

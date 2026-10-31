@@ -4,6 +4,9 @@ import { neuerWep, type BeseitigungsPosition, type Position } from '@/model'
 import {
   BAUM_BESEITIGUNG,
   alterHinweise,
+  altersstufeFuer,
+  brauchtAlter,
+  hoechstwertNachAlter,
   baumFaellenPreis,
   baumFaellenText,
   baumHinweise,
@@ -91,7 +94,7 @@ describe('Staffel „Baum fällen“ (BewRL S. 20–21)', () => {
 })
 
 describe('Obstgehölze nach Alter (BewRL S. 16)', () => {
-  it('Altersstufen in vollen Jahren; genau 30 Jahre = „5 bis 30“ (Frage an den BV)', () => {
+  it('Altersstufen in vollen Jahren; genau 30 Jahre = „5 bis 30“ (vom BV bestätigt)', () => {
     expect(obstAltersstufe(0)).toBe('bis 4 Jahre')
     expect(obstAltersstufe(4)).toBe('bis 4 Jahre')
     expect(obstAltersstufe(4.9)).toBe('bis 4 Jahre')
@@ -133,7 +136,7 @@ describe('Obstgehölze nach Alter (BewRL S. 16)', () => {
     const mit = pos({ katalogId: 'aw-obstgehoelz', baumform: 'Halbstamm', alterJahre: 12, hoechstwert: 85 })
     expect(berechnePreisvorschlag(mit)).toBe(63.75)
     expect(alterHinweise(mit)[0]).toMatchObject({ schwere: 'info' })
-    expect(alterHinweise({ ...mit, alterJahre: 30 })[0]!.text).toMatch(/Genau 30 Jahre/)
+    expect(alterHinweise({ ...mit, alterJahre: 30 })).toEqual([{ schwere: 'info', text: 'Alter 30 Jahre → Altersstufe „5 bis 30 Jahre“ (BewRL S. 16).' }])
   })
 
   it('alte Positionen ohne Baumform bleiben unverändert (Vorschlag aus der Variante), nur Info-Hinweis', () => {
@@ -167,5 +170,42 @@ describe('Vor der Abgabe', () => {
     ]
     expect(fehlendeMasse(w)).toEqual(['Aufwuchs: „Apfel, Halbstamm“ – Alter fehlt', 'Beseitigung: „Birke fällen inkl. Wurzelstock, StU fehlt“ – Stammumfang fehlt'])
     expect(fehlendeMasse(neuerWep('leer'))).toEqual([])
+  })
+})
+
+describe('Beerenobst und weitere Kulturen nach Alter (BewRL S. 16–17)', () => {
+  const kat = (id: string) => katalog.positionen.find((p) => p.id === id)!.varianten!
+
+  it('Altersstufen aus den Spalten der Richtlinie („bis“ einschließlich)', () => {
+    expect([0, 4, 5, 20, 25].map((a) => altersstufeFuer('aw-beerenobst', a))).toEqual(['bis 4 Jahre', 'bis 4 Jahre', '5 bis 20 Jahre', '5 bis 20 Jahre', '5 bis 20 Jahre'])
+    expect([1, 4, 5, 12].map((a) => altersstufeFuer('aw-weinrebe', a))).toEqual(['4 Jahre', '4 Jahre', '5 Jahre und älter', '5 Jahre und älter'])
+    expect([0, 1, 2, 5].map((a) => altersstufeFuer('aw-erdbeere', a))).toEqual(['1 Jahr', '1 Jahr', '2 Jahre', '2 Jahre'])
+    expect([1, 2, 3, 4, 5].map((a) => altersstufeFuer('aw-rhabarber', a))).toEqual(['2 Jahre', '2 Jahre', '4 Jahre', '4 Jahre', '5 Jahre und älter'])
+    for (const id of ['aw-kiwi', 'aw-spargel']) expect([3, 6].map((a) => altersstufeFuer(id, a))).toEqual(['4 Jahre', '5 Jahre und älter'])
+    expect(altersstufeFuer('aw-rose', 5)).toBeUndefined()
+  })
+
+  it('Höchstwerte: mit Wuchsform (Beerenobst) und ohne (Weinrebe, Erdbeere …)', () => {
+    expect(hoechstwertNachAlter('aw-beerenobst', kat('aw-beerenobst'), 'Busch', 3)).toBe(6)
+    expect(hoechstwertNachAlter('aw-beerenobst', kat('aw-beerenobst'), 'Stamm', 8)).toBe(35)
+    expect(hoechstwertNachAlter('aw-beerenobst', kat('aw-beerenobst'), undefined, 8)).toBeUndefined()
+    expect(hoechstwertNachAlter('aw-weinrebe', kat('aw-weinrebe'), undefined, 6)).toBe(35)
+    expect(hoechstwertNachAlter('aw-erdbeere', kat('aw-erdbeere'), undefined, 1)).toBe(2)
+    expect(hoechstwertNachAlter('aw-rhabarber', kat('aw-rhabarber'), undefined, 3)).toBe(2.5)
+    expect(hoechstwertNachAlter('aw-spargel', kat('aw-spargel'), undefined, undefined)).toBeUndefined()
+  })
+
+  it('Pflichtangabe nur bei neu nach Alter erfassten Positionen; alte behalten ihren Preis', () => {
+    const neu = pos({ katalogId: 'aw-weinrebe', bezeichnung: 'Weinrebe', nachAlter: true })
+    expect(brauchtAlter(neu)).toBe(true)
+    expect(berechnePreisvorschlag(neu)).toBe(0)
+    expect(alterHinweise(neu)[0]).toMatchObject({ schwere: 'warnung' })
+    const alt = pos({ katalogId: 'aw-weinrebe', bezeichnung: 'Weinrebe, 5 J.+', hoechstwert: 35 })
+    expect(brauchtAlter(alt)).toBe(false)
+    expect(berechnePreisvorschlag(alt)).toBe(26.25)
+    expect(alterHinweise(alt)).toEqual([expect.objectContaining({ schwere: 'info' })])
+    const w = neuerWep('2026-907')
+    w.gruen.aufwuchs = [neu, alt, pos({ id: 'b', katalogId: 'aw-beerenobst', bezeichnung: 'Johannisbeere, Busch, 6 J.', baumform: 'Busch', alterJahre: 6, nachAlter: true })]
+    expect(fehlendeMasse(w)).toEqual(['Aufwuchs: „Weinrebe“ – Alter fehlt'])
   })
 })

@@ -9,7 +9,7 @@
 import { INVASIVE_ARTEN, KATALOG_POSITIONEN, PROBLEMPFLANZEN } from '../app/katalogDaten'
 import { gefundeneArt, kurzeBezeichnung, variantenMerkmale } from '../gruen/format'
 import { berechnePreisvorschlag } from '../gruen/preisvorschlag'
-import { BAUM_BESEITIGUNG, OBST_ID, baumFaellenPreis, baumFaellenText, obstBezeichnung, obstFormVarianten, obstHoechstwert, staffelSeite, umfangAusDurchmesser } from '../gruen/baumMass'
+import { BAUM_BESEITIGUNG, altersStaffel, baumFaellenPreis, baumFaellenText, hoechstwertNachAlter, obstBezeichnung, obstFormVarianten, staffelSeite, umfangAusDurchmesser } from '../gruen/baumMass'
 import { berechneRegelhinweise } from '../gruen/regelhinweise'
 import { aktiveEigene, lokaleEigene, sucheKatalog, type Position as KatalogPosition, type Variante } from '../katalog'
 import { normalisiere } from '../katalog/util'
@@ -227,10 +227,12 @@ function loeseAuf(k: Kontext, o: Rohobjekt, pfad: string, liste: 'aufwuchs' | 'a
     art = gefundeneArt(pos, suche!)
   }
   let variante = treffVariante
-  // Obstgehölz mit Alter: „variante“ nennt nur die Baumform, die Altersstufe folgt aus „alter“ (BewRL S. 16)
-  if (pos.id === OBST_ID && o.alter !== undefined) {
+  // Nach Alter gestaffelt (Obst, Beerenobst, weitere Kulturen) mit „alter“: „variante“ nennt nur die Wuchsform (falls es
+  // Formen gibt), die Altersstufe folgt aus „alter“ (BewRL S. 16–17)
+  if (altersStaffel(pos.id) && o.alter !== undefined) {
     const vs = pos.varianten ?? []
     const formen = obstFormVarianten(vs)
+    if (!formen.length) return { katalog: pos, art }
     let form: string | undefined
     if (typeof varianteRoh === 'number' && Number.isInteger(varianteRoh) && varianteRoh >= 0 && varianteRoh < vs.length) form = vs[varianteRoh]!.form
     else if (typeof varianteRoh === 'string' && varianteRoh.trim()) {
@@ -239,7 +241,7 @@ function loeseAuf(k: Kontext, o: Rohobjekt, pfad: string, liste: 'aufwuchs' | 'a
       form = passend.length === 1 ? passend[0]!.form : undefined
     } else form = treffVariante?.form
     if (!form) {
-      fehlt(k, `${pfad}.variante`, `Obstgehölz mit „alter“: „variante“ nennt die Baumform – ${formen.map((f) => f.form).join(', ')}.`)
+      fehlt(k, `${pfad}.variante`, `${pos.bezeichnung} mit „alter“: „variante“ nennt die Wuchsform – ${formen.map((f) => f.form).join(', ')}.`)
       return null
     }
     return { katalog: pos, variante: vs.find((v) => v.form === form), art }
@@ -305,12 +307,14 @@ function pruefePosition(k: Kontext, e: unknown, i: number, liste: 'aufwuchs' | '
   const variante = aufgeloest !== 'frei' ? aufgeloest.variante : undefined
   const art = aufgeloest !== 'frei' ? aufgeloest.art : undefined
   // Obstgehölz mit Alter: Höchstwert aus Baumform + Alter; Bezeichnung „Apfel, Halbstamm, 12 J.“
-  const obstMitAlter = katalog?.id === OBST_ID && alter !== undefined && Boolean(variante?.form)
-  if (alter !== undefined && !obstMitAlter) k.hinweise.push(`${pfad}: „alter“ zählt nur bei Obstgehölzen und wird hier nicht verwendet.`)
-  const hoechstwert = obstMitAlter ? obstHoechstwert(katalog!.varianten ?? [], variante!.form, alter) : (variante?.hoechstwert ?? katalog?.hoechstwert)
+  const staffel = altersStaffel(katalog?.id)
+  const mitFormen = Boolean(katalog?.varianten?.some((v) => v.form))
+  const obstMitAlter = Boolean(staffel) && alter !== undefined && (!mitFormen || Boolean(variante?.form))
+  if (alter !== undefined && !staffel) k.hinweise.push(`${pfad}: „alter“ zählt nur, wo die Richtlinie nach Alter staffelt (Obst, Beerenobst, weitere Kulturen), und wird hier nicht verwendet.`)
+  const hoechstwert = obstMitAlter ? hoechstwertNachAlter(katalog!.id, katalog!.varianten ?? [], variante?.form, alter) : (variante?.hoechstwert ?? katalog?.hoechstwert)
   const bezeichnung =
     bezeichnungRoh ??
-    (obstMitAlter ? obstBezeichnung(art ?? 'Obstgehölz', variante!.form, alter) : katalog ? kurzeBezeichnung(katalog, variante, art) : (eigene?.bezeichnung ?? ''))
+    (obstMitAlter ? obstBezeichnung(art ?? kurzeBezeichnung(katalog!), variante?.form, alter) : katalog ? kurzeBezeichnung(katalog, variante, art) : (eigene?.bezeichnung ?? ''))
   const einheit = einheitRoh ?? katalog?.einheit ?? eigene?.einheit ?? 'Stück'
   const grund: Position = {
     id: neuePositionId(),
@@ -323,9 +327,9 @@ function pruefePosition(k: Kontext, e: unknown, i: number, liste: 'aufwuchs' | '
     einzelpreis: 0,
     preisManuell: false,
     hinweise: [],
-    ...(obstMitAlter ? { baumform: variante!.form, alterJahre: Math.floor(alter!) } : {}),
+    ...(obstMitAlter ? { ...(variante?.form ? { baumform: variante.form } : {}), alterJahre: Math.floor(alter!), nachAlter: true } : {}),
   }
-  if (katalog?.id === OBST_ID && !obstMitAlter) k.hinweise.push(`${pfad} „${bezeichnung}“: Alter fehlt – mit „alter“ (Jahre) und der Baumform in „variante“ wählt die App die Altersstufe selbst.`)
+  if (staffel && !obstMitAlter) k.hinweise.push(`${pfad} „${bezeichnung}“: Alter fehlt – mit „alter“ (Jahre)${mitFormen ? ' und der Wuchsform in „variante“' : ''} wählt die App die Altersstufe selbst.`)
   const preisManuell = preis !== undefined || (eigene?.einzelpreis !== undefined && hoechstwert === undefined)
   const einzelpreis = preis ?? (preisManuell ? (eigene?.einzelpreis ?? 0) : berechnePreisvorschlag(grund))
   const pos: Position = { ...grund, einzelpreis, preisManuell }

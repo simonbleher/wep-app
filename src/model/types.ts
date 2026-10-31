@@ -232,12 +232,15 @@ export interface Position {
   preisManuell: boolean
   hinweise: Hinweis[] // Regel-Warnungen
   /**
-   * Obstgehölze: Baumform (Buschbaum, Halbstamm …) – gesetzt bei Positionen, deren Altersstufe die App aus
-   * `alterJahre` wählt (src/gruen/baumMass.ts). Fehlt bei älteren Positionen: Dort gilt die gewählte Variante.
+   * Wuchsform (Obstgehölze: Buschbaum, Halbstamm …; Beerenobst: Busch, Stamm) – gesetzt bei Positionen, deren
+   * Altersstufe die App aus `alterJahre` wählt (src/gruen/baumMass.ts). Fehlt bei älteren Positionen: Dort gilt die
+   * gewählte Variante.
    */
   baumform?: string
-  /** Obstgehölze: Alter in vollen Jahren (Pflichtangabe für den Vorschlag, BewRL S. 16). */
+  /** Alter in vollen Jahren (Pflichtangabe für den Vorschlag, wo die BewRL nach Alter staffelt, S. 16–17). */
   alterJahre?: number
+  /** Position wird nach Alter erfasst (Beerenobst, weitere Kulturen; Obstgehölze erkennt die App an `baumform`). */
+  nachAlter?: boolean
 }
 
 // OFFENE FRAGE: `Formalien` wird in docs/ARCHITEKTUR.md referenziert, aber nicht

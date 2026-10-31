@@ -227,3 +227,18 @@ describe('Bäume: Vorschlag aus dem Maß (wep-positionen/1, abwärtskompatibel)'
     expect(p([{ gegenstand: 'x', stammumfang: 85, menge: 1, einheit: 'Stück', einzelpreis: 1 }], 'beseitigung').fehler[0].pfad).toBe('positionen[0].stammumfang')
   })
 })
+
+describe('Alter auch bei Beerenobst und weiteren Kulturen', () => {
+  it('Weinrebe mit „alter“ ohne Variante; Beerenobst mit Wuchsform', () => {
+    const g = p([{ suche: 'Weinrebe', alter: 6, anzahl: 2 }, { suche: 'Johannisbeere', variante: 'Stamm', alter: 3, anzahl: 4 }])
+    expect(g.fehler).toEqual([])
+    expect(g.positionen[0]).toMatchObject({ bezeichnung: 'Weinrebe, 6 J.', hoechstwert: 35, alterJahre: 6, nachAlter: true, einzelpreis: 26.25 })
+    expect(g.positionen[0].baumform).toBeUndefined()
+    expect(g.positionen[1]).toMatchObject({ bezeichnung: 'Johannisbeere, Stamm, 3 J.', baumform: 'Stamm', hoechstwert: 16, nachAlter: true })
+  })
+  it('ohne „alter“ wie bisher, mit Hinweis', () => {
+    const g = p([{ suche: 'Weinrebe', variante: 1, anzahl: 1 }])
+    expect(g.positionen[0]).toMatchObject({ hoechstwert: 35 })
+    expect(g.hinweise.join(' ')).toMatch(/Alter fehlt/)
+  })
+})

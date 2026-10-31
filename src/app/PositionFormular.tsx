@@ -8,7 +8,7 @@ import { ZUSTANDSSTUFEN } from '@/model'
 import type { EigenePosition, Position as KatalogPosition, Variante as KatalogVariante } from '@/katalog'
 import { berechnePreisvorschlag } from '@/gruen/preisvorschlag'
 import { berechneRegelhinweise } from '@/gruen/regelhinweise'
-import { OBST_ID, formAusBezeichnung, obstBezeichnung, obstHoechstwert, staffelSeite, OBST_ALTER } from '@/gruen/baumMass'
+import { OBST_ID, altersStaffel, formAusBezeichnung, hoechstwertNachAlter, obstBezeichnung, staffelSeite } from '@/gruen/baumMass'
 import { kurzeBezeichnung, leseZahl, leseZahlOder, variantenMerkmale, zahlDe, zahlFuerEingabe } from '@/gruen/format'
 import { INVASIVE_ARTEN, KATALOG_POSITIONEN, PROBLEMPFLANZEN } from './katalogDaten'
 import { WarnListe } from './Positionen'
@@ -66,30 +66,35 @@ export function PositionFormular({
   const { position: katalogPos, variante, art, eigene } = auswahl
   const id = useId()
 
-  // Obstgehölze: Baumform + Alter in Jahren → Altersstufe und Höchstwert (BewRL S. 16). Ältere Positionen ohne
-  // Baumform: Form aus der Bezeichnung lesen; ohne Alter bleibt ihr bisheriger Höchstwert.
-  const obstVarianten = KATALOG_POSITIONEN.find((p) => p.id === OBST_ID)?.varianten ?? []
-  const istObst = (bearbeiten ? bearbeiten.katalogId : katalogPos?.id) === OBST_ID
-  const baumform = istObst
-    ? (bearbeiten?.baumform ?? (bearbeiten ? formAusBezeichnung(obstVarianten, bearbeiten.bezeichnung) : variante?.form))
+  // Nach Alter gestaffelt (Obstgehölze, Beerenobst, weitere Kulturen; BewRL S. 16–17): Wuchsform (falls vorhanden) +
+  // Alter in Jahren → Altersstufe und Höchstwert. Ältere Positionen: Form aus der Bezeichnung lesen; ohne Alter bleibt
+  // ihr bisheriger Höchstwert.
+  const katalogId = bearbeiten ? bearbeiten.katalogId : katalogPos?.id
+  const altersstaffel = altersStaffel(katalogId)
+  const staffelVarianten = altersstaffel ? (KATALOG_POSITIONEN.find((p) => p.id === katalogId)?.varianten ?? []) : []
+  const mitFormen = staffelVarianten.some((v) => v.form)
+  const baumform = altersstaffel && mitFormen
+    ? (bearbeiten?.baumform ?? (bearbeiten ? formAusBezeichnung(staffelVarianten, bearbeiten.bezeichnung) : variante?.form))
     : undefined
   const [alter, setAlter] = useState(bearbeiten?.alterJahre !== undefined ? zahlFuerEingabe(bearbeiten.alterJahre) : '')
   const alterZahl = alter.trim() ? leseZahl(alter) : undefined
   const alterGueltig = alterZahl !== undefined && Number.isFinite(alterZahl) && alterZahl >= 0 ? Math.floor(alterZahl) : undefined
-  const mitAlter = istObst && Boolean(baumform)
+  const mitAlter = Boolean(altersstaffel) && (!mitFormen || Boolean(baumform))
+  // Wurde die Position schon nach Alter erfasst? (Obstgehölze aus #133 erkennt man an der Baumform)
+  const schonNachAlter = Boolean(bearbeiten?.nachAlter) || (katalogId === OBST_ID && Boolean(bearbeiten?.baumform))
   const hoechstwert = mitAlter
     ? alterGueltig !== undefined
-      ? obstHoechstwert(obstVarianten, baumform, alterGueltig)
-      : bearbeiten && !bearbeiten.baumform
+      ? hoechstwertNachAlter(katalogId, staffelVarianten, baumform, alterGueltig)
+      : bearbeiten && !schonNachAlter
         ? bearbeiten.hoechstwert // ältere Position: unverändert, nur Hinweis
         : undefined
     : bearbeiten
       ? bearbeiten.hoechstwert
       : (variante?.hoechstwert ?? katalogPos?.hoechstwert)
-  // Baumform und Alter mitspeichern – bei einer älteren Position erst, wenn ein Alter eingetragen ist (sonst bleibt sie unverändert)
-  const formSpeichern = mitAlter && (!bearbeiten || Boolean(bearbeiten.baumform) || alterGueltig !== undefined)
-  // Name vor Form/Alter, z. B. „Apfel“ aus „Apfel, Halbstamm, 12 J.“
-  const obstName = bearbeiten ? bearbeiten.bezeichnung.split(',')[0]!.trim() : (art ?? 'Obstgehölz')
+  // Form und Alter mitspeichern – bei einer älteren Position erst, wenn ein Alter eingetragen ist (sonst bleibt sie unverändert)
+  const formSpeichern = mitAlter && (!bearbeiten || schonNachAlter || alterGueltig !== undefined)
+  const alterFelder = { ...(baumform ? { baumform } : {}), alterJahre: alterGueltig, nachAlter: true }
+  const obstName = bearbeiten ? bearbeiten.bezeichnung.split(',')[0]!.trim() : (art ?? (katalogPos ? kurzeBezeichnung(katalogPos) : ''))
 
   const [bezeichnung, setBezeichnung] = useState(
     bearbeiten?.bezeichnung ??
@@ -136,7 +141,7 @@ export function PositionFormular({
     einzelpreis: 0,
     preisManuell: false,
     hinweise: [],
-    ...(formSpeichern ? { baumform, alterJahre: alterGueltig } : {}),
+    ...(formSpeichern ? alterFelder : {}),
   }
   const preisVorschlag = berechnePreisvorschlag(vorschauPos)
   const einzelpreis = preisManuell ? leseZahlOder(preisEingabe, 0) : preisVorschlag
@@ -177,7 +182,7 @@ export function PositionFormular({
         einzelpreis,
         preisManuell,
         hinweise: vorschauHinweise,
-        ...(formSpeichern ? { baumform, alterJahre: alterGueltig } : {}),
+        ...(formSpeichern ? alterFelder : {}),
       },
       merkenMoeglich && merken
         ? { bezeichnung: bezeichnung.trim(), einheit, einzelpreis: preisManuell ? einzelpreis : undefined }
@@ -256,10 +261,10 @@ export function PositionFormular({
           />
           <span className="neben">
             {alterGueltig !== undefined
-              ? `${baumform}, ${zahlDe(alterGueltig)} Jahre → bis ${euroFormat(hoechstwert ?? 0)} (BewRL S. ${OBST_ALTER.seite})`
+              ? `${baumform ? `${baumform}, ` : ''}${zahlDe(alterGueltig)} Jahre → bis ${euroFormat(hoechstwert ?? 0)} (BewRL S. ${altersstaffel!.seite})`
               : alter.trim()
                 ? 'Bitte das Alter als Zahl eintragen.'
-                : `${baumform}: Altersstufe und Höchstwert ergeben sich aus dem Alter (${staffelSeite(OBST_ALTER)}).`}
+                : `${baumform ? `${baumform}: ` : ''}Altersstufe und Höchstwert ergeben sich aus dem Alter (${staffelSeite(altersstaffel!)}).`}
           </span>
         </div>
       )}

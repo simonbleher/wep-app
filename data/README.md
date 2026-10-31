@@ -41,8 +41,9 @@ Höchstwert × Zustandsstufe; immer überschreibbar (siehe CLAUDE.md).
 Wo die Richtlinie nach einem Maß staffelt, wählt die App die Stufe selbst (`src/gruen/baumMass.ts`):
 - `baumBeseitigung` – Beseitigungskosten Bäume nach Stammumfang in 1,30 m Höhe (S. 20–21): `bis` cm
   (einschließlich) → `hoechstwert`; die letzte Stufe `ueber: 140` gilt für alles darüber.
-- `obstgehoelzAlter` – Altersstufe der Obstgehölze (S. 16) aus dem Alter in vollen Jahren; der Höchstwert
-  kommt aus der Variante von `aw-obstgehoelz` mit gleicher `form` und `altersstufe`.
+- `obstgehoelzAlter`, `beerenobstAlter`, `weinrebeAlter`, `erdbeereAlter`, `rhabarberAlter`, `kiwiAlter`, `spargelAlter` –
+  Altersstufe (S. 16–17) aus dem Alter in vollen Jahren (`katalogId` nennt die Position); der Höchstwert kommt aus der
+  Variante mit gleicher `form` (falls die Position Formen hat) und `altersstufe`.
 
 ## Schema `invasive.json`
 `meta` + Liste `arten`. Je Art: `id`, `wissenschaftlich`, `synonym` (optional),
